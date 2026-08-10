@@ -1,0 +1,29 @@
+# Godot .NET build artifacts
+.mono/
+.mono/temp/
+.mono/data/
+obj/
+bin/
+
+# Godot editor files
+.godot/
+*.import
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# Save files (runtime)
+saves/*
+!saves/.gitkeep
+
+# Logs
+*.log
+dev.log

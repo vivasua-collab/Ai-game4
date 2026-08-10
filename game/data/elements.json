@@ -1,0 +1,11 @@
+{
+  "elements": [
+    { "id": "fire", "name": "Огонь", "color": "#ff4444", "strongAgainst": "wind", "weakAgainst": "water" },
+    { "id": "water", "name": "Вода", "color": "#4488ff", "strongAgainst": "fire", "weakAgainst": "earth" },
+    { "id": "earth", "name": "Земля", "color": "#886633", "strongAgainst": "water", "weakAgainst": "wind" },
+    { "id": "wind", "name": "Ветер", "color": "#88ff88", "strongAgainst": "earth", "weakAgainst": "fire" },
+    { "id": "lightning", "name": "Молния", "color": "#ffff44", "strongAgainst": "water", "weakAgainst": "earth" },
+    { "id": "light", "name": "Свет", "color": "#ffffff", "strongAgainst": "dark", "weakAgainst": "none" },
+    { "id": "dark", "name": "Тьма", "color": "#444444", "strongAgainst": "light", "weakAgainst": "none" }
+  ]
+}

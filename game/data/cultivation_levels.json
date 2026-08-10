@@ -1,0 +1,13 @@
+{
+  "levels": [
+    { "level": 1, "name": "Начинающий", "qiDensity": 1, "minCoreCapacity": 1000 },
+    { "level": 2, "name": "Ученик", "qiDensity": 2, "minCoreCapacity": 2200 },
+    { "level": 3, "name": "Практик", "qiDensity": 4, "minCoreCapacity": 4840 },
+    { "level": 4, "name": "Мастер", "qiDensity": 8, "minCoreCapacity": 10648 },
+    { "level": 5, "name": "Грандмастер", "qiDensity": 16, "minCoreCapacity": 23426 },
+    { "level": 6, "name": "Духовный наставник", "qiDensity": 32, "minCoreCapacity": 51537 },
+    { "level": 7, "name": "Святой", "qiDensity": 64, "minCoreCapacity": 113382 },
+    { "level": 8, "name": "Бессмертный", "qiDensity": 128, "minCoreCapacity": 249440 },
+    { "level": 9, "name": "Небесный", "qiDensity": 256, "minCoreCapacity": 548768 }
+  ]
+}

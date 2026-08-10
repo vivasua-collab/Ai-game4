@@ -1,0 +1,17 @@
+{
+  "id": "test_polygon",
+  "name": "Тестовый полигон",
+  "description": "Ограниченная локация 100×100 м для тестирования базовой функциональности.",
+  "x": 0,
+  "y": 0,
+  "z": 0,
+  "locationType": "Farm",
+  "width": 50,
+  "height": 50,
+  "seed": 12345,
+  "terrainType": "Grass",
+  "qiDensity": 100,
+  "qiFlowRate": 1,
+  "playerStartX": 25,
+  "playerStartY": 25
+}

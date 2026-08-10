@@ -1,0 +1,27 @@
+{
+  "worldId": "cultivation_world_v1",
+  "worldName": "Мир Культивации",
+  "startYear": 1864,
+  "locations": [
+    {
+      "id": "test_polygon",
+      "name": "Тестовый полигон",
+      "type": "Farm",
+      "x": 0,
+      "y": 0,
+      "width": 50,
+      "height": 50,
+      "seed": 12345
+    },
+    {
+      "id": "world_map",
+      "name": "Карта мира",
+      "type": "WildLands",
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0,
+      "seed": 0
+    }
+  ]
+}

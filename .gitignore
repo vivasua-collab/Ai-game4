@@ -1,0 +1,83 @@
+# =============================================================================
+# Repository-level .gitignore — Ai-game4 (Cultivation World Simulator)
+# =============================================================================
+# This file ignores local environment artifacts that should NEVER be committed.
+# Only source code, documentation, scenes, and configs go to GitHub.
+# =============================================================================
+
+# ── Godot Engine artifacts (local cache, NEVER commit) ───────────────────────
+.godot/
+.mono/
+*.import
+.godot.import/
+
+# ── .NET / C# build artifacts (NEVER commit) ─────────────────────────────────
+bin/
+obj/
+*.dll
+*.pdb
+*.exe
+*.cache
+*.user
+*.suo
+*.userprefs
+*.pidb
+*.swp
+
+# NuGet local packages folder (if any are downloaded locally)
+packages/
+
+# ── IDE / Editor files (NEVER commit) ────────────────────────────────────────
+.vs/
+.vscode/
+.idea/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+
+# ── OS-generated files (NEVER commit) ────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ── Runtime save files (keep folder structure, ignore content) ───────────────
+game/saves/*
+!game/saves/.gitkeep
+
+# ── Logs and temporary files (NEVER commit) ──────────────────────────────────
+*.log
+*.tmp
+*.bak
+*.swp
+*~
+dev.log
+
+# ── Local environment installs (NEVER commit these directories) ──────────────
+# These are local to the development machine and must not be in the repo:
+#   /home/z/godot/          ← Godot engine binary
+#   /home/z/.dotnet/        ← .NET SDK
+#   /home/z/.nuget/         ← NuGet cache
+#   /home/z/my-project/     ← Next.js sandbox (unrelated to this game)
+godot/
+.dotnet/
+.nuget/
+my-project/
+
+# ── Secrets / credentials (NEVER commit) ─────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+secrets.json
+credentials.json
+
+# GitHub tokens must NEVER be in any file. Use environment variables instead.
