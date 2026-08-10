@@ -102,15 +102,8 @@ public partial class MainMenuController : Control
         AddChild(subtitle);
 
         // ---- Button container (centered, 400 wide) ----
-        var buttonContainer = new VBoxContainer
-        {
-            Name = "Buttons",
-        };
-        // Center anchor: left=0.5, top=0.5, right=0.5, bottom=0.5
-        buttonContainer.AnchorLeft = 0.5f;
-        buttonContainer.AnchorTop = 0.5f;
-        buttonContainer.AnchorRight = 0.5f;
-        buttonContainer.AnchorBottom = 0.5f;
+        var buttonContainer = new VBoxContainer { Name = "Buttons" };
+        buttonContainer.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center);
         buttonContainer.CustomMinimumSize = new Vector2(400, 300);
         buttonContainer.OffsetLeft = -200;
         buttonContainer.OffsetRight = 200;
@@ -119,21 +112,29 @@ public partial class MainMenuController : Control
         buttonContainer.AddThemeConstantOverride("separation", 16);
         AddChild(buttonContainer);
 
-        // ---- Buttons ----
+        // ---- Buttons (with 4.7 hover-lift + press-shrink animations) ----
         _newGameBtn = UIFactory.CreateButton("NewGame",   "◆ Новая игра",        400, 50);
         _newGameBtn.Pressed += OnNewGame;
+        UIFactory.AddHoverLift(_newGameBtn);
+        UIFactory.AddPressShrink(_newGameBtn);
         buttonContainer.AddChild(_newGameBtn);
 
         _loadGameBtn = UIFactory.CreateButton("LoadGame", "◇ Загрузить игру",    400, 50);
         _loadGameBtn.Pressed += OnLoadGame;
+        UIFactory.AddHoverLift(_loadGameBtn);
+        UIFactory.AddPressShrink(_loadGameBtn);
         buttonContainer.AddChild(_loadGameBtn);
 
         _settingsBtn = UIFactory.CreateButton("Settings", "○ Настройки",          400, 50);
         _settingsBtn.Pressed += OnSettings;
+        UIFactory.AddHoverLift(_settingsBtn);
+        UIFactory.AddPressShrink(_settingsBtn);
         buttonContainer.AddChild(_settingsBtn);
 
         _quitBtn = UIFactory.CreateButton("Quit",     "✗ Выйти",                  400, 50);
         _quitBtn.Pressed += OnQuit;
+        UIFactory.AddHoverLift(_quitBtn);
+        UIFactory.AddPressShrink(_quitBtn);
         buttonContainer.AddChild(_quitBtn);
 
         // ---- Version label (bottom-right corner) ----

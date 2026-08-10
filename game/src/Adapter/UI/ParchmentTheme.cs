@@ -35,16 +35,24 @@ public static class ParchmentTheme
     /// Build a fully-styled <see cref="Theme"/> for the parchment look.
     /// Apply to a Control via <c>Control.Theme = ParchmentTheme.Create();</c>
     /// or globally via <c>GetTree().Root.Theme = ...</c>.
+    ///
+    /// Godot 4.7 notes:
+    ///  • Theme.SetFontSize / SetColor / SetStylebox are the canonical API.
+    ///  • DefaultFont is now a FontVariation resource (was Font in 4.3).
+    ///  • Container separation is a theme constant, not per-node.
     /// </summary>
     public static Theme Create()
     {
         var theme = new Theme();
 
-        // ---- Default font sizes (per-mille → px) ----
-        // 18‰ of 1080 ≈ 19px for body text.
+        // ---- Default font size (18‰ of 1080 ≈ 19px) ----
+        theme.DefaultFontSize = 19;
+
+        // ---- Per-type font sizes ----
         theme.SetFontSize("font_size", "Label", 19);
         theme.SetFontSize("font_size", "Button", 19);
         theme.SetFontSize("font_size", "LineEdit", 19);
+        theme.SetFontSize("font_size", "RichTextLabel", 19);
 
         // ---- Default colours ----
         theme.SetColor("font_color",         "Label",     InkBlack);
@@ -53,6 +61,7 @@ public static class ParchmentTheme
         theme.SetColor("font_pressed_color", "Button",    AccentRed);
         theme.SetColor("font_disabled_color","Button",    InkFaded);
         theme.SetColor("font_color",         "LineEdit",  InkBlack);
+        theme.SetColor("font_color",         "RichTextLabel", InkBlack);
 
         // ---- Button StyleBoxes ----
         theme.SetStylebox("normal",   "Button", ButtonNormal());
@@ -64,8 +73,20 @@ public static class ParchmentTheme
         // ---- Panel StyleBox ----
         theme.SetStylebox("panel", "Panel", PanelStyle());
 
-        // ---- LineEdit StyleBox ----
+        // ---- LineEdit StyleBoxes ----
         theme.SetStylebox("normal", "LineEdit", LineEditStyle());
+        theme.SetStylebox("focus",  "LineEdit", LineEditFocusStyle());
+
+        // ---- Container separation (4.7: theme constant, not per-node) ----
+        theme.SetConstant("separation", "VBoxContainer", 8);
+        theme.SetConstant("separation", "HBoxContainer", 8);
+        theme.SetConstant("margin_left",   "MarginContainer", 12);
+        theme.SetConstant("margin_right",  "MarginContainer", 12);
+        theme.SetConstant("margin_top",    "MarginContainer", 12);
+        theme.SetConstant("margin_bottom", "MarginContainer", 12);
+
+        // ---- Scrollbar styling (for inventory, journal) ----
+        theme.SetConstant("separation", "ScrollBar", 0);
 
         return theme;
     }
@@ -155,6 +176,18 @@ public static class ParchmentTheme
             ContentMarginTop = 4,
             ContentMarginBottom = 4,
         };
+        return sb;
+    }
+
+    /// <summary>Focused LineEdit style — gold border to indicate input focus.</summary>
+    private static StyleBoxFlat LineEditFocusStyle()
+    {
+        var sb = LineEditStyle();
+        sb.BorderColor = AccentGold;
+        sb.BorderWidthBottom = 2;
+        sb.BorderWidthTop = 2;
+        sb.BorderWidthLeft = 2;
+        sb.BorderWidthRight = 2;
         return sb;
     }
 

@@ -12,12 +12,17 @@ namespace CultivationGame.Adapter.Scene;
 
 /// <summary>
 /// Main GameWorld scene controller. Attached to the root Node2D of GameWorld.tscn.
-/// Sets up the camera, world root, tile rendering, player sprite, InputAdapter
-/// child, SceneBuilder child, and HUD canvas layer.
+/// Sets up the camera, world root, tile rendering (delegated to <see cref="SceneBuilder"/>),
+/// player sprite, InputAdapter child, and HUD canvas layer.
 ///
 /// Movement is applied directly to <see cref="IPlayerService"/> for v1 —
 /// in a future iteration this will be moved into PlayerModule via events.
 /// Sticky input flags (pause, inventory, save, etc.) are also processed here.
+///
+/// Godot 4.7 notes:
+///  • Camera2D.PositionSmoothingEnabled + ProcessCallback=Physics for stable follow.
+///  • CanvasLayer for HUD (not ScreenOverlay) — keeps HUD in screen space.
+///  • Labels use AddThemeFontSizeOverride + AddThemeColorOverride (theme system).
 /// </summary>
 public partial class GameWorldController : Node2D
 {
@@ -37,7 +42,7 @@ public partial class GameWorldController : Node2D
     private Label         _timeLabel     = null!;
     private Label         _hudLabel      = null!;
 
-    // Cached bounds of the test polygon (50x50) for player movement clamping.
+    // Cached bounds of the test polygon (50×50) for player movement clamping.
     // In a future iteration these come from Entry.LocationCatalog.TestPolygon.
     private int _worldWidth  = 50;
     private int _worldHeight = 50;
@@ -67,34 +72,36 @@ public partial class GameWorldController : Node2D
         _worldRoot = new Node2D { Name = "WorldRoot" };
         AddChild(_worldRoot);
 
-        // Camera: zoomed in 2x for visibility of 64px tiles.
+        // Camera: zoomed in 2× for visibility of 64px tiles.
         _camera = new Camera2D
         {
             Name = "MainCamera",
             Zoom = new Vector2(2f, 2f),
             PositionSmoothingEnabled = true,
             PositionSmoothingSpeed = 5.0f,
+            ProcessCallback = Camera2D.Camera2DProcessCallback.Physics,
         };
         _worldRoot.AddChild(_camera);
         _camera.MakeCurrent();
 
-        // Player sprite (procedural texture).
+        // Player sprite (procedural texture — centered on tile center).
         _playerSprite = new Sprite2D
         {
             Name = "PlayerSprite",
             Texture = CreatePlayerTexture(),
             ZIndex = (int)RenderLayer.Player,
+            TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
         };
         _worldRoot.AddChild(_playerSprite);
 
-        // Render test polygon background (single big ColorRect for v1 — faster than 2500 quads).
-        RenderTilesBackground();
+        // Render decorative border around the polygon to make bounds visible.
+        RenderBorder();
 
         // Input adapter child node.
         _inputAdapter = new InputAdapter { Name = "InputAdapter" };
         AddChild(_inputAdapter);
 
-        // Scene builder child node (it will use our _worldRoot as its parent).
+        // Scene builder child node (creates terrain MultiMesh + camera follow logic).
         _sceneBuilder = new SceneBuilder { Name = "SceneBuilder" };
         _worldRoot.AddChild(_sceneBuilder);
     }
@@ -115,26 +122,19 @@ public partial class GameWorldController : Node2D
         for (int y = 4; y < 10; y++)
             for (int x = 16; x < 32; x++)
                 img.SetPixel(x, y, new Color(0.10f, 0.05f, 0.02f));
+        // Eyes.
+        img.SetPixel(20, 12, new Color(0.05f, 0.05f, 0.05f));
+        img.SetPixel(27, 12, new Color(0.05f, 0.05f, 0.05f));
         return ImageTexture.CreateFromImage(img);
     }
 
-    private void RenderTilesBackground()
+    /// <summary>
+    /// Decorative border around the test polygon — 4 thin ColorRects.
+    /// Uses 4.7 Control.MouseFilterEnum.Ignore so they don't block input.
+    /// </summary>
+    private void RenderBorder()
     {
         int tileSize = GameConstants.TILE_PIXELS;
-
-        // Single grass-green ColorRect covering the whole polygon — fast.
-        var bg = new ColorRect
-        {
-            Name = "TerrainBackground",
-            Color = new Color(0.30f, 0.50f, 0.25f),
-            Size = new Vector2(_worldWidth * tileSize, _worldHeight * tileSize),
-            Position = new Vector2(0, 0),
-            ZIndex = (int)RenderLayer.Terrain,
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-        };
-        _worldRoot.AddChild(bg);
-
-        // Decorative border around the polygon to make bounds visible.
         int borderThickness = 4;
         var borderColor = new Color(0.5f, 0.4f, 0.2f, 0.7f);
         var borderSize = new Vector2(_worldWidth * tileSize + borderThickness * 2,
@@ -171,6 +171,7 @@ public partial class GameWorldController : Node2D
         _hudCanvas = new CanvasLayer { Name = "HUDCanvas", Layer = 10 };
         AddChild(_hudCanvas);
 
+        // HUD hint label (top-left).
         _hudLabel = new Label
         {
             Name = "HudHint",
@@ -178,9 +179,11 @@ public partial class GameWorldController : Node2D
         };
         _hudLabel.AddThemeFontSizeOverride("font_size", 16);
         _hudLabel.AddThemeColorOverride("font_color", new Color(0.94f, 0.83f, 0.66f));
+        // 4.7: Label.Position works for CanvasLayer children (screen-space).
         _hudLabel.Position = new Vector2(20, 20);
         _hudCanvas.AddChild(_hudLabel);
 
+        // Time label (below HUD hint).
         _timeLabel = new Label { Name = "TimeLabel" };
         _timeLabel.AddThemeFontSizeOverride("font_size", 18);
         _timeLabel.AddThemeColorOverride("font_color", new Color(0.94f, 0.83f, 0.66f));
@@ -192,11 +195,14 @@ public partial class GameWorldController : Node2D
 
     public override void _PhysicsProcess(double delta)
     {
-        // Update player sprite position from PlayerService.
+        // Update player sprite position from PlayerService (centered on tile).
         if (_playerSprite != null && Player != null)
         {
             var pos = Player.Position;
-            _playerSprite.Position = new Vector2(pos.X * GameConstants.TILE_PIXELS, pos.Y * GameConstants.TILE_PIXELS);
+            _playerSprite.Position = new Vector2(
+                pos.X * GameConstants.TILE_PIXELS + GameConstants.TILE_PIXELS / 2f,
+                pos.Y * GameConstants.TILE_PIXELS + GameConstants.TILE_PIXELS / 2f
+            );
         }
 
         // Camera follows player.

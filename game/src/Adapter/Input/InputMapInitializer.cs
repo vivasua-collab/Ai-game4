@@ -19,18 +19,18 @@ public static class InputMapInitializer
         if (_initialized) return;
         _initialized = true;
 
-        // Movement (WASD + arrows)
-        AddKeyAction("move_up", Key.W);
-        AddKeyAction("move_up", Key.Up);
-        AddKeyAction("move_down", Key.S);
-        AddKeyAction("move_down", Key.Down);
-        AddKeyAction("move_left", Key.A);
-        AddKeyAction("move_left", Key.Left);
-        AddKeyAction("move_right", Key.D);
-        AddKeyAction("move_right", Key.Right);
+        // Movement (WASD + arrows). Use physical keycodes for layout-independent input.
+        AddPhysicalKeyAction("move_up", Key.W);
+        AddPhysicalKeyAction("move_up", Key.Up);
+        AddPhysicalKeyAction("move_down", Key.S);
+        AddPhysicalKeyAction("move_down", Key.Down);
+        AddPhysicalKeyAction("move_left", Key.A);
+        AddPhysicalKeyAction("move_left", Key.Left);
+        AddPhysicalKeyAction("move_right", Key.D);
+        AddPhysicalKeyAction("move_right", Key.Right);
 
         // Run (Shift)
-        AddKeyAction("run", Key.Shift);
+        AddPhysicalKeyAction("run", Key.Shift);
 
         // Interact (E)
         AddKeyAction("interact", Key.E);
@@ -88,7 +88,31 @@ public static class InputMapInitializer
         GD.Print("[InputMap] Registered all input actions.");
     }
 
+    /// <summary>
+    /// Register an action with a logical key (respects keyboard layout).
+    /// Use for letter/number keys where the label matters (E for interact, B for inventory).
+    /// </summary>
     private static void AddKeyAction(string actionName, Key key)
+    {
+        if (!InputMap.HasAction(actionName))
+        {
+            InputMap.AddAction(actionName);
+        }
+
+        var eventKey = new InputEventKey
+        {
+            Keycode = key,
+            // 4.7: also set PhysicalKeycode as fallback for layout-independent matching.
+            PhysicalKeycode = key,
+        };
+        InputMap.ActionAddEvent(actionName, eventKey);
+    }
+
+    /// <summary>
+    /// Register an action with a physical key (layout-independent).
+    /// Use for movement keys (WASD, arrows, Shift) where physical position matters.
+    /// </summary>
+    private static void AddPhysicalKeyAction(string actionName, Key key)
     {
         if (!InputMap.HasAction(actionName))
         {

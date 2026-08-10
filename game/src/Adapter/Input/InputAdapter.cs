@@ -21,16 +21,17 @@ namespace CultivationGame.Adapter.Input;
 /// derives its <c>IsXxxPressed</c> properties from that set; modules call
 /// <c>ResetFrameFlags</c> at the end of the tick to clear them.
 ///
-/// Sticky key names match docs_v2/07_ui/HOTKEYS.md §6.3:
-///   interact, inventory, rest, harvest, special_action, escape, save, load,
-///   journal, techniques, character_sheet, quest_log, world_map, minimap,
-///   attack, input_log.
+/// Godot 4.7 notes:
+///  • Input polling (IsActionPressed / IsActionJustPressed) is still the
+///    recommended approach for game input — event-based (_Input) is for UI.
+///  • Mouse capture: if the game captures the mouse (Input.MouseMode = Captured),
+///    GetMousePosition returns the center of the screen; use InputEventMouseMotion
+///    for relative motion. We don't capture in v1, so viewport position is fine.
+///  • Action events with "echo" flag (key repeat) are now filtered by default
+///    in IsActionJustPressed — no change needed.
 /// </summary>
 public partial class InputAdapter : Node
 {
-    // NOTE: [Inject] targets properties (per InjectAttribute usage in Core/DI).
-    // Auto-property with private setter so the DI container / ContainerAdapter
-    // can write via reflection.
     [Inject] private IPlayerInputService PlayerInput { get; set; } = null!;
 
     // Reusable sticky-key set (cleared each frame, no per-frame allocation).
@@ -42,9 +43,6 @@ public partial class InputAdapter : Node
 
     public override void _Ready()
     {
-        // Manually wire [Inject] properties from the global GameBoot container.
-        // Godot creates this Node via the scene tree, not the DI container,
-        // so property injection must be done explicitly in _Ready().
         var container = Scene.GameBoot.Container;
         if (container != null)
         {
@@ -55,14 +53,17 @@ public partial class InputAdapter : Node
             GD.PushWarning("[InputAdapter] GameBoot.Container is null — DI not wired.");
         }
 
+        // 4.7: SetProcessInput is true by default, but we keep it explicit.
         SetProcessInput(true);
+        // Ensure physics process runs (needed for _PhysicsProcess).
+        SetPhysicsProcess(true);
     }
 
     public override void _PhysicsProcess(double delta)
     {
         _frame++;
 
-        // ---- Continuous / held inputs ----
+        // ---- Continuous / held inputs (polling — correct for game movement) ----
         var move = Vector2.Zero;
         if (GodotInput.IsActionPressed("move_up"))    move.Y -= 1f;
         if (GodotInput.IsActionPressed("move_down"))  move.Y += 1f;
@@ -99,9 +100,9 @@ public partial class InputAdapter : Node
         if (GodotInput.IsActionJustPressed("rest"))            _stickyKeys.Add("rest");
         if (GodotInput.IsActionJustPressed("harvest"))         _stickyKeys.Add("harvest");
         if (GodotInput.IsActionJustPressed("special_action"))  _stickyKeys.Add("special_action");
-        if (GodotInput.IsActionJustPressed("pause"))           _stickyKeys.Add("escape");        // Esc → "pause" action in project.godot
-        if (GodotInput.IsActionJustPressed("quicksave"))       _stickyKeys.Add("save");          // F5
-        if (GodotInput.IsActionJustPressed("quickload"))       _stickyKeys.Add("load");          // F9
+        if (GodotInput.IsActionJustPressed("pause"))           _stickyKeys.Add("escape");
+        if (GodotInput.IsActionJustPressed("quicksave"))       _stickyKeys.Add("save");
+        if (GodotInput.IsActionJustPressed("quickload"))       _stickyKeys.Add("load");
         if (GodotInput.IsActionJustPressed("journal"))         _stickyKeys.Add("journal");
         if (GodotInput.IsActionJustPressed("techniques"))      _stickyKeys.Add("techniques");
         if (GodotInput.IsActionJustPressed("character_sheet")) _stickyKeys.Add("character_sheet");
@@ -126,6 +127,20 @@ public partial class InputAdapter : Node
         );
 
         PlayerInput?.UpdateFrame(frameData);
+    }
+
+    /// <summary>
+    /// Event-based input — used for UI-only events (mouse enter/exit on Control nodes).
+    /// Game input is handled in _PhysicsProcess via polling (more reliable for movement).
+    /// </summary>
+    public override void _Input(InputEvent @event)
+    {
+        // 4.7: InputEventEcho is filtered automatically by IsActionJustPressed,
+        // so we don't need to handle echo here.
+        if (@event is InputEventMouseMotion mm)
+        {
+            // Could track mouse velocity for gesture detection (future).
+        }
     }
 
     /// <summary>
