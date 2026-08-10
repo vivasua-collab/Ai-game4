@@ -48,17 +48,20 @@ public partial class MainMenuController : Control
         // Apply parchment theme globally for this control subtree.
         Theme = ParchmentTheme.Create();
 
+        // Ensure root Control fills the viewport.
+        SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+
         // ---- Background fill ----
         var bg = new ColorRect
         {
             Name = "Background",
             Color = ParchmentTheme.ParchmentBase,
         };
-        bg.SetAnchorsPreset(LayoutPreset.FullRect);
+        bg.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         bg.MouseFilter = MouseFilterEnum.Stop;
         AddChild(bg);
 
-        // ---- Title ----
+        // ---- Title (top, full width, y=80..160) ----
         _titleLabel = new Label
         {
             Name = "Title",
@@ -68,12 +71,18 @@ public partial class MainMenuController : Control
         };
         _titleLabel.AddThemeFontSizeOverride("font_size", 48);
         _titleLabel.AddThemeColorOverride("font_color", ParchmentTheme.InkBlack);
-        _titleLabel.SetAnchorsPreset(LayoutPreset.CenterTop);
-        _titleLabel.Size = new Vector2(1920, 80);
-        _titleLabel.Position = new Vector2(0, 80);
+        // Top-wide anchor: left=0, top=0, right=1, bottom=0; offsets position it.
+        _titleLabel.AnchorLeft = 0f;
+        _titleLabel.AnchorTop = 0f;
+        _titleLabel.AnchorRight = 1f;
+        _titleLabel.AnchorBottom = 0f;
+        _titleLabel.OffsetLeft = 0;
+        _titleLabel.OffsetTop = 80;
+        _titleLabel.OffsetRight = 0;
+        _titleLabel.OffsetBottom = 160;
         AddChild(_titleLabel);
 
-        // ---- Subtitle ----
+        // ---- Subtitle (below title, full width, y=170..210) ----
         var subtitle = new Label
         {
             Name = "Subtitle",
@@ -82,19 +91,31 @@ public partial class MainMenuController : Control
         };
         subtitle.AddThemeFontSizeOverride("font_size", 24);
         subtitle.AddThemeColorOverride("font_color", ParchmentTheme.InkFaded);
-        subtitle.SetAnchorsPreset(LayoutPreset.CenterTop);
-        subtitle.Size = new Vector2(1920, 30);
-        subtitle.Position = new Vector2(0, 160);
+        subtitle.AnchorLeft = 0f;
+        subtitle.AnchorTop = 0f;
+        subtitle.AnchorRight = 1f;
+        subtitle.AnchorBottom = 0f;
+        subtitle.OffsetLeft = 0;
+        subtitle.OffsetTop = 170;
+        subtitle.OffsetRight = 0;
+        subtitle.OffsetBottom = 210;
         AddChild(subtitle);
 
-        // ---- Button container ----
+        // ---- Button container (centered, 400 wide) ----
         var buttonContainer = new VBoxContainer
         {
             Name = "Buttons",
         };
-        buttonContainer.SetAnchorsPreset(LayoutPreset.Center);
+        // Center anchor: left=0.5, top=0.5, right=0.5, bottom=0.5
+        buttonContainer.AnchorLeft = 0.5f;
+        buttonContainer.AnchorTop = 0.5f;
+        buttonContainer.AnchorRight = 0.5f;
+        buttonContainer.AnchorBottom = 0.5f;
         buttonContainer.CustomMinimumSize = new Vector2(400, 300);
-        buttonContainer.Position = new Vector2(-200, -50);
+        buttonContainer.OffsetLeft = -200;
+        buttonContainer.OffsetRight = 200;
+        buttonContainer.OffsetTop = -150;
+        buttonContainer.OffsetBottom = 150;
         buttonContainer.AddThemeConstantOverride("separation", 16);
         AddChild(buttonContainer);
 
@@ -115,18 +136,23 @@ public partial class MainMenuController : Control
         _quitBtn.Pressed += OnQuit;
         buttonContainer.AddChild(_quitBtn);
 
-        // ---- Version label ----
+        // ---- Version label (bottom-right corner) ----
         var version = new Label
         {
             Name = "Version",
-            Text = "v0.1.0 — Iteration 4 (Godot 4)",
+            Text = "v0.1.0 — Godot 4.7.1",
             HorizontalAlignment = HorizontalAlignment.Right,
         };
         version.AddThemeFontSizeOverride("font_size", 14);
         version.AddThemeColorOverride("font_color", ParchmentTheme.InkFaded);
-        version.SetAnchorsPreset(LayoutPreset.BottomRight);
-        version.Size = new Vector2(200, 20);
-        version.Position = new Vector2(1700, 1050);
+        version.AnchorLeft = 1f;
+        version.AnchorTop = 1f;
+        version.AnchorRight = 1f;
+        version.AnchorBottom = 1f;
+        version.OffsetLeft = -260;
+        version.OffsetRight = -20;
+        version.OffsetTop = -40;
+        version.OffsetBottom = -10;
         AddChild(version);
     }
 

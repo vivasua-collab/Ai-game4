@@ -27,7 +27,7 @@ public partial class GameBoot : Node
     private float _tickAccumulator;
     private int _currentTick;
 
-    public override void _Ready()
+    public override async void _Ready()
     {
         // Register input actions programmatically (avoids Object() syntax in project.godot).
         CultivationGame.Adapter.Input.InputMapInitializer.EnsureInitialized();
@@ -46,6 +46,25 @@ public partial class GameBoot : Node
         _entry.Start();
 
         GD.Print("[GameBoot] Game initialized. Container built and entry point started.");
+
+        // Screenshot automation: if GODOT_SCREENSHOT env is set, wait for render then capture and quit.
+        var screenshotPath = System.Environment.GetEnvironmentVariable("GODOT_SCREENSHOT");
+        if (!string.IsNullOrEmpty(screenshotPath))
+        {
+            GD.Print($"[GameBoot] Screenshot mode: will save to {screenshotPath} in 2s...");
+            await ToSignal(GetTree().CreateTimer(2.0), SceneTreeTimer.SignalName.Timeout);
+            var img = GetViewport().GetTexture().GetImage();
+            if (img != null)
+            {
+                var err = img.SavePng(screenshotPath);
+                GD.Print($"[GameBoot] Screenshot saved: {err == Godot.Error.Ok} ({img.GetWidth()}x{img.GetHeight()})");
+            }
+            else
+            {
+                GD.Print("[GameBoot] Screenshot FAILED: viewport image is null");
+            }
+            GetTree().Quit();
+        }
     }
 
     public override void _PhysicsProcess(double delta)

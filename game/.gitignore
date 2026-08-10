@@ -27,3 +27,4 @@ saves/*
 # Logs
 *.log
 dev.log
+NuGet.config
