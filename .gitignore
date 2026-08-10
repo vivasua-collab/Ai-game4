@@ -11,6 +11,9 @@
 *.import
 .godot.import/
 
+# Godot 4.7+ generates .uid files for C# scripts (local cache, NEVER commit)
+*.uid
+
 # ── .NET / C# build artifacts (NEVER commit) ─────────────────────────────────
 bin/
 obj/

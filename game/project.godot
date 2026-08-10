@@ -5,7 +5,7 @@ config_version=5
 config/name="CultivationGame"
 config/description="Xianxia cultivation life-sim"
 run/main_scene="res://scenes/MainMenu.tscn"
-config/features=PackedStringArray("4.3", "C#", "Forward Plus")
+config/features=PackedStringArray("4.7", "C#", "Forward Plus")
 
 [autoload]
 
@@ -18,3 +18,9 @@ window/size/viewport_height=1080
 window/size/resizable=true
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/canvas_textures/default_texture_filter=0
