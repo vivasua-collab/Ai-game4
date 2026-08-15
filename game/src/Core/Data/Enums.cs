@@ -771,10 +771,10 @@ namespace CultivationGame.Core.Data
     /// </summary>
     public enum TimeSpeed
     {
-        Paused,         // Пауза
-        Normal,         // 1 сек = 1 минута
-        Fast,           // 1 сек = 5 минут
-        Quick           // 1 сек = 15 минут
+        Paused = 0,     // Пауза
+        Normal = 1,     // 1 сек = 1 минута (1 tps)
+        Fast = 5,       // 1 сек = 5 минут (5 tps)
+        Quick = 15      // 1 сек = 15 минут (15 tps)
     }
 
     /// <summary>

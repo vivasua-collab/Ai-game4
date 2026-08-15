@@ -34,15 +34,23 @@ public partial class TransitionTileRenderer : Node2D
         _tileService = tileService;
         _tileSize = tileSize;
         ZIndex = (int)RenderLayer.Terrain + 1;  // above base terrain, below objects
+        GD.Print($"[TransitionTiles] Initialize: {tileService.MapWidth}×{tileService.MapHeight}, tileSize={tileSize}, ZIndex={ZIndex}");
         QueueRedraw();  // trigger _Draw() call
     }
 
     public override void _Draw()
     {
-        if (_tileService == null) return;
+        if (_tileService == null)
+        {
+            GD.PrintErr("[TransitionTiles] _Draw called but _tileService is null!");
+            return;
+        }
 
         int width = _tileService.MapWidth;
         int height = _tileService.MapHeight;
+        int cornersDrawn = 0;
+
+        GD.Print($"[TransitionTiles] _Draw() called — scanning {width}×{height} tiles...");
 
         for (int x = 0; x < width; x++)
         {
@@ -52,12 +60,14 @@ public partial class TransitionTileRenderer : Node2D
                 var curTerrain = tile.Terrain;
 
                 // Check each corner for terrain transition.
-                DrawCornerIfDifferent(x, y, x - 1, y - 1, curTerrain, CornerPos.NW);
-                DrawCornerIfDifferent(x, y, x + 1, y - 1, curTerrain, CornerPos.NE);
-                DrawCornerIfDifferent(x, y, x - 1, y + 1, curTerrain, CornerPos.SW);
-                DrawCornerIfDifferent(x, y, x + 1, y + 1, curTerrain, CornerPos.SE);
+                if (DrawCornerIfDifferent(x, y, x - 1, y - 1, curTerrain, CornerPos.NW)) cornersDrawn++;
+                if (DrawCornerIfDifferent(x, y, x + 1, y - 1, curTerrain, CornerPos.NE)) cornersDrawn++;
+                if (DrawCornerIfDifferent(x, y, x - 1, y + 1, curTerrain, CornerPos.SW)) cornersDrawn++;
+                if (DrawCornerIfDifferent(x, y, x + 1, y + 1, curTerrain, CornerPos.SE)) cornersDrawn++;
             }
         }
+
+        GD.Print($"[TransitionTiles] _Draw() complete — drew {cornersDrawn} corner overlays");
     }
 
     private enum CornerPos { NW, NE, SW, SE }
@@ -66,17 +76,17 @@ public partial class TransitionTileRenderer : Node2D
     /// Draw a quarter-circle overlay at the corner if the diagonal neighbor
     /// has a different terrain AND adjacent neighbors match current.
     /// </summary>
-    private void DrawCornerIfDifferent(int curX, int curY, int diagX, int diagY,
+    private bool DrawCornerIfDifferent(int curX, int curY, int diagX, int diagY,
         TerrainType curTerrain, CornerPos corner)
     {
-        if (_tileService == null) return;
+        if (_tileService == null) return false;
 
         // Check diagonal neighbor bounds.
         if (diagX < 0 || diagX >= _tileService.MapWidth ||
-            diagY < 0 || diagY >= _tileService.MapHeight) return;
+            diagY < 0 || diagY >= _tileService.MapHeight) return false;
 
         var diagTerrain = _tileService.GetTile(diagX, diagY).Terrain;
-        if (diagTerrain == curTerrain) return;
+        if (diagTerrain == curTerrain) return false;
 
         // Check the two adjacent (orthogonal) neighbors — both must match current.
         bool shouldDraw = corner switch
@@ -88,7 +98,7 @@ public partial class TransitionTileRenderer : Node2D
             _ => false,
         };
 
-        if (!shouldDraw) return;
+        if (!shouldDraw) return false;
 
         // Draw quarter-circle with diagonal neighbor's color.
         var overlayColor = TerrainColors.Get(diagTerrain);
@@ -109,6 +119,7 @@ public partial class TransitionTileRenderer : Node2D
         float radius = _tileSize * 0.5f;
         var points = CreateQuarterCirclePoints(center, radius, corner);
         DrawColoredPolygon(points, overlayColor);
+        return true;
     }
 
     /// <summary>

@@ -49,6 +49,11 @@ public partial class GameWorldController : Node2D
     private int _worldHeight = 50;
     private int _debugFrameCount;  // for periodic debug logging
 
+    // Speed change debounce — prevents rapid cycling when key held.
+    // Minimum 1 real second between speed changes.
+    private float _speedChangeCooldown;
+    private const float SpeedChangeCooldownSec = 1.0f;
+
     // NOTE: Movement is handled by PlayerModule.Tick() — tied to the tick system,
     // NOT to _PhysicsProcess. This ensures movement scales with TimeSpeed
     // (Normal=1 tile/sec, Fast=5 tiles/sec, Quick=15 tiles/sec).
@@ -298,11 +303,8 @@ public partial class GameWorldController : Node2D
         // Left mouse button click → set destination (one-shot, not while held).
         if (!Godot.Input.IsActionJustPressed("attack")) return;
 
-        // Get mouse position in screen space.
+        // Get mouse position — screen + world.
         var mouseScreenPos = GetViewport().GetMousePosition();
-
-        // Convert screen → world using the canvas transform (correct Godot 4.7 way).
-        // GetGlobalMousePosition accounts for camera position + zoom.
         var mouseWorldPos = GetGlobalMousePosition();
 
         // Convert world position to tile coordinates.
@@ -311,7 +313,19 @@ public partial class GameWorldController : Node2D
         tileX = Mathf.Clamp(tileX, 0, 49);
         tileY = Mathf.Clamp(tileY, 0, 49);
 
-        GD.Print($"[GameWorld] Mouse click → world ({mouseWorldPos.X:F0}, {mouseWorldPos.Y:F0}) → tile ({tileX}, {tileY})");
+        // Player current position.
+        var playerPos = Player.Position;
+        int dx = tileX - playerPos.X;
+        int dy = tileY - playerPos.Y;
+        int dist = Math.Max(Math.Abs(dx), Math.Abs(dy));  // Chebyshev distance
+
+        // Full debug log with movement vector.
+        GD.Print($"[Mouse] Click detected!");
+        GD.Print($"[Mouse] Screen pos: ({mouseScreenPos.X:F0}, {mouseScreenPos.Y:F0})");
+        GD.Print($"[Mouse] World pos: ({mouseWorldPos.X:F0}, {mouseWorldPos.Y:F0})");
+        GD.Print($"[Mouse] Tile target: ({tileX}, {tileY})");
+        GD.Print($"[Mouse] Player at: ({playerPos.X}, {playerPos.Y})");
+        GD.Print($"[Mouse] Movement vector: dx={dx}, dy={dy}, distance={dist} tiles");
 
         // Set destination on PlayerModule via container.
         var container = Scene.GameBoot.Container;
@@ -319,6 +333,11 @@ public partial class GameWorldController : Node2D
         {
             var playerModule = container.Resolve<PlayerModule>();
             playerModule.SetMouseDestination(tileX, tileY);
+            GD.Print($"[Mouse] Destination set on PlayerModule ✓");
+        }
+        else
+        {
+            GD.PrintErr("[Mouse] ERROR: GameBoot.Container is null!");
         }
     }
 
@@ -352,21 +371,25 @@ public partial class GameWorldController : Node2D
         }
 
         // Time speed control: +/PageUp = faster, -/PageDown = slower.
+        // Debounce: max 1 change per real second (prevents rapid cycling).
         // Does NOT include Paused — pause is only via Esc.
-        // Range: Normal (1) ↔ Fast (5) ↔ Quick (15).
-        if (PlayerInput.IsTimeSpeedUpPressed)
+        _speedChangeCooldown -= (float)GetPhysicsProcessDeltaTime();
+        if (_speedChangeCooldown <= 0)
         {
-            // If currently paused, resume to Normal first.
-            if (Time.IsPaused) { Time.Resume(); Time.Speed = TimeSpeed.Normal; }
-            else Time.Speed = CycleSpeedUp(Time.Speed);
-            GD.Print($"[GameWorld] Time speed UP → {Time.Speed} ({(int)Time.Speed} tps)");
-        }
-        if (PlayerInput.IsTimeSpeedDownPressed)
-        {
-            // If currently paused, resume to Normal first.
-            if (Time.IsPaused) { Time.Resume(); Time.Speed = TimeSpeed.Normal; }
-            else Time.Speed = CycleSpeedDown(Time.Speed);
-            GD.Print($"[GameWorld] Time speed DOWN → {Time.Speed} ({(int)Time.Speed} tps)");
+            if (PlayerInput.IsTimeSpeedUpPressed)
+            {
+                if (Time.IsPaused) { Time.Resume(); Time.Speed = TimeSpeed.Normal; }
+                else Time.Speed = CycleSpeedUp(Time.Speed);
+                GD.Print($"[GameWorld] Time speed UP → {Time.Speed} ({(int)Time.Speed} tps)");
+                _speedChangeCooldown = SpeedChangeCooldownSec;
+            }
+            else if (PlayerInput.IsTimeSpeedDownPressed)
+            {
+                if (Time.IsPaused) { Time.Resume(); Time.Speed = TimeSpeed.Normal; }
+                else Time.Speed = CycleSpeedDown(Time.Speed);
+                GD.Print($"[GameWorld] Time speed DOWN → {Time.Speed} ({(int)Time.Speed} tps)");
+                _speedChangeCooldown = SpeedChangeCooldownSec;
+            }
         }
     }
 
