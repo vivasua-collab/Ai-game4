@@ -301,7 +301,8 @@ public partial class GameWorldController : Node2D
         if (Player == null || _camera == null) return;
 
         // Left mouse button click → set destination (one-shot, not while held).
-        if (!Godot.Input.IsActionJustPressed("attack")) return;
+        // Uses "mouse_click" action (LMB) registered in InputMapInitializer.
+        if (!Godot.Input.IsActionJustPressed("mouse_click")) return;
 
         // Get mouse position — screen + world.
         var mouseScreenPos = GetViewport().GetMousePosition();

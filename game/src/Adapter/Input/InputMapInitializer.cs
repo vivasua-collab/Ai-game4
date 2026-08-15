@@ -75,6 +75,11 @@ public static class InputMapInitializer
         // Attack (Space)
         AddKeyAction("attack", Key.Space);
 
+        // Mouse click action — Left Mouse Button for movement/interaction.
+        AddMouseButtonAction("mouse_click", MouseButton.Left);
+        // Also map mouse_click to attack so existing "attack" handlers work with LMB.
+        AddMouseButtonAction("attack", MouseButton.Left);
+
         // Hotbar slots (1-9)
         for (int i = 1; i <= 9; i++)
         {
@@ -131,5 +136,23 @@ public static class InputMapInitializer
             PhysicalKeycode = key,
         };
         InputMap.ActionAddEvent(actionName, eventKey);
+    }
+
+    /// <summary>
+    /// Register an action with a mouse button.
+    /// Use for LMB/RMB/Middle clicks.
+    /// </summary>
+    private static void AddMouseButtonAction(string actionName, MouseButton button)
+    {
+        if (!InputMap.HasAction(actionName))
+        {
+            InputMap.AddAction(actionName);
+        }
+
+        var eventMouse = new InputEventMouseButton
+        {
+            ButtonIndex = button,
+        };
+        InputMap.ActionAddEvent(actionName, eventMouse);
     }
 }
