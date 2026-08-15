@@ -97,8 +97,15 @@ public sealed class TileService : ITileService
     public bool IsInBounds(int x, int y) => x >= 0 && y >= 0 && x < MapWidth && y < MapHeight;
 
     /// <summary>
-    /// Internal — generate a procedural grid. Called by TileModule.Start
-    /// and TileMapGenPhase. Not on the ITileService interface.
+    /// Internal — generate a procedural grid with blob-based terrain.
+    /// Uses cellular automata to create natural-looking terrain patches
+    /// (several adjacent tiles of the same type, then transition to another).
+    ///
+    /// Algorithm:
+    ///   1. Seed random "blob centers" for each terrain type
+    ///   2. Grow blobs outward (cellular automata — majority rule)
+    ///   3. 3 iterations of smoothing for organic shapes
+    ///   4. Base terrain fills remaining space
     /// </summary>
     public void Generate(int seed, int width, int height, TerrainType baseTerrain)
     {
@@ -108,32 +115,169 @@ public sealed class TileService : ITileService
         _grid = new GameTile[width, height];
         var rng = new SeededRandom(seed);
 
+        // Step 1: start with all base terrain.
+        var terrainMap = new TerrainType[width, height];
+        for (int x = 0; x < width; x++)
+            for (int y = 0; y < height; y++)
+                terrainMap[x, y] = baseTerrain;
+
+        // Step 2: seed blob centers.
+        // Each terrain type gets several seed points scattered across the map.
+        // Blob size is random (radius 3-8 tiles) → patches of varying size.
+        var terrainSeeds = new (TerrainType type, int count, int minR, int maxR)[]
+        {
+            (TerrainType.Dirt,          4, 3, 6),   // 4 dirt patches, radius 3-6
+            (TerrainType.Stone,         3, 2, 5),   // 3 stone patches, radius 2-5
+            (TerrainType.Water_Shallow, 2, 3, 7),   // 2 shallow water patches
+            (TerrainType.Water_Deep,    1, 2, 4),   // 1 deep water patch (inside shallow)
+            (TerrainType.Sand,          3, 2, 4),   // 3 sand patches (beaches)
+            (TerrainType.Road,          2, 4, 8),   // 2 road strips
+        };
+
+        foreach (var (type, count, minR, maxR) in terrainSeeds)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                int cx = rng.Next(2, width - 2);
+                int cy = rng.Next(2, height - 2);
+                int radius = rng.Next(minR, maxR + 1);
+                SeedBlob(terrainMap, cx, cy, radius, type, rng);
+            }
+        }
+
+        // Step 3: cellular automata smoothing (3 iterations).
+        // Each tile becomes the majority type among its 8 neighbors.
+        // This creates organic, natural-looking terrain transitions.
+        for (int iter = 0; iter < 3; iter++)
+        {
+            terrainMap = SmoothTerrain(terrainMap, width, height, baseTerrain);
+        }
+
+        // Step 4: deep water inside shallow water (lakes).
+        for (int x = 1; x < width - 1; x++)
+        {
+            for (int y = 1; y < height - 1; y++)
+            {
+                if (terrainMap[x, y] == TerrainType.Water_Shallow)
+                {
+                    // Count shallow water neighbors — if surrounded, make it deep.
+                    int shallowCount = 0;
+                    for (int dx = -1; dx <= 1; dx++)
+                        for (int dy = -1; dy <= 1; dy++)
+                            if (terrainMap[x + dx, y + dy] == TerrainType.Water_Shallow)
+                                shallowCount++;
+                    if (shallowCount >= 8 && rng.Next(0, 100) < 60)
+                        terrainMap[x, y] = TerrainType.Water_Deep;
+                }
+            }
+        }
+
+        // Step 5: build GameTile grid + scatter resources.
         for (int x = 0; x < width; x++)
         {
             for (int y = 0; y < height; y++)
             {
-                var terrain = PickTerrain(rng, baseTerrain);
+                var terrain = terrainMap[x, y];
                 _grid[x, y] = GameTile.CreateTerrain(x, y, terrain);
-                // V1: scatter some bushes / trees for resource testing
-                if (rng.Next(0, 100) < 5)
+
+                // Scatter trees on grass (5% chance, clustered).
+                if (terrain == TerrainType.Grass && rng.Next(0, 100) < 5)
                 {
                     _grid[x, y] = GameTile.CreateWithObject(x, y, terrain,
                         ObjectType.Tree_Oak, resourceMax: 3f, resourceId: "wood", hp: 0f);
                 }
+                // Scatter rocks on stone (8% chance).
+                else if (terrain == TerrainType.Stone && rng.Next(0, 100) < 8)
+                {
+                    _grid[x, y] = GameTile.CreateWithObject(x, y, terrain,
+                        ObjectType.Rock_Medium, resourceMax: 5f, resourceId: "stone", hp: 0f);
+                }
             }
         }
-        Console.WriteLine($"[TileService] Generated {width}x{height} grid, seed={seed}, baseTerrain={baseTerrain}");
+        Console.WriteLine($"[TileService] Generated {width}x{height} grid, seed={seed}, baseTerrain={baseTerrain} (blob-based)");
+
+        // Debug: print terrain distribution.
+        var dist = new System.Collections.Generic.Dictionary<TerrainType, int>();
+        for (int x = 0; x < width; x++)
+            for (int y = 0; y < height; y++)
+            {
+                var t = _grid[x, y].Terrain;
+                dist[t] = dist.TryGetValue(t, out var c) ? c + 1 : 1;
+            }
+        foreach (var kv in dist)
+            Console.WriteLine($"  {kv.Key}: {kv.Value} tiles ({kv.Value * 100 / (width * height)}%)");
     }
 
-    private static TerrainType PickTerrain(SeededRandom rng, TerrainType baseTerrain)
+    /// <summary>
+    /// Seed a blob of terrain at (cx, cy) with given radius.
+    /// Uses a rough circle + noise for organic shape.
+    /// </summary>
+    private static void SeedBlob(TerrainType[,] map, int cx, int cy, int radius, TerrainType type, SeededRandom rng)
     {
-        int r = rng.Next(0, 100);
-        if (r < 60) return baseTerrain;
-        if (r < 75) return TerrainType.Dirt;
-        if (r < 85) return TerrainType.Stone;
-        if (r < 92) return TerrainType.Grass;
-        if (r < 97) return TerrainType.Water_Shallow;
-        if (r < 99) return TerrainType.Road;
-        return TerrainType.Water_Deep;
+        int w = map.GetLength(0);
+        int h = map.GetLength(1);
+        int r2 = radius * radius;
+
+        for (int dx = -radius; dx <= radius; dx++)
+        {
+            for (int dy = -radius; dy <= radius; dy++)
+            {
+                int x = cx + dx;
+                int y = cy + dy;
+                if (x < 0 || x >= w || y < 0 || y >= h) continue;
+
+                // Distance squared + noise for organic edge.
+                int dist2 = dx * dx + dy * dy;
+                int noise = rng.Next(-2, 3);
+                if (dist2 + noise <= r2)
+                {
+                    map[x, y] = type;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// One pass of cellular automata smoothing.
+    /// Each tile becomes the majority type among its 3×3 neighborhood.
+    /// </summary>
+    private static TerrainType[,] SmoothTerrain(TerrainType[,] input, int w, int h, TerrainType baseTerrain)
+    {
+        var output = new TerrainType[w, h];
+        for (int x = 0; x < w; x++)
+        {
+            for (int y = 0; y < h; y++)
+            {
+                // Count terrain types in 3×3 neighborhood.
+                var counts = new System.Collections.Generic.Dictionary<TerrainType, int>();
+                for (int dx = -1; dx <= 1; dx++)
+                {
+                    for (int dy = -1; dy <= 1; dy++)
+                    {
+                        int nx = x + dx;
+                        int ny = y + dy;
+                        if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+                        var t = input[nx, ny];
+                        counts[t] = counts.TryGetValue(t, out var c) ? c + 1 : 1;
+                    }
+                }
+
+                // Find majority (prefer non-base terrain to encourage patch growth).
+                TerrainType majority = input[x, y];
+                int maxCount = 0;
+                foreach (var kv in counts)
+                {
+                    // Bias: non-base terrain needs only 4 neighbors, base needs 6.
+                    int threshold = kv.Key == baseTerrain ? 6 : 4;
+                    if (kv.Value >= threshold && kv.Value > maxCount)
+                    {
+                        maxCount = kv.Value;
+                        majority = kv.Key;
+                    }
+                }
+                output[x, y] = majority;
+            }
+        }
+        return output;
     }
 }

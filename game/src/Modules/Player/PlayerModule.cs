@@ -27,10 +27,10 @@ public sealed class PlayerModule : IModule
 
     public void Start()
     {
-        // Spawn player at origin if not already spawned by SceneOrchestrator.
+        // Spawn player at centre of test polygon (25, 25) if not already spawned.
         if (_playerService is PlayerService ps && !ps.IsSpawned)
         {
-            ps.Spawn(Position2D.Zero);
+            ps.Spawn(new Position2D(25, 25));
         }
         Console.WriteLine($"[PlayerModule] Started — stat svc wired={_statService != null}");
     }
@@ -38,17 +38,21 @@ public sealed class PlayerModule : IModule
     public void Tick(int tickCount)
     {
         _tickCount = tickCount;
-        // Read input and apply movement (V1: simple axis move via MoveDirection)
+        // Read input — free 8-direction movement (includes diagonals).
+        // MoveDirection is in per-mille: X and Y can be -1000..+1000.
+        // Any non-zero component means the player wants to move that direction.
         var dir = _playerInputService.MoveDirection;
         if (dir != Position2D.Zero)
         {
             int oldX = _playerService.Position.X;
             int oldY = _playerService.Position.Y;
-            // V1: snap to tile (1 tile per tick in dominant axis)
+
+            // Determine movement delta: each axis can be -1, 0, or +1.
+            // Threshold 350 (≈35% of full deflection) to avoid accidental drift.
             int dx = 0, dy = 0;
-            // MoveDirection is in per-mille (1000 = 1.0). ≥500 = dominant axis.
-            if (System.Math.Abs(dir.X) >= 500) dx = System.Math.Sign(dir.X);
-            if (System.Math.Abs(dir.Y) >= 500) dy = System.Math.Sign(dir.Y);
+            if (System.Math.Abs(dir.X) >= 350) dx = System.Math.Sign(dir.X);
+            if (System.Math.Abs(dir.Y) >= 350) dy = System.Math.Sign(dir.Y);
+
             if (dx != 0 || dy != 0)
             {
                 int newX = oldX + dx;

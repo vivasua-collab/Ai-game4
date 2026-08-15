@@ -139,8 +139,9 @@ public partial class SceneBuilder : Node
 
     private static Color TileColor(TerrainType terrain, int x, int y)
     {
-        // Base color per terrain type.
-        Color base_ = terrain switch
+        // Base color per terrain type — natural palette for organic terrain patches.
+        // No checkerboard: blob-based generation creates natural variation.
+        return terrain switch
         {
             TerrainType.Grass => new Color(0.28f, 0.48f, 0.22f),
             TerrainType.Dirt  => new Color(0.45f, 0.35f, 0.20f),
@@ -155,17 +156,6 @@ public partial class SceneBuilder : Node
             TerrainType.Road  => new Color(0.55f, 0.45f, 0.30f),
             _                 => new Color(0.28f, 0.48f, 0.22f),
         };
-
-        // Add subtle checkerboard variation for visual texture (±8% brightness).
-        // This breaks up the flat color and makes tiles distinguishable.
-        int checker = (x + y) & 1;  // 0 or 1
-        float variation = checker == 0 ? 0.08f : -0.08f;
-        return new Color(
-            Mathf.Clamp(base_.R + variation, 0f, 1f),
-            Mathf.Clamp(base_.G + variation, 0f, 1f),
-            Mathf.Clamp(base_.B + variation, 0f, 1f),
-            base_.A
-        );
     }
 
     private void SetupPlayer()
