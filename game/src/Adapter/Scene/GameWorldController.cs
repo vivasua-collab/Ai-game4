@@ -226,27 +226,59 @@ public partial class GameWorldController : Node2D
         _hudCanvas = new CanvasLayer { Name = "HUDCanvas", Layer = 10 };
         AddChild(_hudCanvas);
 
-        // HUD hint label (top-left).
+        // HUD hint label (top-left) — all hotkeys.
         _hudLabel = new Label
         {
             Name = "HudHint",
-            Text = "Тестовый полигон | Esc — пауза | B — инвентарь (stub) | F5 — сохранить",
+            Text = "WASD — движение | Shift — бег | ЛКМ — идти к точке | Колесо — зум\n" +
+                   "Esc — пауза | +/- — скорость времени | F5 — сохранение | F9 — загрузка\n" +
+                   "E — взаимодействие | B — инвентарь | R — отдых | F — добыча\n" +
+                   "J — журнал | T — техники | C — персонаж | Q — квесты | M — карта | N — миникарта",
         };
-        _hudLabel.AddThemeFontSizeOverride("font_size", 16);
+        _hudLabel.AddThemeFontSizeOverride("font_size", 14);
         _hudLabel.AddThemeColorOverride("font_color", new Color(0.94f, 0.83f, 0.66f));
-        // 4.7: Label.Position works for CanvasLayer children (screen-space).
-        _hudLabel.Position = new Vector2(20, 20);
-        _hudCanvas.AddChild(_hudLabel);
+        _hudLabel.Position = new Vector2(20, 10);
 
         // Time label (below HUD hint).
         _timeLabel = new Label { Name = "TimeLabel" };
         _timeLabel.AddThemeFontSizeOverride("font_size", 18);
         _timeLabel.AddThemeColorOverride("font_color", new Color(0.94f, 0.83f, 0.66f));
-        _timeLabel.Position = new Vector2(20, 50);
+        _timeLabel.Position = new Vector2(20, 80);
         _hudCanvas.AddChild(_timeLabel);
     }
 
     // ---- Per-frame logic ----
+
+    /// <summary>
+    /// Handle mouse wheel for camera zoom.
+    /// Wheel up = zoom in (Zoom += 0.5), wheel down = zoom out (Zoom -= 0.5).
+    /// Range: 1.0 (far) to 8.0 (close).
+    /// </summary>
+    public override void _Input(InputEvent @event)
+    {
+        if (_camera == null) return;
+
+        if (@event is InputEventMouseButton mb && mb.Pressed)
+        {
+            switch (mb.ButtonIndex)
+            {
+                case MouseButton.WheelUp:
+                    var zoomIn = _camera.Zoom with { X = _camera.Zoom.X + 0.5f, Y = _camera.Zoom.Y + 0.5f };
+                    if (zoomIn.X <= 8.0f)
+                        _camera.Zoom = zoomIn;
+                    break;
+                case MouseButton.WheelDown:
+                    var zoomOut = _camera.Zoom with { X = _camera.Zoom.X - 0.5f, Y = _camera.Zoom.Y - 0.5f };
+                    if (zoomOut.X >= 1.0f)
+                        _camera.Zoom = zoomOut;
+                    break;
+                case MouseButton.Middle:
+                    // Middle click = reset zoom to 3× and center on player.
+                    _camera.Zoom = new Vector2(3f, 3f);
+                    break;
+            }
+        }
+    }
 
     public override void _PhysicsProcess(double delta)
     {
@@ -381,14 +413,18 @@ public partial class GameWorldController : Node2D
             {
                 if (Time.IsPaused) { Time.Resume(); Time.Speed = TimeSpeed.Normal; }
                 else Time.Speed = CycleSpeedUp(Time.Speed);
+#if DEBUG_SPEED_LOG
                 GD.Print($"[GameWorld] Time speed UP → {Time.Speed} ({(int)Time.Speed} tps)");
+#endif
                 _speedChangeCooldown = SpeedChangeCooldownSec;
             }
             else if (PlayerInput.IsTimeSpeedDownPressed)
             {
                 if (Time.IsPaused) { Time.Resume(); Time.Speed = TimeSpeed.Normal; }
                 else Time.Speed = CycleSpeedDown(Time.Speed);
+#if DEBUG_SPEED_LOG
                 GD.Print($"[GameWorld] Time speed DOWN → {Time.Speed} ({(int)Time.Speed} tps)");
+#endif
                 _speedChangeCooldown = SpeedChangeCooldownSec;
             }
         }
