@@ -84,3 +84,4 @@ secrets.json
 credentials.json
 
 # GitHub tokens must NEVER be in any file. Use environment variables instead.
+game
