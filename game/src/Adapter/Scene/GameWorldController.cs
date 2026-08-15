@@ -43,15 +43,14 @@ public partial class GameWorldController : Node2D
     private Label         _timeLabel     = null!;
     private Label         _hudLabel      = null!;
 
-    // Cached bounds of the test polygon (50×50) for player movement clamping.
+    // Cached bounds of the test polygon (50×50) for camera limits.
     private int _worldWidth  = 50;
     private int _worldHeight = 50;
 
-    // Movement accumulator — prevents moving 60 tiles/second.
-    // Player moves 1 tile per ~0.35s (≈3 tiles/second) in Normal speed.
-    private float _moveAccumulator;
-    private const float MoveIntervalNormal = 0.35f;  // seconds between tile moves
-    private const float MoveIntervalRun    = 0.18f;  // seconds when running (Shift)
+    // NOTE: Movement is handled by PlayerModule.Tick() — tied to the tick system,
+    // NOT to _PhysicsProcess. This ensures movement scales with TimeSpeed
+    // (Normal=1 tile/sec, Fast=5 tiles/sec, Quick=15 tiles/sec).
+    // GameWorldController only renders the player position from PlayerService.
 
     public override void _Ready()
     {
@@ -269,36 +268,9 @@ public partial class GameWorldController : Node2D
             _timeLabel.Text = $"{t.Year} г. {t.Month:D2}/{t.Day:D2} {t.Hour:D2}:{t.Minute:D2} | Скорость: {Time.Speed}";
         }
 
-        HandleMovement(delta);
+        // Movement is handled by PlayerModule.Tick() (tick-based, not FPS-based).
+        // This controller only renders the player sprite from PlayerService.Position.
         HandleStickyInput();
-    }
-
-    private void HandleMovement(double delta)
-    {
-        if (Player == null || PlayerInput == null) return;
-
-        var frame = PlayerInput.CurrentFrame;
-        if (frame.MoveDirection.X == 0f && frame.MoveDirection.Y == 0f)
-        {
-            _moveAccumulator = 0;  // reset when no input
-            return;
-        }
-
-        // Accumulate time; move only when interval reached (prevents 60 tiles/sec).
-        float interval = frame.IsRun ? MoveIntervalRun : MoveIntervalNormal;
-        _moveAccumulator += (float)delta;
-        if (_moveAccumulator < interval) return;
-        _moveAccumulator -= interval;
-
-        var pos = Player.Position;
-        int newX = pos.X + (int)frame.MoveDirection.X;
-        int newY = pos.Y + (int)frame.MoveDirection.Y;
-        newX = Mathf.Clamp(newX, 0, _worldWidth  - 1);
-        newY = Mathf.Clamp(newY, 0, _worldHeight - 1);
-        if (newX != pos.X || newY != pos.Y)
-        {
-            Player.MoveTo(newX, newY);
-        }
     }
 
     private void HandleStickyInput()
