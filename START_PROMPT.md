@@ -99,7 +99,7 @@
 
 | Компонент | Путь | Версия |
 |-----------|------|--------|
-| .NET SDK | `/home/z/.dotnet/` | 8.0.424 |
+| .NET SDK | `/home/z/.dotnet/` | 8.0.424 + 9.0.317 |
 | Godot | `/home/z/godot/Godot_v4.7.1-stable_mono_linux_x86_64/` | 4.7.1 stable mono |
 | Проект | `/home/z/my-project/Ai-game4/` | git main branch |
 | Reference (Ai-game3) | `/home/z/my-project/Ai-game3-ref/` | Unity итерация (только чтение) |
@@ -120,6 +120,32 @@ export GODOT_SCREENSHOT=/tmp/shot.png
 "$GODOT" --path . --rendering-driver opengl3
 # (нужен Xvfb + LIBGL_ALWAYS_SOFTWARE=1 для headless рендеринга)
 ```
+
+### Восстановление песочницы
+
+Песочница эфемерна — пересоздаётся периодически. При сбое:
+
+```bash
+# Одна команда для полного восстановления:
+bash /home/z/my-project/Ai-game4/recover_sandbox.sh
+```
+
+Скрипт `recover_sandbox.sh` выполняет:
+1. Устанавливает .NET SDK 8.0 + 9.0 (если нет)
+2. Скачивает Godot 4.7.1 .NET (если нет)
+3. Клонирует/обновляет Ai-game4 с GitHub
+4. Чинит симлинки (game, game-docs, godot)
+5. Создаёт NuGet.config (локальный, не в git)
+6. Верифицирует сборку + headless запуск
+
+**Где РЕАЛЬНО хранятся данные:**
+- ✅ **GitHub** `vivasua-collab/Ai-game4` — код, документация, checkpoints (вечно)
+- ✅ **GitHub** `vivasua-collab/Ai-game3` — reference (вечно)
+- ⚠️ **Песочница** `/home/z/my-project/Ai-game4/` — клон (исчезает при reset)
+- ⚠️ **Песочница** `/home/z/.dotnet/`, `/home/z/godot/` — инструменты (исчезают при reset)
+- ⚠️ **Песочница** `/home/z/my-project/worklog.md` — хроника (исчезает при reset)
+
+**Правило:** ключевые решения дублировать в `checkpoints/` (в git, не теряются).
 
 ---
 
