@@ -50,7 +50,19 @@ public partial class SceneBuilder : Node
 
         SetupCamera();
         SetupTerrainMesh();
+        SetupTransitionTiles();
         SetupPlayer();
+    }
+
+    /// <summary>
+    /// Add transition tile overlays for smooth terrain edges.
+    /// </summary>
+    private void SetupTransitionTiles()
+    {
+        if (TileService == null) return;
+        var renderer = new TransitionTileRenderer();
+        _worldRoot.AddChild(renderer);
+        renderer.Initialize(TileService, GameConstants.TILE_PIXELS, _worldRoot);
     }
 
     private void SetupCamera()
@@ -139,23 +151,8 @@ public partial class SceneBuilder : Node
 
     private static Color TileColor(TerrainType terrain, int x, int y)
     {
-        // Base color per terrain type — natural palette for organic terrain patches.
-        // No checkerboard: blob-based generation creates natural variation.
-        return terrain switch
-        {
-            TerrainType.Grass => new Color(0.28f, 0.48f, 0.22f),
-            TerrainType.Dirt  => new Color(0.45f, 0.35f, 0.20f),
-            TerrainType.Stone => new Color(0.50f, 0.50f, 0.50f),
-            TerrainType.Water_Shallow => new Color(0.30f, 0.45f, 0.65f),
-            TerrainType.Water_Deep => new Color(0.10f, 0.20f, 0.50f),
-            TerrainType.Sand  => new Color(0.85f, 0.80f, 0.55f),
-            TerrainType.Snow  => new Color(0.92f, 0.95f, 0.98f),
-            TerrainType.Ice   => new Color(0.70f, 0.85f, 0.95f),
-            TerrainType.Lava  => new Color(0.85f, 0.25f, 0.10f),
-            TerrainType.Void  => new Color(0.05f, 0.02f, 0.10f),
-            TerrainType.Road  => new Color(0.55f, 0.45f, 0.30f),
-            _                 => new Color(0.28f, 0.48f, 0.22f),
-        };
+        // Use shared palette from TerrainColors (same as TransitionTileRenderer).
+        return TerrainColors.Get(terrain);
     }
 
     private void SetupPlayer()

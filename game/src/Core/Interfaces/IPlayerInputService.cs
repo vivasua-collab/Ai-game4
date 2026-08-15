@@ -54,6 +54,12 @@ namespace CultivationGame.Core.Interfaces
         /// <summary>Нажат ли quickload (F9, однократное). Ai-game3 compatibility.</summary>
         bool IsQuickLoadPressed { get; }
 
+        /// <summary>Нажато ли увеличение скорости времени (+/PageUp, однократное).</summary>
+        bool IsTimeSpeedUpPressed { get; }
+
+        /// <summary>Нажато ли уменьшение скорости времени (-/PageDown, однократное).</summary>
+        bool IsTimeSpeedDownPressed { get; }
+
         /// <summary>Текущий кадр ввода (raw). Ai-game3 compatibility — для Adapter'ов.</summary>
         InputFrameData CurrentFrame { get; }
 

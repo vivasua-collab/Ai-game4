@@ -109,6 +109,8 @@ public partial class InputAdapter : Node
         if (GodotInput.IsActionJustPressed("quest_log"))       _stickyKeys.Add("quest_log");
         if (GodotInput.IsActionJustPressed("world_map"))       _stickyKeys.Add("world_map");
         if (GodotInput.IsActionJustPressed("minimap"))         _stickyKeys.Add("minimap");
+        if (GodotInput.IsActionJustPressed("time_speed_up"))   _stickyKeys.Add("time_speed_up");
+        if (GodotInput.IsActionJustPressed("time_speed_down")) _stickyKeys.Add("time_speed_down");
         if (!_isOverUI && GodotInput.IsActionJustPressed("attack"))
             _stickyKeys.Add("attack");
 

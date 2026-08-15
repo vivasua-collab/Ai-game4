@@ -40,7 +40,6 @@ public sealed class PlayerModule : IModule
         _tickCount = tickCount;
         // Read input — free 8-direction movement (includes diagonals).
         // MoveDirection is in per-mille: X and Y can be -1000..+1000.
-        // Any non-zero component means the player wants to move that direction.
         var dir = _playerInputService.MoveDirection;
         if (dir != Position2D.Zero)
         {
@@ -55,12 +54,16 @@ public sealed class PlayerModule : IModule
 
             if (dx != 0 || dy != 0)
             {
-                int newX = oldX + dx;
-                int newY = oldY + dy;
-                // Clamp to world bounds (test polygon 50×50).
-                // TODO: replace with dynamic bounds from IWorldService when available.
-                newX = Math.Clamp(newX, 0, 49);
-                newY = Math.Clamp(newY, 0, 49);
+                // Movement multiplier: 2 tiles per tick on Normal (doubled from 1).
+                // Run (Shift) adds +1 extra tile (3 total on Normal).
+                int steps = _playerInputService.RunHeld ? 3 : 2;
+                int newX = oldX;
+                int newY = oldY;
+                for (int i = 0; i < steps; i++)
+                {
+                    newX = Math.Clamp(newX + dx, 0, 49);
+                    newY = Math.Clamp(newY + dy, 0, 49);
+                }
                 if (newX != oldX || newY != oldY)
                 {
                     _playerService.SetPosition(new Position2D(newX, newY));
@@ -72,9 +75,7 @@ public sealed class PlayerModule : IModule
             }
         }
 
-        // PLR-E06: ResetFrameFlags() LAST — must be after all other consumers
-        // have read this frame's input. PlayerModule is registered last in
-        // GameLifetimeScope so its Tick runs last in the module-tick order.
+        // PLR-E06: ResetFrameFlags() LAST.
         _playerInputService.ResetFrameFlags();
     }
 

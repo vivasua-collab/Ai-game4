@@ -301,6 +301,46 @@ public partial class GameWorldController : Node2D
             GD.Print("[GameWorld] Quick load (stub)");
             // SaveService?.Load("quicksave");
         }
+
+        // Time speed control: +/PageUp = faster, -/PageDown = slower.
+        if (PlayerInput.IsTimeSpeedUpPressed)
+        {
+            var newSpeed = CycleSpeedUp(Time.Speed);
+            Time.Speed = newSpeed;
+            GD.Print($"[GameWorld] Time speed: {Time.Speed} (ticks/sec = {(int)Time.Speed})");
+        }
+        if (PlayerInput.IsTimeSpeedDownPressed)
+        {
+            var newSpeed = CycleSpeedDown(Time.Speed);
+            Time.Speed = newSpeed;
+            GD.Print($"[GameWorld] Time speed: {Time.Speed} (ticks/sec = {(int)Time.Speed})");
+        }
+    }
+
+    /// <summary>Cycle time speed up: Paused → Normal → Fast → Quick.</summary>
+    private static TimeSpeed CycleSpeedUp(TimeSpeed current)
+    {
+        return current switch
+        {
+            TimeSpeed.Paused => TimeSpeed.Normal,
+            TimeSpeed.Normal => TimeSpeed.Fast,
+            TimeSpeed.Fast   => TimeSpeed.Quick,
+            TimeSpeed.Quick  => TimeSpeed.Quick,  // max
+            _ => TimeSpeed.Normal,
+        };
+    }
+
+    /// <summary>Cycle time speed down: Quick → Fast → Normal → Paused.</summary>
+    private static TimeSpeed CycleSpeedDown(TimeSpeed current)
+    {
+        return current switch
+        {
+            TimeSpeed.Quick  => TimeSpeed.Fast,
+            TimeSpeed.Fast   => TimeSpeed.Normal,
+            TimeSpeed.Normal => TimeSpeed.Paused,
+            TimeSpeed.Paused => TimeSpeed.Paused,  // min
+            _ => TimeSpeed.Normal,
+        };
     }
 
     // ---- Public accessors for child nodes / tests ----

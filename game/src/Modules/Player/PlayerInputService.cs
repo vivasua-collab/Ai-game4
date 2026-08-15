@@ -36,6 +36,8 @@ public sealed class PlayerInputService : IPlayerInputService
     private bool _meditate;
     private bool _attack;
     private bool _defend;
+    private bool _timeSpeedUp;
+    private bool _timeSpeedDown;
     private int _selectedSlot;
 
     /// <summary>
@@ -62,6 +64,8 @@ public sealed class PlayerInputService : IPlayerInputService
     public bool IsPausePressed => _pause && !InputDisabled;
     public bool IsQuickSavePressed => _quickSave && !InputDisabled;
     public bool IsQuickLoadPressed => _quickLoad && !InputDisabled;
+    public bool IsTimeSpeedUpPressed => _timeSpeedUp && !InputDisabled;
+    public bool IsTimeSpeedDownPressed => _timeSpeedDown && !InputDisabled;
 
     public int SelectedTechniqueSlot => _selectedSlot;
 
@@ -99,6 +103,8 @@ public sealed class PlayerInputService : IPlayerInputService
             if (data.IsSticky("n") || data.IsSticky("meditate")) _meditate = true;
             if (data.IsSticky("j") || data.IsSticky("attack")) _attack = true;
             if (data.IsSticky("l") || data.IsSticky("defend")) _defend = true;
+            if (data.IsSticky("time_speed_up")) _timeSpeedUp = true;
+            if (data.IsSticky("time_speed_down")) _timeSpeedDown = true;
         }
         if (data.HotbarSlot is int slot && slot > 0) _selectedSlot = slot;
     }
@@ -109,6 +115,7 @@ public sealed class PlayerInputService : IPlayerInputService
         _pause = _quickSave = _quickLoad = _journal = _techniques = false;
         _characterSheet = _questLog = _map = _minimap = false;
         _meditate = _attack = _defend = false;
+        _timeSpeedUp = _timeSpeedDown = false;
         _inventoryRaw = false;
         _selectedSlot = 0;
     }
