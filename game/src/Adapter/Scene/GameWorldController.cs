@@ -7,6 +7,7 @@ using CultivationGame.Core.Data;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Adapter.Di;
 using CultivationGame.Adapter.Input;
+using CultivationGame.Modules.Player;
 
 namespace CultivationGame.Adapter.Scene;
 
@@ -271,6 +272,58 @@ public partial class GameWorldController : Node2D
         // Movement is handled by PlayerModule.Tick() (tick-based, not FPS-based).
         // This controller only renders the player sprite from PlayerService.Position.
         HandleStickyInput();
+        HandleMouseClick();
+    }
+
+    /// <summary>
+    /// Mouse click movement: left-click on map → set destination tile.
+    /// Player will move towards it each tick (handled by PlayerModule).
+    /// Any keyboard movement input clears the mouse destination.
+    /// </summary>
+    private void HandleMouseClick()
+    {
+        if (Player == null || _camera == null) return;
+
+        // Check if keyboard movement is active — if so, clear mouse destination.
+        var dir = PlayerInput?.CurrentFrame.MoveDirection ?? new Vector2f(0, 0);
+        if (dir.X != 0f || dir.Y != 0f)
+        {
+            // Keyboard input active — clear mouse destination if set.
+            if (Player is PlayerService ps)
+            {
+                // Access PlayerModule via container to clear destination.
+                // For now, just let keyboard movement take over.
+            }
+            return;
+        }
+
+        // Left mouse button click → set destination.
+        if (Godot.Input.IsActionJustPressed("attack") || Godot.Input.IsMouseButtonPressed(MouseButton.Left))
+        {
+            // Only process on the initial click, not while held.
+            if (!Godot.Input.IsActionJustPressed("attack")) return;
+
+            // Get mouse position in world space.
+            var mouseScreenPos = GetViewport().GetMousePosition();
+            var mouseWorldPos = _camera.GetScreenCenterPosition() +
+                (mouseScreenPos - GetViewport().GetVisibleRect().Size / 2f) / _camera.Zoom;
+
+            // Convert world position to tile coordinates.
+            int tileX = (int)(mouseWorldPos.X / GameConstants.TILE_PIXELS);
+            int tileY = (int)(mouseWorldPos.Y / GameConstants.TILE_PIXELS);
+            tileX = Mathf.Clamp(tileX, 0, 49);
+            tileY = Mathf.Clamp(tileY, 0, 49);
+
+            GD.Print($"[GameWorld] Mouse click → tile ({tileX}, {tileY})");
+
+            // Set destination on PlayerModule via container.
+            var container = Scene.GameBoot.Container;
+            if (container != null)
+            {
+                var playerModule = container.Resolve<PlayerModule>();
+                playerModule.SetMouseDestination(tileX, tileY);
+            }
+        }
     }
 
     private void HandleStickyInput()

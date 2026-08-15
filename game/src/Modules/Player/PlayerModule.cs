@@ -24,6 +24,7 @@ public sealed class PlayerModule : IModule
     [Inject] private readonly IPublisher<PlayerMovedEvent> _positionPublisher = null!;
 
     private int _tickCount;
+    private Position2D? _mouseDestination;  // null = keyboard movement, non-null = mouse-click movement
 
     public void Start()
     {
@@ -38,45 +39,127 @@ public sealed class PlayerModule : IModule
     public void Tick(int tickCount)
     {
         _tickCount = tickCount;
-        // Read input — free 8-direction movement (includes diagonals).
-        // MoveDirection is in per-mille: X and Y can be -1000..+1000.
-        var dir = _playerInputService.MoveDirection;
-        if (dir != Position2D.Zero)
+
+        // Check mouse-click destination first (free movement via mouse).
+        if (_mouseDestination.HasValue)
         {
-            int oldX = _playerService.Position.X;
-            int oldY = _playerService.Position.Y;
-
-            // Determine movement delta: each axis can be -1, 0, or +1.
-            // Threshold 350 (≈35% of full deflection) to avoid accidental drift.
-            int dx = 0, dy = 0;
-            if (System.Math.Abs(dir.X) >= 350) dx = System.Math.Sign(dir.X);
-            if (System.Math.Abs(dir.Y) >= 350) dy = System.Math.Sign(dir.Y);
-
-            if (dx != 0 || dy != 0)
-            {
-                // Movement multiplier: 2 tiles per tick on Normal (doubled from 1).
-                // Run (Shift) adds +1 extra tile (3 total on Normal).
-                int steps = _playerInputService.RunHeld ? 3 : 2;
-                int newX = oldX;
-                int newY = oldY;
-                for (int i = 0; i < steps; i++)
-                {
-                    newX = Math.Clamp(newX + dx, 0, 49);
-                    newY = Math.Clamp(newY + dy, 0, 49);
-                }
-                if (newX != oldX || newY != oldY)
-                {
-                    _playerService.SetPosition(new Position2D(newX, newY));
-                    _positionPublisher.Publish(new PlayerMovedEvent(
-                        _tickCount,
-                        new Position2D(oldX, oldY),
-                        new Position2D(newX, newY)));
-                }
-            }
+            HandleMouseMovement();
+        }
+        else
+        {
+            // Keyboard movement — free 8-direction (includes diagonals).
+            HandleKeyboardMovement();
         }
 
         // PLR-E06: ResetFrameFlags() LAST.
         _playerInputService.ResetFrameFlags();
+    }
+
+    private void HandleKeyboardMovement()
+    {
+        var dir = _playerInputService.MoveDirection;
+        if (dir == Position2D.Zero) return;
+
+        // Keyboard input active — clear any mouse destination.
+        _mouseDestination = null;
+
+        int oldX = _playerService.Position.X;
+        int oldY = _playerService.Position.Y;
+
+        // Each axis independently: -1, 0, or +1.
+        // Threshold 200 (was 350 — lowered for better diagonal sensitivity).
+        int dx = 0, dy = 0;
+        if (System.Math.Abs(dir.X) >= 200) dx = System.Math.Sign(dir.X);
+        if (System.Math.Abs(dir.Y) >= 200) dy = System.Math.Sign(dir.Y);
+
+        // Debug: log diagonal detection.
+        if (dx != 0 && dy != 0)
+        {
+            Console.WriteLine($"[PlayerModule] Diagonal move: dx={dx} dy={dy} (dir={dir.X},{dir.Y})");
+        }
+
+        if (dx == 0 && dy == 0) return;
+
+        // Movement multiplier: 2 tiles per tick (doubled from 1).
+        // Run (Shift) adds +1 extra tile (3 total).
+        int steps = _playerInputService.RunHeld ? 3 : 2;
+        int newX = oldX;
+        int newY = oldY;
+        for (int i = 0; i < steps; i++)
+        {
+            newX = Math.Clamp(newX + dx, 0, 49);
+            newY = Math.Clamp(newY + dy, 0, 49);
+        }
+        if (newX != oldX || newY != oldY)
+        {
+            _playerService.SetPosition(new Position2D(newX, newY));
+            _positionPublisher.Publish(new PlayerMovedEvent(
+                _tickCount,
+                new Position2D(oldX, oldY),
+                new Position2D(newX, newY)));
+        }
+    }
+
+    /// <summary>
+    /// Mouse-click movement: move towards destination tile, 2 tiles per tick.
+    /// Each tick, compute direction from current position to destination.
+    /// Clears destination when reached.
+    /// </summary>
+    private void HandleMouseMovement()
+    {
+        var dest = _mouseDestination.Value;
+        int oldX = _playerService.Position.X;
+        int oldY = _playerService.Position.Y;
+
+        int dx = dest.X - oldX;
+        int dy = dest.Y - oldY;
+
+        // Reached destination?
+        if (dx == 0 && dy == 0)
+        {
+            _mouseDestination = null;
+            return;
+        }
+
+        // Normalize to -1, 0, +1 per axis (Chebyshev distance = diagonal movement).
+        int stepX = System.Math.Clamp(dx, -1, 1);
+        int stepY = System.Math.Clamp(dy, -1, 1);
+
+        // Movement speed: 2 tiles per tick (3 with Run).
+        int steps = _playerInputService.RunHeld ? 3 : 2;
+        int newX = oldX;
+        int newY = oldY;
+        for (int i = 0; i < steps; i++)
+        {
+            if (newX != dest.X) newX += stepX;
+            if (newY != dest.Y) newY += stepY;
+            newX = Math.Clamp(newX, 0, 49);
+            newY = Math.Clamp(newY, 0, 49);
+        }
+
+        if (newX != oldX || newY != oldY)
+        {
+            _playerService.SetPosition(new Position2D(newX, newY));
+            _positionPublisher.Publish(new PlayerMovedEvent(
+                _tickCount,
+                new Position2D(oldX, oldY),
+                new Position2D(newX, newY)));
+        }
+    }
+
+    /// <summary>Set destination for mouse-click movement. Called by Adapter.</summary>
+    public void SetMouseDestination(int tileX, int tileY)
+    {
+        tileX = Math.Clamp(tileX, 0, 49);
+        tileY = Math.Clamp(tileY, 0, 49);
+        _mouseDestination = new Position2D(tileX, tileY);
+        Console.WriteLine($"[PlayerModule] Mouse destination set: ({tileX}, {tileY})");
+    }
+
+    /// <summary>Clear mouse destination (e.g., when keyboard input starts).</summary>
+    public void ClearMouseDestination()
+    {
+        _mouseDestination = null;
     }
 
     public void Dispose()
