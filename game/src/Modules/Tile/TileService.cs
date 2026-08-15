@@ -132,8 +132,11 @@ public sealed class TileService : ITileService
                 float elevation = elevationNoise.SampleWarped(x, y, warpStrength: 0.8f);
                 float moisture = moistureNoise.Sample(x, y);
 
-                var terrain = MapToTerrain(elevation, moisture, baseTerrain);
-                _grid[x, y] = GameTile.CreateTerrain(x, y, terrain);
+                var biome = MapToBiome(elevation);
+                var surface = MapToSurface(elevation, moisture, baseTerrain);
+                var tile = GameTile.CreateTerrain(x, y, surface);
+                tile.Biome = biome;
+                _grid[x, y] = tile;
             }
         }
 
@@ -212,32 +215,31 @@ public sealed class TileService : ITileService
     ///   0.75-0.90 → Stone (mountains)
     ///   0.90-1.00 → Snow (peaks)
     /// </summary>
-    private static TerrainType MapToTerrain(float elevation, float moisture, TerrainType baseTerrain)
+    /// <summary>Stratum 0: biome from elevation only (color + Qi).</summary>
+    private static BiomeType MapToBiome(float elevation)
     {
-        // Deep water — lowest elevation.
+        if (elevation < 0.30f) return BiomeType.Ocean;
+        if (elevation < 0.40f) return BiomeType.Sea;
+        if (elevation < 0.45f) return BiomeType.Coast;
+        if (elevation < 0.65f) return BiomeType.Grassland;
+        if (elevation < 0.82f) return BiomeType.Highlands;
+        if (elevation < 0.92f) return BiomeType.Mountains;
+        return BiomeType.Peak;
+    }
+
+    /// <summary>Stratum 1: surface from elevation + moisture (moveCost, walkability).</summary>
+    private static TerrainType MapToSurface(float elevation, float moisture, TerrainType baseTerrain)
+    {
         if (elevation < 0.30f) return TerrainType.Water_Deep;
-
-        // Shallow water — transition.
         if (elevation < 0.40f) return TerrainType.Water_Shallow;
-
-        // Beach sand — just above water.
         if (elevation < 0.45f) return TerrainType.Sand;
-
-        // Lowlands — grass or dirt based on moisture.
         if (elevation < 0.65f)
         {
-            // Dry → dirt, moist → grass.
             if (moisture < 0.35f) return TerrainType.Dirt;
             return TerrainType.Grass;
         }
-
-        // Highlands — stone.
         if (elevation < 0.82f) return TerrainType.Stone;
-
-        // Mountain peaks — snow.
         if (elevation < 0.92f) return TerrainType.Snow;
-
-        // Highest peaks — ice.
         return TerrainType.Ice;
     }
 }

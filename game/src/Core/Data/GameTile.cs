@@ -23,7 +23,8 @@ namespace CultivationGame.Core.Data
         public int Y;
 
         // === Поверхность ===
-        public TerrainType Terrain;
+        public TerrainType Terrain;  // Stratum 1: surface (moveCost, walkability)
+        public BiomeType Biome;      // Stratum 0: biome (color, Qi only)
         public float MoveCost;
         public TileFlags Flags;
 
@@ -91,6 +92,7 @@ namespace CultivationGame.Core.Data
                 X = x,
                 Y = y,
                 Terrain = terrain,
+                Biome = BiomeType.Grassland,  // default, will be set by Generate
                 MoveCost = GetTerrainMoveCost(terrain),
                 Flags = GetTerrainFlags(terrain),
                 Object = ObjectType.None,

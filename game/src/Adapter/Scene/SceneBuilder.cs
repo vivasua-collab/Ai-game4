@@ -2,6 +2,7 @@
 using Godot;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Data;
+using static CultivationGame.Adapter.Scene.SceneBuilder;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Adapter.Di;
 // Note: IPlayerService no longer needed — player sprite handled by GameWorldController.
@@ -97,7 +98,7 @@ public partial class SceneBuilder : Node
             {
                 int idx = y * width + x;
                 var tile = TileService.GetTile(x, y);
-                var color = TileColor(tile.Terrain, x, y);
+                var color = BiomeColors.Get(tile.Biome);  // Stratum 0: biome color
 
                 // QuadMesh is centered on origin; offset to tile center.
                 var transform = new Transform2D(
@@ -133,9 +134,22 @@ public partial class SceneBuilder : Node
         _worldRoot.AddChild(modulate);
     }
 
-    private static Color TileColor(TerrainType terrain, int x, int y)
+    // Stratum 0 colors — biome background (subtle, muted).
+    // Stratum 1 (surface) colors are in TerrainColors, used by TransitionTileRenderer.
+    private static class BiomeColors
     {
-        // Use shared palette from TerrainColors (same as TransitionTileRenderer).
-        return TerrainColors.Get(terrain);
+        public static Color Get(BiomeType biome) => biome switch
+        {
+            BiomeType.Ocean      => new Color(0.10f, 0.15f, 0.30f),  // dark blue
+            BiomeType.Sea        => new Color(0.15f, 0.25f, 0.45f),  // medium blue
+            BiomeType.Coast      => new Color(0.70f, 0.65f, 0.45f),  // sandy
+            BiomeType.Grassland  => new Color(0.20f, 0.35f, 0.15f),  // dark green
+            BiomeType.Steppe     => new Color(0.40f, 0.32f, 0.18f),  // brown
+            BiomeType.Forest     => new Color(0.12f, 0.25f, 0.10f),  // very dark green
+            BiomeType.Highlands  => new Color(0.38f, 0.36f, 0.34f),  // gray-brown
+            BiomeType.Mountains  => new Color(0.65f, 0.65f, 0.68f),  // light gray
+            BiomeType.Peak       => new Color(0.85f, 0.88f, 0.92f),  // white
+            _                    => new Color(0.20f, 0.35f, 0.15f),
+        };
     }
 }

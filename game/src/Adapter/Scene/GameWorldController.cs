@@ -49,6 +49,14 @@ public partial class GameWorldController : Node2D
     private int _worldHeight = 50;
     private int _debugFrameCount;  // for periodic debug logging
 
+    // Free movement — pixel-based, not tile-snap.
+    // Visual position is continuous (float). Tile position derived from it.
+    private Vector2 _visualPosition;
+    private Vector2? _mouseTarget;  // null = keyboard, non-null = mouse click target
+    private const float MoveSpeedPixels = 180.0f;  // pixels per second at Normal speed
+    private const float RunSpeedMultiplier = 1.8f;
+    private bool _positionInitialized;
+
     // Speed change debounce — prevents rapid cycling when key held.
     // Minimum 1 real second between speed changes.
     private float _speedChangeCooldown;
@@ -283,16 +291,25 @@ public partial class GameWorldController : Node2D
 
     public override void _PhysicsProcess(double delta)
     {
-        // Update player sprite + shadow position from PlayerService (centered on tile).
-        if (_playerSprite != null && Player != null)
+        // Initialize visual position on first frame (snap to tile center).
+        if (!_positionInitialized && Player != null)
         {
             var pos = Player.Position;
-            float px = pos.X * GameConstants.TILE_PIXELS + GameConstants.TILE_PIXELS / 2f;
-            float py = pos.Y * GameConstants.TILE_PIXELS + GameConstants.TILE_PIXELS / 2f;
-            _playerSprite.Position = new Vector2(px, py);
-            // Shadow slightly below + offset for depth illusion (2.5D hint).
+            _visualPosition = new Vector2(
+                pos.X * GameConstants.TILE_PIXELS + GameConstants.TILE_PIXELS / 2f,
+                pos.Y * GameConstants.TILE_PIXELS + GameConstants.TILE_PIXELS / 2f);
+            _positionInitialized = true;
+        }
+
+        // Free movement — continuous pixel-based, inspired by 2.5D demo.
+        HandleFreeMovement(delta);
+
+        // Update sprite + shadow from visual position.
+        if (_playerSprite != null)
+        {
+            _playerSprite.Position = _visualPosition;
             if (_playerShadow != null)
-                _playerShadow.Position = new Vector2(px, py + 8f);
+                _playerShadow.Position = new Vector2(_visualPosition.X, _visualPosition.Y + 8f);
         }
 
         // Camera follows player.
@@ -308,21 +325,74 @@ public partial class GameWorldController : Node2D
             _timeLabel.Text = $"{t.Year} г. {t.Month:D2}/{t.Day:D2} {t.Hour:D2}:{t.Minute:D2} | Скорость: {Time.Speed}";
         }
 
-        // Debug: log player position + input every 60 frames (~1 sec).
-        // Disabled — uncomment to re-enable.
-        //_debugFrameCount++;
-        //if (_debugFrameCount >= 60 && Player != null && PlayerInput != null)
-        //{
-        //    _debugFrameCount = 0;
-        //    var pos = Player.Position;
-        //    var frame = PlayerInput.CurrentFrame;
-        //    GD.Print($"[Debug] Player @ ({pos.X},{pos.Y}) | input=({frame.MoveDirection.X:F2},{frame.MoveDirection.Y:F2}) | speed={Time?.Speed}");
-        //}
-
-        // Movement is handled by PlayerModule.Tick() (tick-based, not FPS-based).
-        // This controller only renders the player sprite from PlayerService.Position.
         HandleStickyInput();
         HandleMouseClick();
+    }
+
+    /// <summary>
+    /// Free pixel-based movement. Reads WASD or moves towards mouse target.
+    /// Updates _visualPosition continuously. Syncs tile position to PlayerService
+    /// when crossing tile boundary.
+    /// </summary>
+    private void HandleFreeMovement(double delta)
+    {
+        if (Player == null) return;
+
+        // Check if paused — no movement when paused.
+        if (Time != null && Time.IsPaused) return;
+
+        // Get input vector (normalized -1..1 per axis).
+        Vector2 moveVec = Godot.Input.GetVector("move_left", "move_right", "move_up", "move_down");
+
+        // Speed: base pixels/sec × delta × run multiplier × time speed multiplier.
+        float speedMult = 1.0f;
+        if (Godot.Input.IsActionPressed("run")) speedMult = RunSpeedMultiplier;
+
+        // Time speed affects movement (faster game = faster movement).
+        if (Time != null) speedMult *= (int)Time.Speed;
+
+        if (moveVec != Vector2.Zero)
+        {
+            // Keyboard movement — clear mouse target.
+            _mouseTarget = null;
+            _visualPosition += moveVec * MoveSpeedPixels * speedMult * (float)delta;
+
+            // Clamp to world bounds.
+            float maxX = 50 * GameConstants.TILE_PIXELS - GameConstants.TILE_PIXELS / 2f;
+            float maxY = 50 * GameConstants.TILE_PIXELS - GameConstants.TILE_PIXELS / 2f;
+            _visualPosition = new Vector2(
+                Mathf.Clamp(_visualPosition.X, GameConstants.TILE_PIXELS / 2f, maxX),
+                Mathf.Clamp(_visualPosition.Y, GameConstants.TILE_PIXELS / 2f, maxY));
+        }
+        else if (_mouseTarget.HasValue)
+        {
+            // Mouse click movement — move towards target pixel position.
+            var target = _mouseTarget.Value;
+            var diff = target - _visualPosition;
+            float dist = diff.Length();
+
+            if (dist < 4f)  // close enough — snap
+            {
+                _visualPosition = target;
+                _mouseTarget = null;
+            }
+            else
+            {
+                var dir = diff.Normalized();
+                _visualPosition += dir * MoveSpeedPixels * speedMult * (float)delta;
+            }
+        }
+
+        // Sync tile position to PlayerService (for game logic).
+        int tileX = (int)(_visualPosition.X / GameConstants.TILE_PIXELS);
+        int tileY = (int)(_visualPosition.Y / GameConstants.TILE_PIXELS);
+        tileX = Mathf.Clamp(tileX, 0, 49);
+        tileY = Mathf.Clamp(tileY, 0, 49);
+        var currentTile = Player.Position;
+        if (currentTile.X != tileX || currentTile.Y != tileY)
+        {
+            Player.MoveTo(tileX, tileY);
+        }
     }
 
     /// <summary>

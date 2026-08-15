@@ -728,22 +728,6 @@ namespace CultivationGame.Core.Data
         City            // Город
     }
 
-    /// <summary>
-    /// Тип биома (мировая местность)
-    /// </summary>
-    public enum BiomeType
-    {
-        Mountains,      // Горы
-        Plains,         // Равнины
-        Forest,         // Лес
-        Sea,            // Море
-        Desert,         // Пустыня
-        Swamp,          // Болото
-        Tundra,         // Тундра
-        Jungle,         // Джунгли
-        Volcanic,       // Вулканическая
-        Spiritual       // Духовная область
-    }
 
     /// <summary>
     /// Тип здания
