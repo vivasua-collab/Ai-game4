@@ -238,6 +238,7 @@ public partial class GameWorldController : Node2D
         _hudLabel.AddThemeFontSizeOverride("font_size", 14);
         _hudLabel.AddThemeColorOverride("font_color", new Color(0.94f, 0.83f, 0.66f));
         _hudLabel.Position = new Vector2(20, 10);
+        _hudCanvas.AddChild(_hudLabel);
 
         // Time label (below HUD hint).
         _timeLabel = new Label { Name = "TimeLabel" };
@@ -308,14 +309,15 @@ public partial class GameWorldController : Node2D
         }
 
         // Debug: log player position + input every 60 frames (~1 sec).
-        _debugFrameCount++;
-        if (_debugFrameCount >= 60 && Player != null && PlayerInput != null)
-        {
-            _debugFrameCount = 0;
-            var pos = Player.Position;
-            var frame = PlayerInput.CurrentFrame;
-            GD.Print($"[Debug] Player @ ({pos.X},{pos.Y}) | input=({frame.MoveDirection.X:F2},{frame.MoveDirection.Y:F2}) | speed={Time?.Speed}");
-        }
+        // Disabled — uncomment to re-enable.
+        //_debugFrameCount++;
+        //if (_debugFrameCount >= 60 && Player != null && PlayerInput != null)
+        //{
+        //    _debugFrameCount = 0;
+        //    var pos = Player.Position;
+        //    var frame = PlayerInput.CurrentFrame;
+        //    GD.Print($"[Debug] Player @ ({pos.X},{pos.Y}) | input=({frame.MoveDirection.X:F2},{frame.MoveDirection.Y:F2}) | speed={Time?.Speed}");
+        //}
 
         // Movement is handled by PlayerModule.Tick() (tick-based, not FPS-based).
         // This controller only renders the player sprite from PlayerService.Position.
