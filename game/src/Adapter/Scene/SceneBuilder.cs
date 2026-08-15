@@ -56,13 +56,14 @@ public partial class SceneBuilder : Node
 
     /// <summary>
     /// Add transition tile overlays for smooth terrain edges.
+    /// Uses _draw() on Node2D (Godot 4.7 canonical for custom 2D drawing).
     /// </summary>
     private void SetupTransitionTiles()
     {
         if (TileService == null) return;
         var renderer = new TransitionTileRenderer();
         _worldRoot.AddChild(renderer);
-        renderer.Initialize(TileService, GameConstants.TILE_PIXELS, _worldRoot);
+        renderer.Initialize(TileService, GameConstants.TILE_PIXELS);
     }
 
     private void SetupCamera()
