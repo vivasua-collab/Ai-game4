@@ -53,11 +53,18 @@ public sealed class PlayerModule : IModule
             {
                 int newX = oldX + dx;
                 int newY = oldY + dy;
-                _playerService.SetPosition(new Position2D(newX, newY));
-                _positionPublisher.Publish(new PlayerMovedEvent(
-                    _tickCount,
-                    new Position2D(oldX, oldY),
-                    new Position2D(newX, newY)));
+                // Clamp to world bounds (test polygon 50×50).
+                // TODO: replace with dynamic bounds from IWorldService when available.
+                newX = Math.Clamp(newX, 0, 49);
+                newY = Math.Clamp(newY, 0, 49);
+                if (newX != oldX || newY != oldY)
+                {
+                    _playerService.SetPosition(new Position2D(newX, newY));
+                    _positionPublisher.Publish(new PlayerMovedEvent(
+                        _tickCount,
+                        new Position2D(oldX, oldY),
+                        new Position2D(newX, newY)));
+                }
             }
         }
 
