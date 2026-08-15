@@ -226,7 +226,14 @@ public partial class GameWorldController : Node2D
         _hudCanvas = new CanvasLayer { Name = "HUDCanvas", Layer = 10 };
         AddChild(_hudCanvas);
 
-        // HUD hint label (top-left) — all hotkeys.
+        // Time label — TOP line (visible, parchment color).
+        _timeLabel = new Label { Name = "TimeLabel" };
+        _timeLabel.AddThemeFontSizeOverride("font_size", 18);
+        _timeLabel.AddThemeColorOverride("font_color", new Color(0.94f, 0.83f, 0.66f));
+        _timeLabel.Position = new Vector2(20, 10);
+        _hudCanvas.AddChild(_timeLabel);
+
+        // Hotkey legend — BOTTOM of screen, black color.
         _hudLabel = new Label
         {
             Name = "HudHint",
@@ -235,17 +242,10 @@ public partial class GameWorldController : Node2D
                    "E — взаимодействие | B — инвентарь | R — отдых | F — добыча\n" +
                    "J — журнал | T — техники | C — персонаж | Q — квесты | M — карта | N — миникарта",
         };
-        _hudLabel.AddThemeFontSizeOverride("font_size", 14);
-        _hudLabel.AddThemeColorOverride("font_color", new Color(0.94f, 0.83f, 0.66f));
-        _hudLabel.Position = new Vector2(20, 10);
+        _hudLabel.AddThemeFontSizeOverride("font_size", 13);
+        _hudLabel.AddThemeColorOverride("font_color", new Color(0.1f, 0.08f, 0.05f));  // near-black
+        _hudLabel.Position = new Vector2(20, 1020);  // bottom of 1080p screen
         _hudCanvas.AddChild(_hudLabel);
-
-        // Time label (below HUD hint).
-        _timeLabel = new Label { Name = "TimeLabel" };
-        _timeLabel.AddThemeFontSizeOverride("font_size", 18);
-        _timeLabel.AddThemeColorOverride("font_color", new Color(0.94f, 0.83f, 0.66f));
-        _timeLabel.Position = new Vector2(20, 80);
-        _hudCanvas.AddChild(_timeLabel);
     }
 
     // ---- Per-frame logic ----

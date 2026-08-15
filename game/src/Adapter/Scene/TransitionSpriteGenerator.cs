@@ -50,12 +50,17 @@ public static class TransitionSpriteGenerator
         float radius = size * 0.5f;
         float cx, cy;
 
+        // Note: Godot uses Y-down coordinates. "NW" = top-left = (0,0) in screen space.
+        // But the diagonal neighbor at (x-1, y-1) is "up-left" in game logic,
+        // which in Godot screen space is also (0,0) corner of the tile.
+        // The 180° flip was because we were checking the wrong diagonal neighbor.
+        // Fix: swap NW↔SE and NE↔SW to match Godot's Y-down convention.
         switch (corner)
         {
-            case CornerDir.NW: cx = 0; cy = 0; break;
-            case CornerDir.NE: cx = size; cy = 0; break;
-            case CornerDir.SW: cx = 0; cy = size; break;
-            case CornerDir.SE: cx = size; cy = size; break;
+            case CornerDir.NW: cx = size; cy = size; break;  // diagonal (x-1,y-1) → draw at SE corner
+            case CornerDir.NE: cx = 0; cy = size; break;     // diagonal (x+1,y-1) → draw at SW corner
+            case CornerDir.SW: cx = size; cy = 0; break;     // diagonal (x-1,y+1) → draw at NE corner
+            case CornerDir.SE: cx = 0; cy = 0; break;        // diagonal (x+1,y+1) → draw at NW corner
             default: cx = 0; cy = 0; break;
         }
 

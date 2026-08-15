@@ -80,9 +80,14 @@ public sealed class PlayerModule : IModule
 
         if (dx == 0 && dy == 0) return;
 
-        // Movement multiplier: 2 tiles per tick (doubled from 1).
-        // Run (Shift) adds +1 extra tile (3 total).
-        int steps = _playerInputService.RunHeld ? 3 : 2;
+        // Movement: 2 tiles per tick normal, 3 with Run.
+        // Diagonal correction: diagonal moves cover √2 ≈ 1.41× distance per step.
+        // To equalize speed, reduce steps by ~30% when moving diagonally.
+        int baseSteps = _playerInputService.RunHeld ? 3 : 2;
+        bool isDiagonal = dx != 0 && dy != 0;
+        // Diagonal: 2 steps → 1 step (floor), 3 steps → 2 steps.
+        int steps = isDiagonal ? Math.Max(1, (int)(baseSteps / 1.41f)) : baseSteps;
+
         int newX = oldX;
         int newY = oldY;
         for (int i = 0; i < steps; i++)
