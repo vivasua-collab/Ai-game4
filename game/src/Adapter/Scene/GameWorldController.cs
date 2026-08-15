@@ -36,6 +36,7 @@ public partial class GameWorldController : Node2D
     private Node2D        _worldRoot     = null!;
     private Camera2D      _camera        = null!;
     private Sprite2D      _playerSprite  = null!;
+    private Sprite2D      _playerShadow  = null!;
     private InputAdapter  _inputAdapter  = null!;
     private SceneBuilder  _sceneBuilder  = null!;
     private CanvasLayer   _hudCanvas     = null!;
@@ -43,9 +44,14 @@ public partial class GameWorldController : Node2D
     private Label         _hudLabel      = null!;
 
     // Cached bounds of the test polygon (50×50) for player movement clamping.
-    // In a future iteration these come from Entry.LocationCatalog.TestPolygon.
     private int _worldWidth  = 50;
     private int _worldHeight = 50;
+
+    // Movement accumulator — prevents moving 60 tiles/second.
+    // Player moves 1 tile per ~0.35s (≈3 tiles/second) in Normal speed.
+    private float _moveAccumulator;
+    private const float MoveIntervalNormal = 0.35f;  // seconds between tile moves
+    private const float MoveIntervalRun    = 0.18f;  // seconds when running (Shift)
 
     public override void _Ready()
     {
@@ -72,17 +78,33 @@ public partial class GameWorldController : Node2D
         _worldRoot = new Node2D { Name = "WorldRoot" };
         AddChild(_worldRoot);
 
-        // Camera: zoomed in 2× for visibility of 64px tiles.
+        // Camera: zoomed in 3× for better view of player + tiles.
         _camera = new Camera2D
         {
             Name = "MainCamera",
-            Zoom = new Vector2(2f, 2f),
+            Zoom = new Vector2(3f, 3f),
             PositionSmoothingEnabled = true,
-            PositionSmoothingSpeed = 5.0f,
+            PositionSmoothingSpeed = 8.0f,
             ProcessCallback = Camera2D.Camera2DProcessCallback.Physics,
+            LimitLeft = -100,
+            LimitTop = -100,
+            LimitRight = 50 * 64 + 100,
+            LimitBottom = 50 * 64 + 100,
         };
         _worldRoot.AddChild(_camera);
         _camera.MakeCurrent();
+
+        // Player shadow (simple ellipse beneath player).
+        var shadow = new Sprite2D
+        {
+            Name = "PlayerShadow",
+            Texture = CreateShadowTexture(),
+            ZIndex = (int)RenderLayer.Player - 1,
+            Modulate = new Color(0, 0, 0, 0.35f),
+            TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
+        };
+        _worldRoot.AddChild(shadow);
+        _playerShadow = shadow;
 
         // Player sprite (procedural texture — centered on tile center).
         _playerSprite = new Sprite2D
@@ -125,6 +147,33 @@ public partial class GameWorldController : Node2D
         // Eyes.
         img.SetPixel(20, 12, new Color(0.05f, 0.05f, 0.05f));
         img.SetPixel(27, 12, new Color(0.05f, 0.05f, 0.05f));
+        // Robe trim (gold accent).
+        for (int x = 12; x < 36; x++)
+        {
+            img.SetPixel(x, 16, new Color(0.72f, 0.53f, 0.04f));
+            img.SetPixel(x, 38, new Color(0.72f, 0.53f, 0.04f));
+        }
+        return ImageTexture.CreateFromImage(img);
+    }
+
+    /// <summary>Simple ellipse shadow texture (32×16).</summary>
+    private static ImageTexture CreateShadowTexture()
+    {
+        var img = Image.CreateEmpty(32, 16, false, Image.Format.Rgba8);
+        img.Fill(new Color(0, 0, 0, 0));
+        // Ellipse: centered, wider than tall.
+        float cx = 16f, cy = 8f;
+        float rx = 13f, ry = 6f;
+        for (int y = 0; y < 16; y++)
+        {
+            for (int x = 0; x < 32; x++)
+            {
+                float dx = (x - cx) / rx;
+                float dy = (y - cy) / ry;
+                if (dx * dx + dy * dy <= 1.0f)
+                    img.SetPixel(x, y, new Color(0, 0, 0, 0.5f));
+            }
+        }
         return ImageTexture.CreateFromImage(img);
     }
 
@@ -195,14 +244,16 @@ public partial class GameWorldController : Node2D
 
     public override void _PhysicsProcess(double delta)
     {
-        // Update player sprite position from PlayerService (centered on tile).
+        // Update player sprite + shadow position from PlayerService (centered on tile).
         if (_playerSprite != null && Player != null)
         {
             var pos = Player.Position;
-            _playerSprite.Position = new Vector2(
-                pos.X * GameConstants.TILE_PIXELS + GameConstants.TILE_PIXELS / 2f,
-                pos.Y * GameConstants.TILE_PIXELS + GameConstants.TILE_PIXELS / 2f
-            );
+            float px = pos.X * GameConstants.TILE_PIXELS + GameConstants.TILE_PIXELS / 2f;
+            float py = pos.Y * GameConstants.TILE_PIXELS + GameConstants.TILE_PIXELS / 2f;
+            _playerSprite.Position = new Vector2(px, py);
+            // Shadow slightly below + offset for depth illusion (2.5D hint).
+            if (_playerShadow != null)
+                _playerShadow.Position = new Vector2(px, py + 8f);
         }
 
         // Camera follows player.
@@ -218,18 +269,27 @@ public partial class GameWorldController : Node2D
             _timeLabel.Text = $"{t.Year} г. {t.Month:D2}/{t.Day:D2} {t.Hour:D2}:{t.Minute:D2} | Скорость: {Time.Speed}";
         }
 
-        HandleMovement();
+        HandleMovement(delta);
         HandleStickyInput();
     }
 
-    private void HandleMovement()
+    private void HandleMovement(double delta)
     {
         if (Player == null || PlayerInput == null) return;
 
         var frame = PlayerInput.CurrentFrame;
-        if (frame.MoveDirection.X == 0f && frame.MoveDirection.Y == 0f) return;
+        if (frame.MoveDirection.X == 0f && frame.MoveDirection.Y == 0f)
+        {
+            _moveAccumulator = 0;  // reset when no input
+            return;
+        }
 
-        // Direct move 1 tile per tick (v1 simplification).
+        // Accumulate time; move only when interval reached (prevents 60 tiles/sec).
+        float interval = frame.IsRun ? MoveIntervalRun : MoveIntervalNormal;
+        _moveAccumulator += (float)delta;
+        if (_moveAccumulator < interval) return;
+        _moveAccumulator -= interval;
+
         var pos = Player.Position;
         int newX = pos.X + (int)frame.MoveDirection.X;
         int newY = pos.Y + (int)frame.MoveDirection.Y;

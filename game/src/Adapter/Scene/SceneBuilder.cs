@@ -101,7 +101,7 @@ public partial class SceneBuilder : Node
             {
                 int idx = y * width + x;
                 var tile = TileService.GetTile(x, y);
-                var color = TileColor(tile.Terrain);
+                var color = TileColor(tile.Terrain, x, y);
 
                 // QuadMesh is centered on origin; offset to tile center.
                 var transform = new Transform2D(
@@ -126,13 +126,23 @@ public partial class SceneBuilder : Node
             ZIndex = (int)RenderLayer.Terrain,
         };
         _worldRoot.AddChild(_terrainMesh);
+
+        // Ambient lighting via CanvasModulate — gives the world a warm tone.
+        // This acts as a global color multiplier (like a 2D light without Light2D).
+        var modulate = new CanvasModulate
+        {
+            Name = "AmbientLight",
+            Color = new Color(1.05f, 1.0f, 0.95f, 1.0f),  // warm daylight
+        };
+        _worldRoot.AddChild(modulate);
     }
 
-    private static Color TileColor(TerrainType terrain)
+    private static Color TileColor(TerrainType terrain, int x, int y)
     {
-        return terrain switch
+        // Base color per terrain type.
+        Color base_ = terrain switch
         {
-            TerrainType.Grass => new Color(0.30f, 0.50f, 0.25f),
+            TerrainType.Grass => new Color(0.28f, 0.48f, 0.22f),
             TerrainType.Dirt  => new Color(0.45f, 0.35f, 0.20f),
             TerrainType.Stone => new Color(0.50f, 0.50f, 0.50f),
             TerrainType.Water_Shallow => new Color(0.30f, 0.45f, 0.65f),
@@ -143,8 +153,19 @@ public partial class SceneBuilder : Node
             TerrainType.Lava  => new Color(0.85f, 0.25f, 0.10f),
             TerrainType.Void  => new Color(0.05f, 0.02f, 0.10f),
             TerrainType.Road  => new Color(0.55f, 0.45f, 0.30f),
-            _                 => new Color(0.30f, 0.50f, 0.25f),
+            _                 => new Color(0.28f, 0.48f, 0.22f),
         };
+
+        // Add subtle checkerboard variation for visual texture (±8% brightness).
+        // This breaks up the flat color and makes tiles distinguishable.
+        int checker = (x + y) & 1;  // 0 or 1
+        float variation = checker == 0 ? 0.08f : -0.08f;
+        return new Color(
+            Mathf.Clamp(base_.R + variation, 0f, 1f),
+            Mathf.Clamp(base_.G + variation, 0f, 1f),
+            Mathf.Clamp(base_.B + variation, 0f, 1f),
+            base_.A
+        );
     }
 
     private void SetupPlayer()
