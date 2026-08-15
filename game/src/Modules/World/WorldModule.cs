@@ -49,8 +49,9 @@ public sealed class WorldModule : IModule
             ws.SetActiveLocation("test_polygon");
         }
 
-        _timeService.SetSpeed(_config.DefaultSpeed);
-        Console.WriteLine($"[WorldModule] Started — time {_timeService.CurrentTime}, speed {_timeService.Speed}");
+        _timeService.Speed = _config.DefaultSpeed;
+        var t = (_timeService is TimeService ts2) ? ts2.CurrentTime.ToString() : "?";
+        Console.WriteLine($"[WorldModule] Started — time {t}, speed {_timeService.Speed}");
     }
 
     public void Tick(int tickCount)
@@ -60,8 +61,9 @@ public sealed class WorldModule : IModule
         if (_timeService is TimeService ts)
         {
             ts.AdvanceTick();
+            var t = ts.CurrentTime;
+            _tickPublisher.Publish(new TimeTickEvent(ts.TickCount, t.Day, t.Hour, t.Minute));
         }
-        _tickPublisher.Publish(new TimeTickEvent(_timeService.TickCount, _timeService.CurrentTime));
     }
 
     private void OnSaveRequested(in SaveRequestedEvent e)

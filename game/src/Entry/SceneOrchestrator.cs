@@ -69,26 +69,26 @@ public sealed class SceneOrchestrator
         {
             ct.ThrowIfCancellationRequested();
 
-            _startedPub.Publish(new ScenePhaseStartedEvent(phase.PhaseName, phase.PhaseOrder));
+            _startedPub.Publish(new ScenePhaseStartedEvent(phase.PhaseName, phase.Order));
             var phaseSw = Stopwatch.StartNew();
             try
             {
-                await phase.ExecuteAsync(ct).ConfigureAwait(false);
+                await phase.ExecuteAsync().ConfigureAwait(false);
             }
             catch (Exception ex)
             {
                 _failedPub.Publish(new SceneAssemblyFailedEvent(phase.PhaseName, ex.ToString()));
                 Console.WriteLine(
-                    $"[SceneOrchestrator] Phase '{phase.PhaseName}' (#{phase.PhaseOrder}) failed: {ex.GetType().Name}: {ex.Message}");
+                    $"[SceneOrchestrator] Phase '{phase.PhaseName}' (#{phase.Order}) failed: {ex.GetType().Name}: {ex.Message}");
                 throw;
             }
             phaseSw.Stop();
 
-            _completedPub.Publish(new ScenePhaseCompletedEvent(phase.PhaseName, phase.PhaseOrder, phaseSw.ElapsedMilliseconds));
+            _completedPub.Publish(new ScenePhaseCompletedEvent(phase.PhaseName, phase.Order, phaseSw.ElapsedMilliseconds));
         }
         totalSw.Stop();
 
-        _readyPub.Publish(new SceneReadyEvent(totalSw.ElapsedMilliseconds));
+        _readyPub.Publish(new SceneReadyEvent(_phases.Count, 0, totalSw.ElapsedMilliseconds));
         Console.WriteLine($"[SceneOrchestrator] Assembly complete — {_phases.Count} phases, {totalSw.ElapsedMilliseconds} ms");
     }
 
@@ -111,5 +111,5 @@ public sealed class SceneOrchestrator
     }
 
     private static int ComparePhaseOrder(ISceneAssemblyPhase a, ISceneAssemblyPhase b)
-        => a.PhaseOrder.CompareTo(b.PhaseOrder);
+        => a.Order.CompareTo(b.Order);
 }

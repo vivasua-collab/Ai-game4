@@ -23,6 +23,8 @@ public sealed class PlayerModule : IModule
     [Inject] private readonly IStatService _statService = null!;
     [Inject] private readonly IPublisher<PlayerMovedEvent> _positionPublisher = null!;
 
+    private int _tickCount;
+
     public void Start()
     {
         // Spawn player at origin if not already spawned by SceneOrchestrator.
@@ -30,29 +32,30 @@ public sealed class PlayerModule : IModule
         {
             ps.Spawn(Position2D.Zero);
         }
-        // V1 stub: StatService is wired but not yet used per-tick.
         Console.WriteLine($"[PlayerModule] Started — stat svc wired={_statService != null}");
     }
 
     public void Tick(int tickCount)
     {
+        _tickCount = tickCount;
         // Read input and apply movement (V1: simple axis move via MoveDirection)
-        var frame = _playerInputService.CurrentFrame;
-        if (frame.MoveDirection != Vector2f.Zero)
+        var dir = _playerInputService.MoveDirection;
+        if (dir != Position2D.Zero)
         {
             int oldX = _playerService.Position.X;
             int oldY = _playerService.Position.Y;
             // V1: snap to tile (1 tile per tick in dominant axis)
             int dx = 0, dy = 0;
-            if (Math.Abs(frame.MoveDirection.X) >= 0.5f) dx = Math.Sign(frame.MoveDirection.X);
-            if (Math.Abs(frame.MoveDirection.Y) >= 0.5f) dy = Math.Sign(frame.MoveDirection.Y);
+            // MoveDirection is in per-mille (1000 = 1.0). ≥500 = dominant axis.
+            if (System.Math.Abs(dir.X) >= 500) dx = System.Math.Sign(dir.X);
+            if (System.Math.Abs(dir.Y) >= 500) dy = System.Math.Sign(dir.Y);
             if (dx != 0 || dy != 0)
             {
                 int newX = oldX + dx;
                 int newY = oldY + dy;
-                _playerService.MoveTo(newX, newY);
+                _playerService.SetPosition(new Position2D(newX, newY));
                 _positionPublisher.Publish(new PlayerMovedEvent(
-                    0,
+                    _tickCount,
                     new Position2D(oldX, oldY),
                     new Position2D(newX, newY)));
             }
@@ -70,6 +73,9 @@ public sealed class PlayerModule : IModule
     }
 }
 
+/// <summary>
+/// DI registration helper for the Player module. Called by GameLifetimeScope.
+/// </summary>
 public static class PlayerModuleServices
 {
     public static void Register(IContainerBuilder builder)

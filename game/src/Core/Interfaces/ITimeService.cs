@@ -1,24 +1,27 @@
 #nullable enable
-using System;
+using CultivationGame.Core;
 using CultivationGame.Core.Data;
-
-namespace CultivationGame.Core.Interfaces;
-
-/// <summary>
-/// Engine-agnostic time service. 1 tick = 1 in-game minute. Speeds map
-/// to ticks-per-second: Pause=0, Normal=1, Fast=5, Quick=15.
-/// </summary>
-public interface ITimeService
+// Создано: 2026-05-08 10:07:00 UTC
+// Редактировано: 2026-05-08 11:35:38 UTC — удалён избыточный SetSpeed() (дублирует Speed setter)
+// Редактировано: 2026-08-15 — added CurrentTime + IsPaused for Ai-game3 compatibility.
+namespace CultivationGame.Core.Interfaces
 {
-    WorldTime CurrentTime { get; }
-    int TickCount { get; }
-    TimeSpeed Speed { get; set; }
-    bool IsPaused { get; }
-
-    void Pause();
-    void Resume();
-    void SetSpeed(TimeSpeed speed);
-
-    event Action<int>? OnTick;
-    event Action<WorldTime>? OnTimeChanged;
+    public interface ITimeService
+    {
+        float DeltaTime { get; }
+        float TotalTime { get; }
+        int CurrentDay { get; }
+        int CurrentMonth { get; }
+        int CurrentYear { get; }
+        int CurrentHour { get; }
+        TimeOfDay TimeOfDay { get; }
+        /// <summary>Скорость времени. Использовать setter для изменения.</summary>
+        TimeSpeed Speed { get; set; }
+        /// <summary>True when Speed == TimeSpeed.Paused. Ai-game3 compatibility.</summary>
+        bool IsPaused { get; }
+        /// <summary>Current game time (1 tick = 1 minute). Ai-game3 compatibility.</summary>
+        WorldTime CurrentTime { get; }
+        void Pause();
+        void Resume();
+    }
 }

@@ -41,6 +41,19 @@ public sealed class SeededRandom
         _state = s;
     }
 
+    /// <summary>
+    /// Constructs a generator with a 64-bit seed. The seed is folded into
+    /// the xorshift state so that long seeds (e.g. NPC entity seeds) are
+    /// supported without truncation to int.
+    /// </summary>
+    public SeededRandom(long seed) : this((int)((ulong)seed ^ ((ulong)seed >> 32))) { }
+
+    /// <summary>
+    /// Parameterless constructor — uses a time-based seed.
+    /// Ai-game3 compatibility for `new SeededRandom()`.
+    /// </summary>
+    public SeededRandom() : this(Environment.TickCount) { }
+
     /// <summary>Returns the next non-negative 32-bit integer.</summary>
     public int Next()
     {
@@ -63,6 +76,13 @@ public sealed class SeededRandom
     {
         // 24-bit mantissa precision
         return (NextU64() >> 40) * (1.0f / (1U << 24));
+    }
+
+    /// <summary>Returns a float in [min, max).</summary>
+    public float NextFloat(float min, float max)
+    {
+        if (max <= min) return min;
+        return min + (NextFloat() * (max - min));
     }
 
     /// <summary>Returns a double in [0.0, 1.0).</summary>
@@ -99,6 +119,56 @@ public sealed class SeededRandom
                 v >>= 8;
             }
         }
+    }
+
+    /// <summary>Returns a random element from the given array.</summary>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="source"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="source"/> is empty.</exception>
+    public T NextElement<T>(T[] source)
+    {
+        if (source == null) throw new ArgumentNullException(nameof(source));
+        if (source.Length == 0) throw new ArgumentException("Array is empty.", nameof(source));
+        return source[Next(0, source.Length)];
+    }
+
+    /// <summary>Returns true with the given probability (0.0 - 1.0).</summary>
+    public bool NextBool(float probability = 0.5f)
+    {
+        if (probability <= 0f) return false;
+        if (probability >= 1f) return true;
+        return NextFloat() < probability;
+    }
+
+    /// <summary>
+    /// Picks an index using weighted random selection.
+    /// Sum of all weights is treated as the total; an index is chosen proportionally.
+    /// Returns 0 if weights is null/empty. If all weights are 0, returns a uniform random index.
+    /// </summary>
+    public int NextWeighted(float[] weights)
+    {
+        if (weights == null || weights.Length == 0) return 0;
+
+        double total = 0.0;
+        for (int i = 0; i < weights.Length; i++)
+        {
+            float w = weights[i];
+            if (w > 0f) total += w;
+        }
+
+        if (total <= 0.0)
+            return Next(0, weights.Length);
+
+        double roll = NextDouble() * total;
+        double cumulative = 0.0;
+        for (int i = 0; i < weights.Length; i++)
+        {
+            float w = weights[i];
+            if (w <= 0f) continue;
+            cumulative += w;
+            if (roll < cumulative)
+                return i;
+        }
+        return weights.Length - 1;
     }
 
     /// <summary>Core xorshift64* step producing a 64-bit value.</summary>

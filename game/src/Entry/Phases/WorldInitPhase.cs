@@ -20,10 +20,10 @@ public sealed class WorldInitPhase : AbstractSceneAssemblyPhase
     [Inject] private readonly IWorldService _world = null!;
     [Inject] private readonly ITimeService _time = null!;
 
-    public override Task ExecuteAsync(CancellationToken ct = default)
+    public override Task ExecuteAsync()
     {
         _world.SetActiveLocation(LocationCatalog.TestPolygon.Id);
-        _time.SetSpeed(TimeSpeed.Normal);
+        _time.Speed = TimeSpeed.Normal;
         Console.WriteLine(
             $"[Phase {PhaseOrder}] {PhaseName} complete — location=test_polygon, speed=Normal");
         return Task.CompletedTask;

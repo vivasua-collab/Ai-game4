@@ -1,0 +1,147 @@
+#nullable enable
+// Создано: 2026-05-09
+// Данные определений формаций.
+// Описывает конкретные формации: тип, размер, уровень, эффекты.
+using System.Collections.Generic;
+using CultivationGame.Core;
+using CultivationGame.Core.Data;
+
+namespace CultivationGame.Modules.Formation.Data
+{
+    /// <summary>
+    /// Определение формации — описывает одну конкретную формацию.
+    /// В будущих фазах может загружаться из ScriptableObject.
+    /// </summary>
+    public class FormationData
+    {
+        /// <summary>Уникальный идентификатор формации</summary>
+        public string Id;
+
+        /// <summary>Отображаемое название</summary>
+        public string DisplayName;
+
+        /// <summary>Тип формации</summary>
+        public FormationType FormationType;
+
+        /// <summary>Размер формации</summary>
+        public FormationSize Size;
+
+        /// <summary>Требуемый уровень формации (1-10)</summary>
+        public int RequiredLevel;
+
+        /// <summary>Стихия формации (Neutral = универсальная)</summary>
+        public Element Element = Element.Neutral;
+
+        /// <summary>Тип ядра (для формаций с физическим ядром)</summary>
+        public FormationCoreType CoreType = FormationCoreType.Disk;
+
+        /// <summary>Многоразовая ли формация (с физическим ядром)</summary>
+        public bool IsReusable;
+
+        /// <summary>Эффекты формации</summary>
+        public List<FormationEffectEntry> Effects = new List<FormationEffectEntry>();
+
+        /// <summary>
+        /// Создать данные формации "Базовый барьер" (L1, Small)
+        /// </summary>
+        public static FormationData CreateBasicBarrier()
+        {
+            return new FormationData
+            {
+                Id = "basic_barrier",
+                DisplayName = "Базовый щит",
+                FormationType = FormationType.Barrier,
+                Size = FormationSize.Small,
+                RequiredLevel = 1,
+                Element = Element.Neutral,
+                IsReusable = false,
+                Effects = new List<FormationEffectEntry>
+                {
+                    new FormationEffectEntry
+                    {
+                        EffectType = FormationEffectType.Shield,
+                        TargetStat = StatType.Defense,
+                        Value = 0.3f,
+                        TargetTag = "ally"
+                    }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Создать данные формации "Меч Дао" (L3, Medium)
+        /// </summary>
+        public static FormationData CreateDaoBlade()
+        {
+            return new FormationData
+            {
+                Id = "dao_blade",
+                DisplayName = "Меч Дао",
+                FormationType = FormationType.Amplification,
+                Size = FormationSize.Medium,
+                RequiredLevel = 3,
+                Element = Element.Fire,
+                IsReusable = false,
+                Effects = new List<FormationEffectEntry>
+                {
+                    new FormationEffectEntry
+                    {
+                        EffectType = FormationEffectType.Buff,
+                        TargetStat = StatType.Damage,
+                        Value = 0.3f,
+                        TargetTag = "ally"
+                    }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Создать данные формации "Теневые оковы" (L4, Medium)
+        /// </summary>
+        public static FormationData CreateShadowBindings()
+        {
+            return new FormationData
+            {
+                Id = "shadow_bindings",
+                DisplayName = "Теневые оковы",
+                FormationType = FormationType.Suppression,
+                Size = FormationSize.Medium,
+                RequiredLevel = 4,
+                Element = Element.Void,
+                IsReusable = false,
+                Effects = new List<FormationEffectEntry>
+                {
+                    new FormationEffectEntry
+                    {
+                        EffectType = FormationEffectType.Debuff,
+                        TargetStat = StatType.Speed,
+                        Value = 0.5f,
+                        TargetTag = "enemy"
+                    }
+                }
+            };
+        }
+    }
+
+    /// <summary>
+    /// Запись эффекта формации.
+    /// Определяет, как формация воздействует на сущности.
+    /// </summary>
+    public class FormationEffectEntry
+    {
+        /// <summary>Тип эффекта</summary>
+        public FormationEffectType EffectType;
+
+        /// <summary>Целевая характеристика</summary>
+        public StatType TargetStat;
+
+        /// <summary>Значение эффекта (модификатор: 0.3 = +30%)</summary>
+        public float Value;
+
+        /// <summary>Тип контроля (только для EffectType.Control)</summary>
+        public ControlType ControlType = ControlType.None;
+
+        /// <summary>Цель: "ally" или "enemy"</summary>
+        public string TargetTag = "ally";
+    }
+}

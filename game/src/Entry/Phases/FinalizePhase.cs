@@ -21,9 +21,9 @@ public sealed class FinalizePhase : AbstractSceneAssemblyPhase
 
     [Inject] private readonly IPublisher<SceneReadyEvent> _readyPub = null!;
 
-    public override Task ExecuteAsync(CancellationToken ct = default)
+    public override Task ExecuteAsync()
     {
-        _readyPub.Publish(new SceneReadyEvent(0));
+        _readyPub.Publish(new SceneReadyEvent(1, 0, 0));
         Console.WriteLine($"[Phase {PhaseOrder}] {PhaseName} complete — Scene assembly complete");
         return Task.CompletedTask;
     }

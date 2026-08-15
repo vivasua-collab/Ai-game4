@@ -106,7 +106,7 @@ public sealed class GameSession : IGameSession
             // ISaveService.Load triggers ISaveable.RestoreState on every
             // registered saveable. GameSession.Data is refreshed minimally
             // here; full restoration happens inside the save module.
-            _save.Load(slotName);
+            _save.Load(new SaveSlot(slotName, SaveSlotType.Manual));
 
             Data = new GameSessionData
             {
@@ -140,7 +140,7 @@ public sealed class GameSession : IGameSession
         if (State != SessionState.Playing) return;
         SetState(SessionState.Paused);
         Data.IsPaused = true;
-        _pausedPub.Publish(new GamePausedEvent(_frameCounter));
+        _pausedPub.Publish(new GamePausedEvent());
         Console.WriteLine("[GameSession] Paused");
     }
 
@@ -150,7 +150,7 @@ public sealed class GameSession : IGameSession
         if (State != SessionState.Paused) return;
         SetState(SessionState.Playing);
         Data.IsPaused = false;
-        _resumedPub.Publish(new GameResumedEvent(_frameCounter));
+        _resumedPub.Publish(new GameResumedEvent());
         Console.WriteLine("[GameSession] Resumed");
     }
 
@@ -170,7 +170,7 @@ public sealed class GameSession : IGameSession
         Console.WriteLine("[GameSession] SaveAndQuit — saving...");
         try
         {
-            _save.Save(Data.Id, SaveSlotType.Manual);
+            _save.Save(new SaveSlot(Data.Id, SaveSlotType.Manual));
         }
         catch (Exception ex)
         {

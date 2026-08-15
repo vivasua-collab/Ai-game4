@@ -1,42 +1,53 @@
 #nullable enable
+// Создано: 2026-05-09 — Phase 13: точка входа модуля Interaction
+// Migrated from Ai-game3 (Unity+VContainer+MessagePipe) to Ai-game4 (Godot+DI+EventBus) 2026-08-15.
 using System;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Interfaces;
 
 namespace CultivationGame.Modules.Interaction;
 
-/// <summary>Interaction module — V1 stub, no per-tick work.</summary>
-public sealed class InteractionModule : IModule
+/// <summary>
+/// Точка входа модуля Interaction.
+/// Инициализирует сервисы конфигурацией и обрабатывает тики (typewriter).
+/// </summary>
+public class InteractionModule : IModule
 {
+    [Inject] private readonly InteractionService _interactionServiceImpl = null!;
+    [Inject] private readonly DialogueService _dialogueServiceImpl = null!;
+    [Inject] private readonly DialogueTypewriter _typewriter = null!;
+    [Inject] private readonly ITimeService _timeService = null!;
+
+    private InteractionConfig? _config;
+    private bool _isConfigured;
+
     public string ModuleName => "Interaction";
 
-    [Inject] private readonly IInteractionService _interactionService = null!;
+    public void SetConfig(InteractionConfig config)
+    {
+        _config = config;
+        _isConfigured = true;
+    }
 
     public void Start()
     {
-        // V1 stub: InteractionService is wired but not yet used per-tick.
-        Console.WriteLine($"[InteractionModule] Started — svc wired={_interactionService != null}");
+        if (!_isConfigured || _config == null) return;
+
+        _interactionServiceImpl.Initialize(_config);
+        _dialogueServiceImpl.Initialize(_config);
     }
 
     public void Tick(int tickCount)
     {
-        // V1 stub — no per-tick work. Real impl listens for player input flags
-        // and triggers Interact on the nearest interactable.
+        if (!_isConfigured) return;
+
+        // Обработка typewriter-эффекта (BD-42: ITimeService.DeltaTime)
+        _typewriter.Tick(_timeService.DeltaTime);
     }
 
     public void Dispose()
     {
-        Console.WriteLine("[InteractionModule] Disposed");
-    }
-}
-
-public static class InteractionModuleServices
-{
-    public static void Register(IContainerBuilder builder)
-    {
-        builder.Register<InteractionConfig>(Lifetime.Singleton);
-        builder.Register<InteractionService>(Lifetime.Singleton);
-        builder.Register<IInteractionService, InteractionService>(Lifetime.Singleton);
-        builder.Register<InteractionModule>(Lifetime.Singleton);
+        _interactionServiceImpl?.Dispose();
+        _dialogueServiceImpl?.Dispose();
     }
 }

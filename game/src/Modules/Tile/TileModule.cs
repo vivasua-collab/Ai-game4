@@ -39,7 +39,7 @@ public sealed class TileModule : IModule
 
     private void OnLocationChanged(in LocationChangedEvent e)
     {
-        Console.WriteLine($"[TileModule] LocationChanged '{e.OldLocationId}' → '{e.NewLocationId}'");
+        Console.WriteLine($"[TileModule] LocationChanged '{e.PreviousLocationId}' → '{e.NewLocationId}'");
         // Real impl reads location seed/dims from IWorldService and calls Generate.
     }
 
@@ -55,7 +55,10 @@ public static class TileModuleServices
     public static void Register(IContainerBuilder builder)
     {
         builder.Register<TileConfig>(Lifetime.Singleton);
+        builder.Register<TileService>(Lifetime.Singleton);
+        builder.Register<ResourceService>(Lifetime.Singleton);
         builder.Register<ITileService, TileService>(Lifetime.Singleton);
+        builder.Register<IResourceService, ResourceService>(Lifetime.Singleton);
         builder.Register<TileModule>(Lifetime.Singleton);
     }
 }

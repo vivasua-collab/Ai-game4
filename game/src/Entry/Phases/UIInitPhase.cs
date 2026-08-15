@@ -17,7 +17,7 @@ public sealed class UIInitPhase : AbstractSceneAssemblyPhase
 
     [Inject] private readonly IUIService _ui = null!;
 
-    public override Task ExecuteAsync(CancellationToken ct = default)
+    public override Task ExecuteAsync()
     {
         _ui.ShowView("HUD");
         Console.WriteLine($"[Phase {PhaseOrder}] {PhaseName} complete — HUD shown");

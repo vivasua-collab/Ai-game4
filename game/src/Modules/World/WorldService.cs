@@ -2,7 +2,10 @@
 using System;
 using System.Collections.Generic;
 using CultivationGame.Core.Data;
+using CultivationGame.Core.DI;
+using CultivationGame.Core.Events;
 using CultivationGame.Core.Interfaces;
+using CultivationGame.Core.Messaging.Contracts;
 
 namespace CultivationGame.Modules.World;
 
@@ -21,30 +24,32 @@ public sealed class TimeService : ITimeService
 
     public int TickCount { get; private set; }
     public TimeSpeed Speed { get; set; } = TimeSpeed.Normal;
-    public bool IsPaused => Speed == TimeSpeed.Pause;
+    public bool IsPaused => Speed == TimeSpeed.Paused;
+
+    // ITimeService — V1 stubs (real values derived from CurrentTime when needed).
+    public float DeltaTime { get; private set; }
+    public float TotalTime { get; private set; }
+    public int CurrentDay => CurrentTime.Day;
+    public int CurrentMonth => CurrentTime.Month;
+    public int CurrentYear => CurrentTime.Year;
+    public int CurrentHour => CurrentTime.Hour;
+    public TimeOfDay TimeOfDay => CurrentTime.TimeOfDay;
 
     public event Action<int>? OnTick;
     public event Action<WorldTime>? OnTimeChanged;
 
     public void Pause()
     {
-        if (Speed == TimeSpeed.Pause) return;
-        Speed = TimeSpeed.Pause;
+        if (Speed == TimeSpeed.Paused) return;
+        Speed = TimeSpeed.Paused;
         Console.WriteLine($"[TimeService] Paused at tick {TickCount}");
     }
 
     public void Resume()
     {
-        if (Speed != TimeSpeed.Pause) return;
+        if (Speed != TimeSpeed.Paused) return;
         Speed = TimeSpeed.Normal;
         Console.WriteLine($"[TimeService] Resumed at tick {TickCount}");
-    }
-
-    public void SetSpeed(TimeSpeed speed)
-    {
-        if (Speed == speed) return;
-        Speed = speed;
-        Console.WriteLine($"[TimeService] Speed set to {speed}");
     }
 
     /// <summary>
@@ -55,6 +60,8 @@ public sealed class TimeService : ITimeService
     {
         if (IsPaused) return;
         TickCount++;
+        DeltaTime = 1f / 60f; // V1 placeholder: 1 minute per real-time tick.
+        TotalTime += DeltaTime;
         CurrentTime = CurrentTime.AddMinutes(GameConstants.TICKS_PER_MINUTE);
         OnTick?.Invoke(TickCount);
         OnTimeChanged?.Invoke(CurrentTime);
@@ -63,14 +70,23 @@ public sealed class TimeService : ITimeService
 
 /// <summary>
 /// WorldService — registry of locations + current active location.
-/// Uses LocationData (Core data model). Locations are pre-registered at Start.
+/// Uses LocationData (Core data model). Implements <see cref="IWorldService"/>.
 /// </summary>
 public sealed class WorldService : IWorldService
 {
+    [Inject] private readonly IPublisher<LocationChangedEvent> _locationChangedPub = null!;
+    [Inject] private readonly IPublisher<TravelStartedEvent> _travelStartedPub = null!;
+
     private readonly Dictionary<string, LocationData> _locations = new();
+    private readonly Dictionary<string, FactionInfo> _factions = new();
+    private readonly HashSet<string> _discoveredSectors = new();
     private LocationData? _current;
 
+    /// <summary>Internal — current active location data.</summary>
     public LocationData? CurrentLocation => _current;
+
+    public string CurrentLocationId => _current?.Id ?? string.Empty;
+    public string CurrentSectorId => _current?.ParentSectorId ?? "0_0";
 
     public event Action<LocationData>? OnLocationChanged;
 
@@ -81,14 +97,14 @@ public sealed class WorldService : IWorldService
         _locations[location.Id] = location;
     }
 
-    public IReadOnlyList<LocationData> GetAvailableLocations()
+    /// <summary>Register a faction. Not on interface.</summary>
+    public void RegisterFaction(FactionInfo faction)
     {
-        // Return a snapshot list
-        var list = new List<LocationData>(_locations.Values.Count);
-        foreach (var v in _locations.Values) list.Add(v);
-        return list;
+        if (string.IsNullOrEmpty(faction.Id)) return;
+        _factions[faction.Id] = faction;
     }
 
+    /// <summary>Internal — set active location by ID.</summary>
     public void SetActiveLocation(string locationId)
     {
         if (!_locations.TryGetValue(locationId, out var loc))
@@ -99,6 +115,68 @@ public sealed class WorldService : IWorldService
         var old = _current;
         _current = loc;
         Console.WriteLine($"[WorldService] Active location: {loc.Name} (id={loc.Id})");
+        _locationChangedPub.Publish(new LocationChangedEvent(old?.Id ?? string.Empty, loc.Id));
         OnLocationChanged?.Invoke(loc);
+    }
+
+    public IReadOnlyList<LocationData> GetAvailableLocations()
+    {
+        var list = new List<LocationData>(_locations.Values.Count);
+        foreach (var v in _locations.Values) list.Add(v);
+        return list;
+    }
+
+    // === IWorldService ===
+
+    public bool TryTravel(string locationId)
+    {
+        if (!_locations.ContainsKey(locationId))
+        {
+            Console.WriteLine($"[WorldService] TryTravel('{locationId}') — unknown location");
+            return false;
+        }
+        var from = _current?.Id ?? string.Empty;
+        _travelStartedPub.Publish(new TravelStartedEvent(from, locationId, 1f));
+        SetActiveLocation(locationId);
+        return true;
+    }
+
+    public LocationInfo GetLocation(string locationId)
+    {
+        if (_locations.TryGetValue(locationId, out var loc))
+        {
+            return new LocationInfo(loc.Id, loc.Name, loc.LocationType,
+                BiomeType.Plains, loc.QiDensity, 0, loc.ParentSectorId);
+        }
+        return new LocationInfo(locationId, locationId, LocationType.Village,
+            BiomeType.Plains, 0, 0, "0_0");
+    }
+
+    public FactionInfo GetFaction(string factionId)
+    {
+        if (_factions.TryGetValue(factionId, out var f)) return f;
+        return new FactionInfo(factionId, factionId, string.Empty, 0);
+    }
+
+    public FactionRelationType GetFactionRelation(string factionA, string factionB)
+    {
+        // V1 stub: neutral unless identical.
+        if (factionA == factionB) return FactionRelationType.Ally;
+        return FactionRelationType.Neutral;
+    }
+
+    public IReadOnlyList<string> GetDiscoveredSectors()
+    {
+        var list = new List<string>(_discoveredSectors.Count);
+        foreach (var s in _discoveredSectors) list.Add(s);
+        return list;
+    }
+
+    public bool IsSectorDiscovered(string sectorId) => _discoveredSectors.Contains(sectorId);
+
+    /// <summary>Internal — mark a sector as discovered. Not on interface.</summary>
+    public void DiscoverSector(string sectorId)
+    {
+        if (!string.IsNullOrEmpty(sectorId)) _discoveredSectors.Add(sectorId);
     }
 }

@@ -13,7 +13,7 @@ public sealed class QuestInitPhase : AbstractSceneAssemblyPhase
     public override string PhaseName => "QuestInit";
     public override int PhaseOrder => 8;
 
-    public override Task ExecuteAsync(CancellationToken ct = default)
+    public override Task ExecuteAsync()
     {
         Console.WriteLine($"[Phase {PhaseOrder}] {PhaseName} complete (stub)");
         return Task.CompletedTask;

@@ -13,7 +13,7 @@ public sealed class ChargerInitPhase : AbstractSceneAssemblyPhase
     public override string PhaseName => "ChargerInit";
     public override int PhaseOrder => 7;
 
-    public override Task ExecuteAsync(CancellationToken ct = default)
+    public override Task ExecuteAsync()
     {
         Console.WriteLine($"[Phase {PhaseOrder}] {PhaseName} complete (stub)");
         return Task.CompletedTask;

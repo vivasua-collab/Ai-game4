@@ -16,7 +16,7 @@ public sealed class CoreValidationPhase : AbstractSceneAssemblyPhase
     public override string PhaseName => "CoreValidation";
     public override int PhaseOrder => 1;
 
-    public override Task ExecuteAsync(CancellationToken ct = default)
+    public override Task ExecuteAsync()
     {
         // Actively resolve each core interface — if any is missing the
         // container will throw and the orchestrator will fail-fast.

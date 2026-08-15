@@ -41,6 +41,15 @@ public sealed class ContainerBuilder : IContainerBuilder
     {
         var reg = new Registration(typeof(TInterface), typeof(TImplementation), lifetime, null);
         _registrations[typeof(TInterface)] = reg;
+        // Forwarding: also register the concrete implementation type so that
+        // constructor injection requesting TImplementation (rather than
+        // TInterface) resolves to the SAME singleton. Both keys share the
+        // same Registration object — the singleton cache ensures only one
+        // instance is ever constructed.
+        if (typeof(TInterface) != typeof(TImplementation))
+        {
+            _registrations[typeof(TImplementation)] = reg;
+        }
         _orderedRegistrations.Add(reg);
     }
 
@@ -98,8 +107,13 @@ public sealed class Container : IResolver, IDisposable
     public IEnumerable<T> ResolveAll<T>()
     {
         // For v1 ResolveAll returns concrete instances assignable to T.
+        // Dedupe by reference — forwarded registrations share the same
+        // Registration object across interface and concrete-type keys, so
+        // without dedup the same instance would be yielded twice.
+        var seen = new HashSet<Registration>(ReferenceEqualityComparer.Instance);
         foreach (var reg in _registrations.Values)
         {
+            if (!seen.Add(reg)) continue;
             if (typeof(T).IsAssignableFrom(reg.ServiceType))
             {
                 var instance = Resolve(reg.ServiceType, depth: 0);
@@ -169,10 +183,19 @@ public sealed class Container : IResolver, IDisposable
             // Pre-built instance.
             if (reg.HasInstance) return reg.Instance;
 
-            // Singleton cache.
-            if (reg.Lifetime != Lifetime.Transient
-                && _singletons.TryGetValue(serviceType, out var cached))
-                return cached;
+            // Singleton cache. Check both the requested service type AND the
+            // implementation type — forwarded registrations (interface +
+            // concrete-type keys pointing to the same Registration) must share
+            // a single instance regardless of which key was used to resolve.
+            if (reg.Lifetime != Lifetime.Transient)
+            {
+                if (_singletons.TryGetValue(serviceType, out var cached))
+                    return cached;
+                if (reg.ImplementationType is not null
+                    && reg.ImplementationType != serviceType
+                    && _singletons.TryGetValue(reg.ImplementationType, out var cachedImpl))
+                    return cachedImpl;
+            }
 
             // Need to construct.
             if (reg.ImplementationType is null)
@@ -183,7 +206,14 @@ public sealed class Container : IResolver, IDisposable
             InjectProperties(instance, depth);
 
             if (reg.Lifetime != Lifetime.Transient)
+            {
                 _singletons[serviceType] = instance;
+                // Cache under the implementation type too, so that subsequent
+                // resolves via the forwarded concrete-type key hit the cache
+                // and return the same singleton.
+                if (reg.ImplementationType != serviceType)
+                    _singletons[reg.ImplementationType] = instance;
+            }
 
             return instance;
         }
@@ -245,9 +275,15 @@ public sealed class Container : IResolver, IDisposable
         {
             if (_disposed) return;
             _disposed = true;
+            // Forwarded registrations cache the same instance under multiple
+            // keys (interface + concrete type) — dedupe by reference before
+            // disposing to avoid calling Dispose() twice on the same object.
+            var disposed = new HashSet<object>(ReferenceEqualityComparer.Instance);
             foreach (var singleton in _singletons.Values)
             {
-                if (singleton is IDisposable d && !ReferenceEquals(d, this)) d.Dispose();
+                if (ReferenceEquals(singleton, this)) continue;
+                if (!disposed.Add(singleton)) continue;
+                if (singleton is IDisposable d) d.Dispose();
             }
             _singletons.Clear();
             _registrations.Clear();

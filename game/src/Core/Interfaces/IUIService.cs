@@ -1,15 +1,28 @@
 #nullable enable
-namespace CultivationGame.Core.Interfaces;
-
-/// <summary>UI orchestration (engine-agnostic). Adapter renders the views.</summary>
-public interface IUIService
+using System.Collections.Generic;
+using CultivationGame.Core;
+using CultivationGame.Core.Data;
+// Создано: 2026-05-09 — Phase 14: интерфейс UI-сервиса
+// Редактировано: 2026-08-15 — расширены ShowView/HideView для Ai-game4 Phase wiring.
+namespace CultivationGame.Core.Interfaces
 {
-    void ShowView(string viewId);
-    void HideView(string viewId);
-    void HideAllViews();
-    bool IsViewVisible(string viewId);
+    public interface IUIService
+    {
+        GameState CurrentUIState { get; }
+        void SetUIState(GameState state);
+        void ShowToast(string message);
+        void ShowModal(string title, string message);
 
-    void ShowNotification(string message, float duration = 3f);
-    void ShowTooltip(string text, float x, float y);
-    void HideTooltip();
+        /// <summary>Показать вид по идентификатору (HUD, Inventory, Dialogue, ...).</summary>
+        void ShowView(string viewId);
+
+        /// <summary>Скрыть вид по идентификатору.</summary>
+        void HideView(string viewId);
+
+        /// <summary>Скрыть все виды.</summary>
+        void HideAllViews();
+
+        /// <summary>Открыт ли вид с указанным идентификатором.</summary>
+        bool IsViewVisible(string viewId);
+    }
 }

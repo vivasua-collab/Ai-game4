@@ -1,45 +1,61 @@
 #nullable enable
+// Создано: 2026-05-09 04:35:17 UTC
+// Точка входа модуля Ци.
+// IStartable — инициализация, ITickable — кадровая регенерация
+// Migrated from Ai-game3 (Unity+VContainer) to Ai-game4 (Godot+DI) 2026-08-15:
+//   - IStartable.Start() → IModule.Start()
+//   - ITickable.Tick() → IModule.Tick(int tickCount)
+//   - Uses ITimeService.DeltaTime (engine-agnostic, NOT UnityEngine.Time).
 using System;
-using CultivationGame.Core.Data;
 using CultivationGame.Core.DI;
+using CultivationGame.Core.Data;
 using CultivationGame.Core.Interfaces;
 
 namespace CultivationGame.Modules.Qi;
 
 /// <summary>
-/// Qi module — ticks ProcessRegenBatch every N ticks
-/// (default = GameConstants.QI_REGEN_BATCH_TICKS = 10).
+/// Точка входа модуля Qi.
+/// Инициализирует QiService конфигурацией и запускает регенерацию.
+/// BD-42 урок: Использует ITimeService.DeltaTime вместо UnityEngine.Time.deltaTime.
 /// </summary>
-public sealed class QiModule : IModule
+public class QiModule : IModule
 {
+    [Inject] private readonly IQiService _qiService = null!;
+    [Inject] private readonly QiService _qiServiceImpl = null!;
+    [Inject] private readonly IQiBufferService _qiBufferService = null!;
+    [Inject] private readonly ITimeService _timeService = null!;
+
+    private QiConfig? _config;
+    private bool _isConfigured;
+
     public string ModuleName => "Qi";
 
-    [Inject] private readonly IQiService _qiService = null!;
+    /// <summary>
+    /// Установить конфигурацию модуля Ци.
+    /// Вызывается из QiModuleServices.Register() build callback до Start().
+    /// </summary>
+    public void SetConfig(QiConfig config)
+    {
+        _config = config;
+        _isConfigured = true;
+    }
 
     public void Start()
     {
-        Console.WriteLine("[QiModule] Started");
+        if (_isConfigured && _config != null)
+        {
+            _qiServiceImpl.Initialize(_config);
+        }
     }
 
     public void Tick(int tickCount)
     {
-        if (tickCount % GameConstants.QI_REGEN_BATCH_TICKS != 0) return;
-        _qiService.ProcessRegenBatch();
+        // BD-42: Регенерация через ITimeService.DeltaTime (не UnityEngine.Time)
+        _qiService.Regenerate(_timeService.DeltaTime);
     }
 
     public void Dispose()
     {
-        Console.WriteLine("[QiModule] Disposed");
-    }
-}
-
-public static class QiModuleServices
-{
-    public static void Register(IContainerBuilder builder)
-    {
-        builder.Register<QiConfig>(Lifetime.Singleton);
-        builder.Register<QiService>(Lifetime.Singleton);
-        builder.Register<IQiService, QiService>(Lifetime.Singleton);
-        builder.Register<QiModule>(Lifetime.Singleton);
+        // Services own their subscriptions and dispose themselves.
     }
 }

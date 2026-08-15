@@ -1,53 +1,57 @@
 #nullable enable
+using CultivationGame.Core.Data;
+
 namespace CultivationGame.Core.Messaging.Contracts;
 
-/// <summary>Raised when a new game session starts.</summary>
-public readonly struct GameStartedEvent
+// Created: 2026-05-08 (Ai-game3) — migrated 2026-08-15.
+// Game session lifecycle: state changes, pause/resume, new/load/quit requests.
+
+// GameState is defined in CultivationGame.Core.Data (canonical).
+
+public readonly struct GameStateChangedEvent
 {
-    public readonly int StartVariant;
-    public GameStartedEvent(int startVariant) { StartVariant = startVariant; }
+    public readonly GameState OldState;
+    public readonly GameState NewState;
+    public GameStateChangedEvent(GameState oldState, GameState newState)
+        { OldState = oldState; NewState = newState; }
 }
 
-public readonly struct GamePausedEvent
+public readonly struct GamePausedEvent { }
+
+public readonly struct GameResumedEvent { }
+
+/// <summary>
+/// Событие: сессия запущена (после сборки сцены).
+/// </summary>
+public readonly struct SessionStartedEvent
 {
-    public readonly long Frame;
-    public GamePausedEvent(long frame) { Frame = frame; }
+    /// <summary>Это новая игра (true) или загрузка (false)</summary>
+    public readonly bool IsNewGame;
+    public SessionStartedEvent(bool isNewGame) { IsNewGame = isNewGame; }
 }
 
-public readonly struct GameResumedEvent
+/// <summary>
+/// Событие: запрошена новая игра.
+/// GameSession подписан и запускает StartNewGame().
+/// </summary>
+public readonly struct NewGameRequestedEvent { }
+
+/// <summary>
+/// Событие: запрошена загрузка игры.
+/// GameSession подписан и запускает LoadGame().
+/// </summary>
+public readonly struct LoadGameRequestedEvent
 {
-    public readonly long Frame;
-    public GameResumedEvent(long frame) { Frame = frame; }
+    public readonly SaveSlot Slot;
+    public LoadGameRequestedEvent(SaveSlot slot) { Slot = slot; }
 }
 
-public readonly struct GameSavingEvent
+/// <summary>
+/// Событие: запрошен выход из игры.
+/// </summary>
+public readonly struct QuitGameRequestedEvent
 {
-    public readonly string SlotName;
-    public GameSavingEvent(string slotName) { SlotName = slotName; }
-}
-
-public readonly struct GameSavedEvent
-{
-    public readonly string SlotName;
-    public readonly long DurationMs;
-    public GameSavedEvent(string slotName, long durationMs) { SlotName = slotName; DurationMs = durationMs; }
-}
-
-public readonly struct GameLoadingEvent
-{
-    public readonly string SlotName;
-    public GameLoadingEvent(string slotName) { SlotName = slotName; }
-}
-
-public readonly struct GameLoadedEvent
-{
-    public readonly string SlotName;
-    public readonly long DurationMs;
-    public GameLoadedEvent(string slotName, long durationMs) { SlotName = slotName; DurationMs = durationMs; }
-}
-
-public readonly struct GameQuitEvent
-{
-    public readonly bool Saved;
-    public GameQuitEvent(bool saved) { Saved = saved; }
+    /// <summary>Сохранить перед выходом?</summary>
+    public readonly bool SaveBeforeQuit;
+    public QuitGameRequestedEvent(bool saveBeforeQuit) { SaveBeforeQuit = saveBeforeQuit; }
 }

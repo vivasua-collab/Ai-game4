@@ -1,5 +1,6 @@
 #nullable enable
 using Godot;
+using CultivationGame.Core.Data;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Adapter.Di;
@@ -186,7 +187,7 @@ public partial class MainMenuController : Control
         foreach (var s in saves)
             GD.Print($"  Save slot: {s}");
 
-        if (SaveService.HasSave("quicksave"))
+        if (SaveService.HasSave(new SaveSlot("quicksave", SaveSlotType.QuickSave)))
         {
             try
             {

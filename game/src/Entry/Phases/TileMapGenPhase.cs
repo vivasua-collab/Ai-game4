@@ -18,7 +18,7 @@ public sealed class TileMapGenPhase : AbstractSceneAssemblyPhase
 
     [Inject] private readonly ITileService _tile = null!;
 
-    public override Task ExecuteAsync(CancellationToken ct = default)
+    public override Task ExecuteAsync()
     {
         var loc = LocationCatalog.TestPolygon;
         _tile.Generate(loc.Seed, loc.Width, loc.Height, loc.TerrainType);

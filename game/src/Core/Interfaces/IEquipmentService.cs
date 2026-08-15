@@ -1,14 +1,19 @@
 #nullable enable
-using System.Collections.Generic;
+// Создано: 2026-05-08 10:07:00 UTC
 using CultivationGame.Core.Data;
-
-namespace CultivationGame.Core.Interfaces;
-
-/// <summary>Equipment slot management across the 15-slot body doll.</summary>
-public interface IEquipmentService
+using CultivationGame.Core;
+namespace CultivationGame.Core.Interfaces
 {
-    bool Equip(int entityId, EquipmentSlot slot, string itemId);
-    bool Unequip(int entityId, EquipmentSlot slot);
-    string? GetEquippedItem(int entityId, EquipmentSlot slot);
-    IReadOnlyDictionary<EquipmentSlot, string> GetAllEquipped(int entityId);
+    public interface IEquipmentService
+    {
+        string EntityId { get; }
+        EquipmentData GetEquipped(EquipmentSlot slot);
+        bool TryEquip(EquipmentSlot slot, EquipmentData item);
+        bool TryUnequip(EquipmentSlot slot, out EquipmentData item);
+        bool IsSlotBlocked(EquipmentSlot slot);
+        float GetTotalArmor();
+        float GetTotalDamage();
+        WeaponHandType GetWeaponHandType();
+        bool IsTwoHandEquipped { get; }
+    }
 }

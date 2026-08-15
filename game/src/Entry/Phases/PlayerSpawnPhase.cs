@@ -18,7 +18,7 @@ public sealed class PlayerSpawnPhase : AbstractSceneAssemblyPhase
 
     [Inject] private readonly IPlayerService _player = null!;
 
-    public override Task ExecuteAsync(CancellationToken ct = default)
+    public override Task ExecuteAsync()
     {
         var loc = LocationCatalog.TestPolygon;
         var center = new Position2D(loc.Width / 2, loc.Height / 2);

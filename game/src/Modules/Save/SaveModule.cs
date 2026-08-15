@@ -37,21 +37,21 @@ public sealed class SaveModule : IModule
     {
         // Autosave check every 60 ticks (per task brief)
         if (tickCount % 60 != 0) return;
-        if (!_config.AutosaveEnabled) return;
+        if (_config.AutoSaveIntervalMinutes <= 0) return;
 
-        string slot = $"autosave_{(tickCount / 60):D4}";
-        _saveService.Save(slot, SaveSlotType.AutoSave);
+        var slot = new SaveSlot($"autosave_{(tickCount / 60):D4}", SaveSlotType.AutoSave);
+        _saveService.Save(slot);
     }
 
     private void OnSaveRequested(in SaveRequestedEvent e)
     {
-        _saveService.Save(e.SlotName, e.SlotType);
+        _saveService.Save(new SaveSlot(e.SlotName, e.SlotType));
         _saveCompletedPublisher.Publish(new SaveCompletedEvent(true, e.SlotName, null));
     }
 
     private void OnLoadRequested(in LoadRequestedEvent e)
     {
-        _saveService.Load(e.SlotName);
+        _saveService.Load(new SaveSlot(e.SlotName, e.SlotType));
         _loadCompletedPublisher.Publish(new LoadCompletedEvent(true, e.SlotName, null));
     }
 

@@ -62,36 +62,8 @@ public class CharacterData
 }
 
 // ── NPC ─────────────────────────────────────────────────────────────────
-[Serializable]
-public class NPCState
-{
-    public string Id { get; set; } = string.Empty;
-    public bool IsPreset { get; set; }
-    public string PresetId { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
-    public string Title { get; set; } = string.Empty;
-    public int Age { get; set; }
-
-    public int CultivationLevel { get; set; }
-    public int CultivationSubLevel { get; set; }
-    public long CoreCapacity { get; set; }
-    public long CurrentQi { get; set; }
-
-    public float Strength { get; set; }
-    public float Agility { get; set; }
-    public float Intelligence { get; set; }
-    public float Conductivity { get; set; }
-    public float Vitality { get; set; }
-
-    public PersonalityTrait Personality { get; set; }
-    public string Motivation { get; set; } = string.Empty;
-    public float Attitude { get; set; }
-    public string FactionId { get; set; } = string.Empty;
-
-    public Position2D Position { get; set; }
-    public Direction Facing { get; set; }
-    public bool IsAlive { get; set; } = true;
-}
+// NOTE: NPCState moved to Modules/NPC/Data/NPCState.cs (canonical Ai-game3 version).
+// Core.Data NPCState stub removed to avoid ambiguity with the richer Modules.NPC.Data.NPCState.
 
 // ── Tile ────────────────────────────────────────────────────────────────
 [Serializable]
@@ -166,29 +138,8 @@ public class InventoryItem
 }
 
 // ── Technique ───────────────────────────────────────────────────────────
-[Serializable]
-public class TechniqueData
-{
-    public string Id { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
-    public string NameId { get; set; } = string.Empty;
-    public string Description { get; set; } = string.Empty;
-
-    public TechniqueType Type { get; set; }
-    public TechniqueSubtype Subtype { get; set; }
-    public ElementType Element { get; set; }
-
-    public int Grade { get; set; }
-    public int Level { get; set; }
-    public int MinLevel { get; set; }
-    public int MaxLevel { get; set; }
-
-    public long BaseCapacity { get; set; }
-    public int MinCultivationLevel { get; set; }
-    public long QiCost { get; set; }
-    public float PhysicalFatigueCost { get; set; }
-    public float MentalFatigueCost { get; set; }
-}
+// NOTE: TechniqueData moved to its own file (TechniqueData.cs) — migrated from
+// Ai-game3 with the full technique model (CapacityCost, BaseDamage, Mastery, ...).
 
 // ── Location ────────────────────────────────────────────────────────────
 [Serializable]
@@ -211,6 +162,9 @@ public class LocationData
     public int Width { get; set; }
     public int Height { get; set; }
     public int Seed { get; set; }
+
+    /// <summary>Parent sector identifier (e.g. "0_0"). Defaults to origin sector.</summary>
+    public string ParentSectorId { get; set; } = "0_0";
 }
 
 // ── Factions ────────────────────────────────────────────────────────────

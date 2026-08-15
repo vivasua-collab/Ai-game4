@@ -13,7 +13,7 @@ public sealed class FormationInitPhase : AbstractSceneAssemblyPhase
     public override string PhaseName => "FormationInit";
     public override int PhaseOrder => 6;
 
-    public override Task ExecuteAsync(CancellationToken ct = default)
+    public override Task ExecuteAsync()
     {
         Console.WriteLine($"[Phase {PhaseOrder}] {PhaseName} complete (stub)");
         return Task.CompletedTask;

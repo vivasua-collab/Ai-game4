@@ -126,7 +126,7 @@ public partial class InputAdapter : Node
             frame:           _frame
         );
 
-        PlayerInput?.UpdateFrame(frameData);
+        PlayerInput?.UpdateInputState(frameData);
     }
 
     /// <summary>

@@ -14,7 +14,7 @@ public sealed class NPCSpawnPhase : AbstractSceneAssemblyPhase
     public override string PhaseName => "NPCSpawn";
     public override int PhaseOrder => 5;
 
-    public override Task ExecuteAsync(CancellationToken ct = default)
+    public override Task ExecuteAsync()
     {
         Console.WriteLine($"[Phase {PhaseOrder}] {PhaseName} — No NPCs in test polygon");
         return Task.CompletedTask;

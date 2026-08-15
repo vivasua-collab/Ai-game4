@@ -2,27 +2,21 @@
 using System;
 using System.Collections.Generic;
 using CultivationGame.Core.Data;
+using CultivationGame.Core.DI;
 using CultivationGame.Core.Interfaces;
+using CultivationGame.Core.Messaging.Contracts;
 
 namespace CultivationGame.Modules.Save;
 
 /// <summary>
-/// SaveService — implements ISaveService. Owns a SaveDataAggregator that
-/// collects state from all registered ISaveable services. SaveService itself
-/// implements ISaveable for its own metadata block.
+/// SaveService — implements <see cref="ISaveService"/>. Owns a
+/// SaveDataAggregator that collects state from all registered ISaveable
+/// services. SaveService itself implements ISaveable for its own metadata.
 /// </summary>
 public sealed class SaveService : ISaveService, ISaveable
 {
-    private readonly SaveDataAggregator _aggregator;
-    private readonly SaveConfig _config;
-
-    public SaveService(SaveDataAggregator aggregator, SaveConfig? config = null)
-    {
-        _aggregator = aggregator ?? throw new ArgumentNullException(nameof(aggregator));
-        _config = config ?? new SaveConfig();
-        // Make sure the aggregator has us (meta) registered.
-        _aggregator.Register(this);
-    }
+    [Inject] private readonly SaveDataAggregator _aggregator = null!;
+    private SaveConfig _config = new();
 
     // ISaveable
     public string SaveKey => "save_meta";
@@ -41,29 +35,41 @@ public sealed class SaveService : ISaveService, ISaveable
     public event Action<bool, string>? OnSaveCompleted;
     public event Action<bool, string>? OnLoadCompleted;
 
-    public void Save(string slotName, SaveSlotType slotType)
+    public bool Save(SaveSlot slot)
     {
-        bool ok = _aggregator.Save(slotName);
-        OnSaveCompleted?.Invoke(ok, slotName);
-        Console.WriteLine($"[SaveService] Save('{slotName}', {slotType}) → {(ok ? "OK" : "FAILED")}");
+        bool ok = _aggregator.Save(slot.Name);
+        OnSaveCompleted?.Invoke(ok, slot.Name);
+        Console.WriteLine($"[SaveService] Save('{slot}') → {(ok ? "OK" : "FAILED")}");
+        return ok;
     }
 
-    public void Load(string slotName)
+    public bool Load(SaveSlot slot)
     {
-        bool ok = _aggregator.Load(slotName);
-        OnLoadCompleted?.Invoke(ok, slotName);
-        Console.WriteLine($"[SaveService] Load('{slotName}') → {(ok ? "OK" : "FAILED")}");
+        bool ok = _aggregator.Load(slot.Name);
+        OnLoadCompleted?.Invoke(ok, slot.Name);
+        Console.WriteLine($"[SaveService] Load('{slot}') → {(ok ? "OK" : "FAILED")}");
+        return ok;
     }
 
-    public bool HasSave(string slotName) => _aggregator.HasSave(slotName);
+    public bool HasSave(SaveSlot slot) => _aggregator.HasSave(slot.Name);
 
-    public void DeleteSave(string slotName)
+    public bool DeleteSave(SaveSlot slot)
     {
-        _aggregator.DeleteSave(slotName);
-        Console.WriteLine($"[SaveService] DeleteSave('{slotName}')");
+        _aggregator.DeleteSave(slot.Name);
+        Console.WriteLine($"[SaveService] DeleteSave('{slot}')");
+        return true;
     }
 
-    public IReadOnlyList<string> GetAllSaves() => _aggregator.GetAllSaves();
+    public IReadOnlyList<SaveInfo> GetAllSaves()
+    {
+        var names = _aggregator.GetAllSaves();
+        var list = new List<SaveInfo>(names.Count);
+        foreach (var n in names)
+        {
+            list.Add(new SaveInfo(new SaveSlot(n), n, 0L, 0L, 0, string.Empty));
+        }
+        return list;
+    }
 
     /// <summary>
     /// Register an ISaveable service. NOT on the ISaveService interface —

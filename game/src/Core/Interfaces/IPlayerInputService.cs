@@ -1,31 +1,104 @@
 #nullable enable
+// Создано: 2026-05-09 16:16:00 UTC
+// Редактировано: 2026-05-24 15:58:33 UTC — Фаза 9B: InputFrameData вместо 8 параметров + LMB/RMB
+// Интерфейс сервиса ввода игрока.
+// Чистый C# — НЕ MonoBehaviour, получает ввод извне (от Unity InputSystem адаптера).
 using CultivationGame.Core.Data;
 
-namespace CultivationGame.Core.Interfaces;
-
-/// <summary>
-/// Sticky-flag input service. The Adapter pushes an <see cref="InputFrameData"/>
-/// each frame; modules read sticky flags during their <c>Tick()</c> and the
-/// PlayerModule calls <see cref="ResetFrameFlags"/> at the end of the tick.
-/// </summary>
-public interface IPlayerInputService
+using CultivationGame.Core;
+namespace CultivationGame.Core.Interfaces
 {
-    InputFrameData CurrentFrame { get; }
-    void UpdateFrame(InputFrameData frame);
-    void ResetFrameFlags();
+    /// <summary>
+    /// Сервис ввода игрока.
+    /// Получает состояние ввода извне и предоставляет его другим сервисам.
+    /// НЕ зависит от Unity Input System напрямую — адаптер передаёт данные.
+    ///
+    /// Фаза 9B: UpdateInputState() принимает InputFrameData вместо 8+ параметров.
+    /// Это решает проблему раздутой сигнатуры (8→16 параметров при добавлении мыши).
+    /// InputFrameData — readonly struct, zero-alloc.
+    /// </summary>
+    public interface IPlayerInputService
+    {
+        /// <summary>Направление движения (нормализованный 2D вектор)</summary>
+        Position2D MoveDirection { get; }
 
-    bool IsInteractPressed { get; }
-    bool IsInventoryPressed { get; }
-    bool IsRestPressed { get; }
-    bool IsHarvestPressed { get; }
-    bool IsSpecialActionPressed { get; }
-    bool IsPausePressed { get; }
-    bool IsQuickSavePressed { get; }
-    bool IsQuickLoadPressed { get; }
-    bool IsJournalPressed { get; }
-    bool IsTechniquesPressed { get; }
-    bool IsCharacterSheetPressed { get; }
-    bool IsQuestLogPressed { get; }
-    bool IsMapPressed { get; }
-    bool IsMinimapPressed { get; }
+        /// <summary>Зажата ли клавиша бега</summary>
+        bool RunHeld { get; }
+
+        /// <summary>Нажата ли атака (J или ЛКМ, однократное)</summary>
+        bool IsAttackPressed { get; }
+
+        /// <summary>Нажата ли защита (K, однократное)</summary>
+        bool IsDefendPressed { get; }
+
+        /// <summary>Нажато ли взаимодействие (E, однократное)</summary>
+        bool IsInteractPressed { get; }
+
+        /// <summary>Нажат ли инвентарь (I, однократное)</summary>
+        bool IsInventoryPressed { get; }
+
+        /// <summary>Raw-флаг инвентаря, БЕЗ проверки InputDisabled (для toggle)</summary>
+        bool IsInventoryPressedRaw { get; }
+
+        /// <summary>Нажата ли медитация (M, однократное)</summary>
+        bool IsMeditatePressed { get; }
+
+        // === Ai-game3 compatibility: sticky flags ===
+
+        /// <summary>Нажат ли pause (Esc, однократное). Ai-game3 compatibility.</summary>
+        bool IsPausePressed { get; }
+
+        /// <summary>Нажат ли quicksave (F5, однократное). Ai-game3 compatibility.</summary>
+        bool IsQuickSavePressed { get; }
+
+        /// <summary>Нажат ли quickload (F9, однократное). Ai-game3 compatibility.</summary>
+        bool IsQuickLoadPressed { get; }
+
+        /// <summary>Текущий кадр ввода (raw). Ai-game3 compatibility — для Adapter'ов.</summary>
+        InputFrameData CurrentFrame { get; }
+
+        /// <summary>Выбранная техника (слот 1-9, 0 = не выбрана)</summary>
+        int SelectedTechniqueSlot { get; }
+
+        // === Фаза 9B: Мышь ===
+
+        /// <summary>ЛКМ нажата (однократное, после проверки IsOverUI)</summary>
+        bool IsLMBPressed { get; }
+
+        /// <summary>ПКМ нажата — короткий клик (однократное)</summary>
+        bool IsRMBPressed { get; }
+
+        /// <summary>ПКМ удерживается (состояние, НЕ one-shot)</summary>
+        bool IsRMBHeld { get; }
+
+        /// <summary>ПКМ удержание ≥ 300мс (контекстное меню)</summary>
+        bool IsRMBLongPress { get; }
+
+        /// <summary>Мировая позиция мыши X (промилле: 1000 = 1.0 ед.)</summary>
+        int MouseWorldX { get; }
+
+        /// <summary>Мировая позиция мыши Y (промилле: 1000 = 1.0 ед.)</summary>
+        int MouseWorldY { get; }
+
+        /// <summary>Курсор над UI?</summary>
+        bool IsMouseOverUI { get; }
+
+        // === Общие ===
+
+        /// <summary>Отключён ли ввод (UI, катсцена и т.д.)</summary>
+        bool InputDisabled { get; set; }
+
+        /// <summary>
+        /// Обновить состояние ввода из InputFrameData.
+        /// Вызывается каждый кадр из GameInputAdapter.
+        /// Фаза 9B: заменяет старую 8-параметровую версию.
+        /// </summary>
+        void UpdateInputState(InputFrameData data);
+
+        /// <summary>
+        /// Сбросить одноразовые флаги (после обработки).
+        /// Вызывается в конце кадра.
+        /// </summary>
+        void ResetFrameFlags();
+    }
 }
