@@ -1,13 +1,16 @@
-[gd_scene load_steps=2 format=3 uid="uid://mainmenu1234"]
+[gd_scene format=3 uid="uid://mainmenu1234"]
 
-[ext_resource type="Script" path="res://src/Adapter/UI/MainMenuController.cs" id="1_mainmenu"]
+[ext_resource type="Script" uid="uid://q7qb2mav6ygx" path="res://src/Adapter/UI/MainMenuController.cs" id="1_mainmenu"]
 
-[node name="MainMenu" type="Control"]
+[node name="MainMenu" type="Control" unique_id=154796897]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_left = 150.0
+offset_top = -12.0
+offset_right = 2070.0
+offset_bottom = 1068.0
 grow_horizontal = 2
 grow_vertical = 2
-size = Vector2(1920, 1080)
 script = ExtResource("1_mainmenu")
