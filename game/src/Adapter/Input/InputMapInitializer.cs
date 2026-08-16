@@ -93,9 +93,6 @@ public static class InputMapInitializer
         // Time speed control: Page Up = faster, Page Down = slower
         AddPhysicalKeyAction("time_speed_up", Key.Pageup);
         AddPhysicalKeyAction("time_speed_down", Key.Pagedown);
-        // Also bind + and - on main keyboard (numpad-independent)
-        AddKeyAction("time_speed_up", Key.Equal);      // + (near Backspace)
-        AddKeyAction("time_speed_down", Key.Minus);    // - (near Backspace)
 
         GD.Print("[InputMap] Registered all input actions.");
     }

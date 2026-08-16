@@ -246,7 +246,7 @@ public partial class GameWorldController : Node2D
         {
             Name = "HudHint",
             Text = "WASD — движение | Shift — бег | ЛКМ — идти к точке | Колесо — зум\n" +
-                   "Esc — пауза | +/- — скорость времени | F5 — сохранение | F9 — загрузка\n" +
+                   "Esc — пауза | PageUp/PageDown — скорость | F5 — сохранение | F9 — загрузка\n" +
                    "E — взаимодействие | B — инвентарь | R — отдых | F — добыча\n" +
                    "J — журнал | T — техники | C — персонаж | Q — квесты | M — карта | N — миникарта",
         };
@@ -475,7 +475,7 @@ public partial class GameWorldController : Node2D
             // SaveService?.Load("quicksave");
         }
 
-        // Time speed control: +/PageUp = faster, -/PageDown = slower.
+        // Time speed control: PageUp = faster, PageDown = slower.
         // Debounce: max 1 change per real second (prevents rapid cycling).
         // Does NOT include Paused — pause is only via Esc.
         _speedChangeCooldown -= (float)GetPhysicsProcessDeltaTime();

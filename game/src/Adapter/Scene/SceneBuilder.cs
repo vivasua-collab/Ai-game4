@@ -50,7 +50,8 @@ public partial class SceneBuilder : Node
         // NOTE: Camera and Player sprite are created by GameWorldController (parent).
         // SceneBuilder only creates terrain + transition tiles (rendering only).
         SetupTerrainMesh();
-        SetupTransitionTiles();
+        // Strata 1-9 disabled — only stratum 0 (biome) rendered.
+        // SetupTransitionTiles();
     }
 
     /// <summary>
