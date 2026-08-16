@@ -21,6 +21,7 @@ public sealed class PlayerModule : IModule
     [Inject] private readonly IPlayerService _playerService = null!;
     [Inject] private readonly IPlayerInputService _playerInputService = null!;
     [Inject] private readonly IStatService _statService = null!;
+    [Inject] private readonly ITileService _tileService = null!;
     [Inject] private readonly IPublisher<PlayerMovedEvent> _positionPublisher = null!;
 
     private int _tickCount;
@@ -36,23 +37,38 @@ public sealed class PlayerModule : IModule
         Console.WriteLine($"[PlayerModule] Started — stat svc wired={_statService != null}");
     }
 
+    /// <summary>
+    /// Max valid X coordinate (MapWidth - 1). Falls back to the default
+    /// constant when the tile service has not generated the grid yet.
+    /// Replaces previously hardcoded literal "49" (audit issue #15).
+    /// </summary>
+    private int MaxX => _tileService != null && _tileService.MapWidth > 0
+        ? _tileService.MapWidth - 1
+        : GameConstants.DEFAULT_MAP_WIDTH - 1;
+
+    /// <summary>Max valid Y coordinate. See <see cref="MaxX"/>.</summary>
+    private int MaxY => _tileService != null && _tileService.MapHeight > 0
+        ? _tileService.MapHeight - 1
+        : GameConstants.DEFAULT_MAP_HEIGHT - 1;
+
     public void Tick(int tickCount)
     {
         _tickCount = tickCount;
 
-        // Check mouse-click destination first (free movement via mouse).
-        if (_mouseDestination.HasValue)
-        {
-            HandleMouseMovement();
-        }
-        else
-        {
-            // Keyboard movement — free 8-direction (includes diagonals).
-            HandleKeyboardMovement();
-        }
+        // Movement is now handled by GameWorldController.HandleFreeMovement()
+        // (pixel-based, continuous). PlayerModule.Tick() no longer moves the player.
+        // Old tick-based movement (HandleKeyboardMovement / HandleMouseMovement)
+        // is disabled to prevent double-movement conflict.
+        //
+        // PlayerModule still handles: stat updates, Qi regen, buff ticks, etc.
+        // (to be implemented in future modules)
 
-        // PLR-E06: ResetFrameFlags() LAST.
-        _playerInputService.ResetFrameFlags();
+        // PLR-E06: ResetFrameFlags() is NO LONGER called here.
+        // It is now called from GameWorldController._PhysicsProcess AFTER
+        // HandleStickyInput() and HandleMouseClick() have read the flags.
+        // Previously, PlayerModule.Tick() ran inside GameBoot._PhysicsProcess
+        // (via GameEntryPoint.Tick) which runs BEFORE the main scene's
+        // _PhysicsProcess — causing flags to be cleared before Adapter reads them.
     }
 
     private void HandleKeyboardMovement()
@@ -88,12 +104,14 @@ public sealed class PlayerModule : IModule
         // Diagonal: 2 steps → 1 step (floor), 3 steps → 2 steps.
         int steps = isDiagonal ? Math.Max(1, (int)(baseSteps / 1.41f)) : baseSteps;
 
+        int maxX = MaxX;
+        int maxY = MaxY;
         int newX = oldX;
         int newY = oldY;
         for (int i = 0; i < steps; i++)
         {
-            newX = Math.Clamp(newX + dx, 0, 49);
-            newY = Math.Clamp(newY + dy, 0, 49);
+            newX = Math.Clamp(newX + dx, 0, maxX);
+            newY = Math.Clamp(newY + dy, 0, maxY);
         }
         if (newX != oldX || newY != oldY)
         {
@@ -132,14 +150,16 @@ public sealed class PlayerModule : IModule
 
         // Movement speed: 2 tiles per tick (3 with Run).
         int steps = _playerInputService.RunHeld ? 3 : 2;
+        int maxX = MaxX;
+        int maxY = MaxY;
         int newX = oldX;
         int newY = oldY;
         for (int i = 0; i < steps; i++)
         {
             if (newX != dest.X) newX += stepX;
             if (newY != dest.Y) newY += stepY;
-            newX = Math.Clamp(newX, 0, 49);
-            newY = Math.Clamp(newY, 0, 49);
+            newX = Math.Clamp(newX, 0, maxX);
+            newY = Math.Clamp(newY, 0, maxY);
         }
 
         if (newX != oldX || newY != oldY)
@@ -155,8 +175,8 @@ public sealed class PlayerModule : IModule
     /// <summary>Set destination for mouse-click movement. Called by Adapter.</summary>
     public void SetMouseDestination(int tileX, int tileY)
     {
-        tileX = Math.Clamp(tileX, 0, 49);
-        tileY = Math.Clamp(tileY, 0, 49);
+        tileX = Math.Clamp(tileX, 0, MaxX);
+        tileY = Math.Clamp(tileY, 0, MaxY);
         _mouseDestination = new Position2D(tileX, tileY);
         Console.WriteLine($"[PlayerModule] Mouse destination set: ({tileX}, {tileY})");
     }

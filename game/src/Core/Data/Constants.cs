@@ -1438,6 +1438,16 @@ namespace CultivationGame.Core.Data
         /// <summary>Pixels-per-unit used by the renderer for tile sprites.</summary>
         public const int TILE_PPU = 32;
 
+        /// <summary>
+        /// Default world map dimensions (test polygon V1). Used by PlayerModule
+        /// and GameWorldController for clamping player movement bounds when
+        /// TileService is not yet available. Replaces previously hardcoded
+        /// literal "49" (= MapWidth - 1) and "50" (= MapWidth).
+        /// See audit issue #15 (08_15_code_audit.md).
+        /// </summary>
+        public const int DEFAULT_MAP_WIDTH = 50;
+        public const int DEFAULT_MAP_HEIGHT = 50;
+
         // ── NPC / combat ────────────────────────────────────────────────────
         /// <summary>Maximum simultaneously active NPCs in the world.</summary>
         public const int MAX_ACTIVE_NPCS = 100;

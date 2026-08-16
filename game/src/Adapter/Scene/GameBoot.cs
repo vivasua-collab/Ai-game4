@@ -2,6 +2,7 @@
 using Godot;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Interfaces;
+using CultivationGame.Adapter.Persistence;
 using CultivationGame.Entry;
 
 namespace CultivationGame.Adapter.Scene;
@@ -33,7 +34,21 @@ public partial class GameBoot : Node
         CultivationGame.Adapter.Input.InputMapInitializer.EnsureInitialized();
 
         // Build the DI container (registers all 16 modules + entry + scene phases).
-        Container = GameLifetimeScope.Build();
+        // The Adapter-override hook registers Adapter.Persistence.SaveFileHandler
+        // (Godot-aware, ProjectSettings.GlobalizePath) as ISaveFileHandler in
+        // place of the Modules-layer default (AppContext.BaseDirectory).
+        // See audit issue #6 (08_15_code_audit.md).
+        //
+        // We use RegisterInstance (pre-built) because Adapter.Persistence.SaveFileHandler
+        // has a parameterless ctor that calls ProjectSettings.GlobalizePath — we want
+        // THAT ctor, not the (string saveRoot) test ctor that DI's "greediest ctor"
+        // heuristic would otherwise pick.
+        Container = GameLifetimeScope.Build(configureAdapter: builder =>
+        {
+            var godotSaveHandler = new SaveFileHandler();
+            builder.RegisterInstance(godotSaveHandler);
+            builder.RegisterInstance<ISaveFileHandler>(godotSaveHandler);
+        });
 
         // Resolve GameEntryPoint — the IStartable/ITickable root.
         _entry = Container.Resolve<GameEntryPoint>();

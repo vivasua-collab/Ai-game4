@@ -15,7 +15,6 @@ using CultivationGame.Core.Interfaces;
 using CultivationGame.Core.Messaging.Contracts;
 using CultivationGame.Modules.NPC.Data;
 using CultivationGame.Core.Events;
-using CultivationGame.Core.Messaging.Contracts;
 
 namespace CultivationGame.Modules.NPC
 {

@@ -5,7 +5,6 @@
 using System;
 using CultivationGame.Core;
 using CultivationGame.Core.Data;
-using CultivationGame.Core.Data;
 
 namespace CultivationGame.Modules.NPC
 {

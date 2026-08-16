@@ -92,6 +92,13 @@ public partial class GameWorldController : Node2D
         _worldRoot = new Node2D { Name = "WorldRoot" };
         AddChild(_worldRoot);
 
+        // Resolve map dimensions from TileService (fall back to defaults).
+        // Audit issue #15: replace hardcoded "50".
+        int mapW = Tiles != null && Tiles.MapWidth > 0 ? Tiles.MapWidth : GameConstants.DEFAULT_MAP_WIDTH;
+        int mapH = Tiles != null && Tiles.MapHeight > 0 ? Tiles.MapHeight : GameConstants.DEFAULT_MAP_HEIGHT;
+        _worldWidth = mapW;
+        _worldHeight = mapH;
+
         // Camera: zoomed in 3× for better view of player + tiles.
         _camera = new Camera2D
         {
@@ -102,8 +109,8 @@ public partial class GameWorldController : Node2D
             ProcessCallback = Camera2D.Camera2DProcessCallback.Physics,
             LimitLeft = -100,
             LimitTop = -100,
-            LimitRight = 50 * 64 + 100,
-            LimitBottom = 50 * 64 + 100,
+            LimitRight = _worldWidth * GameConstants.TILE_PIXELS + 100,
+            LimitBottom = _worldHeight * GameConstants.TILE_PIXELS + 100,
         };
         _worldRoot.AddChild(_camera);
         _camera.MakeCurrent();
@@ -327,6 +334,13 @@ public partial class GameWorldController : Node2D
 
         HandleStickyInput();
         HandleMouseClick();
+
+        // PLR-E06: Reset sticky frame flags AFTER all Adapter consumers
+        // (HandleStickyInput, HandleMouseClick) have read them. Previously
+        // this was called from PlayerModule.Tick() which runs BEFORE the
+        // main scene's _PhysicsProcess (via GameBoot autoload ordering),
+        // clearing flags before the Adapter could read them.
+        PlayerInput?.ResetFrameFlags();
     }
 
     /// <summary>
@@ -357,9 +371,12 @@ public partial class GameWorldController : Node2D
             _mouseTarget = null;
             _visualPosition += moveVec * MoveSpeedPixels * speedMult * (float)delta;
 
-            // Clamp to world bounds.
-            float maxX = 50 * GameConstants.TILE_PIXELS - GameConstants.TILE_PIXELS / 2f;
-            float maxY = 50 * GameConstants.TILE_PIXELS - GameConstants.TILE_PIXELS / 2f;
+            // Clamp to world bounds. Use TileService dimensions when available,
+            // falling back to GameConstants.DEFAULT_MAP_* (audit issue #15).
+            int mapW = Tiles != null && Tiles.MapWidth > 0 ? Tiles.MapWidth : GameConstants.DEFAULT_MAP_WIDTH;
+            int mapH = Tiles != null && Tiles.MapHeight > 0 ? Tiles.MapHeight : GameConstants.DEFAULT_MAP_HEIGHT;
+            float maxX = mapW * GameConstants.TILE_PIXELS - GameConstants.TILE_PIXELS / 2f;
+            float maxY = mapH * GameConstants.TILE_PIXELS - GameConstants.TILE_PIXELS / 2f;
             _visualPosition = new Vector2(
                 Mathf.Clamp(_visualPosition.X, GameConstants.TILE_PIXELS / 2f, maxX),
                 Mathf.Clamp(_visualPosition.Y, GameConstants.TILE_PIXELS / 2f, maxY));
@@ -384,10 +401,12 @@ public partial class GameWorldController : Node2D
         }
 
         // Sync tile position to PlayerService (for game logic).
+        int mapWidth = Tiles != null && Tiles.MapWidth > 0 ? Tiles.MapWidth : GameConstants.DEFAULT_MAP_WIDTH;
+        int mapHeight = Tiles != null && Tiles.MapHeight > 0 ? Tiles.MapHeight : GameConstants.DEFAULT_MAP_HEIGHT;
         int tileX = (int)(_visualPosition.X / GameConstants.TILE_PIXELS);
         int tileY = (int)(_visualPosition.Y / GameConstants.TILE_PIXELS);
-        tileX = Mathf.Clamp(tileX, 0, 49);
-        tileY = Mathf.Clamp(tileY, 0, 49);
+        tileX = Mathf.Clamp(tileX, 0, mapWidth - 1);
+        tileY = Mathf.Clamp(tileY, 0, mapHeight - 1);
         var currentTile = Player.Position;
         if (currentTile.X != tileX || currentTile.Y != tileY)
         {
@@ -413,10 +432,12 @@ public partial class GameWorldController : Node2D
         var mouseWorldPos = GetGlobalMousePosition();
 
         // Convert world position to tile coordinates.
+        int mapW = Tiles != null && Tiles.MapWidth > 0 ? Tiles.MapWidth : GameConstants.DEFAULT_MAP_WIDTH;
+        int mapH = Tiles != null && Tiles.MapHeight > 0 ? Tiles.MapHeight : GameConstants.DEFAULT_MAP_HEIGHT;
         int tileX = (int)(mouseWorldPos.X / GameConstants.TILE_PIXELS);
         int tileY = (int)(mouseWorldPos.Y / GameConstants.TILE_PIXELS);
-        tileX = Mathf.Clamp(tileX, 0, 49);
-        tileY = Mathf.Clamp(tileY, 0, 49);
+        tileX = Mathf.Clamp(tileX, 0, mapW - 1);
+        tileY = Mathf.Clamp(tileY, 0, mapH - 1);
 
         // Player current position.
         var playerPos = Player.Position;

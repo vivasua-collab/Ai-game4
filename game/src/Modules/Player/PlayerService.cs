@@ -92,8 +92,19 @@ public sealed class PlayerService : IPlayerService, IDisposable
     // === Module-internal helpers ===
 
     /// <summary>Spawn the player avatar. Called by PlayerSpawnPhase / PlayerModule.Start.</summary>
+    /// <remarks>
+    /// Idempotent: if the player is already spawned, this is a no-op.
+    /// Prevents double-spawn leak when both PlayerModule.Start() and
+    /// PlayerSpawnPhase.ExecuteAsync() call Spawn (audit issue #3).
+    /// </remarks>
     public void Spawn(Position2D position)
     {
+        if (_spawned)
+        {
+            Console.WriteLine($"[PlayerService] Spawn ignored — already spawned @ {_data.Position}");
+            return;
+        }
+
         _data.Id = "player_0";
         _data.Name = "Практик";
         _data.Position = position;

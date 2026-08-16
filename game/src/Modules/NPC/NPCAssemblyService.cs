@@ -17,7 +17,6 @@ using System.Collections.Generic;
 using CultivationGame.Core;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.Interfaces;
-using CultivationGame.Core.Data;
 using CultivationGame.Modules.Body;
 using CultivationGame.Modules.Generator;
 using CultivationGame.Modules.NPC.Data;

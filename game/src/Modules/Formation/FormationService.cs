@@ -18,7 +18,6 @@ using CultivationGame.Modules.Formation.Data;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.Events;
 using CultivationGame.Core.Interfaces;
-using CultivationGame.Core.Messaging.Contracts;
 
 namespace CultivationGame.Modules.Formation
 {

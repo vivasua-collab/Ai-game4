@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Events;
 using CultivationGame.Core.Interfaces;
@@ -50,7 +51,16 @@ public static class GameLifetimeScope
     /// (from the adapter's bootstrap node) and retain the result for the
     /// lifetime of the application.
     /// </summary>
-    public static IResolver Build()
+    /// <param name="configureAdapter">
+    /// Optional callback invoked AFTER all module services have registered
+    /// their defaults but BEFORE <see cref="ContainerBuilder.Build"/>. The
+    /// Adapter layer uses this hook to override engine-agnostic defaults
+    /// with Godot-aware implementations (e.g. register
+    /// <c>Adapter.Persistence.SaveFileHandler</c> as
+    /// <c>ISaveFileHandler</c> in place of the Modules-layer default —
+    /// see audit issue #6).
+    /// </param>
+    public static IResolver Build(Action<IContainerBuilder>? configureAdapter = null)
     {
         var builder = new ContainerBuilder();
 
@@ -83,7 +93,11 @@ public static class GameLifetimeScope
         builder.Register<IGameSession, GameSession>(Lifetime.Singleton);
         builder.Register<GameEntryPoint>(Lifetime.Singleton);
 
-        // 5. Build — the returned container is itself the IResolver.
+        // 5. Adapter overrides — register Godot-aware implementations in
+        //    place of engine-agnostic defaults (e.g. ISaveFileHandler).
+        configureAdapter?.Invoke(builder);
+
+        // 6. Build — the returned container is itself the IResolver.
         return builder.Build();
     }
 }

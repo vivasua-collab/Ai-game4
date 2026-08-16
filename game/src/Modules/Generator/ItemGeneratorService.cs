@@ -8,7 +8,6 @@ using System.Collections.Generic;
 using CultivationGame.Core;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.Interfaces;
-using CultivationGame.Core.Data;
 using CultivationGame.Modules.NPC;
 
 namespace CultivationGame.Modules.Generator

@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using Godot;
+using CultivationGame.Core.Interfaces;
 
 namespace CultivationGame.Adapter.Persistence;
 
@@ -24,8 +25,13 @@ namespace CultivationGame.Adapter.Persistence;
 /// The handler is intentionally minimal: it just (de)serialises objects to disk.
 /// All gameplay-state aggregation is the responsibility of the engine-agnostic
 /// SaveDataAggregator in CultivationGame.Modules.Save.
+///
+/// Implements <see cref="ISaveFileHandler"/> so it can be registered (via
+/// Adapter DI override in GameBoot) as the production save handler. The
+/// flat-file API (Save/Load/HasSave/DeleteSave/GetAllSaves) wraps the
+/// slot-directory layout using a single "main.json" file per slot.
 /// </summary>
-public sealed class SaveFileHandler
+public sealed class SaveFileHandler : ISaveFileHandler
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -159,4 +165,58 @@ public sealed class SaveFileHandler
         }
         return clean;
     }
+
+    // ---- ISaveFileHandler (flat-file API) ----
+    //
+    // The flat-file layout ({saveRoot}/{slotName}/main.json) wraps the
+    // slot-directory layout so that the engine-agnostic SaveDataAggregator
+    // can use the same interface regardless of which handler is registered.
+    // One file per slot keeps the on-disk format identical to the
+    // Modules.Save.SaveFileHandler's flat layout, so saves produced by
+    // one handler can be read by the other (file extension differs:
+    // .json here vs .json there — both use JSON).
+
+    private const string FlatFileName = "main.json";
+
+    bool ISaveFileHandler.Save(string slotName, Dictionary<string, object> data)
+    {
+        if (string.IsNullOrEmpty(slotName)) return false;
+        try
+        {
+            Write(slotName, FlatFileName, data);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            GD.PrintErr($"[SaveFileHandler] Save FAILED for '{slotName}': {ex.Message}");
+            return false;
+        }
+    }
+
+    Dictionary<string, object>? ISaveFileHandler.Load(string slotName)
+    {
+        if (string.IsNullOrEmpty(slotName)) return null;
+        var json = ReadText(slotName, FlatFileName);
+        if (string.IsNullOrEmpty(json)) return null;
+        try
+        {
+            return JsonSerializer.Deserialize<Dictionary<string, object>>(json, JsonOptions);
+        }
+        catch (JsonException ex)
+        {
+            GD.PrintErr($"[SaveFileHandler] Load FAILED for '{slotName}': {ex.Message}");
+            return null;
+        }
+    }
+
+    bool ISaveFileHandler.HasSave(string slotName) => Exists(slotName);
+
+    bool ISaveFileHandler.DeleteSave(string slotName)
+    {
+        if (!Exists(slotName)) return false;
+        Delete(slotName);
+        return true;
+    }
+
+    IReadOnlyList<string> ISaveFileHandler.GetAllSaves() => GetAllSlots();
 }

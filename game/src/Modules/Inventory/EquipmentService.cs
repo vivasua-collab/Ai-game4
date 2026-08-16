@@ -15,7 +15,6 @@ using CultivationGame.Core.Data;
 using CultivationGame.Core.Messaging.Contracts;
 using CultivationGame.Core.Events;
 using CultivationGame.Core.Interfaces;
-using CultivationGame.Core.Messaging.Contracts;
 
 namespace CultivationGame.Modules.Inventory
 {

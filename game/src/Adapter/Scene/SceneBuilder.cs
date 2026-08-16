@@ -73,8 +73,9 @@ public partial class SceneBuilder : Node
     {
         if (TileService == null) return;
 
-        const int width = 50;
-        const int height = 50;
+        // Map dimensions from TileService (audit issue #15: replace hardcoded "50").
+        int width = TileService.MapWidth > 0 ? TileService.MapWidth : GameConstants.DEFAULT_MAP_WIDTH;
+        int height = TileService.MapHeight > 0 ? TileService.MapHeight : GameConstants.DEFAULT_MAP_HEIGHT;
         int tileSize = GameConstants.TILE_PIXELS;
 
         // Create a 1×1 quad mesh as the prototype for the MultiMesh.

@@ -8,6 +8,12 @@ using CultivationGame.Core.Messaging.Contracts;
 
 namespace CultivationGame.Modules.Save;
 
+// Note: ISaveFileHandler (Core.Interfaces) is registered here as the Modules-
+// layer default (AppContext.BaseDirectory). The Adapter layer (GameBoot) may
+// override this registration with Adapter.Persistence.SaveFileHandler
+// (Godot ProjectSettings.GlobalizePath) before the container is built.
+// See audit issue #6.
+
 /// <summary>
 /// Save module — ticks every 60 ticks to check for autosave.
 /// Subscribes to SaveRequestedEvent / LoadRequestedEvent via the bus.
@@ -68,7 +74,10 @@ public static class SaveModuleServices
     public static void Register(IContainerBuilder builder)
     {
         builder.Register<SaveConfig>(Lifetime.Singleton);
+        // Modules-layer default — uses AppContext.BaseDirectory. The Adapter
+        // layer may override ISaveFileHandler with a Godot-aware impl.
         builder.Register<SaveFileHandler>(Lifetime.Singleton);
+        builder.Register<ISaveFileHandler, SaveFileHandler>(Lifetime.Singleton);
         builder.Register<SaveDataAggregator>(Lifetime.Singleton);
         builder.Register<SaveService>(Lifetime.Singleton);
         builder.Register<ISaveService, SaveService>(Lifetime.Singleton);

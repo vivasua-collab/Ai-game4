@@ -9,13 +9,17 @@ namespace CultivationGame.Modules.Save;
 /// SaveDataAggregator — collects state from all registered ISaveable services
 /// when SaveRequestedEvent fires, and restores it on LoadRequestedEvent.
 /// V1 stub: just iterates registered saveables and calls CaptureState/RestoreState.
+///
+/// Depends on <see cref="ISaveFileHandler"/> (interface) so the Adapter layer
+/// can swap in a Godot-aware file handler without breaking the Modules layer
+/// (audit issue #6).
 /// </summary>
 public sealed class SaveDataAggregator
 {
     private readonly List<ISaveable> _saveables = new();
-    private readonly SaveFileHandler _fileHandler;
+    private readonly ISaveFileHandler _fileHandler;
 
-    public SaveDataAggregator(SaveFileHandler fileHandler)
+    public SaveDataAggregator(ISaveFileHandler fileHandler)
     {
         _fileHandler = fileHandler ?? throw new ArgumentNullException(nameof(fileHandler));
     }

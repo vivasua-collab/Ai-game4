@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using CultivationGame.Core.Interfaces;
 
 namespace CultivationGame.Modules.Save;
 
@@ -10,8 +11,15 @@ namespace CultivationGame.Modules.Save;
 /// SaveFileHandler — JSON file I/O for save slots.
 /// V1 stub: uses System.Text.Json. Path is config-driven; falls back to a
 /// platform-agnostic local "saves" directory.
+///
+/// Implements <see cref="ISaveFileHandler"/> so the engine-agnostic
+/// <see cref="SaveDataAggregator"/> can depend on the interface rather than
+/// the concrete type. In production the Adapter layer registers
+/// <c>Adapter.Persistence.SaveFileHandler</c> (Godot-aware) as the
+/// <see cref="ISaveFileHandler"/>; this Modules-layer implementation is the
+/// fallback for headless tests where Godot is unavailable.
 /// </summary>
-public sealed class SaveFileHandler
+public sealed class SaveFileHandler : ISaveFileHandler
 {
     private readonly SaveConfig _config;
 
