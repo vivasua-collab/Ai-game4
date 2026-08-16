@@ -140,6 +140,11 @@ public sealed class TileService : ITileService
             }
         }
 
+        // Step 3.5: smooth biomes — cellular automata to avoid 3+ biome intersections.
+        // Each tile takes the majority biome among its 3×3 neighborhood.
+        // This prevents complex transition sprites for multi-biome corners.
+        SmoothBiomes(width, height);
+
         // Step 4: add sand beaches at water→land transitions.
         for (int x = 1; x < width - 1; x++)
         {
@@ -215,6 +220,52 @@ public sealed class TileService : ITileService
     ///   0.75-0.90 → Stone (mountains)
     ///   0.90-1.00 → Snow (peaks)
     /// </summary>
+    /// <summary>
+    /// Smooth biomes using cellular automata (majority rule).
+    /// Prevents 3+ biomes from meeting at a single tile.
+    /// </summary>
+    private void SmoothBiomes(int width, int height)
+    {
+        if (_grid == null) return;
+        var biomeMap = new BiomeType[width, height];
+        for (int x = 0; x < width; x++)
+            for (int y = 0; y < height; y++)
+                biomeMap[x, y] = _grid[x, y].Biome;
+
+        for (int x = 1; x < width - 1; x++)
+        {
+            for (int y = 1; y < height - 1; y++)
+            {
+                // Count biome types in 3×3 neighborhood.
+                var counts = new System.Collections.Generic.Dictionary<BiomeType, int>();
+                for (int dx = -1; dx <= 1; dx++)
+                {
+                    for (int dy = -1; dy <= 1; dy++)
+                    {
+                        var b = biomeMap[x + dx, y + dy];
+                        counts[b] = counts.TryGetValue(b, out var v) ? v + 1 : 1;
+                    }
+                }
+                // Find majority (need >= 5 of 9 neighbors).
+                BiomeType majority = biomeMap[x, y];
+                int maxCount = 0;
+                foreach (var kv in counts)
+                {
+                    if (kv.Value >= 5 && kv.Value > maxCount)
+                    {
+                        maxCount = kv.Value;
+                        majority = kv.Key;
+                    }
+                }
+                // Apply majority if different.
+                if (majority != biomeMap[x, y])
+                {
+                    _grid[x, y].Biome = majority;
+                }
+            }
+        }
+    }
+
     /// <summary>Stratum 0: biome from elevation only (color + Qi).</summary>
     private static BiomeType MapToBiome(float elevation)
     {

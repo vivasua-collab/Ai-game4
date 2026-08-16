@@ -50,18 +50,17 @@ public partial class SceneBuilder : Node
         // NOTE: Camera and Player sprite are created by GameWorldController (parent).
         // SceneBuilder only creates terrain + transition tiles (rendering only).
         SetupTerrainMesh();
-        // Strata 1-9 disabled — only stratum 0 (biome) rendered.
-        // SetupTransitionTiles();
+        // Stratum 1: surface transition sprites.
+        SetupSurfaceTransitions();
     }
 
     /// <summary>
-    /// Add transition tile overlays for smooth terrain edges.
-    /// Uses _draw() on Node2D (Godot 4.7 canonical for custom 2D drawing).
+    /// Stratum 1: surface transition sprites (8 directions per biome pair).
     /// </summary>
-    private void SetupTransitionTiles()
+    private void SetupSurfaceTransitions()
     {
         if (TileService == null) return;
-        var renderer = new TransitionTileRenderer();
+        var renderer = new SurfaceTransitionRenderer();
         _worldRoot.AddChild(renderer);
         renderer.Initialize(TileService, GameConstants.TILE_PIXELS);
     }
