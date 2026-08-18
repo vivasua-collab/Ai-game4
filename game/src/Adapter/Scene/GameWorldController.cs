@@ -7,6 +7,7 @@ using CultivationGame.Core.Data;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Adapter.Di;
 using CultivationGame.Adapter.Input;
+using CultivationGame.Adapter.UI;
 using CultivationGame.Modules.Player;
 
 namespace CultivationGame.Adapter.Scene;
@@ -40,6 +41,7 @@ public partial class GameWorldController : Node2D
     private Sprite2D      _playerShadow  = null!;
     private InputAdapter  _inputAdapter  = null!;
     private SceneBuilder  _sceneBuilder  = null!;
+    private InventoryWindow _inventoryWindow = null!;
     private CanvasLayer   _hudCanvas     = null!;
     private Label         _timeLabel     = null!;
     private Label         _hudLabel      = null!;
@@ -144,9 +146,13 @@ public partial class GameWorldController : Node2D
         _inputAdapter = new InputAdapter { Name = "InputAdapter" };
         AddChild(_inputAdapter);
 
-        // Scene builder child node (creates terrain MultiMesh + camera follow logic).
+        // Scene builder child node (creates terrain sprites + transition renderer).
         _sceneBuilder = new SceneBuilder { Name = "SceneBuilder" };
         _worldRoot.AddChild(_sceneBuilder);
+
+        // Inventory window (opens with B key).
+        _inventoryWindow = new InventoryWindow { Name = "InventoryWindow" };
+        _hudCanvas.AddChild(_inventoryWindow);
     }
 
     private static ImageTexture CreatePlayerTexture()
@@ -423,48 +429,31 @@ public partial class GameWorldController : Node2D
     {
         if (Player == null || _camera == null) return;
 
-        // Left mouse button click → set destination (one-shot, not while held).
-        // Uses "mouse_click" action (LMB) registered in InputMapInitializer.
+        // Left mouse button click → set pixel target for free movement.
         if (!Godot.Input.IsActionJustPressed("mouse_click")) return;
 
-        // Get mouse position — screen + world.
-        var mouseScreenPos = GetViewport().GetMousePosition();
         var mouseWorldPos = GetGlobalMousePosition();
 
-        // Convert world position to tile coordinates.
+        // Clamp to world bounds.
         int mapW = Tiles != null && Tiles.MapWidth > 0 ? Tiles.MapWidth : GameConstants.DEFAULT_MAP_WIDTH;
         int mapH = Tiles != null && Tiles.MapHeight > 0 ? Tiles.MapHeight : GameConstants.DEFAULT_MAP_HEIGHT;
-        int tileX = (int)(mouseWorldPos.X / GameConstants.TILE_PIXELS);
-        int tileY = (int)(mouseWorldPos.Y / GameConstants.TILE_PIXELS);
-        tileX = Mathf.Clamp(tileX, 0, mapW - 1);
-        tileY = Mathf.Clamp(tileY, 0, mapH - 1);
+        float maxX = mapW * GameConstants.TILE_PIXELS - GameConstants.TILE_PIXELS / 2f;
+        float maxY = mapH * GameConstants.TILE_PIXELS - GameConstants.TILE_PIXELS / 2f;
+        var target = new Vector2(
+            Mathf.Clamp(mouseWorldPos.X, GameConstants.TILE_PIXELS / 2f, maxX),
+            Mathf.Clamp(mouseWorldPos.Y, GameConstants.TILE_PIXELS / 2f, maxY));
 
-        // Player current position.
+        _mouseTarget = target;
+
+        // Debug logging (enabled for testing).
+        int tileX = (int)(target.X / GameConstants.TILE_PIXELS);
+        int tileY = (int)(target.Y / GameConstants.TILE_PIXELS);
         var playerPos = Player.Position;
         int dx = tileX - playerPos.X;
         int dy = tileY - playerPos.Y;
-        int dist = Math.Max(Math.Abs(dx), Math.Abs(dy));  // Chebyshev distance
-
-        // Full debug log with movement vector.
-        GD.Print($"[Mouse] Click detected!");
-        GD.Print($"[Mouse] Screen pos: ({mouseScreenPos.X:F0}, {mouseScreenPos.Y:F0})");
-        GD.Print($"[Mouse] World pos: ({mouseWorldPos.X:F0}, {mouseWorldPos.Y:F0})");
-        GD.Print($"[Mouse] Tile target: ({tileX}, {tileY})");
-        GD.Print($"[Mouse] Player at: ({playerPos.X}, {playerPos.Y})");
-        GD.Print($"[Mouse] Movement vector: dx={dx}, dy={dy}, distance={dist} tiles");
-
-        // Set destination on PlayerModule via container.
-        var container = Scene.GameBoot.Container;
-        if (container != null)
-        {
-            var playerModule = container.Resolve<PlayerModule>();
-            playerModule.SetMouseDestination(tileX, tileY);
-            GD.Print($"[Mouse] Destination set on PlayerModule ✓");
-        }
-        else
-        {
-            GD.PrintErr("[Mouse] ERROR: GameBoot.Container is null!");
-        }
+        int dist = Math.Max(Math.Abs(dx), Math.Abs(dy));
+        GD.Print($"[Mouse] Click → world ({target.X:F0}, {target.Y:F0}) → tile ({tileX}, {tileY})");
+        GD.Print($"[Mouse] Player at ({playerPos.X}, {playerPos.Y}), dx={dx}, dy={dy}, dist={dist}");
     }
 
     private void HandleStickyInput()
@@ -481,7 +470,7 @@ public partial class GameWorldController : Node2D
 
         if (PlayerInput.IsInventoryPressed)
         {
-            GD.Print("[GameWorld] Inventory (stub)");
+            _inventoryWindow?.Toggle();
         }
 
         if (PlayerInput.IsQuickSavePressed)
