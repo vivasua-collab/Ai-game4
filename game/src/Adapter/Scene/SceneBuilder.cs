@@ -1,32 +1,26 @@
 #nullable enable
 using Godot;
+using System.Collections.Generic;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Data;
-using static CultivationGame.Adapter.Scene.SceneBuilder;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Adapter.Di;
-// Note: IPlayerService no longer needed — player sprite handled by GameWorldController.
 
 namespace CultivationGame.Adapter.Scene;
 
 /// <summary>
-/// Procedural scene builder. Constructs Camera2D, terrain tile layer (via
-/// <see cref="MultiMeshInstance2D"/> — one draw call for all tiles), object
-/// layer, and the player sprite (procedural texture).
-///
-/// Godot 4.7 notes:
-///  • TileMapLayer is the canonical tile node (TileMap with layers is deprecated since 4.5).
-///  • For pure coloured tiles, MultiMeshInstance2D is dramatically faster than
-///    per-tile Polygon2D (1 draw call vs N draw calls). We use it for the terrain.
-///  • Player texture is generated via <see cref="Image"/> + <see cref="ImageTexture"/>
-///    (DrawableTexture2D is for runtime drawing; our texture is static, so Image is enough).
+/// Procedural scene builder. Renders stratum 0 (biome) using sprite textures
+/// from resources/tiles/64/, and stratum 1 (surface transitions) via
+/// SurfaceTransitionRenderer.
 /// </summary>
 public partial class SceneBuilder : Node
 {
-    [Inject] private ITileService   TileService   { get; set; } = null!;
+    [Inject] private ITileService TileService { get; set; } = null!;
 
     private Node2D _worldRoot = null!;
-    private MultiMeshInstance2D _terrainMesh = null!;
+
+    // Cached biome textures (loaded once from resources/tiles/64/).
+    private static Dictionary<BiomeType, Texture2D>? _biomeTextures;
 
     public override void _Ready()
     {
@@ -36,7 +30,6 @@ public partial class SceneBuilder : Node
             ContainerAdapter.InjectProperties(this, container);
         }
 
-        // Resolve the world root: prefer an explicit Node2D parent.
         if (GetParent() is Node2D parent2D)
         {
             _worldRoot = parent2D;
@@ -47,15 +40,71 @@ public partial class SceneBuilder : Node
             AddChild(_worldRoot);
         }
 
-        // NOTE: Camera and Player sprite are created by GameWorldController (parent).
-        // SceneBuilder only creates terrain + transition tiles (rendering only).
-        SetupTerrainMesh();
+        // Stratum 0: biome sprite textures.
+        SetupTerrainSprites();
         // Stratum 1: surface transition sprites.
         SetupSurfaceTransitions();
     }
 
     /// <summary>
-    /// Stratum 1: surface transition sprites (8 directions per biome pair).
+    /// Load biome textures from resources/tiles/64/biome_{name}.png.
+    /// Cached statically — loaded once per session.
+    /// </summary>
+    private static Dictionary<BiomeType, Texture2D> LoadBiomeTextures()
+    {
+        if (_biomeTextures != null) return _biomeTextures;
+
+        _biomeTextures = new Dictionary<BiomeType, Texture2D>();
+        var basePath = "res://resources/tiles/64/biome_";
+
+        foreach (BiomeType biome in System.Enum.GetValues(typeof(BiomeType)))
+        {
+            // Skip legacy aliases (they have same values as real biomes).
+            string name = biome.ToString().ToLowerInvariant();
+            if (name == "plains" || name == "desert" || name == "swamp" ||
+                name == "tundra" || name == "jungle" || name == "volcanic" || name == "spiritual")
+                continue;
+
+            string path = $"{basePath}{name}.png";
+            var tex = GD.Load<Texture2D>(path);
+            if (tex != null)
+            {
+                _biomeTextures[biome] = tex;
+                GD.Print($"[SceneBuilder] Loaded biome texture: {path}");
+            }
+            else
+            {
+                GD.PrintErr($"[SceneBuilder] Missing biome texture: {path}");
+            }
+        }
+
+        return _biomeTextures;
+    }
+
+    /// <summary>
+    /// Stratum 0: render biome sprites via a single Node2D with _Draw().
+    /// Each tile draws its biome texture at the correct position.
+    /// </summary>
+    private void SetupTerrainSprites()
+    {
+        if (TileService == null) return;
+
+        var textures = LoadBiomeTextures();
+        var renderer = new BiomeTileRenderer();
+        renderer.Initialize(TileService, GameConstants.TILE_PIXELS, textures);
+        _worldRoot.AddChild(renderer);
+
+        // Ambient lighting.
+        var modulate = new CanvasModulate
+        {
+            Name = "AmbientLight",
+            Color = new Color(1.05f, 1.0f, 0.95f, 1.0f),
+        };
+        _worldRoot.AddChild(modulate);
+    }
+
+    /// <summary>
+    /// Stratum 1: surface transition sprites.
     /// </summary>
     private void SetupSurfaceTransitions()
     {
@@ -64,93 +113,56 @@ public partial class SceneBuilder : Node
         _worldRoot.AddChild(renderer);
         renderer.Initialize(TileService, GameConstants.TILE_PIXELS);
     }
+}
 
-    /// <summary>
-    /// Render the test polygon as a single MultiMesh of colored quads.
-    /// One draw call for all 2500 tiles (vs 2500 Polygon2D nodes = 2500 draw calls).
-    /// </summary>
-    private void SetupTerrainMesh()
+/// <summary>
+/// Renders stratum 0 (biome) using sprite textures via _Draw().
+/// One draw call per tile via DrawTexture — Godot batches internally.
+/// </summary>
+public partial class BiomeTileRenderer : Node2D
+{
+    private ITileService? _tileService;
+    private int _tileSize;
+    private Dictionary<BiomeType, Texture2D> _textures = new();
+
+    public void Initialize(ITileService tileService, int tileSize, Dictionary<BiomeType, Texture2D> textures)
     {
-        if (TileService == null) return;
+        _tileService = tileService;
+        _tileSize = tileSize;
+        _textures = textures;
+        ZIndex = (int)RenderLayer.Terrain;  // stratum 0
+        QueueRedraw();
+    }
 
-        // Map dimensions from TileService (audit issue #15: replace hardcoded "50").
-        int width = TileService.MapWidth > 0 ? TileService.MapWidth : GameConstants.DEFAULT_MAP_WIDTH;
-        int height = TileService.MapHeight > 0 ? TileService.MapHeight : GameConstants.DEFAULT_MAP_HEIGHT;
-        int tileSize = GameConstants.TILE_PIXELS;
+    public override void _Draw()
+    {
+        if (_tileService == null) return;
 
-        // Create a 1×1 quad mesh as the prototype for the MultiMesh.
-        var quadMesh = new QuadMesh
+        int w = _tileService.MapWidth;
+        int h = _tileService.MapHeight;
+        int drawn = 0;
+        int missing = 0;
+
+        for (int x = 0; x < w; x++)
         {
-            Size = new Vector2(tileSize, tileSize),
-        };
-
-        var multimesh = new MultiMesh
-        {
-            Mesh = quadMesh,
-            TransformFormat = MultiMesh.TransformFormatEnum.Transform2D,
-            UseColors = true,
-        };
-        multimesh.InstanceCount = width * height;
-
-        // Populate each tile instance: position + color.
-        for (int y = 0; y < height; y++)
-        {
-            for (int x = 0; x < width; x++)
+            for (int y = 0; y < h; y++)
             {
-                int idx = y * width + x;
-                var tile = TileService.GetTile(x, y);
-                var color = BiomeColors.Get(tile.Biome);  // Stratum 0: biome color
-
-                // QuadMesh is centered on origin; offset to tile center.
-                var transform = new Transform2D(
-                    0f,                          // rotation
-                    new Vector2(tileSize, tileSize), // scale (already in mesh size, so identity)
-                    0f,
-                    new Vector2(x * tileSize + tileSize / 2f, y * tileSize + tileSize / 2f) // position
-                );
-                // Actually, for 2D, use Transform2D.Identity with translation:
-                transform = Transform2D.Identity.Translated(
-                    new Vector2(x * tileSize + tileSize / 2f, y * tileSize + tileSize / 2f));
-
-                multimesh.SetInstanceTransform2D(idx, transform);
-                multimesh.SetInstanceColor(idx, color);
+                var tile = _tileService.GetTile(x, y);
+                if (_textures.TryGetValue(tile.Biome, out var tex))
+                {
+                    DrawTexture(tex, new Vector2(x * _tileSize, y * _tileSize));
+                    drawn++;
+                }
+                else
+                {
+                    // Fallback: draw colored rect if texture missing.
+                    DrawRect(new Rect2(x * _tileSize, y * _tileSize, _tileSize, _tileSize),
+                             new Color(0.5f, 0.2f, 0.2f), true);
+                    missing++;
+                }
             }
         }
 
-        _terrainMesh = new MultiMeshInstance2D
-        {
-            Name = "TerrainMesh",
-            Multimesh = multimesh,
-            ZIndex = (int)RenderLayer.Terrain,
-        };
-        _worldRoot.AddChild(_terrainMesh);
-
-        // Ambient lighting via CanvasModulate — gives the world a warm tone.
-        // This acts as a global color multiplier (like a 2D light without Light2D).
-        var modulate = new CanvasModulate
-        {
-            Name = "AmbientLight",
-            Color = new Color(1.05f, 1.0f, 0.95f, 1.0f),  // warm daylight
-        };
-        _worldRoot.AddChild(modulate);
-    }
-
-    // Stratum 0 colors — biome background (subtle, muted).
-    // Stratum 1 (surface) colors are in TerrainColors, used by TransitionTileRenderer.
-    private static class BiomeColors
-    {
-        public static Color Get(BiomeType biome) => biome switch
-        {
-            BiomeType.Ocean      => new Color(0.10f, 0.15f, 0.30f),  // dark blue
-            BiomeType.Sea        => new Color(0.15f, 0.25f, 0.45f),  // medium blue
-            BiomeType.Coast      => new Color(0.70f, 0.65f, 0.45f),  // sandy
-            BiomeType.Grassland  => new Color(0.20f, 0.35f, 0.15f),  // dark green
-            BiomeType.Steppe     => new Color(0.40f, 0.32f, 0.18f),  // brown
-            BiomeType.Forest     => new Color(0.12f, 0.25f, 0.10f),  // very dark green
-            BiomeType.Highlands  => new Color(0.38f, 0.36f, 0.34f),  // gray-brown
-            BiomeType.Mountains  => new Color(0.65f, 0.65f, 0.68f),  // light gray
-            BiomeType.Peak       => new Color(0.85f, 0.88f, 0.92f),  // white
-            _                    => new Color(0.20f, 0.35f, 0.15f),
-        };
+        GD.Print($"[BiomeTiles] Drew {drawn} textures, {missing} missing (fallback red)");
     }
 }
