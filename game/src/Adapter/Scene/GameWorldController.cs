@@ -149,10 +149,6 @@ public partial class GameWorldController : Node2D
         // Scene builder child node (creates terrain sprites + transition renderer).
         _sceneBuilder = new SceneBuilder { Name = "SceneBuilder" };
         _worldRoot.AddChild(_sceneBuilder);
-
-        // Inventory window (opens with B key).
-        _inventoryWindow = new InventoryWindow { Name = "InventoryWindow" };
-        _hudCanvas.AddChild(_inventoryWindow);
     }
 
     private static ImageTexture CreatePlayerTexture()
@@ -267,6 +263,10 @@ public partial class GameWorldController : Node2D
         _hudLabel.AddThemeColorOverride("font_color", new Color(0.1f, 0.08f, 0.05f));  // near-black
         _hudLabel.Position = new Vector2(20, 1020);  // bottom of 1080p screen
         _hudCanvas.AddChild(_hudLabel);
+
+        // Inventory window (opens with B key) — must be created AFTER _hudCanvas.
+        _inventoryWindow = new InventoryWindow { Name = "InventoryWindow" };
+        _hudCanvas.AddChild(_inventoryWindow);
     }
 
     // ---- Per-frame logic ----
@@ -445,15 +445,15 @@ public partial class GameWorldController : Node2D
 
         _mouseTarget = target;
 
-        // Debug logging (enabled for testing).
-        int tileX = (int)(target.X / GameConstants.TILE_PIXELS);
-        int tileY = (int)(target.Y / GameConstants.TILE_PIXELS);
-        var playerPos = Player.Position;
-        int dx = tileX - playerPos.X;
-        int dy = tileY - playerPos.Y;
-        int dist = Math.Max(Math.Abs(dx), Math.Abs(dy));
-        GD.Print($"[Mouse] Click → world ({target.X:F0}, {target.Y:F0}) → tile ({tileX}, {tileY})");
-        GD.Print($"[Mouse] Player at ({playerPos.X}, {playerPos.Y}), dx={dx}, dy={dy}, dist={dist}");
+        // Debug logging (disabled — uncomment to re-enable).
+        //int tileX = (int)(target.X / GameConstants.TILE_PIXELS);
+        //int tileY = (int)(target.Y / GameConstants.TILE_PIXELS);
+        //var playerPos = Player.Position;
+        //int dx = tileX - playerPos.X;
+        //int dy = tileY - playerPos.Y;
+        //int dist = Math.Max(Math.Abs(dx), Math.Abs(dy));
+        //GD.Print($"[Mouse] Click → world ({target.X:F0}, {target.Y:F0}) → tile ({tileX}, {tileY})");
+        //GD.Print($"[Mouse] Player at ({playerPos.X}, {playerPos.Y}), dx={dx}, dy={dy}, dist={dist}");
     }
 
     private void HandleStickyInput()
