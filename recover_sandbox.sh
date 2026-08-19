@@ -71,16 +71,40 @@ else
 fi
 echo ""
 
-# ── Шаг 4: Симлинки ─────────────────────────────────────────────────────────
-echo "── Шаг 4: Симлинки ──"
+# ── Шаг 4: Симлинки (Вариант D — гибридный) ────────────────────────────────
+# Структура: docs/docs_v2/09_workflow/ENVIRONMENT_LINKING.md
+echo "── Шаг 4: Симлинки (aigame4 + checkpoints + backward compat) ──"
 # Удаляем старые симлинки (могут быть битыми или директориями)
-rm -rf /home/z/my-project/game /home/z/my-project/game-docs /home/z/my-project/godot 2>/dev/null
+rm -rf /home/z/my-project/aigame4 \
+       /home/z/my-project/checkpoints \
+       /home/z/my-project/game \
+       /home/z/my-project/game-docs \
+       /home/z/my-project/godot 2>/dev/null
+
+# ── Единая точка входа (как Ai-game3-ref) ──
+ln -sf /home/z/my-project/Ai-game4 /home/z/my-project/aigame4
+
+# ── Прямой доступ к критичным путям ──
+ln -sf /home/z/my-project/Ai-game4/checkpoints /home/z/my-project/checkpoints
+
+# ── Backward compat (существующие симлинки) ──
 ln -sf /home/z/my-project/Ai-game4/game /home/z/my-project/game
 ln -sf /home/z/my-project/Ai-game4/docs /home/z/my-project/game-docs
+
+# ── Toolchain (движок, восстанавливаемый) ──
 ln -sf /home/z/godot /home/z/my-project/godot
-echo "  game      → $(readlink /home/z/my-project/game)"
-echo "  game-docs → $(readlink /home/z/my-project/game-docs)"
-echo "  godot     → $(readlink /home/z/my-project/godot)"
+
+echo "  aigame4     → $(readlink /home/z/my-project/aigame4)"
+echo "  checkpoints → $(readlink /home/z/my-project/checkpoints)"
+echo "  game        → $(readlink /home/z/my-project/game)"
+echo "  game-docs   → $(readlink /home/z/my-project/game-docs)"
+echo "  godot       → $(readlink /home/z/my-project/godot)"
+echo ""
+echo "  Доступ к файлам:"
+echo "    aigame4/checkpoints/          — все чекпоинты"
+echo "    aigame4/START_PROMPT.md       — правила для AI"
+echo "    aigame4/worklog.md            — хроника работы"
+echo "    checkpoints/                  — прямой доступ к чекпоинтам"
 echo ""
 
 # ── Шаг 5: NuGet.config (локальный, не в git) ───────────────────────────────
@@ -110,7 +134,20 @@ echo ""
 echo "=== Восстановление завершено ==="
 echo "Время: $(date)"
 echo ""
-echo "Симлинки:"
-for link in /home/z/my-project/game /home/z/my-project/game-docs /home/z/my-project/godot; do
-    if test -e "$link"; then echo "  ✅ $link"; else echo "  ❌ $link (BROKEN)"; fi
+echo "Симлинки (5 штук):"
+for link in aigame4 checkpoints game game-docs godot; do
+    if test -e "/home/z/my-project/$link"; then
+        echo "  ✅ /home/z/my-project/$link"
+    else
+        echo "  ❌ /home/z/my-project/$link (BROKEN)"
+    fi
+done
+echo ""
+echo "Проверка видимости критичных файлов:"
+for f in checkpoints/08_19_full_audit.md START_PROMPT.md SESSION_SUMMARY.md worklog.md recover_sandbox.sh; do
+    if test -e "/home/z/my-project/aigame4/$f"; then
+        echo "  ✅ aigame4/$f"
+    else
+        echo "  ❌ aigame4/$f (MISSING)"
+    fi
 done

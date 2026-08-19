@@ -66,11 +66,25 @@
 └── worklog.md                         ← хроника работы (append-only)
 ```
 
-**Симлинки для удобства (в /home/z/my-project/):**
-- `game` → `Ai-game4/game`
-- `game-docs` → `Ai-game4/docs`
-- `godot` → `/home/z/godot` (Godot 4.7.1 binary)
-- `Ai-game3-ref` → reference clone Ai-game3 (Unity, только для чтения)
+**Симлинки в `/home/z/my-project/` (Вариант D — гибридный, см. [ENVIRONMENT_LINKING.md](docs/docs_v2/09_workflow/ENVIRONMENT_LINKING.md)):**
+
+| Симлинк | Цель | Назначение |
+|---------|------|------------|
+| `aigame4` | `Ai-game4/` | **Единая точка входа** (как Ai-game3-ref) — весь репозиторий |
+| `checkpoints` | `Ai-game4/checkpoints` | Прямой доступ к чекпоинтам |
+| `game` | `Ai-game4/game` | Код игры (backward compat) |
+| `game-docs` | `Ai-game4/docs` | Документация (backward compat) |
+| `godot` | `/home/z/godot` | Godot 4.7.1 binary (toolchain) |
+| `Ai-game3-ref` | — | Reference clone Ai-game3 (Unity, только для чтения) |
+
+**Доступ к ключевым файлам:**
+- `aigame4/START_PROMPT.md` — этот файл (правила работы)
+- `aigame4/SESSION_SUMMARY.md` — контекст сессий
+- `aigame4/worklog.md` — хроника работы (append-only)
+- `aigame4/recover_sandbox.sh` — скрипт восстановления песочницы
+- `aigame4/checkpoints/` или `checkpoints/` — все чекпоинты
+
+**Восстановление после сбоя:** `bash /home/z/my-project/aigame4/recover_sandbox.sh`
 
 ---
 
