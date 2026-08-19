@@ -460,17 +460,28 @@ public partial class GameWorldController : Node2D
     {
         if (PlayerInput == null || Time == null) return;
 
-        // Esc (sticky "escape") → toggle pause.
-        if (PlayerInput.IsPausePressed)
+        // Esc (sticky "escape") → toggle pause (but not when inventory is open).
+        if (PlayerInput.IsPausePressed && (_inventoryWindow == null || !_inventoryWindow.Visible))
         {
             if (Time.IsPaused) Time.Resume();
             else               Time.Pause();
             GD.Print($"[GameWorld] Pause toggled: {Time.IsPaused}");
         }
+        // If inventory is open and Esc pressed, close it instead of pausing.
+        else if (PlayerInput.IsPausePressed && _inventoryWindow != null && _inventoryWindow.Visible)
+        {
+            _inventoryWindow.Toggle();
+        }
 
         if (PlayerInput.IsInventoryPressed)
         {
             _inventoryWindow?.Toggle();
+        }
+
+        // Suppress game input when inventory is open.
+        if (_inputAdapter != null && _inventoryWindow != null)
+        {
+            _inputAdapter.SetOverUI(_inventoryWindow.Visible);
         }
 
         if (PlayerInput.IsQuickSavePressed)

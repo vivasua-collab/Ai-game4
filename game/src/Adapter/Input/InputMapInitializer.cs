@@ -77,8 +77,6 @@ public static class InputMapInitializer
 
         // Mouse click action — Left Mouse Button for movement/interaction.
         AddMouseButtonAction("mouse_click", MouseButton.Left);
-        // Also map mouse_click to attack so existing "attack" handlers work with LMB.
-        AddMouseButtonAction("attack", MouseButton.Left);
 
         // Hotbar slots (1-9)
         for (int i = 1; i <= 9; i++)

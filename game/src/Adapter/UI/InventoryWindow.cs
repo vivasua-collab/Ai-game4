@@ -139,18 +139,9 @@ public partial class InventoryWindow : Control
         content.AddChild(footer);
     }
 
-    public override void _Input(InputEvent @event)
-    {
-        // Close on B or Esc.
-        if (_isVisible && @event is InputEventKey key && key.Pressed)
-        {
-            if (key.Keycode == Key.B || key.Keycode == Key.Escape)
-            {
-                Toggle();
-                GetViewport().SetInputAsHandled();
-            }
-        }
-    }
+    // Note: B and Esc handling is done by GameWorldController.HandleStickyInput
+    // to avoid double-toggle (both _Input and HandleStickyInput fire on same frame).
+    // GameWorldController calls Toggle() directly.
 
     /// <summary>Toggle inventory visibility.</summary>
     public void Toggle()

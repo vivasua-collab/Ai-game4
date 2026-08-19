@@ -87,22 +87,22 @@ public sealed class PlayerInputService : IPlayerInputService
         if (!InputDisabled)
         {
             if (_inventoryRaw) _inventory = true;
-            if (data.IsSticky("e") || data.IsSticky("interact")) _interact = true;
-            if (data.IsSticky("r") || data.IsSticky("rest")) _rest = true;
-            if (data.IsSticky("f") || data.IsSticky("harvest")) _harvest = true;
-            if (data.IsSticky("special")) _specialAction = true;
+            if (data.IsSticky("interact")) _interact = true;
+            if (data.IsSticky("rest")) _rest = true;
+            if (data.IsSticky("harvest")) _harvest = true;
+            if (data.IsSticky("special_action")) _specialAction = true;
             if (data.IsSticky("escape") || data.IsSticky("pause")) _pause = true;
-            if (data.IsSticky("f5")) _quickSave = true;
-            if (data.IsSticky("f9")) _quickLoad = true;
-            if (data.IsSticky("j") || data.IsSticky("journal")) _journal = true;
-            if (data.IsSticky("k") || data.IsSticky("techniques")) _techniques = true;
-            if (data.IsSticky("c") || data.IsSticky("character")) _characterSheet = true;
-            if (data.IsSticky("q") || data.IsSticky("quest")) _questLog = true;
-            if (data.IsSticky("m") || data.IsSticky("map")) _map = true;
-            if (data.IsSticky("tab") || data.IsSticky("minimap")) _minimap = true;
-            if (data.IsSticky("n") || data.IsSticky("meditate")) _meditate = true;
-            if (data.IsSticky("j") || data.IsSticky("attack")) _attack = true;
-            if (data.IsSticky("l") || data.IsSticky("defend")) _defend = true;
+            if (data.IsSticky("save")) _quickSave = true;
+            if (data.IsSticky("load")) _quickLoad = true;
+            if (data.IsSticky("journal")) _journal = true;
+            if (data.IsSticky("techniques")) _techniques = true;
+            if (data.IsSticky("character_sheet")) _characterSheet = true;
+            if (data.IsSticky("quest_log")) _questLog = true;
+            if (data.IsSticky("world_map")) _map = true;
+            if (data.IsSticky("minimap")) _minimap = true;
+            if (data.IsSticky("minimap")) _meditate = true;
+            if (data.IsSticky("attack")) _attack = true;
+            if (data.IsSticky("defend")) _defend = true;
             if (data.IsSticky("time_speed_up")) _timeSpeedUp = true;
             if (data.IsSticky("time_speed_down")) _timeSpeedDown = true;
         }

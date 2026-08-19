@@ -44,7 +44,7 @@ public sealed class SaveFileHandler : ISaveFileHandler
 
     public SaveFileHandler()
     {
-        _saveRoot = ProjectSettings.GlobalizePath("res://saves");
+        _saveRoot = ProjectSettings.GlobalizePath("user://saves");
         Directory.CreateDirectory(_saveRoot);
     }
 
