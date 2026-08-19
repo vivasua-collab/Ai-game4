@@ -58,6 +58,10 @@ public partial class GameWorldController : Node2D
     private Vector2 _visualPosition;
     private Vector2? _mouseTarget;  // null = keyboard, non-null = mouse click target
     private const float MoveSpeedPixels = 180.0f;  // pixels per second at Normal speed
+
+    // Redraw throttle for viewport-culled renderers (~10 Hz).
+    private const float RedrawIntervalSec = 0.1f;
+    private float _redrawCooldown = 0f;
     private const float RunSpeedMultiplier = 1.8f;
     private bool _positionInitialized;
 
@@ -348,6 +352,15 @@ public partial class GameWorldController : Node2D
         if (_camera != null && _playerSprite != null)
         {
             _camera.Position = _playerSprite.Position;
+        }
+
+        // Redraw tile renderers every few frames so viewport culling updates
+        // as camera/player moves. Throttle to ~10 Hz to avoid per-frame redraw cost.
+        _redrawCooldown -= (float)delta;
+        if (_redrawCooldown <= 0 && _sceneBuilder != null)
+        {
+            _sceneBuilder.QueueRedrawAll();
+            _redrawCooldown = RedrawIntervalSec;
         }
 
         // Update time HUD label.

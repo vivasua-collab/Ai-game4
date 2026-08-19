@@ -35,9 +35,12 @@ public partial class SurfaceTransitionRenderer : Node2D
         int h = _tileService.MapHeight;
         int drawn = 0;
 
-        for (int x = 0; x < w; x++)
+        // Viewport culling: only process tiles visible on screen (+1 margin for neighbor lookups).
+        GetVisibleTileRange(out int xMin, out int yMin, out int xMax, out int yMax, w, h);
+
+        for (int x = xMin; x <= xMax; x++)
         {
-            for (int y = 0; y < h; y++)
+            for (int y = yMin; y <= yMax; y++)
             {
                 var curBiome = _tileService.GetTile(x, y).Biome;
                 int curPriority = TransitionSpriteGenerator.GetBiomePriority(curBiome);
@@ -62,7 +65,25 @@ public partial class SurfaceTransitionRenderer : Node2D
             }
         }
 
-        GD.Print($"[SurfaceTransitions] Drew {drawn} transition sprites");
+        GD.Print($"[SurfaceTransitions] Drew {drawn} transition sprites (culled to {xMax-xMin+1}×{yMax-yMin+1})");
+    }
+
+    /// <summary>
+    /// Compute visible tile range from viewport + camera transform.
+    /// Adds +1 margin so neighbor lookups at edges work correctly.
+    /// </summary>
+    private void GetVisibleTileRange(out int xMin, out int yMin, out int xMax, out int yMax, int w, int h)
+    {
+        var canvasXform = GetGlobalTransformWithCanvas();
+        var vpRectScreen = GetViewportRect();
+        var topLeft = canvasXform.AffineInverse() * vpRectScreen.Position;
+        var botRight = canvasXform.AffineInverse() * (vpRectScreen.Position + vpRectScreen.Size);
+
+        // -1/+2 margin: neighbor lookups need 1 tile beyond visible area.
+        xMin = Mathf.Clamp((int)(topLeft.X / _tileSize) - 1, 0, w - 1);
+        yMin = Mathf.Clamp((int)(topLeft.Y / _tileSize) - 1, 0, h - 1);
+        xMax = Mathf.Clamp((int)(botRight.X / _tileSize) + 2, 0, w - 1);
+        yMax = Mathf.Clamp((int)(botRight.Y / _tileSize) + 2, 0, h - 1);
     }
 
     /// <summary>

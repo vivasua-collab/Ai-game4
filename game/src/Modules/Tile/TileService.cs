@@ -17,6 +17,9 @@ public sealed class TileService : ITileService
 {
     private GameTile[,] _grid = new GameTile[0, 0];
 
+    // Cached once: number of BiomeType enum values (avoid Enum.GetValues per tile).
+    private static readonly int BiomeTypeCount = System.Enum.GetValues(typeof(BiomeType)).Length;
+
     [Inject] private readonly IPublisher<TileChangedEvent> _tileChangedPub = null!;
     [Inject] private readonly IPublisher<ResourceHarvestedEvent> _harvestedPub = null!;
     [Inject] private readonly IPublisher<ResourceDepletedEvent> _depletedPub = null!;
@@ -289,29 +292,37 @@ public sealed class TileService : ITileService
             for (int y = 0; y < height; y++)
                 biomeMap[x, y] = _grid[x, y].Biome;
 
+        // Reusable count array — heap-allocated ONCE, reset per tile (no stackalloc).
+        var counts = new int[16];
+
         for (int x = 1; x < width - 1; x++)
         {
             for (int y = 1; y < height - 1; y++)
             {
-                // Count biome types in 3×3 neighborhood.
-                var counts = new System.Collections.Generic.Dictionary<BiomeType, int>();
+                // Count biome types in 3×3 neighborhood using fixed array
+                // (eliminates Dictionary allocation per tile — 250k allocs at 500×500).
+                // BiomeType enum values are small non-negative ints, safe as array index.
+                // Reset counts (only first 9 slots used, clear those).
+                counts[0] = counts[1] = counts[2] = counts[3] = 0;
+                counts[4] = counts[5] = counts[6] = counts[7] = 0;
+                counts[8] = 0;
                 for (int dx = -1; dx <= 1; dx++)
                 {
                     for (int dy = -1; dy <= 1; dy++)
                     {
                         var b = biomeMap[x + dx, y + dy];
-                        counts[b] = counts.TryGetValue(b, out var v) ? v + 1 : 1;
+                        counts[(int)b]++;
                     }
                 }
                 // Find majority (need >= 5 of 9 neighbors).
                 BiomeType majority = biomeMap[x, y];
                 int maxCount = 0;
-                foreach (var kv in counts)
+                for (int i = 0; i < BiomeTypeCount; i++)
                 {
-                    if (kv.Value >= 5 && kv.Value > maxCount)
+                    if (counts[i] >= 5 && counts[i] > maxCount)
                     {
-                        maxCount = kv.Value;
-                        majority = kv.Key;
+                        maxCount = counts[i];
+                        majority = (BiomeType)i;
                     }
                 }
                 // Apply majority if different.

@@ -25,6 +25,8 @@ public interface IGameSession
     GameSessionData Data { get; }
 
     void NewGame(int startVariant);
+    /// <summary>Start a new game with a specific location (e.g. test_polygon, large_world).</summary>
+    void NewGame(int startVariant, string locationId);
     void LoadGame(string slotName);
     void Pause();
     void Resume();

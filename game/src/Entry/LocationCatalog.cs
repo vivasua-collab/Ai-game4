@@ -35,6 +35,29 @@ public static class LocationCatalog
     };
 
     /// <summary>
+    /// Large world: 500×500 tiles (= 1×1 km), diverse terrain,
+    /// deterministic seed. For performance testing at scale.
+    /// Used when <c>GameSession.ActiveLocationId = "large_world"</c>.
+    /// </summary>
+    public static readonly LocationData LargeWorld = new()
+    {
+        Id = "large_world",
+        Name = "Большой мир",
+        Description = "Локация 1×1 км для нагрузочного тестирования. 500×500 тайлов.",
+        X = 0,
+        Y = 0,
+        Z = 0,
+        DistanceFromCenter = 0,
+        LocationType = LocationType.WildLands,
+        Width = 500,
+        Height = 500,
+        Seed = 67890,
+        TerrainType = TerrainType.Grass,
+        QiDensity = 100,
+        QiFlowRate = 1,
+    };
+
+    /// <summary>
     /// World map placeholder. Not a tile location (Width/Height = 0).
     /// Reserved for the fast-travel / region view.
     /// </summary>
@@ -57,7 +80,7 @@ public static class LocationCatalog
     };
 
     /// <summary>All registered locations.</summary>
-    public static IReadOnlyList<LocationData> GetAll() => new[] { TestPolygon, WorldMap };
+    public static IReadOnlyList<LocationData> GetAll() => new[] { TestPolygon, LargeWorld, WorldMap };
 
     /// <summary>Look up a location by id. Returns null if not found.</summary>
     public static LocationData? Find(string id)

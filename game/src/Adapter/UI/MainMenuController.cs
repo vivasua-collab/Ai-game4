@@ -19,6 +19,7 @@ public partial class MainMenuController : Control
     [Inject] private ISaveService  SaveService { get; set; } = null!;
 
     private Button  _newGameBtn  = null!;
+    private Button  _largeWorldBtn = null!;
     private Button  _loadGameBtn = null!;
     private Button  _settingsBtn = null!;
     private Button  _quitBtn     = null!;
@@ -114,11 +115,17 @@ public partial class MainMenuController : Control
         AddChild(buttonContainer);
 
         // ---- Buttons (with 4.7 hover-lift + press-shrink animations) ----
-        _newGameBtn = UIFactory.CreateButton("NewGame",   "◆ Новая игра",        400, 50);
+        _newGameBtn = UIFactory.CreateButton("NewGame",   "◆ Новая игра (50×50)", 400, 50);
         _newGameBtn.Pressed += OnNewGame;
         UIFactory.AddHoverLift(_newGameBtn);
         UIFactory.AddPressShrink(_newGameBtn);
         buttonContainer.AddChild(_newGameBtn);
+
+        _largeWorldBtn = UIFactory.CreateButton("LargeWorld", "◈ Большой мир (500×500)", 400, 50);
+        _largeWorldBtn.Pressed += OnLargeWorld;
+        UIFactory.AddHoverLift(_largeWorldBtn);
+        UIFactory.AddPressShrink(_largeWorldBtn);
+        buttonContainer.AddChild(_largeWorldBtn);
 
         _loadGameBtn = UIFactory.CreateButton("LoadGame", "◇ Загрузить игру",    400, 50);
         _loadGameBtn.Pressed += OnLoadGame;
@@ -162,15 +169,29 @@ public partial class MainMenuController : Control
 
     private void OnNewGame()
     {
-        GD.Print("[MainMenu] New Game selected");
+        GD.Print("[MainMenu] New Game selected — test_polygon (50×50)");
         try
         {
-            Session?.NewGame(1);
+            Session?.NewGame(1, "test_polygon");
             GetTree().ChangeSceneToFile(GameWorldScenePath);
         }
         catch (System.Exception ex)
         {
             GD.PrintErr($"[MainMenu] NewGame failed: {ex}");
+        }
+    }
+
+    private void OnLargeWorld()
+    {
+        GD.Print("[MainMenu] Large World selected — large_world (500×500)");
+        try
+        {
+            Session?.NewGame(1, "large_world");
+            GetTree().ChangeSceneToFile(GameWorldScenePath);
+        }
+        catch (System.Exception ex)
+        {
+            GD.PrintErr($"[MainMenu] LargeWorld failed: {ex}");
         }
     }
 

@@ -19,13 +19,15 @@ public sealed class WorldInitPhase : AbstractSceneAssemblyPhase
 
     [Inject] private readonly IWorldService _world = null!;
     [Inject] private readonly ITimeService _time = null!;
+    [Inject] private readonly IGameSession _session = null!;
 
     public override Task ExecuteAsync()
     {
-        _world.SetActiveLocation(LocationCatalog.TestPolygon.Id);
+        var locId = _session.Data?.WorldId ?? LocationCatalog.TestPolygon.Id;
+        _world.SetActiveLocation(locId);
         _time.Speed = TimeSpeed.Normal;
         Console.WriteLine(
-            $"[Phase {PhaseOrder}] {PhaseName} complete — location=test_polygon, speed=Normal");
+            $"[Phase {PhaseOrder}] {PhaseName} complete — location={locId}, speed=Normal");
         return Task.CompletedTask;
     }
 }

@@ -201,3 +201,78 @@
 - Процедурные спрайты (placeholder, заменятся на PNG позже)
 - Toast feedback: "+N item (осталось: M)"
 - Концепция задокументирована (slot protection, nested containers, harvest modes)
+
+---
+
+### 10:30 — Performance optimization + 500×500 LargeWorld scene
+
+**Task ID:** 4-b
+**Agent:** main (Z.ai Code)
+
+**Задача:**
+Оценить быстродействие при 500×500 тайлов, создать вторую сцену 500×500, отклонить концепт BG3 вложенных контейнеров.
+
+**Концепт отклонён:**
+- `docs/docs_v2/03_world/ENVIRONMENT_CONCEPT.md` §2 — BG3 nested containers → ❌ REJECTED
+- Остаётся только Storage Ring + Spirit Storage (backend уже готов)
+
+**Performance fixes (Easy Wins из аудита 4-a):**
+
+1. **SmoothBiomes: Dictionary → int[16] array**
+   - Раньше: `new Dictionary<BiomeType,int>()` PER TILE → 250k allocs (64 MB GC)
+   - Теперь: `var counts = new int[16]` heap-allocated ONCE, reset per tile
+   - + BiomeTypeCount cached statically (avoid Enum.GetValues per tile)
+   - Фикс stack overflow: stackalloc int[16] в 250k итераций вызывал SO
+
+2. **Viewport culling для 3 рендереров:**
+   - BiomeTileRenderer: GetVisibleTileRange → только видимые тайлы
+   - ObjectLayerRenderer: то же
+   - SurfaceTransitionRenderer: +1 margin для neighbor lookups
+   - Результат: 250k → ~57-144 тайлов per redraw (1736×-4400× reduction)
+   - QueueRedrawAll() в SceneBuilder, throttle 10 Hz в GameWorldController
+
+3. **Parameterize map size:**
+   - LocationCatalog.LargeWorld (500×500, seed=67890) добавлен
+   - IGameSession.NewGame(variant, locationId) overload
+   - TileMapGenPhase использует _session.Data.WorldId (не hardcoded TestPolygon)
+   - PlayerSpawnPhase + WorldInitPhase — то же
+   - MainMenu: кнопка "◈ Большой мир (500×500)"
+   - Env var GODOT_MAP_SIZE=500 для CLI benchmarking
+
+4. **GODOT_MAP_SIZE env var** для perf testing:
+   - `GODOT_MAP_SIZE=500 godot --headless scenes/GameWorld.tscn`
+   - Добавлен Stopwatch в TileModule.Start
+
+**Результаты бенчмарка (headless):**
+
+| Map size | Tiles | Generation | Render (culled) |
+|----------|-------|------------|-----------------|
+| 50×50 | 2,500 | **20 ms** | 10×10 = 100 tiles |
+| 500×500 | 250,000 | **1397 ms** | 12×12 = 144 tiles |
+
+- Generation: 1.4 sec (audit estimated 2-5.5 sec — SmoothBiomes fix ускорил)
+- Render: 144 tiles per redraw (audit estimated 250k — culling ускорил 1736×)
+- Memory: ~20 MB grid + 1.5 MB textures = ~125 MB total (по оценке)
+
+**Файлы:**
+- `docs/docs_v2/03_world/ENVIRONMENT_CONCEPT.md` — §2 REJECTED
+- `game/src/Modules/Tile/TileService.cs` — SmoothBiomes fix (int[16] + BiomeTypeCount cache)
+- `game/src/Adapter/Scene/SceneBuilder.cs` — BiomeTileRenderer culling + GetVisibleTileRange + QueueRedrawAll
+- `game/src/Adapter/Scene/ObjectLayerRenderer.cs` — culling + GetVisibleTileRange
+- `game/src/Adapter/Scene/SurfaceTransitionRenderer.cs` — culling + GetVisibleTileRange (margin +1)
+- `game/src/Adapter/Scene/GameWorldController.cs` — RedrawIntervalSec throttle (10 Hz)
+- `game/src/Entry/LocationCatalog.cs` — +LargeWorld (500×500)
+- `game/src/Core/Interfaces/IGameSession.cs` — +NewGame(variant, locationId)
+- `game/src/Entry/GameSession.cs` — NewGame overload implementation
+- `game/src/Entry/Phases/TileMapGenPhase.cs` — uses _session.Data.WorldId
+- `game/src/Entry/Phases/PlayerSpawnPhase.cs` — uses _session.Data.WorldId
+- `game/src/Entry/Phases/WorldInitPhase.cs` — uses _session.Data.WorldId
+- `game/src/Adapter/UI/MainMenuController.cs` — +LargeWorld button + OnLargeWorld handler
+- `game/src/Modules/Tile/TileModule.cs` — GODOT_MAP_SIZE env var + Stopwatch
+
+**Stage Summary:**
+- 500×500 работает: generation 1.4 sec, render 144 tiles (culled from 250k)
+- Viewport culling: 1736× reduction in draw calls
+- SmoothBiomes: 0 allocations (was 250k Dictionary allocs)
+- Scene selection: MainMenu → "Новая игра (50×50)" or "Большой мир (500×500)"
+- BG3 nested containers rejected — only Storage Ring

@@ -40,9 +40,12 @@ public partial class ObjectLayerRenderer : Node2D
         int h = _tileService.MapHeight;
         int drawn = 0;
 
-        for (int x = 0; x < w; x++)
+        // Viewport culling: only draw objects on visible tiles.
+        GetVisibleTileRange(out int xMin, out int yMin, out int xMax, out int yMax, w, h);
+
+        for (int x = xMin; x <= xMax; x++)
         {
-            for (int y = 0; y < h; y++)
+            for (int y = yMin; y <= yMax; y++)
             {
                 var tile = _tileService.GetTile(x, y);
                 if (tile.Object == ObjectType.None) continue;
@@ -57,7 +60,24 @@ public partial class ObjectLayerRenderer : Node2D
             }
         }
 
-        GD.Print($"[ObjectLayer] Drew {drawn} object sprites");
+        if (drawn > 0)
+            GD.Print($"[ObjectLayer] Drew {drawn} object sprites (culled to {xMax-xMin+1}×{yMax-yMin+1})");
+    }
+
+    /// <summary>
+    /// Compute visible tile range from viewport + camera transform.
+    /// </summary>
+    private void GetVisibleTileRange(out int xMin, out int yMin, out int xMax, out int yMax, int w, int h)
+    {
+        var canvasXform = GetGlobalTransformWithCanvas();
+        var vpRectScreen = GetViewportRect();
+        var topLeft = canvasXform.AffineInverse() * vpRectScreen.Position;
+        var botRight = canvasXform.AffineInverse() * (vpRectScreen.Position + vpRectScreen.Size);
+
+        xMin = Mathf.Clamp((int)(topLeft.X / _tileSize), 0, w - 1);
+        yMin = Mathf.Clamp((int)(topLeft.Y / _tileSize), 0, h - 1);
+        xMax = Mathf.Clamp((int)(botRight.X / _tileSize) + 1, 0, w - 1);
+        yMax = Mathf.Clamp((int)(botRight.Y / _tileSize) + 1, 0, h - 1);
     }
 
     /// <summary>Refresh after tile changes (harvest/depletion).</summary>

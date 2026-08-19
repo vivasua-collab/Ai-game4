@@ -58,25 +58,34 @@ public sealed class GameSession : IGameSession
     /// <inheritdoc />
     public void NewGame(int startVariant)
     {
+        NewGame(startVariant, LocationCatalog.TestPolygon.Id);
+    }
+
+    /// <inheritdoc />
+    public void NewGame(int startVariant, string locationId)
+    {
         if (State != SessionState.MainMenu && State != SessionState.Quitting)
         {
             Console.WriteLine($"[GameSession] NewGame rejected — state={State}");
             return;
         }
 
+        // Resolve location from catalog.
+        var loc = LocationCatalog.Find(locationId) ?? LocationCatalog.TestPolygon;
+
         SetState(SessionState.Loading);
         Data = new GameSessionData
         {
             Id = Guid.NewGuid().ToString("N"),
-            WorldId = LocationCatalog.TestPolygon.Id,
-            WorldName = LocationCatalog.TestPolygon.Name,
+            WorldId = loc.Id,
+            WorldName = loc.Name,
             StartVariant = startVariant,
             WorldTime = new WorldTime(GameConstants.START_YEAR, 1, 1, 6, 0),
             DaysSinceStart = 0,
             IsPaused = false,
         };
 
-        Console.WriteLine($"[GameSession] NewGame variant={startVariant} — assembling scene...");
+        Console.WriteLine($"[GameSession] NewGame variant={startVariant} location={loc.Id} ({loc.Width}×{loc.Height}) — assembling scene...");
         try
         {
             _orchestrator.RunAssembly(CancellationToken.None).GetAwaiter().GetResult();

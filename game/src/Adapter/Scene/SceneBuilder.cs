@@ -135,6 +135,24 @@ public partial class SceneBuilder : Node
     {
         _objectRenderer?.Refresh();
     }
+
+    /// <summary>
+    /// Queue redraw on all renderers (needed for viewport culling to update
+    /// when camera moves). Called from GameWorldController._PhysicsProcess.
+    /// </summary>
+    public void QueueRedrawAll()
+    {
+        // Each renderer is a child Node2D; QueueRedraw propagates.
+        // BiomeTileRenderer and SurfaceTransitionRenderer are added to _worldRoot,
+        // not to SceneBuilder directly, so we call QueueRedraw on each.
+        foreach (var child in _worldRoot.GetChildren())
+        {
+            if (child is CanvasItem ci)
+            {
+                ci.QueueRedraw();
+            }
+        }
+    }
 }
 
 /// <summary>
@@ -165,9 +183,13 @@ public partial class BiomeTileRenderer : Node2D
         int drawn = 0;
         int missing = 0;
 
-        for (int x = 0; x < w; x++)
+        // Viewport culling: only draw tiles visible on screen.
+        // At 500×500 = 250k tiles, only ~57 are visible at default zoom.
+        GetVisibleTileRange(out int xMin, out int yMin, out int xMax, out int yMax, w, h);
+
+        for (int x = xMin; x <= xMax; x++)
         {
-            for (int y = 0; y < h; y++)
+            for (int y = yMin; y <= yMax; y++)
             {
                 var tile = _tileService.GetTile(x, y);
                 if (_textures.TryGetValue(tile.Biome, out var tex))
@@ -185,6 +207,27 @@ public partial class BiomeTileRenderer : Node2D
             }
         }
 
-        GD.Print($"[BiomeTiles] Drew {drawn} textures, {missing} missing (fallback red)");
+        if (drawn + missing > 0)
+            GD.Print($"[BiomeTiles] Drew {drawn} textures, {missing} missing (culled to {xMax-xMin+1}×{yMax-yMin+1})");
+    }
+
+    /// <summary>
+    /// Compute visible tile range from viewport + camera transform.
+    /// Returns clamped bounds [xMin..xMax, yMin..yMax] within [0..w, 0..h].
+    /// </summary>
+    private void GetVisibleTileRange(out int xMin, out int yMin, out int xMax, out int yMax, int w, int h)
+    {
+        // GetVisibleRect() returns viewport rect in screen space.
+        // Transform canvas X-form converts to this node's local space.
+        var canvasXform = GetGlobalTransformWithCanvas();
+        var vpRectScreen = GetViewportRect();
+        // Inverse-transform viewport corners into tile space.
+        var topLeft = canvasXform.AffineInverse() * vpRectScreen.Position;
+        var botRight = canvasXform.AffineInverse() * (vpRectScreen.Position + vpRectScreen.Size);
+
+        xMin = Mathf.Clamp((int)(topLeft.X / _tileSize), 0, w - 1);
+        yMin = Mathf.Clamp((int)(topLeft.Y / _tileSize), 0, h - 1);
+        xMax = Mathf.Clamp((int)(botRight.X / _tileSize) + 1, 0, w - 1);
+        yMax = Mathf.Clamp((int)(botRight.Y / _tileSize) + 1, 0, h - 1);
     }
 }

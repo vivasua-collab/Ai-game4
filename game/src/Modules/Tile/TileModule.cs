@@ -26,10 +26,29 @@ public sealed class TileModule : IModule
     public void Start()
     {
         _locationSubToken = _locationChangedSub.Subscribe(OnLocationChanged);
-        // Generate a default grid so V1 has something playable before scene is ready
-        _tileService.Generate(_config.DefaultSeed, _config.DefaultWidth, _config.DefaultHeight, _config.DefaultTerrain);
-        _mapGenPublisher.Publish(new TileMapGeneratedEvent(_config.DefaultWidth, _config.DefaultHeight, _config.DefaultSeed));
-        Console.WriteLine($"[TileModule] Started — generated {_config.DefaultWidth}x{_config.DefaultHeight} grid");
+
+        // Env var override for perf testing: GODOT_MAP_SIZE=500 generates 500×500.
+        // Usage: GODOT_MAP_SIZE=500 godot --headless scenes/GameWorld.tscn
+        int width = _config.DefaultWidth;
+        int height = _config.DefaultHeight;
+        int seed = _config.DefaultSeed;
+        var envSize = System.Environment.GetEnvironmentVariable("GODOT_MAP_SIZE");
+        if (!string.IsNullOrEmpty(envSize) && int.TryParse(envSize, out var envW))
+        {
+            width = height = envW;
+            seed = 67890; // deterministic for large world
+            Console.WriteLine($"[TileModule] GODOT_MAP_SIZE={envW} override");
+        }
+
+        // Generate a default grid as fallback for direct scene loading
+        // (e.g. `godot scenes/GameWorld.tscn` from CLI without going through MainMenu).
+        // When NewGame() is called, TileMapGenPhase will regenerate with the
+        // selected location (test_polygon 50×50 or large_world 500×500).
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        _tileService.Generate(seed, width, height, _config.DefaultTerrain);
+        sw.Stop();
+        _mapGenPublisher.Publish(new TileMapGeneratedEvent(width, height, seed));
+        Console.WriteLine($"[TileModule] Started — generated {width}x{height} grid in {sw.ElapsedMilliseconds} ms");
     }
 
     public void Tick(int tickCount)
