@@ -9,22 +9,34 @@ using CultivationGame.Adapter.Di;
 namespace CultivationGame.Adapter.UI;
 
 /// <summary>
-/// Inventory window — line-model inventory (list of items, not grid).
-/// Opens with B key. Shows: item name, quantity, weight, total weight/volume.
+/// Inventory window — line-model inventory + character doll panel.
+/// Opens with B key.
 ///
-/// Design per docs_v2/06_player/INVENTORY_SYSTEM.md:
-/// - Line model: list of items + maxWeight + maxVolume
-/// - No grid (Tetris-style) — items are indexed by position in list
-/// - Rarity colors for item borders
+/// Layout:
+///   ┌─────────────────────────────────────────────┐
+///   │              ◆ Инвентарь ◆                   │
+///   │   Вес: 12.5 / 50.0 кг | Объём: 30 / 100     │
+///   ├──────────────────────────┬──────────────────┤
+///   │  Предметы (list, drag src)│  Кукла (drop tgt)│
+///   │  ──────                   │  ────            │
+///   │  ⚔ Железный меч-цзянь ×1  │  Голова: шлем    │
+///   │  🛡 Стальной нагрудник ×1 │  Торс: нагрудник │
+///   │  💊 Пилюля лечения ×5     │  ...             │
+///   │                           │                  │
+///   └──────────────────────────┴──────────────────┘
+///   B или Esc — закрыть | ЛКМ на кукле — снять
 ///
-/// This is a simple v1 implementation:
-/// - Read-only display (no drag&drop yet)
-/// - Shows items from IInventoryService
-/// - Closes with B or Esc
+/// Drag&drop:
+///   - Drag equipment item row → drop on doll slot = equip
+///   - Drag doll slot → drop on inventory list = unequip
+///   - LMB click on occupied doll slot = quick unequip
+///
+/// Design per docs_v2/06_player/INVENTORY_SYSTEM.md.
 /// </summary>
 public partial class InventoryWindow : Control
 {
     [Inject] private IInventoryService InventoryService { get; set; } = null!;
+    [Inject] private IItemDatabaseService ItemDatabase { get; set; } = null!;
 
     private bool _isVisible;
     private Panel _panel = null!;
@@ -32,6 +44,10 @@ public partial class InventoryWindow : Control
     private Label _headerLabel = null!;
     private Label _weightLabel = null!;
     private ScrollContainer _scroll = null!;
+    private CharacterDollPanel _dollPanel = null!;
+    private HBoxContainer _contentRow = null!;
+
+    private static bool _itemsSeeded = false;
 
     public override void _Ready()
     {
@@ -39,6 +55,14 @@ public partial class InventoryWindow : Control
         if (container != null)
         {
             ContainerAdapter.InjectProperties(this, container);
+        }
+
+        // Seed test items on first open (debug/test data).
+        if (!_itemsSeeded)
+        {
+            TestItemSeeder.Seed(ItemDatabase, InventoryService);
+            _itemsSeeded = true;
+            GD.Print("[Inventory] Test items seeded");
         }
 
         BuildUI();
@@ -49,10 +73,9 @@ public partial class InventoryWindow : Control
 
     private void BuildUI()
     {
-        // Apply parchment theme.
         Theme = ParchmentTheme.Create();
 
-        // Full-screen overlay (clickable background to close).
+        // Full-screen overlay (clickable background to close on outside click).
         SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         MouseFilter = MouseFilterEnum.Stop;
 
@@ -63,31 +86,31 @@ public partial class InventoryWindow : Control
             Color = new Color(0.05f, 0.03f, 0.02f, 0.7f),
         };
         bg.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        bg.MouseFilter = MouseFilterEnum.Stop;
+        bg.MouseFilter = MouseFilterEnum.Pass; // allow clicks to pass to close handler
         AddChild(bg);
 
-        // Main panel (centered, 600×500).
+        // Main panel (centered, 880×560 — wider to fit doll + inventory side by side).
         _panel = new Panel
         {
             Name = "InventoryPanel",
         };
         _panel.SetAnchorsAndOffsetsPreset(LayoutPreset.Center);
-        _panel.OffsetLeft = -300;
-        _panel.OffsetRight = 300;
-        _panel.OffsetTop = -250;
-        _panel.OffsetBottom = 250;
+        _panel.OffsetLeft = -440;
+        _panel.OffsetRight = 440;
+        _panel.OffsetTop = -280;
+        _panel.OffsetBottom = 280;
         _panel.MouseFilter = MouseFilterEnum.Stop;
         AddChild(_panel);
 
-        // Container for content.
-        var content = new VBoxContainer();
-        content.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        content.OffsetLeft = 16;
-        content.OffsetRight = -16;
-        content.OffsetTop = 16;
-        content.OffsetBottom = -16;
-        content.AddThemeConstantOverride("separation", 8);
-        _panel.AddChild(content);
+        // Outer VBox: header / content-row / footer.
+        var outer = new VBoxContainer();
+        outer.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+        outer.OffsetLeft = 16;
+        outer.OffsetRight = -16;
+        outer.OffsetTop = 12;
+        outer.OffsetBottom = -12;
+        outer.AddThemeConstantOverride("separation", 8);
+        _panel.AddChild(outer);
 
         // Header.
         _headerLabel = new Label
@@ -97,51 +120,94 @@ public partial class InventoryWindow : Control
         };
         _headerLabel.AddThemeFontSizeOverride("font_size", 24);
         _headerLabel.AddThemeColorOverride("font_color", ParchmentTheme.InkBlack);
-        content.AddChild(_headerLabel);
+        outer.AddChild(_headerLabel);
 
         // Weight/volume summary.
         _weightLabel = new Label
         {
-            Text = "Вес: 0.0 / 10.0 кг | Объём: 0.0 / 20.0",
+            Text = "Вес: 0.0 / 50.0 кг | Объём: 0.0 / 100.0",
             HorizontalAlignment = HorizontalAlignment.Center,
         };
         _weightLabel.AddThemeFontSizeOverride("font_size", 14);
         _weightLabel.AddThemeColorOverride("font_color", ParchmentTheme.InkFaded);
-        content.AddChild(_weightLabel);
+        outer.AddChild(_weightLabel);
 
-        // Separator.
         var sep = new HSeparator();
-        content.AddChild(sep);
+        outer.AddChild(sep);
 
-        // Scrollable item list.
+        // Content row: left = item list, right = doll panel.
+        _contentRow = new HBoxContainer
+        {
+            Name = "ContentRow",
+        };
+        _contentRow.AddThemeConstantOverride("separation", 12);
+        _contentRow.SizeFlagsVertical = SizeFlags.ExpandFill;
+        outer.AddChild(_contentRow);
+
+        // ── Left: inventory list (drag source) ──
+        var leftWrap = new VBoxContainer
+        {
+            Name = "InventoryListWrap",
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+        };
+        _contentRow.AddChild(leftWrap);
+
+        var leftTitle = new Label
+        {
+            Text = "Предметы (тащи на куклу →)",
+            HorizontalAlignment = HorizontalAlignment.Left,
+        };
+        leftTitle.AddThemeFontSizeOverride("font_size", 13);
+        leftTitle.AddThemeColorOverride("font_color", ParchmentTheme.InkFaded);
+        leftWrap.AddChild(leftTitle);
+
         _scroll = new ScrollContainer
         {
             Name = "ItemScroll",
-            CustomMinimumSize = new Vector2(560, 350),
+            CustomMinimumSize = new Vector2(560, 440),
+            SizeFlagsVertical = SizeFlags.ExpandFill,
         };
-        content.AddChild(_scroll);
+        leftWrap.AddChild(_scroll);
 
         _itemList = new VBoxContainer
         {
             Name = "ItemList",
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
         };
-        _itemList.AddThemeConstantOverride("separation", 4);
+        _itemList.AddThemeConstantOverride("separation", 3);
         _scroll.AddChild(_itemList);
+
+        // ── Right: character doll (drop target) ──
+        _dollPanel = new CharacterDollPanel
+        {
+            Name = "DollPanel",
+            CustomMinimumSize = new Vector2(260, 440),
+        };
+        _contentRow.AddChild(_dollPanel);
 
         // Footer hint.
         var footer = new Label
         {
-            Text = "B или Esc — закрыть",
+            Text = "B или Esc — закрыть | ЛКМ на кукле — снять | Перетащи предмет на слот — надеть",
             HorizontalAlignment = HorizontalAlignment.Center,
         };
-        footer.AddThemeFontSizeOverride("font_size", 13);
+        footer.AddThemeFontSizeOverride("font_size", 12);
         footer.AddThemeColorOverride("font_color", ParchmentTheme.InkFaded);
-        content.AddChild(footer);
+        outer.AddChild(footer);
+
+        // Background click → close (only if click is on bg, not panel).
+        bg.GuiInput += OnBackgroundClick;
     }
 
-    // Note: B and Esc handling is done by GameWorldController.HandleStickyInput
-    // to avoid double-toggle (both _Input and HandleStickyInput fire on same frame).
-    // GameWorldController calls Toggle() directly.
+    private void OnBackgroundClick(InputEvent @event)
+    {
+        if (@event is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Left)
+        {
+            Toggle();
+        }
+    }
+
+    // Note: B and Esc handling done by GameWorldController.HandleStickyInput.
 
     /// <summary>Toggle inventory visibility.</summary>
     public void Toggle()
@@ -151,6 +217,7 @@ public partial class InventoryWindow : Control
         if (_isVisible)
         {
             RefreshItems();
+            _dollPanel?.RefreshAll();
             GD.Print("[Inventory] Opened");
         }
         else
@@ -159,7 +226,12 @@ public partial class InventoryWindow : Control
         }
     }
 
-    /// <summary>Refresh item list from IInventoryService.</summary>
+    /// <summary>Refresh item list (called on open + after drag&drop).</summary>
+    public void RefreshExternally()
+    {
+        if (_isVisible) RefreshItems();
+    }
+
     private void RefreshItems()
     {
         // Clear existing items.
@@ -192,69 +264,139 @@ public partial class InventoryWindow : Control
 
         // Update weight/volume.
         float curWeight = InventoryService?.GetCurrentWeight() ?? 0f;
-        float maxWeight = InventoryService?.GetEffectiveMaxWeight() ?? 10f;
+        float maxWeight = InventoryService?.GetEffectiveMaxWeight() ?? 50f;
         float curVol = InventoryService?.GetCurrentVolume() ?? 0f;
-        float maxVol = InventoryService?.GetEffectiveMaxVolume() ?? 20f;
+        float maxVol = InventoryService?.GetEffectiveMaxVolume() ?? 100f;
         _weightLabel.Text = $"Вес: {curWeight:F1} / {maxWeight:F1} кг | Объём: {curVol:F1} / {maxVol:F1}";
     }
 
-    /// <summary>Create a single item row (name + quantity + weight).</summary>
-    private HBoxContainer CreateItemRow(InventorySlot slot)
+    /// <summary>Create a single draggable item row.</summary>
+    private InventoryItemRow CreateItemRow(InventorySlot slot)
     {
-        var row = new HBoxContainer();
-        row.AddThemeConstantOverride("separation", 12);
+        var row = new InventoryItemRow(slot, this, ItemDatabase);
+        return row;
+    }
+}
 
-        // Rarity color for border.
-        var rarityColor = slot.Rarity switch
-        {
-            ItemRarity.Uncommon  => ParchmentTheme.AccentGreen,
-            ItemRarity.Rare      => new Color(0.3f, 0.5f, 0.9f),
-            ItemRarity.Epic      => ParchmentTheme.AccentPurple,
-            ItemRarity.Legendary => ParchmentTheme.AccentGold,
-            ItemRarity.Mythic    => ParchmentTheme.AccentRed,
-            _                    => ParchmentTheme.InkFaded,
-        };
+/// <summary>
+/// Single inventory item row — DRAG SOURCE.
+/// Drag with LMB to a doll slot to equip. RMB to use (consumables).
+/// </summary>
+public partial class InventoryItemRow : HBoxContainer
+{
+    private readonly InventorySlot _slot;
+    private readonly InventoryWindow _parent;
+    private readonly IItemDatabaseService _itemDb;
 
-        // Rarity indicator (colored square).
-        var indicator = new ColorRect
+    private ColorRect _rarityIndicator = null!;
+    private Label _nameLabel = null!;
+    private Label _qtyLabel = null!;
+    private Label _weightLabel = null!;
+
+    public InventoryItemRow(InventorySlot slot, InventoryWindow parent, IItemDatabaseService db)
+    {
+        _slot = slot;
+        _parent = parent;
+        _itemDb = db;
+        Name = $"Item_{slot.ItemId}";
+        MouseFilter = MouseFilterEnum.Stop;
+    }
+
+    public override void _Ready()
+    {
+        AddThemeConstantOverride("separation", 12);
+
+        var rarityColor = CharacterDollPanel.GetRarityColor(_slot.Rarity);
+
+        _rarityIndicator = new ColorRect
         {
             Color = rarityColor,
-            CustomMinimumSize = new Vector2(8, 24),
+            CustomMinimumSize = new Vector2(6, 22),
         };
-        row.AddChild(indicator);
+        AddChild(_rarityIndicator);
 
-        // Item name.
-        var nameLabel = new Label
+        // Resolve display name from database (fallback to itemId).
+        string displayName = _slot.ItemId;
+        if (_itemDb.TryGetItem(_slot.ItemId, out var itemData))
         {
-            Text = slot.ItemId,
-            CustomMinimumSize = new Vector2(200, 24),
+            displayName = itemData.NameRu;
+        }
+
+        _nameLabel = new Label
+        {
+            Text = displayName,
+            CustomMinimumSize = new Vector2(220, 22),
         };
-        nameLabel.AddThemeFontSizeOverride("font_size", 15);
-        nameLabel.AddThemeColorOverride("font_color", ParchmentTheme.InkBlack);
-        row.AddChild(nameLabel);
+        _nameLabel.AddThemeFontSizeOverride("font_size", 14);
+        _nameLabel.AddThemeColorOverride("font_color", rarityColor);
+        AddChild(_nameLabel);
 
-        // Quantity.
-        var qtyLabel = new Label
+        _qtyLabel = new Label
         {
-            Text = $"×{slot.Count}",
-            CustomMinimumSize = new Vector2(60, 24),
+            Text = $"×{_slot.Count}",
+            CustomMinimumSize = new Vector2(50, 22),
             HorizontalAlignment = HorizontalAlignment.Right,
         };
-        qtyLabel.AddThemeFontSizeOverride("font_size", 15);
-        qtyLabel.AddThemeColorOverride("font_color", ParchmentTheme.InkFaded);
-        row.AddChild(qtyLabel);
+        _qtyLabel.AddThemeFontSizeOverride("font_size", 14);
+        _qtyLabel.AddThemeColorOverride("font_color", ParchmentTheme.InkFaded);
+        AddChild(_qtyLabel);
 
-        // Weight.
-        var weightLabel = new Label
+        _weightLabel = new Label
         {
-            Text = $"{slot.Weight:F1} кг",
-            CustomMinimumSize = new Vector2(80, 24),
+            Text = $"{_slot.Weight:F1} кг",
+            CustomMinimumSize = new Vector2(70, 22),
             HorizontalAlignment = HorizontalAlignment.Right,
         };
-        weightLabel.AddThemeFontSizeOverride("font_size", 13);
-        weightLabel.AddThemeColorOverride("font_color", ParchmentTheme.InkFaded);
-        row.AddChild(weightLabel);
+        _weightLabel.AddThemeFontSizeOverride("font_size", 12);
+        _weightLabel.AddThemeColorOverride("font_color", ParchmentTheme.InkFaded);
+        AddChild(_weightLabel);
+    }
 
-        return row;
+    // === Drag source: provide drag data ===
+
+    public override Variant _GetDragData(Vector2 atPosition)
+    {
+        // Only equipment is draggable (consumables cannot be equipped).
+        if (!_itemDb.TryGetItem(_slot.ItemId, out var itemData))
+            return new Variant();
+
+        bool isEquipment = itemData.Category == ItemCategory.Weapon
+                        || itemData.Category == ItemCategory.Armor
+                        || itemData.Category == ItemCategory.Accessory;
+        if (!isEquipment)
+        {
+            // Show feedback for consumables (not draggable to doll).
+            SetDragPreview(BuildConsumablePreview(itemData.NameRu));
+            return new Variant(); // empty = no drag
+        }
+
+        var dragData = CharacterDollPanel.CreateDragData(itemData, "inventory");
+        SetDragPreview(CharacterDollPanel.BuildDragPreview(itemData.NameRu,
+            CharacterDollPanel.GetRarityColor(itemData.Rarity)));
+        return dragData;
+    }
+
+    private static Control BuildConsumablePreview(string name)
+    {
+        var preview = new Label
+        {
+            Text = $"💊 {name} — нельзя надеть",
+        };
+        preview.AddThemeFontSizeOverride("font_size", 13);
+        preview.AddThemeColorOverride("font_color", ParchmentTheme.InkFaded);
+        return preview;
+    }
+
+    // === RMB: use consumable (stub for now) ===
+
+    public override void _GuiInput(InputEvent @event)
+    {
+        if (@event is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Right)
+        {
+            if (_itemDb.TryGetItem(_slot.ItemId, out var itemData))
+            {
+                GD.Print($"[Inventory] RMB on {itemData.NameRu} (category={itemData.Category}, rarity={itemData.Rarity})");
+            }
+        }
     }
 }

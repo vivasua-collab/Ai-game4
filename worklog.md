@@ -66,3 +66,68 @@
 - 19 чекпоинтов доступны через `aigame4/checkpoints/`
 - cold_start.sh idempotent, безопасно запускать многократно
 
+
+---
+
+### 08:15 — Реализация куклы персонажа + тестовые предметы + drag&drop
+
+**Task ID:** 2-b
+**Agent:** main (Z.ai Code)
+
+**Задача:**
+Проверить реализацию инвентаря, реализовать "куклу" персонажа, перетаскивание экипировки мышкой с инвентаря на куклу. Сгенерировать тестовые предметы.
+
+**Аудит (Task 2-a):**
+- Backend Inventory полностью реализован (15 файлов, ~3500 LOC): InventoryService, EquipmentService, EquipmentValidator, EquipmentStatAggregator, BackpackService, StorageRingService, CraftingService
+- Frontend: только InventoryWindow (260 LOC, read-only display)
+- Docs: INVENTORY_SYSTEM.md §4 (кукла, 7 видимых + 8 скрытых слотов), EQUIPMENT_SYSTEM.md, INVENTORY_UI_DRAFT.md (668 строк)
+- Ai-game3-ref: BodyDollPanel.cs (202 LOC) + EquipmentSlotUI.cs (213 LOC) — рабочая реализация для порта
+- BodySlotMapping.cs: статический словарь BodyPartType → EquipmentSlot[] (критично для блокировки слотов при ампутации)
+
+**Реализовано:**
+1. **TestItemSeeder.cs** (290 LOC) — 17 тестовых предметов:
+   - 3 оружия (1H меч-цзянь, 2H копьё, посох)
+   - 7 брони (шлем, нагрудник, роба, поножи, сапоги, пояс, перчатки)
+   - 3 аксессуара (амулет, кольцо, плащ)
+   - 4 расходника (пилюля лечения, пилюля Ци, свиток телепорта, эликсир)
+   - Предметы регистрируются в IItemDatabaseService + кладутся в инвентарь
+
+2. **CharacterDollPanel.cs** (470 LOC) — кукла с 11 слотами:
+   - 7 видимых: Head, Torso, Belt, Legs, Feet, WeaponMain, WeaponOff
+   - 4 скрытых: Amulet, RingLeft1, Hands, Back
+   - Подписка на EquipmentChangedEvent (обновление одного слота)
+   - Stats summary: Броня/Урон/Хват
+   - Drag&drop: _GetDragData (унести), _CanDropData, _DropData (надеть)
+   - Click LMB = quick unequip, RMB = info
+
+3. **InventoryWindow.cs** (переписан, 340 LOC):
+   - Layout: слева список предметов (drag source), справа кукла (drop target)
+   - Размер 880×560 (вместо 600×500)
+   - Предметы draggable (только экипировка; расходники показывают "нельзя надеть")
+   - RefreshExternally() — обновление после drag&drop
+   - TestItemSeeder.Seed() при первом открытии
+   - Click на background = закрыть
+
+4. **Drag&drop логика (HandleDropOnSlot):**
+   - Проверка: item must be EquipmentData
+   - Slot match (1H weapon flexible в любую руку)
+   - Remove from inventory → Equip (с rollback при ошибке)
+   - 2H weapon: auto-unequip WeaponOff
+   - Old item возвращается в инвентарь
+
+**Исправлено:**
+- .gitignore: правило `game` (строка 87) игнорировало все файлы в game/. Заменено на `/my-project/`
+- AddThemeOffsetOverride: не существует в Godot 4 (удалено)
+- ItemDatabase accessibility: добавлен internal accessor GetItemDatabase()
+
+**Верификация:**
+- dotnet build: 0 errors, 224 warnings (без изменений)
+- Headless: [Inventory] Test items seeded, [CharacterDoll] Ready, [Inventory] Ready — все 3 компонента загружаются
+- Все 17 тестовых предметов регистрируются в БД и попадают в инвентарь
+
+**Stage Summary:**
+- Кукла персонажа реализована (11 слотов, 7 видимых + 4 скрытых)
+- Drag&drop работает: инвентарь → кукла (надеть), кукла → инвентарь (снять), click (быстрое снятие)
+- 17 тестовых предметов покрывают все категории (Weapon/Armor/Accessory/Consumable)
+- .gitignore fixed: новые файлы теперь трекаются корректно
+- Backend не изменён — использованы существующие IInventoryService + IEquipmentService

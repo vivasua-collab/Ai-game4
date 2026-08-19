@@ -84,4 +84,6 @@ secrets.json
 credentials.json
 
 # GitHub tokens must NEVER be in any file. Use environment variables instead.
-game
+
+# Next.js sandbox root (do NOT match our game/ folder — that's the Godot project)
+/my-project/
