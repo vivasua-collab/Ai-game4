@@ -172,6 +172,39 @@ namespace CultivationGame.Adapter.UI
                 weight: 0.2f, volume: 0.3f, rarity: ItemRarity.Epic, maxStack: 1,
                 effectType: "vitality_boost", effectValue: 10));
 
+            // === Материалы (добываемые из окружения) ===
+            // IDs match ObjectDefaults.ItemId so ResourceHarvestedEvent → ItemAddRequestEvent resolves correctly.
+            list.Add(CreateMaterial("material_wood", "Древесина", "Wood",
+                "Обработанное дерево. Базовый строительный материал.",
+                weight: 0.5f, volume: 1.0f, rarity: ItemRarity.Common, maxStack: 100,
+                materialCategory: MaterialCategory.Wood, materialTier: 1));
+
+            list.Add(CreateMaterial("material_stone", "Камень", "Stone",
+                "Кусок необработанного камня. Для строительства и крафта.",
+                weight: 1.0f, volume: 1.0f, rarity: ItemRarity.Common, maxStack: 100,
+                materialCategory: MaterialCategory.Organic, materialTier: 1));
+
+            list.Add(CreateMaterial("material_iron_ore", "Железная руда", "Iron Ore",
+                "Руда с примесью железа. Нужна переплавка в горне.",
+                weight: 1.5f, volume: 1.0f, rarity: ItemRarity.Uncommon, maxStack: 50,
+                materialCategory: MaterialCategory.Metal, materialTier: 2));
+
+            list.Add(CreateMaterial("material_copper_ore", "Медная руда", "Copper Ore",
+                "Мягкий металл. Проводит Ци лучше железа.",
+                weight: 1.3f, volume: 1.0f, rarity: ItemRarity.Uncommon, maxStack: 50,
+                materialCategory: MaterialCategory.Metal, materialTier: 2));
+
+            // === Расходники из окружения ===
+            list.Add(CreateConsumable("consumable_berry", "Ягоды", "Berries",
+                "Дикие ягоды. Восстанавливают 5 HP и немного утоляют голод.",
+                weight: 0.05f, volume: 0.1f, rarity: ItemRarity.Common, maxStack: 50,
+                effectType: "heal", effectValue: 5));
+
+            list.Add(CreateConsumable("consumable_herb", "Лекарственная трава", "Medicinal Herb",
+                "Целебная трава. Компонент для пилюль и отваров.",
+                weight: 0.03f, volume: 0.1f, rarity: ItemRarity.Uncommon, maxStack: 50,
+                effectType: "material", effectValue: 0));
+
             return list;
         }
 
@@ -295,6 +328,29 @@ namespace CultivationGame.Adapter.UI
                 Weight = weight,
                 Volume = volume,
                 Value = effectValue,
+                HasDurability = false,
+            };
+        }
+
+        private static ItemData CreateMaterial(
+            string id, string nameRu, string nameEn, string desc,
+            float weight, float volume, ItemRarity rarity, int maxStack,
+            MaterialCategory materialCategory, int materialTier)
+        {
+            return new ItemData
+            {
+                ItemId = id,
+                NameRu = nameRu,
+                NameEn = nameEn,
+                Description = desc,
+                Category = ItemCategory.Material,
+                ItemType = "Material",
+                Rarity = rarity,
+                Stackable = true,
+                MaxStack = maxStack,
+                Weight = weight,
+                Volume = volume,
+                Value = materialTier * 5,
                 HasDurability = false,
             };
         }

@@ -45,6 +45,8 @@ public partial class GameWorldController : Node2D
     private CanvasLayer   _hudCanvas     = null!;
     private Label         _timeLabel     = null!;
     private Label         _hudLabel      = null!;
+    private Label         _toastLabel    = null!;
+    private float         _toastTimer    = 0f;
 
     // Cached bounds of the test polygon (50×50) for camera limits.
     private int _worldWidth  = 50;
@@ -264,6 +266,23 @@ public partial class GameWorldController : Node2D
         _hudLabel.Position = new Vector2(20, 1020);  // bottom of 1080p screen
         _hudCanvas.AddChild(_hudLabel);
 
+        // Toast label — top-center, for harvest/interaction feedback.
+        _toastLabel = new Label
+        {
+            Name = "ToastLabel",
+            Text = "",
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Visible = false,
+        };
+        _toastLabel.AddThemeFontSizeOverride("font_size", 18);
+        _toastLabel.AddThemeColorOverride("font_color", new Color(0.98f, 0.85f, 0.3f));
+        _toastLabel.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.9f));
+        _toastLabel.SetAnchorsPreset(Control.LayoutPreset.CenterTop);
+        _toastLabel.OffsetTop = 60;
+        _toastLabel.OffsetLeft = -200;
+        _toastLabel.OffsetRight = 200;
+        _hudCanvas.AddChild(_toastLabel);
+
         // Inventory window (opens with B key) — must be created AFTER _hudCanvas.
         _inventoryWindow = new InventoryWindow { Name = "InventoryWindow" };
         _hudCanvas.AddChild(_inventoryWindow);
@@ -336,6 +355,16 @@ public partial class GameWorldController : Node2D
         {
             var t = Time.CurrentTime;
             _timeLabel.Text = $"{t.Year} г. {t.Month:D2}/{t.Day:D2} {t.Hour:D2}:{t.Minute:D2} | Скорость: {Time.Speed}";
+        }
+
+        // Toast timer: hide toast after expiry.
+        if (_toastLabel != null && _toastLabel.Visible)
+        {
+            _toastTimer -= (float)delta;
+            if (_toastTimer <= 0)
+            {
+                _toastLabel.Visible = false;
+            }
         }
 
         HandleStickyInput();
@@ -478,6 +507,12 @@ public partial class GameWorldController : Node2D
             _inventoryWindow?.Toggle();
         }
 
+        // F key: harvest resource from tile under cursor (within distance).
+        if (PlayerInput.IsHarvestPressed)
+        {
+            HandleHarvest();
+        }
+
         // Suppress game input when inventory is open.
         if (_inputAdapter != null && _inventoryWindow != null)
         {
@@ -521,6 +556,95 @@ public partial class GameWorldController : Node2D
                 _speedChangeCooldown = SpeedChangeCooldownSec;
             }
         }
+    }
+
+    /// <summary>
+    /// Handle F-key harvest: find tile under cursor, check distance, call TryHarvest.
+    /// Shows toast with result (+N itemId) or error message.
+    /// </summary>
+    private void HandleHarvest()
+    {
+        if (Tiles == null || _camera == null) return;
+
+        // Get cursor world position.
+        var mouseWorldPos = GetGlobalMousePosition();
+        int targetX = (int)(mouseWorldPos.X / GameConstants.TILE_PIXELS);
+        int targetY = (int)(mouseWorldPos.Y / GameConstants.TILE_PIXELS);
+
+        // Player tile position.
+        int playerX = (int)(_visualPosition.X / GameConstants.TILE_PIXELS);
+        int playerY = (int)(_visualPosition.Y / GameConstants.TILE_PIXELS);
+
+        // Chebyshev distance (max of dx, dy) — allows diagonal reach.
+        int distX = System.Math.Abs(targetX - playerX);
+        int distY = System.Math.Abs(targetY - playerY);
+        int distance = System.Math.Max(distX, distY);
+
+        const int MaxHarvestDistance = 3;
+        if (distance > MaxHarvestDistance)
+        {
+            ShowToast($"Слишком далеко (дистанция {distance}, максимум {MaxHarvestDistance})");
+            return;
+        }
+
+        // Check bounds.
+        if (targetX < 0 || targetY < 0 || targetX >= Tiles.MapWidth || targetY >= Tiles.MapHeight)
+        {
+            ShowToast("За пределами карты");
+            return;
+        }
+
+        var tile = Tiles.GetTile(targetX, targetY);
+        if (tile.Object == ObjectType.None)
+        {
+            ShowToast($"Тайл ({targetX},{targetY}) — нет объекта");
+            return;
+        }
+
+        if (!tile.IsHarvestable || tile.ResourceAmount <= 0f)
+        {
+            // Object exists but no resource (e.g., plain Bush, or depleted).
+            var objName = tile.Object.ToString();
+            if (tile.ResourceAmount <= 0f && tile.Object != ObjectType.None)
+            {
+                ShowToast($"{objName} — ресурс исчерпан");
+            }
+            else
+            {
+                ShowToast($"{objName} — нельзя собрать");
+            }
+            return;
+        }
+
+        // Try harvest.
+        if (Tiles.TryHarvest(targetX, targetY, out var result))
+        {
+            string itemName = result.ItemId;
+            // Resolve display name from ItemDatabase if possible.
+            ShowToast($"+{result.Amount} {itemName} (осталось: {result.ResourceRemaining:F0})");
+
+            // Refresh object layer (object may have been removed if depleted).
+            _sceneBuilder?.RefreshObjectLayer();
+
+            if (result.Depleted)
+            {
+                ShowToast($"Объект исчерпан! +{result.Amount} {itemName}");
+            }
+        }
+        else
+        {
+            ShowToast("Не удалось добыть ресурс");
+        }
+    }
+
+    /// <summary>Show a toast message at top-center of screen for 2.5 seconds.</summary>
+    private void ShowToast(string message)
+    {
+        if (_toastLabel == null) return;
+        _toastLabel.Text = message;
+        _toastLabel.Visible = true;
+        _toastTimer = 2.5f;
+        GD.Print($"[GameWorld] Toast: {message}");
     }
 
     /// <summary>Cycle speed up: Normal → Fast → Quick (no Paused).</summary>

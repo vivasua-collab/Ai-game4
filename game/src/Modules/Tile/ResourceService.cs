@@ -56,18 +56,33 @@ public sealed class ResourceService : IResourceService, IDisposable
         if (!tile.IsHarvestable || tile.ResourceAmount <= 0f || string.IsNullOrEmpty(tile.ResourceId))
             return HarvestResult.Empty;
 
-        int amount = Math.Max(1, (int)(tile.ResourceMax * 0.1f));
+        // Use HarvestAmount from ObjectDefaults (fallback to 10% of ResourceMax).
+        string itemId = tile.ResourceId;
+        int amount = 1;
+        if (ObjectDefaults.TryGet(tile.Object, out var objInfo))
+        {
+            itemId = objInfo.ItemId;
+            amount = objInfo.HarvestAmount > 0 ? objInfo.HarvestAmount : Math.Max(1, (int)(tile.ResourceMax * 0.1f));
+        }
+        else
+        {
+            amount = Math.Max(1, (int)(tile.ResourceMax * 0.1f));
+        }
+
         if (amount > tile.ResourceAmount) amount = (int)tile.ResourceAmount;
         if (amount <= 0) return HarvestResult.Empty;
 
         float remaining = Math.Max(0f, tile.ResourceAmount - amount);
         bool depleted = remaining <= 0f;
 
-        _itemAddPub.Publish(new ItemAddRequestEvent(tile.ResourceId, amount, "harvest"));
-        _harvestedPub.Publish(new ResourceHarvestedEvent(
-            x, y, tile.ResourceId, tile.ResourceId, amount, remaining));
+        // Publish ItemAddRequest with ITEM ID (not resource ID) so InventoryModule
+        // can resolve it via IItemDatabaseService.TryGetItem().
+        _itemAddPub.Publish(new ItemAddRequestEvent(itemId, amount, "harvest"));
 
-        return new HarvestResult(tile.ResourceId, amount, remaining, depleted);
+        // NOTE: ResourceHarvestedEvent is published by TileService.TryHarvest (sole publisher).
+        // Do NOT publish here to avoid double-publish bug.
+
+        return new HarvestResult(itemId, amount, remaining, depleted);
     }
 
     public void RegisterDepletedResource(int x, int y, in GameTile tile)

@@ -131,3 +131,73 @@
 - 17 тестовых предметов покрывают все категории (Weapon/Armor/Accessory/Consumable)
 - .gitignore fixed: новые файлы теперь трекаются корректно
 - Backend не изменён — использованы существующие IInventoryService + IEquipmentService
+
+---
+
+### 09:20 — Окружение: деревья/кусты/камни/руда + спрайты + добыча (Mode A)
+
+**Task ID:** 3-b
+**Agent:** main (Z.ai Code)
+
+**Задача:**
+Защита слотов (концепция), анализ вложенных контейнеров BG3, реализация окружения (деревья, кусты, камни, руда), спрайты, привязка ресурсов, добыча, уничтожение при исчерпании.
+
+**Концепция (без кода):**
+- `docs/docs_v2/03_world/ENVIRONMENT_CONCEPT.md` — анализ 3 вопросов:
+  1. Защита слотов: уже реализована (Dictionary + UI валидация). Belt exception для расходников — v2
+  2. Вложенные контейнеры BG3: отложить. Использовать Storage Ring + Spirit Storage (backend уже есть)
+  3. Режимы добычи: Mode A (gradual, 85% готов) vs Mode B (threshold, 20% готов). Рекомендация: V1=Mode A, V2=Mode B для деревьев/камней
+
+**Реализация Mode A (постепенная добыча):**
+
+1. **Fix TileService.Generate** (step 5):
+   - Использует ObjectDefaults (resourceId, ResourceMax, HP, HardnessTier)
+   - Деревья: Forest=15% (oak/pine/birch), Grassland/Steppe=5% (oak)
+   - Камни: Stone terrain=12% (small/medium/large)
+   - Руда: Stone in Mountains=3% (OreVein)
+   - Кусты: Grass/Dirt in Grassland/Forest=6% (berry/bush)
+   - Травы: Grass=1% (herb)
+
+2. **Fix double-publish bug** (ResourceService.Harvest):
+   - Убрана публикация ResourceHarvestedEvent (теперь только TileService публикует)
+   - ItemAddRequestEvent теперь использует ItemId из ObjectDefaults (не ResourceId)
+   - Использует HarvestAmount из ObjectDefaults (не хардкод 10%)
+
+3. **Fix tile grid update bug** (TileService.TryHarvest):
+   - ResourceAmount теперь обновляется в _grid (раньше не обновлялся при _resourceService != null)
+   - При depleted: Object = None, IsHarvestable = false, ResourceId = ""
+   - Schedule respawn via RegisterDepletedResource
+
+4. **Add IsHarvestPressed** to IPlayerInputService + PlayerInputService
+
+5. **Add material items** to TestItemSeeder (6 новых):
+   - material_wood, material_stone, material_iron_ore, material_copper_ore
+   - consumable_berry, consumable_herb
+   - IDs match ObjectDefaults.ItemId
+
+6. **ObjectLayerRenderer.cs** (300 LOC):
+   - Процедурные спрайты (Image → ImageTexture, без PNG файлов)
+   - 9 ObjectType: Tree_Oak/Pine/Birch, Rock_Small/Medium/Large, Bush/Bush_Berry, OreVein, Herb, Chest
+   - ZIndex = RenderLayer.Objects (3), выше terrain, ниже player
+   - Refresh() после добычи (объект исчезает)
+
+7. **GameWorldController.HandleHarvest**:
+   - F key → cursor tile → Chebyshev distance check (≤3) → TryHarvest
+   - Toast: "+5 material_wood (осталось: 45)" или "Слишком далеко"
+   - Refresh object layer после добычи
+   - Toast label (top-center, 2.5s expiry)
+
+**Верификация:**
+- dotnet build: 0 errors, 0 warnings
+- Headless: `[ObjectLayer] Drew 71 object sprites` — 71 объект на карте 50×50
+- `[Inventory] Test items seeded` — 6 материалов + расходников зарегистрировано
+- TileService.Generate: Grass=51%, Water=26%, Sand=21% → деревья/кусты на Grass
+
+**Stage Summary:**
+- 71 объект окружения генерируется (trees, bushes, herbs)
+- F key добывает ресурсы (Mode A: 10% per harvest, depletion at 0)
+- Объекты исчезают при исчерпании (Object = None)
+- Респаун запланирован (7 дней, через RegisterDepletedResource)
+- Процедурные спрайты (placeholder, заменятся на PNG позже)
+- Toast feedback: "+N item (осталось: M)"
+- Концепция задокументирована (slot protection, nested containers, harvest modes)

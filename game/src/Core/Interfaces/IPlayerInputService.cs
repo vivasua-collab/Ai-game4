@@ -34,6 +34,9 @@ namespace CultivationGame.Core.Interfaces
         /// <summary>Нажато ли взаимодействие (E, однократное)</summary>
         bool IsInteractPressed { get; }
 
+        /// <summary>Нажата ли добыча (F, однократное) — сбор ресурсов/использование инструмента</summary>
+        bool IsHarvestPressed { get; }
+
         /// <summary>Нажат ли инвентарь (I, однократное)</summary>
         bool IsInventoryPressed { get; }
 

@@ -56,6 +56,7 @@ public sealed class PlayerInputService : IPlayerInputService
     public bool IsAttackPressed => _attack;
     public bool IsDefendPressed => _defend;
     public bool IsInteractPressed => _interact;
+    public bool IsHarvestPressed => _harvest && !InputDisabled;
     public bool IsInventoryPressed => _inventory && !InputDisabled;
     public bool IsInventoryPressedRaw => _inventoryRaw;
     public bool IsMeditatePressed => _meditate;

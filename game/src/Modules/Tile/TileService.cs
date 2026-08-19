@@ -66,21 +66,27 @@ public sealed class TileService : ITileService
             float remaining = tile.ResourceAmount - 1f;
             bool depleted = remaining <= 0f;
             result = new HarvestResult(tile.ResourceId, 1, remaining, depleted);
-            var updated = tile;
-            updated.ResourceAmount = remaining;
-            if (depleted)
-            {
-                updated.IsHarvestable = false;
-                updated.ResourceId = string.Empty;
-            }
-            _grid[x, y] = updated;
         }
 
-        _harvestedPub.Publish(new ResourceHarvestedEvent(
-            x, y, _grid[x, y].ResourceId, result.ItemId, result.Amount, result.ResourceRemaining));
+        // Update the tile grid: reduce ResourceAmount, clear object if depleted.
+        // This MUST be done in TileService (owner of _grid), not in ResourceService.
+        var updated = tile;
+        updated.ResourceAmount = result.ResourceRemaining;
         if (result.Depleted)
         {
-            _depletedPub.Publish(new ResourceDepletedEvent(x, y, _grid[x, y].ResourceId));
+            updated.IsHarvestable = false;
+            updated.ResourceId = string.Empty;
+            updated.Object = ObjectType.None;
+            // Schedule respawn via ResourceService (7-day timer).
+            _resourceService?.RegisterDepletedResource(x, y, in tile);
+        }
+        _grid[x, y] = updated;
+
+        _harvestedPub.Publish(new ResourceHarvestedEvent(
+            x, y, updated.ResourceId, result.ItemId, result.Amount, result.ResourceRemaining));
+        if (result.Depleted)
+        {
+            _depletedPub.Publish(new ResourceDepletedEvent(x, y, tile.ResourceId));
         }
         return true;
     }
@@ -166,30 +172,81 @@ public sealed class TileService : ITileService
             }
         }
 
-        // Step 5: scatter resources based on terrain.
+        // Step 5: scatter environment objects based on terrain.
+        // Uses ObjectDefaults for ResourceId, ResourceMax, HP, HardnessTier.
+        // Density tuned per terrain type.
         for (int x = 0; x < width; x++)
         {
             for (int y = 0; y < height; y++)
             {
                 var terrain = _grid[x, y].Terrain;
+                var biome = _grid[x, y].Biome;
 
-                // Trees on grass (5% chance).
-                if (terrain == TerrainType.Grass && rng.Next(0, 100) < 5)
+                ObjectType? objType = null;
+                int chance = 0;
+
+                // Trees: denser in Forest biome, sparse in Grassland.
+                if (terrain == TerrainType.Grass)
                 {
-                    _grid[x, y] = GameTile.CreateWithObject(x, y, terrain,
-                        ObjectType.Tree_Oak, resourceMax: 3f, resourceId: "wood", hp: 0f);
+                    if (biome == BiomeType.Forest)
+                    {
+                        // Forest: 15% trees, mix of oak/pine/birch.
+                        chance = 15;
+                        objType = rng.Next(0, 3) switch
+                        {
+                            0 => ObjectType.Tree_Oak,
+                            1 => ObjectType.Tree_Pine,
+                            _ => ObjectType.Tree_Birch,
+                        };
+                    }
+                    else if (biome == BiomeType.Grassland || biome == BiomeType.Steppe)
+                    {
+                        // Grassland/Steppe: 5% trees (oak only).
+                        chance = 5;
+                        objType = ObjectType.Tree_Oak;
+                    }
                 }
-                // Rocks on stone (8% chance).
-                else if (terrain == TerrainType.Stone && rng.Next(0, 100) < 8)
+                // Rocks: on Stone terrain (mountains/highlands).
+                else if (terrain == TerrainType.Stone)
                 {
-                    _grid[x, y] = GameTile.CreateWithObject(x, y, terrain,
-                        ObjectType.Rock_Medium, resourceMax: 5f, resourceId: "stone", hp: 0f);
+                    // 12% rocks, mix of small/medium/large.
+                    chance = 12;
+                    objType = rng.Next(0, 3) switch
+                    {
+                        0 => ObjectType.Rock_Small,
+                        1 => ObjectType.Rock_Medium,
+                        _ => ObjectType.Rock_Large,
+                    };
                 }
-                // Bushes on dirt (4% chance).
-                else if (terrain == TerrainType.Dirt && rng.Next(0, 100) < 4)
+                // Ore veins: rare on Stone in Mountains biome.
+                else if (terrain == TerrainType.Stone && biome == BiomeType.Mountains)
                 {
-                    _grid[x, y] = GameTile.CreateWithObject(x, y, terrain,
-                        ObjectType.Bush, resourceMax: 2f, resourceId: "berries", hp: 0f);
+                    chance = 3;
+                    objType = ObjectType.OreVein;
+                }
+                // Bushes: on Dirt and Grass (passable, berries).
+                else if (terrain == TerrainType.Dirt || terrain == TerrainType.Grass)
+                {
+                    if (biome == BiomeType.Grassland || biome == BiomeType.Forest)
+                    {
+                        chance = 6;
+                        objType = rng.Next(0, 2) == 0 ? ObjectType.Bush_Berry : ObjectType.Bush;
+                    }
+                }
+                // Herbs: very rare on Grass in any land biome.
+                if (objType == null && terrain == TerrainType.Grass && rng.Next(0, 100) < 1)
+                {
+                    objType = ObjectType.Herb;
+                    chance = 1;
+                }
+
+                if (objType.HasValue && rng.Next(0, 100) < chance)
+                {
+                    var info = ObjectDefaults.TryGet(objType.Value, out var oi) ? oi : default;
+                    _grid[x, y] = GameTile.CreateWithObject(x, y, terrain, objType.Value,
+                        resourceMax: oi.ResourceMax,
+                        resourceId: oi.ResourceId,
+                        hp: oi.DestructibleHP);
                 }
             }
         }

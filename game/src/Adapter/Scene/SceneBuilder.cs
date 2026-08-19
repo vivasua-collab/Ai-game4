@@ -44,6 +44,8 @@ public partial class SceneBuilder : Node
         SetupTerrainSprites();
         // Stratum 1: surface transition sprites.
         SetupSurfaceTransitions();
+        // Stratum 3+: environment objects (trees, rocks, bushes, ore).
+        SetupObjectLayer();
     }
 
     /// <summary>
@@ -112,6 +114,26 @@ public partial class SceneBuilder : Node
         var renderer = new SurfaceTransitionRenderer();
         _worldRoot.AddChild(renderer);
         renderer.Initialize(TileService, GameConstants.TILE_PIXELS);
+    }
+
+    /// <summary>
+    /// Stratum 3+: environment objects (trees, rocks, bushes, ore).
+    /// Procedural placeholder textures (no PNG files needed yet).
+    /// </summary>
+    private ObjectLayerRenderer? _objectRenderer;
+
+    private void SetupObjectLayer()
+    {
+        if (TileService == null) return;
+        _objectRenderer = new ObjectLayerRenderer();
+        _worldRoot.AddChild(_objectRenderer);
+        _objectRenderer.Initialize(TileService, GameConstants.TILE_PIXELS);
+    }
+
+    /// <summary>Refresh object layer after tile changes (harvest/depletion).</summary>
+    public void RefreshObjectLayer()
+    {
+        _objectRenderer?.Refresh();
     }
 }
 
