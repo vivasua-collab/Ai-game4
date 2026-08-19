@@ -276,3 +276,75 @@
 - SmoothBiomes: 0 allocations (was 250k Dictionary allocs)
 - Scene selection: MainMenu → "Новая игра (50×50)" or "Большой мир (500×500)"
 - BG3 nested containers rejected — only Storage Ring
+
+---
+
+### 11:45 — Подготовка к NPC + Combat: аудит + план + генератор debug
+
+**Task ID:** 5
+**Agent:** main (Z.ai Code)
+
+**Задача:**
+Подготовить всё для внедрения NPC (мирные/враждебные), взаимодействие, тестовый чат, торговцы. Анализ боевой системы (классическая + техники). Проверка генераторов. Изучение документации.
+
+**Аудит (3 параллельных агента):**
+
+1. **Task 5-a — NPC система** (worklog lines 1075-1408):
+   - Backend ~3500 LOC, 16 файлов — MOSTLY IMPLEMENTED
+   - NPCSpawnPhase — STUB (NPC не спавнятся)
+   - NPCVisualService — STUB (нет Godot рендеринга)
+   - DialogueService (398 LOC) — работает, но NO UI
+   - Trade — ZERO implementation
+   - Faction — ZERO в Ai-game4 (есть в Ai-game3-ref, 261 LOC, portable)
+   - Документация: 5 docs (1795 LOC), MISSING Trade + Dialogue specs
+
+2. **Task 5-b — Боевая система** (worklog lines 1411-1884):
+   - Backend ~3527 LOC, 18 файлов — MOSTLY IMPLEMENTATED
+   - 11-layer damage pipeline работает
+   - PlayerCombatAdapter — STUB (74 LOC vs 241), NOT registered в DI
+   - 5 TODOs (equipment data not wired: pen, dodge, parry = 0)
+   - NO weapon variety (hardcoded "Sword")
+   - NO ammo, NO thrown, NO dual wield
+   - Knockback + Chain lightning — STUBS
+   - Документация: 11 docs (~4300 LOC), COMPREHENSIVE
+
+3. **Task 5-c — Генераторы** (worklog lines 1885-2169):
+   - ItemGeneratorService (527 LOC, 7 methods) — работает, verified
+   - TechniqueGeneratorService (555 LOC, 10-step) — работает
+   - DORMANT: generators не вызываются (NPCSpawnPhase stub, PlayerCombatAdapter stub)
+   - Проблемы: pen=0, dodge=0, Cultivator cap=0, weapon variety=0
+
+**Реализация: GODOT_GEN_DEBUG env flag**
+- `GeneratorModule.cs` — added RunGeneratorDebugDump()
+- Генерирует 5 items + 3 techniques + 6 loot items, выводит в лог
+- Headless verified: генераторы работают, но с ограничениями
+
+**Результаты debug dump:**
+```
+[Weapon]  weapon_3_001 | Меч уровня 3 | dmg=14 | pen=0 (!) | OneHand
+[Armor]   armor_3_002 | Броня уровня 3 | def=9 | dodge=0 (!) | Torso
+[Tech1]   Cultivator → Cultivation/Neutral | cap=0 (!) | qiCost=0 (!)
+[Tech2]   Guard → Defense/Void | cap=831 | qiCost=124
+[Loot]    3 items + 3 consumables generated correctly
+Database: 11 items registered
+```
+
+**План внедрения (NPC_COMBAT_PREP.md):**
+- 9 phases, ~5110 LOC total
+- Phase 1: NPC Spawn + Render (~480 LOC, P0 BLOCKER)
+- Phase 2: Test Chat (~450 LOC, P0)
+- Phase 3: Faction Port (~400 LOC, P1)
+- Phase 4: Trade Foundation (~520 LOC, P1)
+- Phase 5: Trade UI (~650 LOC, P1)
+- Phase 6: Combat Activation (~630 LOC, P0)
+- Phase 7: Combat Visuals (~330 LOC, P2)
+- Phase 8: Weapon Variety + Ammo (~1000 LOC, P2)
+- Phase 9: Thrown + Dual Wield (~650 LOC, P2)
+
+**Stage Summary:**
+- Генераторы работают (verified via GODOT_GEN_DEBUG=1)
+- NPC backend 90% готов, не хватает spawn + render + UI
+- Combat backend 85% готов, не хватает PlayerCombatAdapter + target selection
+- Trade — ZERO, нужен с нуля
+- Faction — есть в Ai-game3-ref, portable
+- План задокументирован, готов к поэтапной реализации
