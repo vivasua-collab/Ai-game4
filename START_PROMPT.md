@@ -66,25 +66,25 @@
 └── worklog.md                         ← хроника работы (append-only)
 ```
 
-**Симлинки в `/home/z/my-project/` (Вариант D — гибридный, см. [ENVIRONMENT_LINKING.md](docs/docs_v2/09_workflow/ENVIRONMENT_LINKING.md)):**
+**Симлинки в `/home/z/my-project/` (минимальная структура, см. [COLD_START.md](docs/docs_v2/09_workflow/COLD_START.md)):**
 
 | Симлинк | Цель | Назначение |
 |---------|------|------------|
-| `aigame4` | `Ai-game4/` | **Единая точка входа** (как Ai-game3-ref) — весь репозиторий |
-| `checkpoints` | `Ai-game4/checkpoints` | Прямой доступ к чекпоинтам |
-| `game` | `Ai-game4/game` | Код игры (backward compat) |
-| `game-docs` | `Ai-game4/docs` | Документация (backward compat) |
+| `aigame4` | `Ai-game4/` | **Единая точка входа** — весь репозиторий (структура 1-в-1 как GitHub) |
 | `godot` | `/home/z/godot` | Godot 4.7.1 binary (toolchain) |
-| `Ai-game3-ref` | — | Reference clone Ai-game3 (Unity, только для чтения) |
 
-**Доступ к ключевым файлам:**
+**Доступ ко всему через `aigame4/`:**
 - `aigame4/START_PROMPT.md` — этот файл (правила работы)
 - `aigame4/SESSION_SUMMARY.md` — контекст сессий
 - `aigame4/worklog.md` — хроника работы (append-only)
-- `aigame4/recover_sandbox.sh` — скрипт восстановления песочницы
-- `aigame4/checkpoints/` или `checkpoints/` — все чекпоинты
+- `aigame4/cold_start.sh` — скрипт холодного старта
+- `aigame4/checkpoints/` — все чекпоинты
+- `aigame4/docs/` — документация
+- `aigame4/game/` — Godot проект
 
-**Восстановление после сбоя:** `bash /home/z/my-project/aigame4/recover_sandbox.sh`
+**Платформенное ограничение:** `/home/z/my-project/` — сам git-репо Z.ai Code (для персистентности sandbox). Ai-game4 обязан быть подпапкой. Единый симлинк `aigame4` даёт прямой доступ ко всей структуре GitHub.
+
+**Холодный старт:** `bash /home/z/my-project/aigame4/cold_start.sh`
 
 ---
 
