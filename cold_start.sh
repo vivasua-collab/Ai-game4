@@ -123,7 +123,10 @@ echo "$BUILD_OUTPUT" | tail -3
 echo ""
 echo "  Godot headless:"
 GODOT_BIN="$GODOT_DIR/Godot_v4.7.1-stable_mono_linux_x86_64/Godot_v4.7.1-stable_mono_linux.x86_64"
-timeout 15 "$GODOT_BIN" --headless --path . --quit 2>&1 | grep -E "(GameBoot|MainMenu|Started|Error)" | head -3
+# Godot .NET needs DOTNET_ROOT to find hostfxr (set above in step 1).
+export DOTNET_ROOT="$DOTNET_DIR"
+export PATH="$DOTNET_ROOT:$PATH"
+timeout 15 "$GODOT_BIN" --headless --path . --quit 2>&1 | grep -E "(GameBoot|MainMenu|Started|Error|hostfxr)" | head -3
 
 echo ""
 echo "═══════════════════════════════════════════════════════════════"

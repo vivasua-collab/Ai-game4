@@ -86,7 +86,7 @@ public partial class InventoryWindow : Control
             Color = new Color(0.05f, 0.03f, 0.02f, 0.7f),
         };
         bg.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        bg.MouseFilter = MouseFilterEnum.Pass; // allow clicks to pass to close handler
+        bg.MouseFilter = MouseFilterEnum.Stop; // consume clicks on background (close + don't propagate to world)
         AddChild(bg);
 
         // Main panel (centered, 880×560 — wider to fit doll + inventory side by side).

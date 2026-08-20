@@ -381,14 +381,48 @@ public partial class GameWorldController : Node2D
         }
 
         HandleStickyInput();
-        HandleMouseClick();
+        // LMB movement is handled in _UnhandledInput (respects UI consumption).
+        // HandleMouseClick() was removed — it used polling which bypassed Godot's
+        // input propagation chain, causing player to move when clicking UI.
 
         // PLR-E06: Reset sticky frame flags AFTER all Adapter consumers
-        // (HandleStickyInput, HandleMouseClick) have read them. Previously
+        // (HandleStickyInput) have read them. Previously
         // this was called from PlayerModule.Tick() which runs BEFORE the
         // main scene's _PhysicsProcess (via GameBoot autoload ordering),
         // clearing flags before the Adapter could read them.
         PlayerInput?.ResetFrameFlags();
+    }
+
+    /// <summary>
+    /// Unhandled input: receives input events NOT consumed by UI Controls.
+    /// This is the Godot-idiomatic way to handle game-world mouse clicks:
+    /// if mouse is over a UI panel (inventory, doll, future minimap/quickbar),
+    /// the panel's MouseFilter.Stop consumes the event, and _UnhandledInput
+    /// never fires. No SetOverUI hack needed for mouse events.
+    ///
+    /// Design: docs/docs_v2/07_ui/MOUSE_INPUT_SCHEME.md
+    /// </summary>
+    public override void _UnhandledInput(InputEvent @event)
+    {
+        if (Player == null || _camera == null) return;
+
+        // LMB click → set pixel target for free movement.
+        // Only fires if NO UI Control consumed the event (MouseFilter.Stop).
+        if (@event is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Left)
+        {
+            var mouseWorldPos = GetGlobalMousePosition();
+
+            // Clamp to world bounds.
+            int mapW = Tiles != null && Tiles.MapWidth > 0 ? Tiles.MapWidth : GameConstants.DEFAULT_MAP_WIDTH;
+            int mapH = Tiles != null && Tiles.MapHeight > 0 ? Tiles.MapHeight : GameConstants.DEFAULT_MAP_HEIGHT;
+            float maxX = mapW * GameConstants.TILE_PIXELS - GameConstants.TILE_PIXELS / 2f;
+            float maxY = mapH * GameConstants.TILE_PIXELS - GameConstants.TILE_PIXELS / 2f;
+            var target = new Vector2(
+                Mathf.Clamp(mouseWorldPos.X, GameConstants.TILE_PIXELS / 2f, maxX),
+                Mathf.Clamp(mouseWorldPos.Y, GameConstants.TILE_PIXELS / 2f, maxY));
+
+            _mouseTarget = target;
+        }
     }
 
     /// <summary>
@@ -462,41 +496,10 @@ public partial class GameWorldController : Node2D
         }
     }
 
-    /// <summary>
-    /// Mouse click movement: left-click on map → set destination tile.
-    /// Player will move towards it each tick (handled by PlayerModule).
-    /// Any keyboard movement input clears the mouse destination.
-    /// </summary>
-    private void HandleMouseClick()
-    {
-        if (Player == null || _camera == null) return;
-
-        // Left mouse button click → set pixel target for free movement.
-        if (!Godot.Input.IsActionJustPressed("mouse_click")) return;
-
-        var mouseWorldPos = GetGlobalMousePosition();
-
-        // Clamp to world bounds.
-        int mapW = Tiles != null && Tiles.MapWidth > 0 ? Tiles.MapWidth : GameConstants.DEFAULT_MAP_WIDTH;
-        int mapH = Tiles != null && Tiles.MapHeight > 0 ? Tiles.MapHeight : GameConstants.DEFAULT_MAP_HEIGHT;
-        float maxX = mapW * GameConstants.TILE_PIXELS - GameConstants.TILE_PIXELS / 2f;
-        float maxY = mapH * GameConstants.TILE_PIXELS - GameConstants.TILE_PIXELS / 2f;
-        var target = new Vector2(
-            Mathf.Clamp(mouseWorldPos.X, GameConstants.TILE_PIXELS / 2f, maxX),
-            Mathf.Clamp(mouseWorldPos.Y, GameConstants.TILE_PIXELS / 2f, maxY));
-
-        _mouseTarget = target;
-
-        // Debug logging (disabled — uncomment to re-enable).
-        //int tileX = (int)(target.X / GameConstants.TILE_PIXELS);
-        //int tileY = (int)(target.Y / GameConstants.TILE_PIXELS);
-        //var playerPos = Player.Position;
-        //int dx = tileX - playerPos.X;
-        //int dy = tileY - playerPos.Y;
-        //int dist = Math.Max(Math.Abs(dx), Math.Abs(dy));
-        //GD.Print($"[Mouse] Click → world ({target.X:F0}, {target.Y:F0}) → tile ({tileX}, {tileY})");
-        //GD.Print($"[Mouse] Player at ({playerPos.X}, {playerPos.Y}), dx={dx}, dy={dy}, dist={dist}");
-    }
+    // HandleMouseClick() REMOVED — replaced by _UnhandledInput override above.
+    // Old impl used Godot.Input.IsActionJustPressed (polling) which bypassed
+    // Godot's input propagation chain, causing player to move when clicking UI.
+    // See docs/docs_v2/07_ui/MOUSE_INPUT_SCHEME.md for details.
 
     private void HandleStickyInput()
     {

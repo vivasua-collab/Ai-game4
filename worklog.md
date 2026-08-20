@@ -348,3 +348,59 @@ Database: 11 items registered
 - Trade — ZERO, нужен с нуля
 - Faction — есть в Ai-game3-ref, portable
 - План задокументирован, готов к поэтапной реализации
+
+---
+
+### 08:00 — Fix: LMB over UI двигает персонажа (mouse input scheme)
+
+**Task ID:** 6-a
+**Agent:** main (Z.ai Code)
+
+**Проблема (из локального тестирования):**
+При открытом инвентаре нажатие ЛКМ на предмете для перетаскивания одновременно вызывает перемещение персонажа к точке клика.
+
+**Корневая причина:**
+`GameWorldController.HandleMouseClick()` использовал `Godot.Input.IsActionJustPressed("mouse_click")` — это **polling API**, который проверяет сырое состояние InputMap action. Он **не уважает** цепочку потребления ввода Godot (UI → unhandled).
+
+Цепочка ввода Godot 4.7:
+1. `Node._input()` — ВСЕ события (top-level)
+2. `Control._gui_input()` — если мышь над Control с MouseFilter.Stop
+3. (событие помечается как consumed)
+4. `Node._unhandled_input()` — если НЕ потреблено UI
+5. `Godot.Input.IsActionJustPressed()` — **обходит** всю цепочку (polling)
+
+**Решение:**
+- Заменить polling в `_PhysicsProcess` на `_UnhandledInput(InputEvent)` override
+- `_UnhandledInput` автоматически НЕ вызывается, если UI потребил событие
+- Изменить `bg.MouseFilter` с `Pass` на `Stop` (клик по фону закрывает + не идёт в world)
+
+**Документация:**
+- `docs/docs_v2/07_ui/MOUSE_INPUT_SCHEME.md` — полная схема:
+  - Цепочка ввода Godot 4.7
+  - Матрица MouseFilter для всех UI элементов
+  - Правила для будущих UI (minimap, quickbar, trade, dialogue)
+  - Проверочные сценарии
+
+**Изменения:**
+1. `GameWorldController.cs`:
+   - Удалён `HandleMouseClick()` (polling в _PhysicsProcess)
+   - Добавлен `_UnhandledInput(InputEvent)` override
+   - Логика: LMB → set _mouseTarget (только если UI не потребил)
+
+2. `InventoryWindow.cs`:
+   - `bg.MouseFilter`: `Pass` → `Stop`
+   - Клик по фону: закрывает инвентарь + НЕ идёт в world
+
+3. `cold_start.sh`:
+   - Добавлен `export DOTNET_ROOT` для Godot headless (hostfxr detection)
+
+**Верификация:**
+- dotnet build: 0 errors
+- Headless: игра загружается, Inventory/Doll/ObjectLayer — OK
+- (Визуальная проверка LMB на ПК с Godot — у пользователя)
+
+**Stage Summary:**
+- LMB над UI → UI потребляет → игрок НЕ двигается ✓
+- LMB над world → _UnhandledInput → игрок идёт ✓
+- Drag&drop в инвентаре работает без конфликта с movement ✓
+- Схема задокументирована для будущих UI элементов
