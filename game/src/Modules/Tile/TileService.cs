@@ -141,7 +141,7 @@ public sealed class TileService : ITileService
                 float elevation = elevationNoise.SampleWarped(x, y, warpStrength: 0.8f);
                 float moisture = moistureNoise.Sample(x, y);
 
-                var biome = MapToBiome(elevation);
+                var biome = MapToBiome(elevation, moisture);
                 var surface = MapToSurface(elevation, moisture, baseTerrain);
                 var tile = GameTile.CreateTerrain(x, y, surface);
                 tile.Biome = biome;
@@ -209,6 +209,12 @@ public sealed class TileService : ITileService
                         objType = ObjectType.Tree_Oak;
                     }
                 }
+                // Ore veins: rare on Stone in Mountains biome (check BEFORE generic rocks).
+                else if (terrain == TerrainType.Stone && biome == BiomeType.Mountains && rng.Next(0, 100) < 8)
+                {
+                    chance = 100; // already passed the rng check
+                    objType = ObjectType.OreVein;
+                }
                 // Rocks: on Stone terrain (mountains/highlands).
                 else if (terrain == TerrainType.Stone)
                 {
@@ -221,13 +227,7 @@ public sealed class TileService : ITileService
                         _ => ObjectType.Rock_Large,
                     };
                 }
-                // Ore veins: rare on Stone in Mountains biome.
-                else if (terrain == TerrainType.Stone && biome == BiomeType.Mountains)
-                {
-                    chance = 3;
-                    objType = ObjectType.OreVein;
-                }
-                // Bushes: on Dirt and Grass (passable, berries).
+                // Bushes: on Dirt and Grass (passable, berries + fiber).
                 else if (terrain == TerrainType.Dirt || terrain == TerrainType.Grass)
                 {
                     if (biome == BiomeType.Grassland || biome == BiomeType.Forest)
@@ -258,14 +258,20 @@ public sealed class TileService : ITileService
 
         // Debug: print terrain distribution.
         var dist = new System.Collections.Generic.Dictionary<TerrainType, int>();
+        var biomeDist = new System.Collections.Generic.Dictionary<BiomeType, int>();
         for (int x = 0; x < width; x++)
             for (int y = 0; y < height; y++)
             {
                 var t = _grid[x, y].Terrain;
                 dist[t] = dist.TryGetValue(t, out var c) ? c + 1 : 1;
+                var b = _grid[x, y].Biome;
+                biomeDist[b] = biomeDist.TryGetValue(b, out var bc) ? bc + 1 : 1;
             }
         foreach (var kv in dist)
             Console.WriteLine($"  {kv.Key}: {kv.Value} tiles ({kv.Value * 100 / (width * height)}%)");
+        Console.WriteLine("  Biomes:");
+        foreach (var kv in biomeDist)
+            Console.WriteLine($"    {kv.Key}: {kv.Value} tiles ({kv.Value * 100 / (width * height)}%)");
     }
 
     /// <summary>
@@ -334,13 +340,19 @@ public sealed class TileService : ITileService
         }
     }
 
-    /// <summary>Stratum 0: biome from elevation only (color + Qi).</summary>
-    private static BiomeType MapToBiome(float elevation)
+    /// <summary>Stratum 0: biome from elevation + moisture (color + Qi).</summary>
+    private static BiomeType MapToBiome(float elevation, float moisture = 0.5f)
     {
         if (elevation < 0.30f) return BiomeType.Ocean;
         if (elevation < 0.40f) return BiomeType.Sea;
         if (elevation < 0.45f) return BiomeType.Coast;
-        if (elevation < 0.65f) return BiomeType.Grassland;
+        // Mid-elevation (0.45-0.65): biome varies by moisture.
+        if (elevation < 0.65f)
+        {
+            if (moisture < 0.35f) return BiomeType.Steppe;    // dry grassland
+            if (moisture > 0.65f) return BiomeType.Forest;     // moist grassland
+            return BiomeType.Grassland;                         // medium moisture
+        }
         if (elevation < 0.82f) return BiomeType.Highlands;
         if (elevation < 0.92f) return BiomeType.Mountains;
         return BiomeType.Peak;

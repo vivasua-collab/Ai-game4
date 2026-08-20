@@ -194,6 +194,11 @@ namespace CultivationGame.Adapter.UI
                 weight: 1.3f, volume: 1.0f, rarity: ItemRarity.Uncommon, maxStack: 50,
                 materialCategory: MaterialCategory.Metal, materialTier: 2));
 
+            list.Add(CreateMaterial("material_fiber", "Растительное волокно", "Plant Fiber",
+                "Прочные волокна из стеблей растений. Для верёвок и тканей.",
+                weight: 0.05f, volume: 0.2f, rarity: ItemRarity.Common, maxStack: 100,
+                materialCategory: MaterialCategory.Organic, materialTier: 1));
+
             // === Расходники из окружения ===
             list.Add(CreateConsumable("consumable_berry", "Ягоды", "Berries",
                 "Дикие ягоды. Восстанавливают 5 HP и немного утоляют голод.",

@@ -232,6 +232,9 @@ public partial class InventoryWindow : Control
         if (_isVisible) RefreshItems();
     }
 
+    /// <summary>Expose doll panel for double-click equip (InventoryItemRow uses this).</summary>
+    public CharacterDollPanel? GetDollPanel() => _dollPanel;
+
     private void RefreshItems()
     {
         // Clear existing items.
@@ -387,16 +390,84 @@ public partial class InventoryItemRow : HBoxContainer
         return preview;
     }
 
-    // === RMB: use consumable (stub for now) ===
+    // === Double-click: equip item to its designated slot ===
+
+    private double _lastClickTime = -1;
+    private const double DoubleClickInterval = 0.35; // seconds
 
     public override void _GuiInput(InputEvent @event)
     {
-        if (@event is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Right)
+        if (@event is InputEventMouseButton mb && mb.Pressed)
         {
-            if (_itemDb.TryGetItem(_slot.ItemId, out var itemData))
+            if (mb.ButtonIndex == MouseButton.Right)
             {
-                GD.Print($"[Inventory] RMB on {itemData.NameRu} (category={itemData.Category}, rarity={itemData.Rarity})");
+                // RMB: info log
+                if (_itemDb.TryGetItem(_slot.ItemId, out var itemData))
+                {
+                    GD.Print($"[Inventory] RMB on {itemData.NameRu} (category={itemData.Category}, rarity={itemData.Rarity})");
+                }
             }
+            else if (mb.ButtonIndex == MouseButton.Left)
+            {
+                // LMB: detect double-click → equip
+                double now = Time.GetTicksMsec() / 1000.0;
+                if (now - _lastClickTime < DoubleClickInterval)
+                {
+                    // Double-click → equip
+                    TryEquipFromInventory();
+                    _lastClickTime = -1; // reset to prevent triple-click as double
+                }
+                else
+                {
+                    _lastClickTime = now;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Equip this item to its designated equipment slot (double-click action).
+    /// Resolves slot from EquipmentData.Slot, removes from inventory, equips.
+    /// </summary>
+    private void TryEquipFromInventory()
+    {
+        if (!_itemDb.TryGetItem(_slot.ItemId, out var itemData))
+            return;
+
+        if (itemData is not EquipmentData eq)
+        {
+            GD.Print($"[Inventory] Cannot equip {_slot.ItemId} — not equipment");
+            return;
+        }
+
+        // Get the parent InventoryWindow to access equipment service via doll panel.
+        var inventoryWindow = _parent;
+        if (inventoryWindow == null) return;
+
+        // Resolve slot: use item's designated slot.
+        // For 1H weapons, prefer WeaponMain if empty, else WeaponOff.
+        var targetSlot = eq.Slot;
+        if (eq.Category == ItemCategory.Weapon && eq.HandType == WeaponHandType.OneHand)
+        {
+            // Try WeaponMain first, fall back to WeaponOff.
+            // The doll panel's HandleDropOnSlot handles this flexibility,
+            // but for double-click we pick the designated slot.
+            targetSlot = EquipmentSlot.WeaponMain;
+        }
+
+        // Use the doll panel's equip logic by calling HandleDropOnSlot.
+        var dollPanel = inventoryWindow.GetDollPanel();
+        if (dollPanel == null)
+        {
+            GD.Print("[Inventory] Doll panel not found");
+            return;
+        }
+
+        bool success = dollPanel.HandleDropOnSlot(targetSlot, itemData);
+        if (success)
+        {
+            inventoryWindow.RefreshExternally();
+            GD.Print($"[Inventory] Double-click equipped {eq.NameRu} → {targetSlot}");
         }
     }
 }

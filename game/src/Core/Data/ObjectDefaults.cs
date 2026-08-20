@@ -99,7 +99,7 @@ namespace CultivationGame.Core.Data
 
             { ObjectType.Bush, new(
                 ObjectType.Bush, ObjectCategory.Vegetation,
-                "", "", 0f, 0, 0f, 0,
+                "fiber", "material_fiber", 8f, 2, 0f, 3,
                 isPassable: true, moveCostModifier: 1.5f,
                 hardnessTier: HardnessTier.None) },
 
@@ -124,7 +124,7 @@ namespace CultivationGame.Core.Data
 
             { ObjectType.Rock_Large, new(
                 ObjectType.Rock_Large, ObjectCategory.Rock,
-                "", "", 0f, 0, 200f, 0,
+                "stone_large", "material_stone", 80f, 8, 200f, 14,
                 isPassable: false, moveCostModifier: 1.0f,
                 hardnessTier: HardnessTier.Stone) },
 

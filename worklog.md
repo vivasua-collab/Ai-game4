@@ -404,3 +404,73 @@ Database: 11 items registered
 - LMB над world → _UnhandledInput → игрок идёт ✓
 - Drag&drop в инвентаре работает без конфликта с movement ✓
 - Схема задокументирована для будущих UI элементов
+
+---
+
+### 18:00 — Fix 8 issues: inventory double-click, wheel zoom, pause, grid lines, biomes, harvest, destruction, resources
+
+**Task ID:** 7-a
+**Agent:** main (Z.ai Code)
+
+**Issues fixed:**
+
+1. **Double-click equip** (Issue 1):
+   - Added double-click detection in `InventoryItemRow._GuiInput`
+   - 350ms interval, calls `TryEquipFromInventory()` → `dollPanel.HandleDropOnSlot(eq.Slot, itemData)`
+   - Added `GetDollPanel()` method to InventoryWindow
+   - Resolves correct slot from EquipmentData.Slot
+
+2. **Mouse wheel zoom in inventory** (Issue 2):
+   - Moved zoom from `_Input` (receives ALL events) to `_UnhandledInput` (only if UI didn't consume)
+   - ScrollContainer with MouseFilter.Stop now consumes wheel events → zoom doesn't fire
+   - Same fix pattern as LMB movement (MOUSE_INPUT_SCHEME.md)
+
+3. **Pause on inventory open** (Issue 3):
+   - When inventory opens: `Time.Pause()` (unless already paused)
+   - When inventory closes: `Time.Resume()` (only if not paused before)
+   - Tracks `_wasPausedBeforeInventory` to not resume if game was manually paused
+   - Rationale: inventory = planning activity (Kenshi/RimWorld pattern), no time pressure
+
+4. **Surface sprite grid lines** (Issue 4):
+   - Root cause: default LINEAR texture filter bleeds edge pixels across tile boundaries
+   - Fix: `project.godot` → `textures/canvas_textures/default_texture_filter=0` (NEAREST)
+   - Eliminates grid lines between same-type tiles
+
+5. **Large map all biomes** (Issue 5):
+   - Root cause: `MapToBiome(elevation)` used ONLY elevation → Steppe and Forest never generated
+   - Fix: `MapToBiome(elevation, moisture)` — mid-elevation biome varies by moisture:
+     - moisture < 0.35 → Steppe (dry)
+     - moisture > 0.65 → Forest (moist)
+     - else → Grassland
+   - Verified 500×500: all 9 biomes present (Ocean 7%, Sea 17%, Coast 12%, Grassland 35%, Forest 7%, Steppe 7%, Highlands 12%, Mountains 0.6%, Peak 0.02%)
+
+6. **Harvest not adding to inventory** (Issue 6):
+   - Root cause: `_inventoryWindow?.RefreshExternally()` NOT called after harvest
+   - Fix: added refresh call in `HandleHarvest` after `TryHarvest`
+   - Also: added display name resolution via ItemDatabase (toast shows "Древесина" not "material_wood")
+
+7. **Objects not removed after depletion** (Issue 7):
+   - Root cause: objects with `ResourceMax=0` (Bush, Rock_Large) had `IsHarvestable=false` → `TryHarvest` returned false → grid never updated → sprite remained
+   - Fix: see Issue 8 (give resources to all objects)
+   - For objects WITH resources: grid update + RefreshObjectLayer already worked
+
+8. **Objects missing resources** (Issue 8):
+   - Root cause: `ObjectDefaults` had `ResourceMax=0` for Bush and Rock_Large
+   - Fix Bush: ResourceId="fiber", ItemId="material_fiber", ResourceMax=8, HarvestAmount=2
+   - Fix Rock_Large: ResourceId="stone_large", ItemId="material_stone", ResourceMax=80, HarvestAmount=8
+   - Fix OreVein: unreachable code (else-if order) → moved Mountains biome check BEFORE generic Stone check
+   - Added `material_fiber` to TestItemSeeder
+   - Added biome distribution debug print in Generate()
+
+**Верификация:**
+- dotnet build: 0 errors
+- Headless 500×500: all 9 biomes present, objects generate with resources
+- Harvest flow: TryHarvest → ResourceService.Harvest → ItemAddRequestEvent → InventoryModule → TryAddItem → RefreshExternally
+
+**Stage Summary:**
+- 8 issues fixed in one pass
+- All 9 biomes now generate on large map
+- All resource objects have resources (Bush=fiber, Rock_Large=stone, OreVein=iron)
+- Double-click equips, wheel scrolls inventory not zoom, pause on inventory open
+- NEAREST texture filter eliminates grid lines
+- Harvest adds items to inventory + refreshes UI + removes depleted objects

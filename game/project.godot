@@ -29,3 +29,10 @@ window/stretch/aspect="expand"
 [dotnet]
 
 project/assembly_name="CultivationGame"
+
+[rendering]
+
+; NEAREST filtering for pixel-art tiles — prevents grid lines between tiles
+; caused by LINEAR bilinear sampling bleeding edge pixels across boundaries.
+; 0 = Nearest, 1 = Linear
+textures/canvas_textures/default_texture_filter=0

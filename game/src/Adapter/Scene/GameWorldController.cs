@@ -34,6 +34,7 @@ public partial class GameWorldController : Node2D
     [Inject] private ITimeService        Time        { get; set; } = null!;
     [Inject] private ITileService        Tiles       { get; set; } = null!;
     [Inject] private ISaveService        SaveService { get; set; } = null!;
+    [Inject] private IItemDatabaseService ItemDatabase { get; set; } = null!;
 
     private Node2D        _worldRoot     = null!;
     private Camera2D      _camera        = null!;
@@ -64,6 +65,7 @@ public partial class GameWorldController : Node2D
     private float _redrawCooldown = 0f;
     private const float RunSpeedMultiplier = 1.8f;
     private bool _positionInitialized;
+    private bool _wasPausedBeforeInventory; // track if game was paused before opening inventory
 
     // Speed change debounce — prevents rapid cycling when key held.
     // Minimum 1 real second between speed changes.
@@ -294,36 +296,10 @@ public partial class GameWorldController : Node2D
 
     // ---- Per-frame logic ----
 
-    /// <summary>
-    /// Handle mouse wheel for camera zoom.
-    /// Wheel up = zoom in (Zoom += 0.5), wheel down = zoom out (Zoom -= 0.5).
-    /// Range: 1.0 (far) to 8.0 (close).
-    /// </summary>
-    public override void _Input(InputEvent @event)
-    {
-        if (_camera == null) return;
-
-        if (@event is InputEventMouseButton mb && mb.Pressed)
-        {
-            switch (mb.ButtonIndex)
-            {
-                case MouseButton.WheelUp:
-                    var zoomIn = _camera.Zoom with { X = _camera.Zoom.X + 0.5f, Y = _camera.Zoom.Y + 0.5f };
-                    if (zoomIn.X <= 8.0f)
-                        _camera.Zoom = zoomIn;
-                    break;
-                case MouseButton.WheelDown:
-                    var zoomOut = _camera.Zoom with { X = _camera.Zoom.X - 0.5f, Y = _camera.Zoom.Y - 0.5f };
-                    if (zoomOut.X >= 1.0f)
-                        _camera.Zoom = zoomOut;
-                    break;
-                case MouseButton.Middle:
-                    // Middle click = reset zoom to 3× and center on player.
-                    _camera.Zoom = new Vector2(3f, 3f);
-                    break;
-            }
-        }
-    }
+    // _Input() REMOVED — mouse wheel zoom moved to _UnhandledInput.
+    // Old _Input received ALL events (including wheel) before UI processed them,
+    // causing zoom to fire when scrolling inventory list.
+    // Now _UnhandledInput only fires if UI (ScrollContainer) didn't consume.
 
     public override void _PhysicsProcess(double delta)
     {
@@ -395,10 +371,8 @@ public partial class GameWorldController : Node2D
 
     /// <summary>
     /// Unhandled input: receives input events NOT consumed by UI Controls.
-    /// This is the Godot-idiomatic way to handle game-world mouse clicks:
-    /// if mouse is over a UI panel (inventory, doll, future minimap/quickbar),
-    /// the panel's MouseFilter.Stop consumes the event, and _UnhandledInput
-    /// never fires. No SetOverUI hack needed for mouse events.
+    /// Handles: LMB click (move), mouse wheel (zoom), middle click (reset zoom).
+    /// When inventory is open, ScrollContainer consumes wheel events → zoom doesn't fire.
     ///
     /// Design: docs/docs_v2/07_ui/MOUSE_INPUT_SCHEME.md
     /// </summary>
@@ -406,22 +380,42 @@ public partial class GameWorldController : Node2D
     {
         if (Player == null || _camera == null) return;
 
-        // LMB click → set pixel target for free movement.
-        // Only fires if NO UI Control consumed the event (MouseFilter.Stop).
-        if (@event is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Left)
+        if (@event is InputEventMouseButton mb && mb.Pressed)
         {
-            var mouseWorldPos = GetGlobalMousePosition();
-
-            // Clamp to world bounds.
-            int mapW = Tiles != null && Tiles.MapWidth > 0 ? Tiles.MapWidth : GameConstants.DEFAULT_MAP_WIDTH;
-            int mapH = Tiles != null && Tiles.MapHeight > 0 ? Tiles.MapHeight : GameConstants.DEFAULT_MAP_HEIGHT;
-            float maxX = mapW * GameConstants.TILE_PIXELS - GameConstants.TILE_PIXELS / 2f;
-            float maxY = mapH * GameConstants.TILE_PIXELS - GameConstants.TILE_PIXELS / 2f;
-            var target = new Vector2(
-                Mathf.Clamp(mouseWorldPos.X, GameConstants.TILE_PIXELS / 2f, maxX),
-                Mathf.Clamp(mouseWorldPos.Y, GameConstants.TILE_PIXELS / 2f, maxY));
-
-            _mouseTarget = target;
+            switch (mb.ButtonIndex)
+            {
+                case MouseButton.Left:
+                {
+                    // LMB click → set pixel target for free movement.
+                    var mouseWorldPos = GetGlobalMousePosition();
+                    int mapW = Tiles != null && Tiles.MapWidth > 0 ? Tiles.MapWidth : GameConstants.DEFAULT_MAP_WIDTH;
+                    int mapH = Tiles != null && Tiles.MapHeight > 0 ? Tiles.MapHeight : GameConstants.DEFAULT_MAP_HEIGHT;
+                    float maxX = mapW * GameConstants.TILE_PIXELS - GameConstants.TILE_PIXELS / 2f;
+                    float maxY = mapH * GameConstants.TILE_PIXELS - GameConstants.TILE_PIXELS / 2f;
+                    var target = new Vector2(
+                        Mathf.Clamp(mouseWorldPos.X, GameConstants.TILE_PIXELS / 2f, maxX),
+                        Mathf.Clamp(mouseWorldPos.Y, GameConstants.TILE_PIXELS / 2f, maxY));
+                    _mouseTarget = target;
+                    break;
+                }
+                case MouseButton.WheelUp:
+                {
+                    var zoomIn = _camera.Zoom with { X = _camera.Zoom.X + 0.5f, Y = _camera.Zoom.Y + 0.5f };
+                    if (zoomIn.X <= 8.0f)
+                        _camera.Zoom = zoomIn;
+                    break;
+                }
+                case MouseButton.WheelDown:
+                {
+                    var zoomOut = _camera.Zoom with { X = _camera.Zoom.X - 0.5f, Y = _camera.Zoom.Y - 0.5f };
+                    if (zoomOut.X >= 1.0f)
+                        _camera.Zoom = zoomOut;
+                    break;
+                }
+                case MouseButton.Middle:
+                    _camera.Zoom = new Vector2(3f, 3f);
+                    break;
+            }
         }
     }
 
@@ -521,6 +515,24 @@ public partial class GameWorldController : Node2D
         if (PlayerInput.IsInventoryPressed)
         {
             _inventoryWindow?.Toggle();
+            // Pause game time when inventory opens, resume when closes.
+            // Rationale: inventory management is a planning activity (like Kenshi/RimWorld).
+            // Player should be able to examine items, equip, drag&drop without time pressure.
+            // This does NOT affect real-time input (mouse, keyboard) — only tick-based simulation.
+            if (_inventoryWindow != null && Time != null)
+            {
+                if (_inventoryWindow.Visible)
+                {
+                    _wasPausedBeforeInventory = Time.IsPaused;
+                    if (!Time.IsPaused) Time.Pause();
+                }
+                else
+                {
+                    // Only resume if we paused for inventory (not if already paused before).
+                    if (!_wasPausedBeforeInventory && Time.IsPaused)
+                        Time.Resume();
+                }
+            }
         }
 
         // F key: harvest resource from tile under cursor (within distance).
@@ -635,17 +647,24 @@ public partial class GameWorldController : Node2D
         // Try harvest.
         if (Tiles.TryHarvest(targetX, targetY, out var result))
         {
-            string itemName = result.ItemId;
-            // Resolve display name from ItemDatabase if possible.
-            ShowToast($"+{result.Amount} {itemName} (осталось: {result.ResourceRemaining:F0})");
+            // Resolve display name from ItemDatabase (fallback to itemId).
+            string displayName = result.ItemId;
+            if (ItemDatabase != null && ItemDatabase.TryGetItem(result.ItemId, out var harvestedItem))
+            {
+                displayName = harvestedItem.NameRu;
+            }
+            ShowToast($"+{result.Amount} {displayName} (осталось: {result.ResourceRemaining:F0})");
 
             // Refresh object layer (object may have been removed if depleted).
             _sceneBuilder?.RefreshObjectLayer();
+            // Refresh inventory window if open (so item count updates immediately).
+            _inventoryWindow?.RefreshExternally();
 
             if (result.Depleted)
             {
-                ShowToast($"Объект исчерпан! +{result.Amount} {itemName}");
+                ShowToast($"Объект исчерпан! +{result.Amount} {displayName}");
             }
+            GD.Print($"[Harvest] +{result.Amount} {displayName} ({result.ItemId}) at ({targetX},{targetY}), remaining={result.ResourceRemaining}, depleted={result.Depleted}");
         }
         else
         {
