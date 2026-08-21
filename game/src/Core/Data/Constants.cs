@@ -438,8 +438,8 @@ namespace CultivationGame.Core.Data
         /// <summary>Множитель урона Ultimate-техники (промилле: 2000 = ×2.0)</summary>
         public const int ULTIMATE_DAMAGE_MULTIPLIER_PERMIL = 2000;
 
-        /// <summary>Множитель стоимости Ци Ultimate-техники (промилле: 1500 = ×1.5)</summary>
-        public const int ULTIMATE_QI_COST_MULTIPLIER_PERMIL = 1500;
+        /// <summary>Множитель стоимости Ци Ultimate-техники (промилле: 2000 = ×2.0)</summary>
+        public const int ULTIMATE_QI_COST_MULTIPLIER_PERMIL = 2000;
 
         /// <summary>
         /// Множитель урона Ultimate-техники
@@ -447,9 +447,9 @@ namespace CultivationGame.Core.Data
         public const float ULTIMATE_DAMAGE_MULTIPLIER = 2.0f;
 
         /// <summary>
-        /// Множитель стоимости Ци Ultimate-техники
+        /// Множитель стоимости Ци Ultimate-техники (×2.0 — TECHNIQUE_SYSTEM.md §9.1)
         /// </summary>
-        public const float ULTIMATE_QI_COST_MULTIPLIER = 1.5f;
+        public const float ULTIMATE_QI_COST_MULTIPLIER = 2.0f;
 
         #endregion
 

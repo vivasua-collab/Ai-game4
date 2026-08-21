@@ -16,7 +16,8 @@ namespace CultivationGame.Adapter.Scene;
 ///
 /// Listens to ItemDroppedEvent / ItemPickedUpEvent from EventBus.
 /// Each ground item = small procedural sprite (16×16) at world position.
-/// ZIndex = RenderLayer.Objects (3) — same as environment objects.
+/// ZIndex = RenderLayer.Objects (3) — below player (Player=4) so the player
+/// visually stands on top of ground items (AUDIT-3 M1 fix).
 /// </summary>
 public partial class GroundItemRenderer : Node2D
 {
@@ -39,7 +40,7 @@ public partial class GroundItemRenderer : Node2D
         }
 
         _categoryTextures = GenerateCategoryTextures();
-        ZIndex = (int)RenderLayer.Objects + 1; // above environment objects
+        ZIndex = (int)RenderLayer.Objects; // below player (Player = RenderLayer.Player = 4)
 
         // Subscribe to events.
         _droppedToken = DroppedSub.Subscribe(OnItemDropped);

@@ -244,7 +244,7 @@ namespace CultivationGame.Modules.Generator
             int baseCapacity = GetBaseCapacity(techniqueType);
             int capacity = CalculateCapacity(baseCapacity, level, mastery);
             float gradeMultiplier = GetGradeMultiplier(grade);
-            long qiCost = CalculateQiCost(capacity);
+            long qiCost = CalculateQiCost(baseCapacity, level);
             float baseDamage = CalculateBaseDamage(capacity, gradeMultiplier);
             float cooldown = GetBaseCooldown(techniqueType);
             float range = GetBaseRange(subtype);
@@ -255,7 +255,7 @@ namespace CultivationGame.Modules.Generator
             if (isUltimate)
             {
                 baseDamage *= GameConstants.ULTIMATE_DAMAGE_MULTIPLIER; // ×2.0, НЕ ×1.3!
-                qiCost = (long)(qiCost * GameConstants.ULTIMATE_QI_COST_MULTIPLIER); // ×1.5 стоимость Ци для Ultimate
+                qiCost = (long)(qiCost * GameConstants.ULTIMATE_QI_COST_MULTIPLIER); // ×2.0 стоимость Ци для Ultimate
             }
 
             // === Шаг 6.9: Сборка TechniqueData ===
@@ -284,7 +284,7 @@ namespace CultivationGame.Modules.Generator
                 // Эффекты
                 IsUltimate = isUltimate,
                 UltimateDamageMultiplier = isUltimate ? 2.0f : 1.0f,
-                UltimateQiCostMultiplier = isUltimate ? 1.5f : 1.0f,
+                UltimateQiCostMultiplier = isUltimate ? 2.0f : 1.0f,
 
                 // Мастерство
                 Mastery = mastery
@@ -438,12 +438,13 @@ namespace CultivationGame.Modules.Generator
 
         /// <summary>
         /// Рассчитать стоимость Ци техники.
-        /// Формула: capacity × 0.15
+        /// Формула: qiCost = floor(baseCapacity × 2^(level-1))
+        /// (TECHNIQUE_SYSTEM.md §5.2 / ALGORITHMS.md §4.2)
         /// ВНИМАНИЕ: ВСЕГДА ×1.0 по Grade! Grade НЕ влияет на стоимость Ци!
         /// </summary>
-        private long CalculateQiCost(int capacity)
+        private long CalculateQiCost(int baseCapacity, int level)
         {
-            return (long)(capacity * 0.15);
+            return (long)Math.Floor(baseCapacity * Math.Pow(2, level - 1));
         }
 
         /// <summary>

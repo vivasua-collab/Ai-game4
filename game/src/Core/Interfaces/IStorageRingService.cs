@@ -18,19 +18,19 @@ namespace CultivationGame.Core.Interfaces
     public interface IStorageRingService
     {
         /// <summary>Поместить предмет в хранилище кольца</summary>
-        bool TryStore(string ringItemId, ItemData item, out float qiCost);
+        bool TryStore(string ringItemId, ItemData item, out long qiCost);
 
         /// <summary>Извлечь предмет из хранилища кольца</summary>
-        bool TryRetrieve(string ringItemId, string storedItemId, out ItemData item, out float qiCost);
+        bool TryRetrieve(string ringItemId, string storedItemId, out ItemData item, out long qiCost);
 
         /// <summary>Получить содержимое хранилища кольца</summary>
         IReadOnlyList<InventorySlot> GetRingContents(string ringItemId);
 
         /// <summary>Qi стоимость помещения предмета</summary>
-        float GetStoreQiCost(int ringTier, float itemWeight);
+        long GetStoreQiCost(int ringTier, float itemWeight);
 
         /// <summary>Qi стоимость извлечения предмета</summary>
-        float GetRetrieveQiCost(int ringTier, float itemWeight);
+        long GetRetrieveQiCost(int ringTier, float itemWeight);
 
         /// <summary>Активировать хранилище для кольца (при экипировке)</summary>
         void ActivateRing(string ringItemId, int tier, int capacity);

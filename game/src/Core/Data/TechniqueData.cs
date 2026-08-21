@@ -6,9 +6,9 @@
 // Источник: docs/NPC_ASSEMBLY_PIPELINE.md §6, TECHNIQUE_SYSTEM.md
 //
 // Ключевые правила:
-// - qiCost = capacity × 0.15 — ВСЕГДА ×1.0 по Grade (Grade НЕ влияет на стоимость Ци!)
+// - qiCost = floor(baseCapacity × 2^(level-1)) — ВСЕГДА ×1.0 по Grade (Grade НЕ влияет на стоимость Ци!)
 // - UltimateDamageMultiplier = 2.0 (НЕ 1.3 как в Legacy!)
-// - UltimateQiCostMultiplier = 1.5
+// - UltimateQiCostMultiplier = 2.0 (TECHNIQUE_SYSTEM.md §9.1)
 namespace CultivationGame.Core.Data
 {
     /// <summary>
@@ -18,14 +18,14 @@ namespace CultivationGame.Core.Data
     ///
     /// Формулы:
     /// - capacity = baseCapacity(type) × 2^(level-1) × (1 + mastery × 0.005)
-    /// - qiCost = capacity × 0.15 (ВСЕГДА ×1.0 по Grade!)
+    /// - qiCost = floor(baseCapacity × 2^(level-1)) (ВСЕГДА ×1.0 по Grade!)
     /// - baseDamage = capacity × gradeMultiplier
     /// - cooldown = baseCooldown(type)
     /// - range/castTime = base по CombatSubtype
     ///
     /// Ultimate (5% шанс для Transcendent):
     /// - damage × 2.0 (НЕ ×1.3 как в Legacy!)
-    /// - qiCost × 1.5
+    /// - qiCost × 2.0 (TECHNIQUE_SYSTEM.md §9.1)
     /// </summary>
     public sealed class TechniqueData
     {
@@ -65,7 +65,7 @@ namespace CultivationGame.Core.Data
         /// <summary>Стоимость в единицах ёмкости = baseCapacity(type) × 2^(level-1)</summary>
         public int CapacityCost;
 
-        /// <summary>Стоимость Ци = CapacityCost × 0.15 (ВСЕГДА ×1.0 по Grade!)</summary>
+        /// <summary>Стоимость Ци = floor(baseCapacity × 2^(level-1)) (ВСЕГДА ×1.0 по Grade!)</summary>
         public long QiCost;
 
         /// <summary>Базовый урон = CapacityCost × gradeMultiplier (P1-6.1: integer — ЗАПРЕТ 3.9)</summary>
@@ -88,8 +88,8 @@ namespace CultivationGame.Core.Data
         /// <summary>Множитель урона для Ultimate = 2.0 (НЕ 1.3!)</summary>
         public float UltimateDamageMultiplier = 2.0f;
 
-        /// <summary>Множитель стоимости Ци для Ultimate = 1.5</summary>
-        public float UltimateQiCostMultiplier = 1.5f;
+        /// <summary>Множитель стоимости Ци для Ultimate = 2.0 (TECHNIQUE_SYSTEM.md §9.1)</summary>
+        public float UltimateQiCostMultiplier = 2.0f;
 
         // === Мастерство ===
 

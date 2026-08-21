@@ -537,6 +537,9 @@ public partial class GameWorldController : Node2D
         else if (PlayerInput.IsPausePressed && _inventoryWindow != null && _inventoryWindow.Visible)
         {
             _inventoryWindow.Toggle();
+            // Resume game time when closing inventory via Esc (same as B-close path).
+            if (!_wasPausedBeforeInventory && Time != null && Time.IsPaused)
+                Time.Resume();
         }
 
         if (PlayerInput.IsInventoryPressed)
@@ -717,8 +720,8 @@ public partial class GameWorldController : Node2D
         float px = _visualPosition.X;
         float py = _visualPosition.Y;
 
-        // Pickup distance: 1.5 tiles in pixels.
-        const float PickupDistance = 1.5f * 96f; // ~144 px (96 = TILE_PIXELS approx)
+        // Pickup distance: 1.5 tiles in pixels (use canonical TILE_PIXELS, not hard-coded 96).
+        const float PickupDistance = 1.5f * GameConstants.TILE_PIXELS;
 
         bool picked = GroundItems.TryPickupNearest(px, py, PickupDistance);
         if (picked)

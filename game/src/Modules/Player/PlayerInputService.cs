@@ -84,7 +84,7 @@ public sealed class PlayerInputService : IPlayerInputService
     public void UpdateInputState(InputFrameData data)
     {
         _frame = data;
-        _inventoryRaw = data.IsSticky("i") || data.IsSticky("inventory");
+        _inventoryRaw = data.IsSticky("inventory");
         if (!InputDisabled)
         {
             if (_inventoryRaw) _inventory = true;
@@ -101,7 +101,7 @@ public sealed class PlayerInputService : IPlayerInputService
             if (data.IsSticky("quest_log")) _questLog = true;
             if (data.IsSticky("world_map")) _map = true;
             if (data.IsSticky("minimap")) _minimap = true;
-            if (data.IsSticky("minimap")) _meditate = true;
+            if (data.IsSticky("meditate")) _meditate = true;
             if (data.IsSticky("attack")) _attack = true;
             if (data.IsSticky("defend")) _defend = true;
             if (data.IsSticky("time_speed_up")) _timeSpeedUp = true;

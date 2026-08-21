@@ -59,13 +59,15 @@ public partial class InventoryWindow : Control
             ContainerAdapter.InjectProperties(this, container);
         }
 
-        // Seed test items on first open (debug/test data).
+        // Seed test items on first open (debug/test data — DEBUG builds only).
+#if DEBUG
         if (!_itemsSeeded)
         {
             TestItemSeeder.Seed(ItemDatabase, InventoryService);
             _itemsSeeded = true;
             GD.Print("[Inventory] Test items seeded");
         }
+#endif
 
         BuildUI();
         _isVisible = false;

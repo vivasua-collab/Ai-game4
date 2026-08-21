@@ -38,9 +38,9 @@ namespace CultivationGame.Entry;
 /// <see cref="SceneOrchestrator"/>, <see cref="GameEntryPoint"/>) have
 /// <c>[Inject] IResolver</c> fields that are filled post-build.</para>
 /// <para><b>Module registration order</b> follows DI_AND_EVENTBUS §1.2
-/// (adjusted per task brief): World, Tile, Body, Qi, Buff, Charger,
-/// Inventory, Combat, Formation, NPC, Player, Quest, Interaction, UI,
-/// Save, Generator. Order matters where module constructors depend on
+/// (canonical order): World, Tile, Body, Qi, Buff, Inventory, Combat,
+/// Formation, NPC, Player, Quest, Interaction, UI, Charger, Save,
+/// Generator. Order matters where module constructors depend on
 /// interfaces registered by earlier modules (resolved lazily by the
 /// container, but registration order can affect startable iteration).</para>
 /// </remarks>
@@ -74,7 +74,6 @@ public static class GameLifetimeScope
         BodyModuleServices.Register(builder);
         QiModuleServices.Register(builder);
         BuffModuleServices.Register(builder);
-        ChargerModuleServices.Register(builder);
         InventoryModuleServices.Register(builder);
         CombatModuleServices.Register(builder);
         FormationModuleServices.Register(builder);
@@ -83,6 +82,7 @@ public static class GameLifetimeScope
         QuestModuleServices.Register(builder);
         InteractionModuleServices.Register(builder);
         UIModuleServices.Register(builder);
+        ChargerModuleServices.Register(builder);
         SaveModuleServices.Register(builder);
         GeneratorModuleServices.Register(builder);
 

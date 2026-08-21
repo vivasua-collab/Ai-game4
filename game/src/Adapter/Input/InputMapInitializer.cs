@@ -47,6 +47,9 @@ public static class InputMapInitializer
         // Special action (X)
         AddKeyAction("special_action", Key.X);
 
+        // Meditate (V) — M is taken by world_map, so V is used for meditate.
+        AddKeyAction("meditate", Key.V);
+
         // Pause / Esc
         AddKeyAction("pause", Key.Escape);
 

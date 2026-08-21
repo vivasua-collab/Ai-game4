@@ -80,9 +80,9 @@ namespace CultivationGame.Modules.Inventory
         /// Поместить предмет в хранилище кольца.
         /// STR-MODEL: проверка по объёму (CurrentVolume + item.Volume ≤ MaxVolume).
         /// </summary>
-        public bool TryStore(string ringItemId, ItemData item, out float qiCost)
+        public bool TryStore(string ringItemId, ItemData item, out long qiCost)
         {
-            qiCost = 0f;
+            qiCost = 0L;
 
             if (string.IsNullOrEmpty(ringItemId) || item == null) return false;
 
@@ -151,10 +151,10 @@ namespace CultivationGame.Modules.Inventory
         /// <summary>
         /// Извлечь предмет из хранилища кольца.
         /// </summary>
-        public bool TryRetrieve(string ringItemId, string storedItemId, out ItemData item, out float qiCost)
+        public bool TryRetrieve(string ringItemId, string storedItemId, out ItemData item, out long qiCost)
         {
             item = null;
-            qiCost = 0f;
+            qiCost = 0L;
 
             if (string.IsNullOrEmpty(ringItemId) || string.IsNullOrEmpty(storedItemId)) return false;
 
@@ -217,23 +217,25 @@ namespace CultivationGame.Modules.Inventory
         /// <summary>
         /// Qi стоимость помещения предмета в кольцо.
         /// Формула: (10 + tier * 5) + itemWeight * (0.5 + tier * 0.2)
+        /// ЗАПРЕТ 2: Qi-значения должны быть long.
         /// </summary>
-        public float GetStoreQiCost(int ringTier, float itemWeight)
+        public long GetStoreQiCost(int ringTier, float itemWeight)
         {
             float baseCost = 10f + ringTier * 5f;
             float weightCost = itemWeight * (0.5f + ringTier * 0.2f);
-            return baseCost + weightCost;
+            return (long)Math.Floor(baseCost + weightCost);
         }
 
         /// <summary>
         /// Qi стоимость извлечения предмета из кольца.
         /// Формула: (10 + tier * 5) * 0.5 + itemWeight * (0.5 + tier * 0.2) * 0.5
+        /// ЗАПРЕТ 2: Qi-значения должны быть long.
         /// </summary>
-        public float GetRetrieveQiCost(int ringTier, float itemWeight)
+        public long GetRetrieveQiCost(int ringTier, float itemWeight)
         {
             float baseCost = (10f + ringTier * 5f) * 0.5f;
             float weightCost = itemWeight * (0.5f + ringTier * 0.2f) * 0.5f;
-            return baseCost + weightCost;
+            return (long)Math.Floor(baseCost + weightCost);
         }
 
         /// <summary>
