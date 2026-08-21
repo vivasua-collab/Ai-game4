@@ -29,6 +29,8 @@ public class InventoryModule : IModule
     [Inject] private readonly BackpackService _backpackService = null!;
     [Inject] private readonly StorageRingService _storageRingService = null!;
     [Inject] private readonly IItemDatabaseService _itemDatabase = null!;
+    [Inject] private readonly IGroundItemService _groundItemService = null!;
+    [Inject] private readonly IPlayerService _playerService = null!;
 
     [Inject] private readonly ISubscriber<ResourceHarvestedEvent> _resourceHarvestedSub = null!;
     [Inject] private readonly ISubscriber<ItemAddRequestEvent> _itemAddRequestSub = null!;
@@ -110,12 +112,41 @@ public class InventoryModule : IModule
 
         if (_itemDatabase.TryGetItem(e.ItemId, out var itemData))
         {
-            _inventoryServiceImpl.TryAddItem(itemData, e.Count);
+            // Try to add to inventory. If volume full, drop overflow on ground.
+            bool added = _inventoryServiceImpl.TryAddItem(itemData, e.Count, out int addedCount);
+            int overflow = e.Count - addedCount;
+            if (overflow > 0)
+            {
+                // Drop overflow items on ground near player.
+                DropItemsNearPlayer(e.ItemId, overflow);
+            }
         }
         else
         {
             Console.WriteLine($"[InventoryModule] Предмет '{e.ItemId}' не найден в ItemDatabase (source={e.Source})");
         }
+    }
+
+    /// <summary>
+    /// Drop items on the ground near the player position.
+    /// Used when inventory volume is full and items can't be added.
+    /// </summary>
+    private void DropItemsNearPlayer(string itemId, int count)
+    {
+        if (_playerService == null || _groundItemService == null) return;
+
+        var playerPos = _playerService.Position;
+        // Convert tile position to pixel position (center of tile).
+        float pixelX = playerPos.X * GameConstants.TILE_PIXELS + GameConstants.TILE_PIXELS / 2f;
+        float pixelY = playerPos.Y * GameConstants.TILE_PIXELS + GameConstants.TILE_PIXELS / 2f;
+
+        // Small random offset so items don't stack on same pixel.
+        var rng = new System.Random((int)System.DateTime.UtcNow.Ticks);
+        float offsetX = (float)(rng.NextDouble() - 0.5) * 30f;
+        float offsetY = (float)(rng.NextDouble() - 0.5) * 30f;
+
+        long dropId = _groundItemService.DropItem(itemId, count, pixelX + offsetX, pixelY + offsetY);
+        Console.WriteLine($"[InventoryModule] Dropped {itemId}×{count} on ground at ({pixelX + offsetX:F0}, {pixelY + offsetY:F0}), dropId={dropId}");
     }
 
     private void OnEquipmentChanged(in EquipmentChangedEvent e)

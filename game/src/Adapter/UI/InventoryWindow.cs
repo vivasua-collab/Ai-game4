@@ -37,6 +37,8 @@ public partial class InventoryWindow : Control
 {
     [Inject] private IInventoryService InventoryService { get; set; } = null!;
     [Inject] private IItemDatabaseService ItemDatabase { get; set; } = null!;
+    [Inject] private IGroundItemService GroundItems { get; set; } = null!;
+    [Inject] private IPlayerService PlayerService { get; set; } = null!;
 
     private bool _isVisible;
     private Panel _panel = null!;
@@ -185,10 +187,18 @@ public partial class InventoryWindow : Control
         };
         _contentRow.AddChild(_dollPanel);
 
+        // Trash/basket zone — drag item here to drop on ground.
+        var trashZone = new TrashDropZone
+        {
+            Name = "TrashZone",
+            CustomMinimumSize = new Vector2(260, 50),
+        };
+        _contentRow.AddChild(trashZone);
+
         // Footer hint.
         var footer = new Label
         {
-            Text = "B или Esc — закрыть | ЛКМ на кукле — снять | Перетащи предмет на слот — надеть",
+            Text = "B/Esc — закрыть | Dbl-click — надеть | Перетащи на 🗑 — выбросить",
             HorizontalAlignment = HorizontalAlignment.Center,
         };
         footer.AddThemeFontSizeOverride("font_size", 12);
@@ -234,6 +244,52 @@ public partial class InventoryWindow : Control
 
     /// <summary>Expose doll panel for double-click equip (InventoryItemRow uses this).</summary>
     public CharacterDollPanel? GetDollPanel() => _dollPanel;
+
+    /// <summary>
+    /// Drop an item from inventory onto the ground near the player.
+    /// Called by TrashDropZone when item is dragged to trash basket.
+    /// Removes ALL count of the item from inventory, drops as ground item.
+    /// </summary>
+    public void DropItemOnGround(string itemId)
+    {
+        if (string.IsNullOrEmpty(itemId)) return;
+
+        // Get current count of this item in inventory.
+        int count = InventoryService.GetItemCount(itemId);
+        if (count <= 0)
+        {
+            GD.Print($"[Inventory] Cannot drop {itemId} — not in inventory");
+            return;
+        }
+
+        // Remove from inventory.
+        if (!InventoryService.TryRemoveItem(itemId, count))
+        {
+            GD.Print($"[Inventory] Failed to remove {itemId}×{count} from inventory");
+            return;
+        }
+
+        // Get player position (tile → pixel).
+        var playerPos = PlayerService.Position;
+        float pixelX = playerPos.X * GameConstants.TILE_PIXELS + GameConstants.TILE_PIXELS / 2f;
+        float pixelY = playerPos.Y * GameConstants.TILE_PIXELS + GameConstants.TILE_PIXELS / 2f;
+
+        // Small random offset.
+        var rng = new System.Random((int)System.DateTime.UtcNow.Ticks);
+        float offsetX = (float)(rng.NextDouble() - 0.5) * 30f;
+        float offsetY = (float)(rng.NextDouble() - 0.5) * 30f;
+
+        // Drop on ground.
+        long dropId = GroundItems.DropItem(itemId, count, pixelX + offsetX, pixelY + offsetY);
+
+        // Resolve display name.
+        string displayName = itemId;
+        if (ItemDatabase.TryGetItem(itemId, out var itemData))
+            displayName = itemData.NameRu;
+
+        GD.Print($"[Inventory] Dropped {displayName}×{count} on ground (dropId={dropId})");
+        RefreshExternally();
+    }
 
     private void RefreshItems()
     {
@@ -484,5 +540,85 @@ public partial class InventoryItemRow : HBoxContainer
             inventoryWindow.RefreshExternally();
             GD.Print($"[Inventory] Double-click equipped {eq.NameRu} → {targetSlot}");
         }
+    }
+}
+
+/// <summary>
+/// Trash/basket drop zone — drag inventory item here to drop it on ground near player.
+/// Accepts drops from InventoryItemRow (source="inventory").
+/// </summary>
+public partial class TrashDropZone : Panel
+{
+    public override void _Ready()
+    {
+        MouseFilter = MouseFilterEnum.Stop;
+        // Visual: dark panel with trash icon + label.
+        var vbox = new VBoxContainer();
+        vbox.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+        vbox.OffsetLeft = 4;
+        vbox.OffsetRight = -4;
+        vbox.OffsetTop = 4;
+        vbox.OffsetBottom = -4;
+        vbox.AddThemeConstantOverride("separation", 2);
+        vbox.Alignment = BoxContainer.AlignmentMode.Center;
+        AddChild(vbox);
+
+        var icon = new Label
+        {
+            Text = "🗑",
+            HorizontalAlignment = HorizontalAlignment.Center,
+        };
+        icon.AddThemeFontSizeOverride("font_size", 24);
+        icon.AddThemeColorOverride("font_color", new Color(0.6f, 0.3f, 0.2f));
+        vbox.AddChild(icon);
+
+        var label = new Label
+        {
+            Text = "Выбросить",
+            HorizontalAlignment = HorizontalAlignment.Center,
+        };
+        label.AddThemeFontSizeOverride("font_size", 12);
+        label.AddThemeColorOverride("font_color", ParchmentTheme.InkFaded);
+        vbox.AddChild(label);
+
+        // Style: dark red background.
+        var style = new StyleBoxFlat();
+        style.BgColor = new Color(0.2f, 0.1f, 0.08f, 0.8f);
+        style.SetBorderWidthAll(1);
+        style.SetBorderColor(new Color(0.5f, 0.2f, 0.15f));
+        style.SetCornerRadiusAll(4);
+        AddThemeStyleboxOverride("panel", style);
+    }
+
+    public override bool _CanDropData(Vector2 atPosition, Variant data)
+    {
+        // Accept drops from inventory.
+        if (!CharacterDollPanel.TryParseDragData(data, out _, out var source))
+            return false;
+        return source == "inventory";
+    }
+
+    public override void _DropData(Vector2 atPosition, Variant data)
+    {
+        if (!CharacterDollPanel.TryParseDragData(data, out var itemId, out _))
+            return;
+
+        // Find InventoryWindow parent to access services.
+        var inventoryWindow = FindParentInventoryWindow();
+        if (inventoryWindow == null) return;
+
+        inventoryWindow.DropItemOnGround(itemId);
+    }
+
+    private InventoryWindow? FindParentInventoryWindow()
+    {
+        Node? parent = GetParent();
+        while (parent != null)
+        {
+            if (parent is InventoryWindow win)
+                return win;
+            parent = parent.GetParent();
+        }
+        return null;
     }
 }

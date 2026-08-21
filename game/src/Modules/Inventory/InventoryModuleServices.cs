@@ -26,6 +26,9 @@ public static class InventoryModuleServices
         builder.Register<MaterialService>(Lifetime.Singleton);
         builder.Register<BackpackService>(Lifetime.Singleton);
 
+        // === Ground items (dropped on world) ===
+        builder.Register<IGroundItemService, GroundItemService>(Lifetime.Singleton);
+
         // === Точка входа модуля ===
         builder.Register<InventoryModule>(Lifetime.Singleton);
 

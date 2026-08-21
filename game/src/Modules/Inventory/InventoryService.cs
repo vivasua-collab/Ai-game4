@@ -83,6 +83,17 @@ namespace CultivationGame.Modules.Inventory
 
         public bool TryAddItem(ItemData item, int count = 1)
         {
+            return TryAddItem(item, count, out _);
+        }
+
+        /// <summary>
+        /// Try to add items. Returns true if at least 1 added.
+        /// addedCount = actual number added (may be less than requested if volume full).
+        /// Caller can drop (count - addedCount) on ground if > 0.
+        /// </summary>
+        public bool TryAddItem(ItemData item, int count, out int addedCount)
+        {
+            addedCount = 0;
             if (item == null) return false;
             if (!_isConfigured) Configure(new InventoryConfig());
             if (count <= 0) return false;
@@ -105,8 +116,14 @@ namespace CultivationGame.Modules.Inventory
                     return false;
                 }
                 // Add partial, log overflow.
+                int originalCount = count;
                 count = canFit;
-                Console.WriteLine($"[Inventory] Volume limit — adding partial {item.ItemId}×{count}");
+                addedCount = count;
+                Console.WriteLine($"[Inventory] Volume limit — adding partial {item.ItemId}×{count}/{originalCount}");
+            }
+            else
+            {
+                addedCount = count;
             }
 
             // Стакающиеся предметы — ищем существующий слот

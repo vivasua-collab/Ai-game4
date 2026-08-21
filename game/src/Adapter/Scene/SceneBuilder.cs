@@ -46,6 +46,8 @@ public partial class SceneBuilder : Node
         SetupSurfaceTransitions();
         // Stratum 3+: environment objects (trees, rocks, bushes, ore).
         SetupObjectLayer();
+        // Ground items (dropped from inventory overflow + player throw).
+        SetupGroundItems();
     }
 
     /// <summary>
@@ -134,6 +136,15 @@ public partial class SceneBuilder : Node
     public void RefreshObjectLayer()
     {
         _objectRenderer?.Refresh();
+    }
+
+    /// <summary>Setup ground item renderer (dropped items on world).</summary>
+    private GroundItemRenderer? _groundItemRenderer;
+
+    private void SetupGroundItems()
+    {
+        _groundItemRenderer = new GroundItemRenderer();
+        _worldRoot.AddChild(_groundItemRenderer);
     }
 
     /// <summary>

@@ -545,3 +545,78 @@ Database: 11 items registered
 - Toast уведомление при переходе через порог перевеса
 - Weight label: красный при перевесе, золотой при >80%, серый в норме
 - Объём всё ещё enforced (partial add если переполнен)
+
+---
+
+### 13:00 — Ground item system: overflow drop, trash zone, pickup
+
+**Task ID:** 9-a
+**Agent:** main (Z.ai Code)
+
+**Задача:**
+При превышении ОБЪЁМА ресурсы должны выпадать на землю. Корзина в инвентаре для выбрасывания. Подбор выпавших предметов.
+
+**Реализация:**
+
+1. **Контракты** (`GroundItemContracts.cs`):
+   - `ItemDroppedEvent` — предмет выпал (dropId, itemId, count, worldX, worldY)
+   - `ItemPickedUpEvent` — предмет подобран (dropId, itemId, count)
+
+2. **IGroundItemService** + `GroundItemService`:
+   - `DropItem(itemId, count, x, y)` — создать ground item, опубликовать ItemDroppedEvent
+   - `TryPickupNearest(x, y, maxDistance)` — найти ближайший, опубликовать ItemPickedUpEvent + ItemAddRequestEvent
+   - `GetAllGroundItems()` — для рендерера
+   - Хранит List<GroundItem>, уникальные dropId
+
+3. **GroundItemRenderer** (270 LOC):
+   - Подписывается на ItemDroppedEvent / ItemPickedUpEvent
+   - Создаёт Sprite2D для каждого ground item
+   - Процедурные текстуры 16×16 по категориям:
+     - Weapon: меч (вертикальная линия + гарда)
+     - Armor: щит (прямоугольник)
+     - Accessory: кольцо (окружность)
+     - Consumable: зелье (бутылка)
+     - Material: куб
+     - Technique: свиток
+     - Quest: звезда
+     - Misc: круг
+   - ZIndex = RenderLayer.Objects + 1 (выше объектов окружения)
+   - Scale 0.5 (16×16 → 8×8 на земле)
+
+4. **InventoryService.TryAddItem** — новая сигнатура с `out int addedCount`:
+   - Возвращает сколько реально добавлено (partial add при полном объёме)
+   - Caller (InventoryModule) вычисляет overflow = requested - addedCount
+
+5. **InventoryModule.OnItemAddRequest** — overflow handling:
+   - TryAddItem with out addedCount
+   - If overflow > 0 → DropItemsNearPlayer(itemId, overflow)
+   - DropItemsNearPlayer: конвертирует tile→pixel, random offset, вызывает GroundItemService.DropItem
+
+6. **TrashDropZone** (Panel в инвентаре):
+   - 🗑 иконка + "Выбросить" label
+   - MouseFilter.Stop, _CanDropData принимает source="inventory"
+   - _DropData → InventoryWindow.DropItemOnGround(itemId)
+   - DropItemOnGround: GetItemCount → TryRemoveItem → GroundItemService.DropItem near player
+
+7. **GameWorldController.HandlePickup** (E key):
+   - TryPickupNearest(player pixel pos, 1.5 tiles distance)
+   - Toast: "Подобран предмет" / "Рядом нет предметов"
+   - RefreshExternally после подбора
+
+8. **DI**: IGroundItemService registered в InventoryModuleServices
+   - Injected в GameWorldController (pickup)
+   - Injected в InventoryWindow (trash drop)
+   - Injected в InventoryModule (overflow drop)
+   - Injected в GroundItemRenderer (events)
+
+**Верификация:**
+- dotnet build: 0 errors
+- Headless: [GroundItemRenderer] Ready, [Inventory] Test items seeded
+- Все компоненты загружаются
+
+**Stage Summary:**
+- При превышении объёма излишек выпадает на землю рядом с игроком
+- Корзина в инвентаре: перетащи предмет → выпадает рядом с игроком
+- E key: подобрать ближайший предмет (1.5 тайла)
+- Процедурные спрайты по категориям (8 типов)
+- Полный цикл: harvest → overflow → drop → pickup → inventory

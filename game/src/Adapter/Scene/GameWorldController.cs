@@ -36,6 +36,7 @@ public partial class GameWorldController : Node2D
     [Inject] private ISaveService        SaveService { get; set; } = null!;
     [Inject] private IItemDatabaseService ItemDatabase { get; set; } = null!;
     [Inject] private IInventoryService   Inventory   { get; set; } = null!;
+    [Inject] private IGroundItemService  GroundItems { get; set; } = null!;
 
     private Node2D        _worldRoot     = null!;
     private Camera2D      _camera        = null!;
@@ -567,6 +568,12 @@ public partial class GameWorldController : Node2D
             HandleHarvest();
         }
 
+        // E key: pick up nearest ground item (within pickup distance).
+        if (PlayerInput.IsInteractPressed)
+        {
+            HandlePickup();
+        }
+
         // Suppress game input when inventory is open.
         if (_inputAdapter != null && _inventoryWindow != null)
         {
@@ -695,6 +702,38 @@ public partial class GameWorldController : Node2D
         else
         {
             ShowToast("Не удалось добыть ресурс");
+        }
+    }
+
+    /// <summary>
+    /// Handle E-key pickup: find nearest ground item within pickup distance.
+    /// Picks up item → adds to inventory (may overflow again → drops back).
+    /// </summary>
+    private void HandlePickup()
+    {
+        if (GroundItems == null) return;
+
+        // Player pixel position.
+        float px = _visualPosition.X;
+        float py = _visualPosition.Y;
+
+        // Pickup distance: 1.5 tiles in pixels.
+        const float PickupDistance = 1.5f * 96f; // ~144 px (96 = TILE_PIXELS approx)
+
+        bool picked = GroundItems.TryPickupNearest(px, py, PickupDistance);
+        if (picked)
+        {
+            ShowToast("Подобран предмет");
+            _inventoryWindow?.RefreshExternally();
+        }
+        else
+        {
+            // No ground item near — check if there are any at all.
+            if (GroundItems.Count > 0)
+            {
+                ShowToast("Рядом нет предметов (подойди ближе)");
+            }
+            // else: silent (no items on ground at all)
         }
     }
 
