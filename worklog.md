@@ -474,3 +474,74 @@ Database: 11 items registered
 - Double-click equips, wheel scrolls inventory not zoom, pause on inventory open
 - NEAREST texture filter eliminates grid lines
 - Harvest adds items to inventory + refreshes UI + removes depleted objects
+
+---
+
+### 12:30 — Overweight system: overflow allowed, speed penalty, notification
+
+**Task ID:** 8-a
+**Agent:** main (Z.ai Code)
+
+**Проблема:**
+При переполнении инвентаря по весу новые ресурсы не попадают. Нет сообщения о перевесе.
+
+**Корневая причина:**
+`InventoryService.TryAddItem` проверял `CanFitItem` (вес+объём) и отклонял предмет если перевес. Это блокировало добычу при полном инвентаре.
+
+**Решение (overflow policy):**
+- **Вес:** НЕ enforced — предметы ВСЕГДА попадают в инвентарь (даже при перевесе)
+- **Объём:** enforced (физическое пространство рюкзака) — partial add если переполнен
+- **Перевес** → штраф к скорости перемещения + уведомление
+- Будущее: Storage Ring / Spirit Storage для перемещения избыточных ресурсов
+
+**Изменения:**
+
+1. **InventoryService.TryAddItem** — убрана проверка веса, оставлена только объём:
+   - Если объём полон → partial add (сколько влезло)
+   - Если объём OK → полный add (даже если перевес)
+
+2. **CanFitItem** — проверяет только объём (вес игнорируется):
+   ```csharp
+   return currentVolume + addedVolume <= effectiveMaxVolume;
+   ```
+
+3. **HowManyCanFit** — лимит по объёму только:
+   ```csharp
+   int byVolume = item.Volume > 0 ? (int)Math.Floor(remainingVolume / item.Volume) : int.MaxValue;
+   ```
+
+4. **IInventoryService** — добавлены:
+   - `bool IsOverweight { get; }` — текущий вес > эффективный макс
+   - `float OverweightRatio { get; }` — 0 = нет перегруза, 1.0 = 2× макс, 3.0 = 4× макс (cap)
+
+5. **GameWorldController.HandleFreeMovement** — штраф скорости:
+   ```csharp
+   if (Inventory.IsOverweight) {
+       float ratio = Inventory.OverweightRatio;
+       float penalty = 1.0f / (1.0f + ratio);
+       speedMult *= penalty;
+       // ratio 0 → 1.0× speed, 1.0 → 0.5×, 2.0 → 0.33×, 3.0 → 0.25× (min)
+   }
+   ```
+   - Toast "⚠ Перевес! 15.2/10.0 кг — скорость снижена" (debounced, один раз при переходе)
+   - Toast "Вес в норме" при возврате
+
+6. **InventoryWindow weight label** — цветовая индикация:
+   - Красный (AccentRed) если перевес или объём полон
+   - Золотой (AccentGold) если >80% лимита
+   - Серый (InkFaded) в норме
+   - Текст: "Вес: 15.2 / 10.0 кг ⚠ ПЕРЕВЕС | Объём: 45.0 / 100.0"
+
+**DI:** IInventoryService injected в GameWorldController для доступа к IsOverweight/OverweightRatio.
+
+**Верификация:**
+- dotnet build: 0 errors
+- Headless: игра загружается, Inventory/Doll/ObjectLayer — OK
+- (Визуальная проверка перевеса на ПК с Godot)
+
+**Stage Summary:**
+- Ресурсы всегда попадают в инвентарь (overflow по весу разрешён)
+- Перевес → скорость снижается (0.25×-1.0× в зависимости от ratio)
+- Toast уведомление при переходе через порог перевеса
+- Weight label: красный при перевесе, золотой при >80%, серый в норме
+- Объём всё ещё enforced (partial add если переполнен)

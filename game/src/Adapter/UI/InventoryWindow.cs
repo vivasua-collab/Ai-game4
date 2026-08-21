@@ -265,12 +265,27 @@ public partial class InventoryWindow : Control
             }
         }
 
-        // Update weight/volume.
+        // Update weight/volume — red color if overweight.
         float curWeight = InventoryService?.GetCurrentWeight() ?? 0f;
         float maxWeight = InventoryService?.GetEffectiveMaxWeight() ?? 50f;
         float curVol = InventoryService?.GetCurrentVolume() ?? 0f;
         float maxVol = InventoryService?.GetEffectiveMaxVolume() ?? 100f;
-        _weightLabel.Text = $"Вес: {curWeight:F1} / {maxWeight:F1} кг | Объём: {curVol:F1} / {maxVol:F1}";
+        bool isOverweight = InventoryService?.IsOverweight ?? false;
+        bool isVolumeFull = curVol >= maxVol;
+
+        string weightStatus = isOverweight ? " ⚠ ПЕРЕВЕС" : "";
+        string volStatus = isVolumeFull ? " ⚠ ПОЛНО" : "";
+        _weightLabel.Text = $"Вес: {curWeight:F1} / {maxWeight:F1} кг{weightStatus} | Объём: {curVol:F1} / {maxVol:F1}{volStatus}";
+
+        // Color: red if overweight or volume full, gold if near limit, else faded.
+        Color weightColor;
+        if (isOverweight || isVolumeFull)
+            weightColor = ParchmentTheme.AccentRed;
+        else if (curWeight > maxWeight * 0.8f || curVol > maxVol * 0.8f)
+            weightColor = ParchmentTheme.AccentGold;
+        else
+            weightColor = ParchmentTheme.InkFaded;
+        _weightLabel.AddThemeColorOverride("font_color", weightColor);
     }
 
     /// <summary>Create a single draggable item row.</summary>

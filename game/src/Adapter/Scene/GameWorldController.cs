@@ -35,6 +35,7 @@ public partial class GameWorldController : Node2D
     [Inject] private ITileService        Tiles       { get; set; } = null!;
     [Inject] private ISaveService        SaveService { get; set; } = null!;
     [Inject] private IItemDatabaseService ItemDatabase { get; set; } = null!;
+    [Inject] private IInventoryService   Inventory   { get; set; } = null!;
 
     private Node2D        _worldRoot     = null!;
     private Camera2D      _camera        = null!;
@@ -66,6 +67,7 @@ public partial class GameWorldController : Node2D
     private const float RunSpeedMultiplier = 1.8f;
     private bool _positionInitialized;
     private bool _wasPausedBeforeInventory; // track if game was paused before opening inventory
+    private bool _overweightNotified; // debounce overweight toast
 
     // Speed change debounce — prevents rapid cycling when key held.
     // Minimum 1 real second between speed changes.
@@ -440,6 +442,30 @@ public partial class GameWorldController : Node2D
 
         // Time speed affects movement (faster game = faster movement).
         if (Time != null) speedMult *= (int)Time.Speed;
+
+        // Overweight penalty: movement speed drops as carry weight exceeds max.
+        // Ratio 0 = no penalty, 1.0 (2× max) = 0.5× speed, 3.0 (4× max) = 0.25× speed.
+        // Formula: speedMult *= 1.0 / (1.0 + ratio). Capped ratio at 3.0 → min 0.25× speed.
+        if (Inventory != null && Inventory.IsOverweight)
+        {
+            float ratio = Inventory.OverweightRatio;
+            float overweightPenalty = 1.0f / (1.0f + ratio);
+            speedMult *= overweightPenalty;
+            // Show overweight toast once when crossing threshold (debounced).
+            if (!_overweightNotified)
+            {
+                _overweightNotified = true;
+                float curW = Inventory.GetCurrentWeight();
+                float maxW = Inventory.GetEffectiveMaxWeight();
+                ShowToast($"⚠ Перевес! {curW:F1}/{maxW:F1} кг — скорость снижена");
+            }
+        }
+        else if (_overweightNotified)
+        {
+            // Reset notification when back to normal weight.
+            _overweightNotified = false;
+            ShowToast("Вес в норме");
+        }
 
         if (moveVec != Vector2.Zero)
         {

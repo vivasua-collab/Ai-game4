@@ -87,8 +87,27 @@ namespace CultivationGame.Modules.Inventory
             if (!_isConfigured) Configure(new InventoryConfig());
             if (count <= 0) return false;
 
-            // STR-MODEL: Проверка лимитов веса и объёма с учётом рюкзака
-            if (!CanFitItem(item, count)) return false;
+            // OVERFLOW POLICY: Items ALWAYS enter inventory (even if overweight).
+            // This is intentional — player can exceed carry weight, but movement
+            // speed drops (handled in GameWorldController.HandleFreeMovement).
+            // Storage Ring / Spirit Storage (future) allow offloading excess.
+            // Volume limit still enforced (physical space in backpack).
+            float addedVolume = item.Volume * count;
+            float effectiveMaxVolume = GetEffectiveMaxVolume();
+            float currentVolume = GetCurrentVolume();
+            if (currentVolume + addedVolume > effectiveMaxVolume)
+            {
+                // Volume limit reached — try to add as many as fit.
+                int canFit = HowManyCanFit(item);
+                if (canFit <= 0)
+                {
+                    Console.WriteLine($"[Inventory] Cannot add {item.ItemId}×{count} — volume full ({currentVolume:F1}/{effectiveMaxVolume:F1})");
+                    return false;
+                }
+                // Add partial, log overflow.
+                count = canFit;
+                Console.WriteLine($"[Inventory] Volume limit — adding partial {item.ItemId}×{count}");
+            }
 
             // Стакающиеся предметы — ищем существующий слот
             if (item.Stackable)
@@ -238,43 +257,37 @@ namespace CultivationGame.Modules.Inventory
 
         /// <summary>
         /// STR-MODEL: Проверить, поместится ли предмет в инвентарь.
-        /// Учитывает бонусы рюкзака (weightBonus, volumeBonus, weightReduction).
+        /// NOTE: Weight limit is NOT enforced (overflow allowed — player can be overweight,
+        /// movement speed drops). Only volume (physical backpack space) is enforced.
         /// </summary>
         public bool CanFitItem(ItemData item, int count = 1)
         {
             if (item == null || count <= 0) return false;
 
-            float addedWeight = item.Weight * count;
             float addedVolume = item.Volume * count;
-            float effectiveMaxWeight = GetEffectiveMaxWeight();
             float effectiveMaxVolume = GetEffectiveMaxVolume();
-            float currentWeight = GetCurrentWeight();
             float currentVolume = GetCurrentVolume();
 
-            return currentWeight + addedWeight <= effectiveMaxWeight
-                && currentVolume + addedVolume <= effectiveMaxVolume;
+            return currentVolume + addedVolume <= effectiveMaxVolume;
         }
 
         /// <summary>
         /// STR-MODEL: Сколько предметов данного типа поместится.
-        /// Ограничено: вес (эффективный макс), объём (эффективный макс).
+        /// Limited by VOLUME only (weight overflow allowed).
         /// </summary>
         public int HowManyCanFit(ItemData item)
         {
             if (item == null) return 0;
 
-            float effectiveMaxWeight = GetEffectiveMaxWeight();
             float effectiveMaxVolume = GetEffectiveMaxVolume();
-            float currentWeight = GetCurrentWeight();
             float currentVolume = GetCurrentVolume();
 
-            float remainingWeight = effectiveMaxWeight - currentWeight;
             float remainingVolume = effectiveMaxVolume - currentVolume;
 
-            int byWeight = item.Weight > 0 ? (int)Math.Floor(remainingWeight / item.Weight) : int.MaxValue;
+            // Weight NOT checked — overflow allowed.
             int byVolume = item.Volume > 0 ? (int)Math.Floor(remainingVolume / item.Volume) : int.MaxValue;
 
-            return Math.Max(0, Math.Min(byWeight, byVolume));
+            return Math.Max(0, byVolume);
         }
 
         /// <summary>
@@ -335,6 +348,26 @@ namespace CultivationGame.Modules.Inventory
             if (_backpackService != null)
                 return _backpackService.GetEffectiveMaxVolume(baseMax);
             return baseMax;
+        }
+
+        /// <summary>True if current weight exceeds effective max (overweight).</summary>
+        public bool IsOverweight => GetCurrentWeight() > GetEffectiveMaxWeight();
+
+        /// <summary>
+        /// Overload ratio: 0 = at/below max, 1.0 = 2× max, 2.0 = 3× max.
+        /// Capped at 3.0 (4× max) to prevent zero-speed lock.
+        /// </summary>
+        public float OverweightRatio
+        {
+            get
+            {
+                float max = GetEffectiveMaxWeight();
+                if (max <= 0f) return 0f;
+                float current = GetCurrentWeight();
+                if (current <= max) return 0f;
+                // (current - max) / max gives overload fraction; cap at 3.0
+                return Math.Min(3.0f, (current - max) / max);
+            }
         }
 
         // === ISaveable ===

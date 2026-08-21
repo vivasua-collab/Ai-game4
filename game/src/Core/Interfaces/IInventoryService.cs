@@ -59,5 +59,17 @@ namespace CultivationGame.Core.Interfaces
         /// Формула: baseMaxVolume + backpack.volumeBonus
         /// </summary>
         float GetEffectiveMaxVolume();
+
+        /// <summary>
+        /// Is player carrying more than effective max weight? (overweight)
+        /// Items still enter inventory, but movement speed is reduced.
+        /// </summary>
+        bool IsOverweight { get; }
+
+        /// <summary>
+        /// Weight overload ratio: 0 = no overload, 1.0 = 2× max, 2.0 = 3× max, etc.
+        /// Used to scale movement speed penalty (0.5 - 1.0 × speed).
+        /// </summary>
+        float OverweightRatio { get; }
     }
 }
