@@ -39,6 +39,7 @@ public partial class GameWorldController : Node2D
     [Inject] private IGroundItemService  GroundItems { get; set; } = null!;
     [Inject] private INPCService         Npcs        { get; set; } = null!;
     [Inject] private Modules.Interaction.DialogueService DialogueService { get; set; } = null!;
+    [Inject] private Modules.Player.PlayerCombatAdapter CombatAdapter { get; set; } = null!;
 
     private Node2D        _worldRoot     = null!;
     private Camera2D      _camera        = null!;
@@ -102,6 +103,8 @@ public partial class GameWorldController : Node2D
 
         SetupWorld();
         SetupHUD();
+        // Phase 6: subscribe the combat bridge (attack intent → combat module).
+        CombatAdapter?.Start();
         GD.Print("[GameWorldController] Ready");
     }
 
@@ -375,6 +378,16 @@ public partial class GameWorldController : Node2D
         }
 
         HandleStickyInput();
+
+        // Phase 6: player combat bridge — Space publishes AttackIntentEvent
+        // with the nearest NPC target. Must run BEFORE ResetFrameFlags below.
+        CombatAdapter?.Tick((float)delta);
+        if (PlayerInput is { IsAttackPressed: true })
+        {
+            // Feedback for the attack press (target resolution logs in combat module).
+            ShowToast("⚔ Атака!");
+        }
+
         // LMB movement is handled in _UnhandledInput (respects UI consumption).
         // HandleMouseClick() was removed — it used polling which bypassed Godot's
         // input propagation chain, causing player to move when clicking UI.

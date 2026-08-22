@@ -43,8 +43,32 @@
 - Прямой запуск GameWorld.tscn НЕ вызывает scene-assembly фазы (NewGame вызывается только из MainMenu) — тестировать полный флоу через GODOT_NEWGAME=1 + MainMenu.tscn.
 - NPCVisualService (Modules) остаётся no-op стабом — рендер в Adapter-слое (правильно по архитектуре).
 
+## Phase 2: Test Chat / Dialogue UI (коммит d89fed2)
+
+**Новые файлы:**
+- `Adapter/UI/DialogueWindow.cs` — нижняя панель диалога (пергамент): имя NPC, typewriter-текст (CurrentDisplayText), кнопки вариантов 1..4 (клик или цифры), E — далее, Esc — закрыть. Окно не блокирует ввод игры (MouseFilter.Ignore на корне, Stop на панели).
+
+**Изменено:**
+- `DialogueService`: 3 новых дефолтных диалога (dialogue_guard / dialogue_cultivator / dialogue_passerby) + `TryStartNpcDialogue(npcId)` (поиск по карте NPC→dialogue без знания dialogueId).
+- `HumanNPCSpawnPhase`: привязка диалога по роли при спавне (`MapNpcDialogue`).
+- `GameWorldController`: E-key — приоритет диалогу (если открыт → Advance; если NPC в 2.5 тайлах → старт диалога + пауза тиков; иначе подбор предмета). Esc при открытом диалоге — закрыть + снять паузу.
+
+**Проверка:** headless GODOT_NEWGAME=1 — 4/4 NPC, DialogueWindow Ready, state=Playing, 0 ошибок.
+
+## Phase 6: Combat Activation (коммит см. ниже)
+
+**Изменено:**
+- `PlayerCombatAdapter` (полная реализация, был 74-строчный стаб): выбор цели — ближайший живой NPC в радиусе 2.5 тайлов (Chebyshev) от игрока; Space → `AttackIntentEvent(playerId, targetId, "basic_attack", false)`. CombatModule (мост Фаза 9D) сам стартует бой и запускает 11-слойный damage pipeline. Инжект INPCService — санкционированный прецедент NPCCombatAdapter.
+- `PlayerModule.Register`: регистрация PlayerCombatAdapter (Singleton).
+- `GameWorldController`: `CombatAdapter.Start()` в _Ready; `CombatAdapter.Tick(delta)` в _Process (до ResetFrameFlags, PLR-E06); toast «⚔ Атака!».
+
+**Не входило (per plan):** 5 TODO экипировки в CombatService (penetration/dodge/parry/shield/crit) — заблокированы пустым IItemDatabaseService, запланированы в Phase 8 (Weapon Variety). Combat visuals — Phase 7.
+
+**Проверка:** build 0 ошибок; headless GODOT_NEWGAME=1 — state=Playing, 0 ошибок. CombatModule._isConfigured=true (Start устанавливает) — AttackIntentEvent обрабатывается.
+
 ## Следующие шаги
 
-- Phase 2: DialogueWindow UI + E-key взаимодействие с NPC (backend DialogueService готов, 398 LOC).
-- Phase 6: Combat Activation (PlayerCombatAdapter full + target selection + 5 TODO экипировки).
-- Phase 3-5: Faction port, Trade.
+- Phase 7: Combat Visuals (DamageNumber, HP-бары NPC).
+- Phase 8: Weapon Variety + Ammo (+ 5 TODO экипировки в CombatService, генераторы penetration/dodge).
+- Phase 3-5: Faction port, Trade foundation + UI.
+- Live playtest: Space у NPC, диалоги, скорость PageUp/PageDown, тосты.

@@ -206,6 +206,9 @@ public static class PlayerModuleServices
         builder.Register<StatService>(Lifetime.Singleton);
         builder.Register<IPlayerService, PlayerService>(Lifetime.Singleton);
         builder.Register<IPlayerInputService, PlayerInputService>(Lifetime.Singleton);
+        // NPC_COMBAT_PREP Phase 6: player combat bridge (attack intent with
+        // resolved NPC target). Ticked from the Adapter scene controller.
+        builder.Register<PlayerCombatAdapter>(Lifetime.Singleton);
         builder.Register<IStatService, StatService>(Lifetime.Singleton);
         builder.Register<PlayerModule>(Lifetime.Singleton);
     }
