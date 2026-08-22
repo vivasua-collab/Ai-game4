@@ -37,6 +37,8 @@ public partial class GameWorldController : Node2D
     [Inject] private IItemDatabaseService ItemDatabase { get; set; } = null!;
     [Inject] private IInventoryService   Inventory   { get; set; } = null!;
     [Inject] private IGroundItemService  GroundItems { get; set; } = null!;
+    [Inject] private INPCService         Npcs        { get; set; } = null!;
+    [Inject] private Modules.Interaction.DialogueService DialogueService { get; set; } = null!;
 
     private Node2D        _worldRoot     = null!;
     private Camera2D      _camera        = null!;
@@ -46,6 +48,7 @@ public partial class GameWorldController : Node2D
     private SceneBuilder  _sceneBuilder  = null!;
     private InventoryWindow _inventoryWindow = null!;
     private CharacterSheetWindow _characterSheetWindow = null!;
+    private UI.DialogueWindow _dialogueWindow = null!;
     private CanvasLayer   _hudCanvas     = null!;
     private Label         _timeLabel     = null!;
     private Label         _hudLabel      = null!;
@@ -67,6 +70,9 @@ public partial class GameWorldController : Node2D
     private const float RedrawIntervalSec = 0.1f;
     private float _redrawCooldown = 0f;
     private const float RunSpeedMultiplier = 1.8f;
+
+    /// <summary>Max Chebyshev distance (tiles) for E-key NPC talk. Phase 2.</summary>
+    private const float TalkRangeTiles = 2.5f;
     private bool _positionInitialized;
     private bool _wasPausedBeforeInventory; // track if game was paused before opening inventory
     private bool _overweightNotified; // debounce overweight toast
@@ -300,6 +306,10 @@ public partial class GameWorldController : Node2D
         // Character sheet window (opens with C key).
         _characterSheetWindow = new CharacterSheetWindow { Name = "CharacterSheetWindow" };
         _hudCanvas.AddChild(_characterSheetWindow);
+
+        // Dialogue window (opens with E key near an NPC) — NPC_COMBAT_PREP Phase 2.
+        _dialogueWindow = new UI.DialogueWindow { Name = "DialogueWindow" };
+        _hudCanvas.AddChild(_dialogueWindow);
     }
 
     // ---- Per-frame logic ----
@@ -533,8 +543,15 @@ public partial class GameWorldController : Node2D
     {
         if (PlayerInput == null || Time == null) return;
 
+        // Esc while a dialogue is open → close it and resume ticks (Phase 2).
+        if (PlayerInput.IsPausePressed && _dialogueWindow is { IsOpen: true })
+        {
+            _dialogueWindow.Close();
+            if (!_wasPausedBeforeInventory && Time is { IsPaused: true })
+                Time.Resume();
+        }
         // Esc (sticky "escape") → toggle pause (but not when inventory is open).
-        if (PlayerInput.IsPausePressed && (_inventoryWindow == null || !_inventoryWindow.Visible))
+        else if (PlayerInput.IsPausePressed && (_inventoryWindow == null || !_inventoryWindow.Visible))
         {
             if (Time.IsPaused) Time.Resume();
             else               Time.Pause();
@@ -598,10 +615,21 @@ public partial class GameWorldController : Node2D
             }
         }
 
-        // E key: pick up nearest ground item (within pickup distance).
+        // E key: dialogue takes priority when open or an NPC is in range;
+        // otherwise pick up the nearest ground item.
+        // NPC_COMBAT_PREP Phase 2: E near NPC → open role dialogue (pause ticks).
         if (PlayerInput.IsInteractPressed)
         {
-            HandlePickup();
+            if (_dialogueWindow != null && _dialogueWindow.IsOpen)
+            {
+                _dialogueWindow.Advance();
+                if (_dialogueWindow is { IsOpen: false } && !_wasPausedBeforeInventory && Time is { IsPaused: true })
+                    Time.Resume();
+            }
+            else if (!HandleNpcTalk())
+            {
+                HandlePickup();
+            }
         }
 
         // Suppress game input when inventory is open.
@@ -637,6 +665,47 @@ public partial class GameWorldController : Node2D
                 _speedChangeCooldown = SpeedChangeCooldownSec;
             }
         }
+    }
+
+    /// <summary>
+    /// NPC_COMBAT_PREP Phase 2 — E near an NPC opens the role dialogue.
+    /// Uses the nearest NPC within TalkRange tiles of the player.
+    /// Returns true when a dialogue started (E should not fall through to pickup).
+    /// Pauses the tick simulation while the dialogue is open (planning activity).
+    /// </summary>
+    private bool HandleNpcTalk()
+    {
+        if (Npcs == null || Player == null || _dialogueWindow == null) return false;
+
+        var playerPos = Player.Position;
+        var nearby = Npcs.GetNearbyNPCIds(playerPos, TalkRangeTiles);
+        if (nearby is not { Count: > 0 }) return false;
+
+        // Nearest first (GetNearbyNPCIds order is not guaranteed).
+        string? best = null;
+        int bestDist = int.MaxValue;
+        foreach (var id in nearby)
+        {
+            var npc = Npcs.GetNPC(id);
+            if (npc == null || !Npcs.IsAlive(id)) continue;
+            int dx = System.Math.Abs(npc.Position.X - playerPos.X);
+            int dy = System.Math.Abs(npc.Position.Y - playerPos.Y);
+            int dist = System.Math.Max(dx, dy);
+            if (dist < bestDist) { bestDist = dist; best = id; }
+        }
+        if (best == null) return false;
+
+        var dialogueSvc = DialogueService;
+        if (dialogueSvc == null || !dialogueSvc.TryStartNpcDialogue(best))
+        {
+            ShowToast("Нечего сказать друг другу");
+            return true; // NPC was in range — don't fall through to item pickup.
+        }
+
+        _wasPausedBeforeInventory = Time is { IsPaused: true };
+        if (Time is { IsPaused: false }) Time.Pause();
+        _dialogueWindow.Open(best);
+        return true;
     }
 
     /// <summary>

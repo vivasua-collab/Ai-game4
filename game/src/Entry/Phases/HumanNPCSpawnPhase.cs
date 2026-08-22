@@ -27,6 +27,7 @@ public sealed class HumanNPCSpawnPhase : AbstractSceneAssemblyPhase
     [Inject] private readonly INPCSpawnerService _spawner = null!;
     [Inject] private readonly ITileService _tiles = null!;
     [Inject] private readonly IGameSession _session = null!;
+    [Inject] private readonly CultivationGame.Modules.Interaction.DialogueService _dialogues = null!;
 
     // Prime offset — independent RNG stream from animals (7919) and terrain.
     private const int NpcSeedOffset = 104729;
@@ -63,6 +64,8 @@ public sealed class HumanNPCSpawnPhase : AbstractSceneAssemblyPhase
             if (!string.IsNullOrEmpty(npcId))
             {
                 spawned++;
+                // Phase 2: bind a role dialogue so E-key interaction opens chat.
+                _dialogues?.MapNpcDialogue(npcId, DialogueIdForRole(role));
                 Console.WriteLine($"[HumanNPCSpawn] Spawned {role} #{npcId} at ({pos.Value.X}, {pos.Value.Y})");
             }
         }
@@ -71,6 +74,15 @@ public sealed class HumanNPCSpawnPhase : AbstractSceneAssemblyPhase
             $"[Phase {PhaseOrder}] {PhaseName} complete — {spawned}/{SpawnRoles.Length} NPCs on '{loc.Id}'");
         return Task.CompletedTask;
     }
+
+    private static string DialogueIdForRole(NPCRole role) => role switch
+    {
+        NPCRole.Merchant   => "dialogue_merchant",
+        NPCRole.Cultivator => "dialogue_cultivator",
+        NPCRole.Guard      => "dialogue_guard",
+        NPCRole.Elder      => "dialogue_elder",
+        _                  => "dialogue_passerby",
+    };
 
     private Position2D? FindWalkablePosition(SeededRandom rng, int width, int height)
     {

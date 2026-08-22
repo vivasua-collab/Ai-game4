@@ -378,6 +378,93 @@ namespace CultivationGame.Modules.Interaction
             };
             RegisterDialogue("dialogue_merchant", merchantDialogue);
             MapNpcDialogue("merchant_01", "dialogue_merchant");
+
+            // NPC_COMBAT_PREP Phase 2: диалоги для ролей, спавнящихся на
+            // тестовой карте (HumanNPCSpawnPhase). Привязка по npcId
+            // выполняется в фазе спавна через MapNpcDialogueByRole.
+            var guardDialogue = new Dictionary<string, DialogueNode>
+            {
+                ["start"] = new DialogueNode
+                {
+                    NodeId = "start",
+                    Text = "Стой! ...А, ты путник. Я страж этой деревни. Держись дорог и не ходи в лес после заката.",
+                    Choices =
+                    {
+                        new DialogueChoice { Index = 0, Text = "Что тревожит округу?", TargetNodeId = "threats" },
+                        new DialogueChoice { Index = 1, Text = "Спасибо, пойду дальше", TargetNodeId = null }
+                    }
+                },
+                ["threats"] = new DialogueNode
+                {
+                    NodeId = "threats",
+                    Text = "Волки дерзают, а с гор спускается лихо. Культиваторам тут цены нет — как и голове на плечах.",
+                    Choices =
+                    {
+                        new DialogueChoice { Index = 0, Text = "Понял", TargetNodeId = null }
+                    }
+                }
+            };
+            RegisterDialogue("dialogue_guard", guardDialogue);
+
+            var cultivatorDialogue = new Dictionary<string, DialogueNode>
+            {
+                ["start"] = new DialogueNode
+                {
+                    NodeId = "start",
+                    Text = "Чувствую в тебе дыхание Ци, но неупорядоченное. Хочешь услышать слово о Пути?",
+                    Choices =
+                    {
+                        new DialogueChoice { Index = 0, Text = "Наставляй", TargetNodeId = "advice" },
+                        new DialogueChoice { Index = 1, Text = "В другой раз", TargetNodeId = null }
+                    }
+                },
+                ["advice"] = new DialogueNode
+                {
+                    NodeId = "advice",
+                    Text = "Ци — не сила, а течение. Не гони его, а направляй. Медитируй у мест силы — и меридианы сами раскроются.",
+                    Choices =
+                    {
+                        new DialogueChoice { Index = 0, Text = "Запомню", TargetNodeId = null }
+                    }
+                }
+            };
+            RegisterDialogue("dialogue_cultivator", cultivatorDialogue);
+
+            var passerbyDialogue = new Dictionary<string, DialogueNode>
+            {
+                ["start"] = new DialogueNode
+                {
+                    NodeId = "start",
+                    Text = "Приветствую! Денёк сегодня тихий... для этих мест. Торопишься куда-то?",
+                    Choices =
+                    {
+                        new DialogueChoice { Index = 0, Text = "Просто осматриваюсь", TargetNodeId = "looking" },
+                        new DialogueChoice { Index = 1, Text = "Проходи", TargetNodeId = null }
+                    }
+                },
+                ["looking"] = new DialogueNode
+                {
+                    NodeId = "looking",
+                    Text = "Оглядись тогда: у торговца есть зелья, а старейшина всегда ищет помощников.",
+                    Choices =
+                    {
+                        new DialogueChoice { Index = 0, Text = "Спасибо", TargetNodeId = null }
+                    }
+                }
+            };
+            RegisterDialogue("dialogue_passerby", passerbyDialogue);
+        }
+
+        /// <summary>
+        /// NPC_COMBAT_PREP Phase 2: старт диалога по npcId через карту
+        /// NPC→dialogue (без знания dialogueId вызывающей стороной).
+        /// </summary>
+        public bool TryStartNpcDialogue(string npcId)
+        {
+            if (_isInDialogue) return false;
+            if (string.IsNullOrEmpty(npcId)) return false;
+            return _npcDialogueMap.TryGetValue(npcId, out var dialogueId)
+                && StartDialogue(npcId, dialogueId);
         }
 
         public void Dispose()
