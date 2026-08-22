@@ -7,7 +7,9 @@
 using System;
 using System.Collections.Generic;
 using CultivationGame.Core.Data;
+using CultivationGame.Core.Events;
 using CultivationGame.Core.Interfaces;
+using CultivationGame.Core.Messaging.Contracts;
 using CultivationGame.Modules.Body;
 
 namespace CultivationGame.Modules.NPC
@@ -40,9 +42,15 @@ namespace CultivationGame.Modules.NPC
         private readonly IBodyFactory _bodyFactory;
         private readonly ITileService _tileService;
         private readonly SpeciesRegistry _speciesRegistry;
+        private readonly ISubscriber<DamageAppliedEvent> _damageAppliedSub;
+        private readonly IPublisher<AttackIntentEvent> _attackIntentPub;
 
         // === State ===
         private readonly List<AnimalEntity> _animals = new();
+        private IDisposable? _damageAppliedToken;
+
+        // Track which animals are hostile (attacked by player → retaliate).
+        private readonly HashSet<string> _hostileAnimals = new();
 
         // Deterministic RNG for wandering (separate from spawn RNG which is created per SpawnForLocation call).
         private readonly SeededRandom _wanderRng = new SeededRandom(seed: 0xC0FFEE);
@@ -73,12 +81,16 @@ namespace CultivationGame.Modules.NPC
             IBodyDataProvider bodyDataProvider,
             IBodyFactory bodyFactory,
             ITileService tileService,
-            SpeciesRegistry speciesRegistry)
+            SpeciesRegistry speciesRegistry,
+            ISubscriber<DamageAppliedEvent> damageAppliedSub,
+            IPublisher<AttackIntentEvent> attackIntentPub)
         {
             _bodyDataProvider = bodyDataProvider ?? throw new ArgumentNullException(nameof(bodyDataProvider));
             _bodyFactory = bodyFactory ?? throw new ArgumentNullException(nameof(bodyFactory));
             _tileService = tileService ?? throw new ArgumentNullException(nameof(tileService));
             _speciesRegistry = speciesRegistry ?? throw new ArgumentNullException(nameof(speciesRegistry));
+            _damageAppliedSub = damageAppliedSub ?? throw new ArgumentNullException(nameof(damageAppliedSub));
+            _attackIntentPub = attackIntentPub ?? throw new ArgumentNullException(nameof(attackIntentPub));
         }
 
         // === IStartable ===
@@ -113,6 +125,9 @@ namespace CultivationGame.Modules.NPC
             }
 
             SpawnForLocation(width, height, seed, locId);
+
+            // Subscribe to damage events for animal retaliation.
+            _damageAppliedToken = _damageAppliedSub.Subscribe(OnDamageApplied);
         }
 
         // === Spawn API ===
@@ -258,6 +273,13 @@ namespace CultivationGame.Modules.NPC
         ///   4. Step MoveSpeedTilesPerTick tiles towards Target via
         ///      greedy single-tile moves (diagonal first, then orthogonal).
         /// </summary>
+        /// <summary>Cleanup: unsubscribe from events.</summary>
+        public void Dispose()
+        {
+            _damageAppliedToken?.Dispose();
+            _damageAppliedToken = null;
+        }
+
         public void Tick(int tickCount)
         {
             // Periodic debug log so headless tests can confirm Tick is wired.
@@ -274,6 +296,28 @@ namespace CultivationGame.Modules.NPC
                 var a = _animals[i];
                 if (!a.IsAlive) continue;
 
+                // === Combat: hostile animals attack player if adjacent ===
+                if (_hostileAnimals.Contains(a.EntityId))
+                {
+                    // Hostile animal: attack player every few ticks.
+                    // We don't have player position directly, but AttackIntentEvent
+                    // is processed by CombatService which checks range.
+                    if (a.CombatCooldownTicks > 0)
+                    {
+                        a.CombatCooldownTicks--;
+                    }
+                    else
+                    {
+                        // Publish attack intent towards player.
+                        // CombatService will check if player is in range.
+                        _attackIntentPub.Publish(new AttackIntentEvent(
+                            a.EntityId, "player", string.Empty, false));
+                        a.CombatCooldownTicks = 3; // 3-tick cooldown
+                    }
+                    continue; // Don't wander while hostile
+                }
+
+                // === Normal wandering ===
                 // Cooldown gate — wait before next action.
                 if (a.MoveCooldownTicks > 0)
                 {
@@ -302,6 +346,30 @@ namespace CultivationGame.Modules.NPC
                     a.MoveCooldownTicks = GetWanderCooldownTicks(a.Species);
                 }
             }
+        }
+
+        /// <summary>
+        /// Handle damage applied to an animal — mark as hostile, track attacker.
+        /// Animals retaliate by moving towards and attacking the player.
+        /// </summary>
+        private void OnDamageApplied(in DamageAppliedEvent e)
+        {
+            // Copy fields for use in lambda (in parameter cannot be captured).
+            string targetId = e.TargetId;
+            string sourceId = e.SourceId;
+
+            // Check if target is one of our animals.
+            var animal = _animals.Find(a => a.EntityId == targetId);
+            if (animal == null || !animal.IsAlive) return;
+
+            // Mark as hostile (retaliate).
+            _hostileAnimals.Add(animal.EntityId);
+
+            // Track attacker ID (for AttackIntentEvent target).
+            animal.LastAttackerId = sourceId;
+            animal.CombatCooldownTicks = 0; // attack next tick
+
+            Console.WriteLine($"[AnimalService] {animal.Species}#{animal.EntityId} hit by {e.SourceId} → hostile!");
         }
 
         // === Helpers ===

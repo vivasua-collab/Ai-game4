@@ -51,6 +51,12 @@ namespace CultivationGame.Modules.NPC
         /// </summary>
         public int MoveSpeedTilesPerTick { get; set; } = 1;
 
+        /// <summary>Cooldown for combat attacks (ticks until next attack).</summary>
+        public int CombatCooldownTicks { get; set; }
+
+        /// <summary>ID of last attacker (for retaliation targeting).</summary>
+        public string LastAttackerId { get; set; } = string.Empty;
+
         public AnimalEntity(
             string entityId,
             string species,

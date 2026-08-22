@@ -535,13 +535,38 @@ public partial class InventoryItemRow : HBoxContainer
 
         _weightLabel = new Label
         {
-            Text = $"{_slot.Weight:F1} кг",
-            CustomMinimumSize = new Vector2(70, 22),
+            Text = GetItemWeightVolumeText(),
+            CustomMinimumSize = new Vector2(120, 22),
             HorizontalAlignment = HorizontalAlignment.Right,
         };
         _weightLabel.AddThemeFontSizeOverride("font_size", 12);
         _weightLabel.AddThemeColorOverride("font_color", ParchmentTheme.InkFaded);
         AddChild(_weightLabel);
+    }
+
+    /// <summary>
+    /// Get weight + volume text for this item row.
+    /// Reads from ItemDatabase (InventorySlot.Weight may be 0 if created
+    /// via the category/rarity constructor).
+    /// </summary>
+    private string GetItemWeightVolumeText()
+    {
+        float weight = _slot.Weight;
+        float volume = _slot.Volume;
+
+        // If slot weight is 0, try to resolve from ItemDatabase.
+        if (weight <= 0 && _itemDb != null && _itemDb.TryGetItem(_slot.ItemId, out var item))
+        {
+            weight = item.Weight * _slot.Count;
+            volume = item.Volume * _slot.Count;
+        }
+        else
+        {
+            weight *= _slot.Count;
+            volume *= _slot.Count;
+        }
+
+        return $"{weight:F1} кг | {volume:F1} л";
     }
 
     // === Drag source: provide drag data ===

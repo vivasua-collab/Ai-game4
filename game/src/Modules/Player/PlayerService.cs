@@ -135,6 +135,8 @@ public sealed class PlayerService : IPlayerService, IDisposable
         _spawned = true;
         _qiChangedToken = _qiChangedSub.Subscribe(OnQiChanged);
         _bodyCriticalToken = _bodyCriticalSub.Subscribe(OnBodyCritical);
+        // Publish initial position so NPC AI/movement knows where player is.
+        _positionPub.Publish(new PlayerPositionChangedEvent(position.X, position.Y));
         Console.WriteLine($"[PlayerService] Player spawned @ {position}, hp delegated to BodyService");
     }
 
