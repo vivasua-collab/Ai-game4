@@ -1,6 +1,6 @@
 # Сводка сессий (обновляется при завершении каждой сессии)
 
-Обновлено: 2026-08-22 10:30 UTC
+Обновлено: 2026-08-22 22:30 UTC (локальный ZCode-агент, Windows)
 
 ## Проект
 Cultivation World Simulator (Ai-game4), Godot 4.7.1 .NET, C#
@@ -10,7 +10,41 @@ Cultivation World Simulator (Ai-game4), Godot 4.7.1 .NET, C#
 
 ## Последние сессии
 
-### 2026-08-22 (текущая сессия)
+### 2026-08-22 (вечер/ночь — локальный ZCode, 9 коммитов 11e495d..1549919)
+
+#### Играбельный прототип физической части (главное)
+- **Диспозиционный ИИ**: NPCDisposition (Hostile/Friendly/Neutral/Merchant) по роли; Hostile агро на игрока в 5 тайлах; Friendly (страж) вступается за игрока; Merchant стоит на месте; TargetId = argmax threat (фикс «атаки в никуда»)
+- **NPC-атаки**: NPCModule.ProcessNpcAttacks — AttackIntentEvent(npc, target, "npc_strike") раз в 1.6 сек при дистанции ≤2 → полный damage pipeline
+- **Экипировка NPC из «Матрёшки»**: оружие всем (Enemy +1 уровень), броня 60%; TotalDamage += сгенерированный урон
+- **Лут**: смерть NPC → 1-2 предмета EquipmentGenerator → на землю (подбор E)
+- **Игрок**: HP-бар в HUD (Σ RedHP, Q4), тост «💥 −X HP», смерть → респавн 3с (полное лечение + центр карты)
+- **Состав локации**: 2 Enemy (бандиты, без диалога) + 1 Guard + 2 Passerby + 1 Merchant
+- **Коммит:** 1549919
+
+#### Генератор экипировки «Матрёшка»
+- EquipmentGenerationTables (Core/Data): 7 оружий (§10.2), 6 броней (§11.2), 14 материалов (§5), GradeProfiles (§4.1), 5 зачарований (§8)
+- IEquipmentGenerator + EquipmentGenerator (Modules/Generator): формулы §2, бонусы §7.3, зачарование §8.4, ItemId без коллизий; debug-dump в GODOT_GEN_DEBUG
+- Закрыты 4/5 проблем NPC_COMBAT_PREP §8 (variety, slots, penetration, id-collision)
+- **Коммит:** 2532be9
+
+#### Слоты быстрого запуска (пояс)
+- BeltService (7 слотов = хотбар 3-9), гейт по EquipmentSlot.Belt; HotbarPanel на HUD (1-2 оружие); BeltSlotRow в инвентаре (drag&drop расходников, ПКМ — вернуть); клавиши 3-9/click — использование (heal → BodyService, qi_restore → QiService)
+- Контракты: BeltSlotsChangedEvent, ConsumableUsedEvent
+- **Коммит:** 8fbb18b
+
+#### P0 NPC_COMBAT_PREP (Phase 1/2/6)
+- Phase 1: HumanNPCSpawnPhase + NPCSpriteRenderer (d7837e8); тест-хук GODOT_NEWGAME=1 (headless полный флоу)
+- Phase 2: DialogueWindow + роль-диалоги + E-key (d89fed2)
+- Phase 6: PlayerCombatAdapter full + выбор цели + Space (f0ee6fb)
+
+#### Багфиксы по playtest
+- Скорость: TimeSpeedChangedEvent публикуется (раньше никто), toast «⏩ Скорость», Day/Month/Year контракты (11e495d)
+- Зависание после диалога: Resume через DialogueEndedEvent — единая точка (219b3fc)
+- Скорость игрока: умеренный множитель Normal ×1 / Fast ×2 / Quick ×3.5 + камера (Q7 уточнён) (00c42bc)
+- Зум в инвентаре: modalOpen-гвард на wheel/LMB/middle (00c42bc)
+- ДУБЛИРОВАНИЕ экипировки: старый предмет возвращался дважды (UI TryAddItem + событие OldItemId → InventoryModule); убран ручной возврат из CharacterDollPanel (00c42bc)
+
+### 2026-08-22 (утро — облачный агент)
 
 #### Сборка тела + визуализация + животные
 - **BodyStatusPanel** — схематическое отображение частей тела через _Draw()
@@ -125,34 +159,32 @@ Cultivation World Simulator (Ai-game4), Godot 4.7.1 .NET, C#
 ## Текущее состояние игры
 
 ### Что работает
-- ✅ Main menu → New Game (50×50) / Large World (500×500)
+- ✅ Main menu → New Game (50×50) / Large World (500×500) + GODOT_NEWGAME=1 headless-хук
 - ✅ World generation (noise-based, 9 biomes, viewport-culled rendering)
-- ✅ Environment objects (trees, rocks, bushes, ore, herbs) + procedural sprites
-- ✅ Player free movement (WASD, pixel-based, no Time.Speed scaling)
-- ✅ Camera (zoom 1-8, follow player, mouse wheel)
-- ✅ Inventory (B key) — line model, drag&drop, double-click equip, trash zone
-- ✅ Character doll (equipment slots, drag&drop equip/unequip)
-- ✅ Character Sheet (C key) — body silhouette + HP + stats + cultivation
-- ✅ Body assembly (BodyService + BodyFactory + 10 templates + 11 species)
-- ✅ Body visualization (schematic silhouette, 4 morphologies)
-- ✅ Simple animals (wolf, deer, rabbit) — spawn + wander + body parts
-- ✅ Harvest (F key) — Mode A gradual depletion, toast feedback
-- ✅ Object destruction on depletion + 7-day respawn schedule
-- ✅ Ground items — overflow drop, pickup (E key), procedural sprites
-- ✅ Overweight system — speed penalty, toast, color-coded weight label
-- ✅ Generators (verified via GODOT_GEN_DEBUG=1)
-- ✅ EventBus re-entrancy protection (queue)
-- ✅ Deterministic combat (SeededRandom, seed=12345)
+- ✅ Environment objects + Harvest (F) + ground items (E)
+- ✅ Inventory (B) + Character doll + двойной клик (БЕЗ дублирования — фикс)
+- ✅ Character Sheet (C) — силуэт тела + HP + статы
+- ✅ Body assembly + визуализация + животные (wolf/deer/rabbit)
+- ✅ **Гуманоиды-NPC**: 6 на локации (2 Enemy + Guard + 2 Passerby + Merchant), спавн через полный пайплайн, рендер кругами по ролям
+- ✅ **Диспозиционный ИИ**: агро/защита/блуждание/лавка; NPC-атаки через damage pipeline
+- ✅ **Диалоги**: E возле NPC → DialogueWindow (typewriter, выборы 1-4/E/Esc), пауза на диалог с корректным resume
+- ✅ **Бой**: Space — атака игрока по ближайшему NPC (2.5 тайла); HP-бар игрока; тосты урона; смерть игрока → респавн
+- ✅ **Лут**: смерть NPC → 1-2 предмета на землю, подбор E
+- ✅ **Генератор «Матрёшка»**: 7 оружий × 6 бронь × 14 материалов × 5 грейдов × зачарования (GODOT_GEN_DEBUG=1 — дамп)
+- ✅ **Слоты пояса**: 7 слотов (хотбар 3-9), гейт по поясу, drag&drop из инвентаря, использование (heal/qi)
+- ✅ Скорость: PageUp/PageDown с тостами + ускорение игрока (Fast ×2, Quick ×3.5)
+- ✅ Overweight, EventBus re-entrancy, детерминированный combat RNG
 
 ### Что НЕ работает (отложено)
-- ❌ NPC spawn (NPCSpawnPhase replaced by AnimalSpawnPhase for animals)
-- ❌ NPC AI (3-tier nervous system — отложено)
-- ❌ Combat activation (PlayerCombatAdapter stub)
-- ❌ Trade system (нет backend, нет UI)
-- ❌ Dialogue/chat UI (backend готов, UI нет)
-- ❌ Faction system (portable из Ai-game3-ref)
-- ❌ Save/load (отключено — Q8 decision)
-- ❌ TileMapLayer migration (ЗАПРЕТ 8 — отложено, Q11 decision)
+- ❌ Урон NPC→игрок по частям тела — проверить живьём (pipeline готов, headless не симулирует бой)
+- ❌ Combat visuals (HP-бары над NPC, цифры урона — Phase 7)
+- ❌ Trade (окно у торговца — Phase 4-5)
+- ❌ Faction system (portable из Ai-game3-ref — Phase 3)
+- ❌ Weapon variety в луте/экипировке игрока — интеграция StatBonuses в CombatService (5 TODO, Phase 8)
+- ❌ Cultivator technique cap=0 (баг TechniqueGeneratorService)
+- ❌ Духовная часть (культивация-геймплей), глобальная карта, квесты — не трогали по условию
+- ❌ Save/load (отключён — Q8)
+- ❌ TileMapLayer migration (ЗАПРЕТ 8 — Q11)
 
 ---
 
@@ -218,22 +250,19 @@ Cultivation World Simulator (Ai-game4), Godot 4.7.1 .NET, C#
 
 ---
 
-## Следующие шаги (план NPC_COMBAT_PREP.md)
+## Следующие шаги
 
-### P0 — BLOCKERS
-1. Phase 1: NPC Spawn + Render (~480 LOC) — NPCSpawnPhase + NPCVisualService
-2. Phase 2: Test Chat (~450 LOC) — DialogueWindow UI
-3. Phase 6: Combat Activation (~630 LOC) — PlayerCombatAdapter + target selection
+### P0 — проверить живьём (сделано локально, не проверено в бою)
+1. Урон NPC→игрок через pipeline (бандит бьёт игрока: HP-бар, тосты, смерть/респавн)
+2. Дружественный страж вступается за игрока (Friendly → threat врагу)
+3. Лут-дроп при смерти NPC + подбор
+4. Слоты пояса end-to-end (надеть пояс → drag&drop пилюли → клавиша 3)
 
-### P1
-4. Phase 3: Faction Port (~400 LOC)
-5. Phase 4: Trade Foundation (~520 LOC)
-6. Phase 5: Trade UI (~650 LOC)
-
-### P2
-7. Phase 7: Combat Visuals (~330 LOC)
-8. Phase 8: Weapon Variety + Ammo (~1000 LOC)
-9. Phase 9: Thrown + Dual Wield (~650 LOC)
+### P1 — по плану NPC_COMBAT_PREP.md
+5. Phase 7: Combat Visuals (HP-бары над NPC, DamageNumber)
+6. Phase 4-5: Trade (торговец уже на локации с диалогом)
+7. Phase 3: Faction Port
+8. Phase 8: Weapon Variety wiring (5 TODO CombatService ← StatBonuses «Матрёшки», генератор готов)
 
 ---
 

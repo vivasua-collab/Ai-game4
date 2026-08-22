@@ -1,8 +1,25 @@
-# SESSION_CONTEXT — Передача контекста локальному zcode
+# SESSION_CONTEXT — Передача контекста облачному агенту
 
 **Дата создания:** 2026-08-22 10:35 UTC
-**Назначение:** Полный контекст для продолжения разработки в локальном окружении zcode
+**Обновлено:** 2026-08-22 22:35 UTC (обратная передача от локального ZCode после сессии прототипа)
+**Назначение:** Полный контекст для продолжения разработки
 **Инструкция:** Прочитай этот файл ПЕРВЫМ при старте новой сессии
+
+---
+
+## 0. ЧТО СДЕЛАЛОСЬ ЗА ЛОКАЛЬНУЮ СЕССИЮ (9 коммитов, 11e495d..1549919)
+
+Главное: **играбельный прототип физической части** (ИИ + бой + лут + экипировка + слоты пояса). Духовная часть, глобальная карта, квесты — не тронуты (по условию задачи).
+
+1. **Фикс скорости** (11e495d): TimeService публикует TimeSpeedChangedEvent (никто не публиковал!); Day/Month/Year контракты; тосты скорости.
+2. **NPC_COMBAT_PREP P0** (d7837e8, d89fed2, f0ee6fb): спавн NPC + рендер + диалоги (E) + бой (Space). Тест-хук GODOT_NEWGAME=1.
+3. **Playtest-фиксы** (219b3fc, 00c42bc): зависание после диалога (Resume через DialogueEndedEvent); скорость игрока ×2/×3.5; зум под инвентарём; ДУБЛИРОВАНИЕ экипировки (двойной возврат старого предмета: UI TryAddItem + событие OldItemId→InventoryModule; убран ручной возврат).
+4. **Слоты пояса** (8fbb18b): BeltService (хотбар 3-9, гейт по поясу), HotbarPanel HUD, BeltSlotRow в инвентаре, использование heal/qi_restore.
+5. **Генератор «Матрёшка»** (2532be9): EquipmentGenerationTables (7 оружий/6 бронь/14 материалов/грейды/зачарования) + EquipmentGenerator. Закрыты 4/5 проблем из NPC_COMBAT_PREP §8.
+6. **Прототип** (1549919): диспозиционный ИИ (NPCDisposition), NPC-атаки (AttackIntentEvent цикл), экипировка NPC генератором, лут при смерти, HP-бар, респавн игрока, состав локации 2 Enemy + Guard + 2 Passerby + Merchant.
+
+**Ключевые новые файлы:** Core/Data/EquipmentGenerationTables.cs, Core/Interfaces/IEquipmentGenerator.cs, Modules/Generator/EquipmentGenerator.cs, Modules/Inventory/BeltService.cs, Adapter/UI/{HotbarPanel,BeltSlotRow,DialogueWindow}.cs, Adapter/Scene/NPCSpriteRenderer.cs, Entry/Phases/HumanNPCSpawnPhase.cs.
+**Ключевые изменённые:** NPCState (+Disposition), NPCSpawnerService (экипировка из генератора), NPCAIService (диспозиции, TargetId=argmax threat), NPCModule (атакующий цикл, лут), GameWorldController (HP-бар, диалог E, респавн, хотбар-клавиши), CharacterDollPanel (фикс дублирования), DialogueService (роль-диалоги).
 
 ---
 
@@ -59,9 +76,9 @@ export DOTNET_ROOT=/home/z/.dotnet
 
 ---
 
-## 2. ТЕКУЩЕЕ СОСТОЯНИЕ (коммит 86152da)
+## 2. ТЕКУЩЕЕ СОСТОЯНИЕ (коммит 1549919)
 
-### Что работает в игре
+### Что работает в игре (дельта за локальную сессию — жирным)
 - ✅ **Main Menu** → New Game (50×50) / Large World (500×500)
 - ✅ **World generation** — noise-based, 9 биомов (Ocean, Sea, Coast, Grassland, Steppe, Forest, Highlands, Mountains, Peak)
 - ✅ **Tile rendering** — viewport-culled, NEAREST filter (нет сетки), 1736× reduction
@@ -81,6 +98,19 @@ export DOTNET_ROOT=/home/z/.dotnet
 - ✅ **Generators** — items + techniques (verified via GODOT_GEN_DEBUG=1)
 - ✅ **EventBus** — re-entrancy queue (no StackOverflow)
 - ✅ **Deterministic combat** — SeededRandom (seed=12345)
+- ✅ **Гуманоиды-NPC**: 6 на локации (2 Enemy + Guard + 2 Passerby + Merchant), диспозиционный ИИ (Hostile агро 5 тайлов / Friendly защищает / Merchant лавка)
+- ✅ **Бой активен**: Space — атака игрока (цель = ближайший NPC в 2.5 тайла); NPC бьют в ответ ("npc_strike" раз в 1.6с через AttackIntentEvent → полный damage pipeline)
+- ✅ **Диалоги**: E возле NPC → DialogueWindow (typewriter, выборы 1-4, Esc), пауза тиков с resume через DialogueEndedEvent
+- ✅ **HP-бар игрока** (Σ RedHP, Q4) + тосты «💥 −X HP» + смерть → респавн (3с, полное лечение, центр карты)
+- ✅ **Лут**: смерть NPC → 1-2 предмета на землю (подбор E)
+- ✅ **Слоты пояса**: HotbarPanel (1-2 оружие, 3-9 пояс при надетом Belt), drag&drop расходников в инвентаре, 3-9/click — использование (heal→BodyService по раненым частям, qi_restore→QiService)
+- ✅ **Генератор «Матрёшка»**: EquipmentGenerator — 7 оружий/6 бронь/14 материалов/грейды/зачарования, NPC экипируются им, лут из него
+- ✅ **Скорость игры**: PageUp/PageDown (тосты), игрок ускоряется (Fast ×2, Quick ×3.5, камера следом)
+
+### НЕ проверено живьём (сделано headless-only)
+- ⚠ Урон NPC→игрок: pipeline готов, но бой не симулировался — ПЕРВОЕ что проверить в редакторе
+- ⚠ Страж-союзник вступается (Friendly → threat врагу)
+- ⚠ Слоты пояса end-to-end (надеть → drag&drop → клавиша 3)
 
 ### Что НЕ работает (отложено, документация НЕ редактируется)
 - ❌ NPC spawn (animals есть, но NPC нет)
@@ -211,6 +241,14 @@ game/src/
 ### Запрос 4: Передача контекста (текущий)
 > "Сейчас работа будет передаваться локальному zcode, необходимо составить для него файл передачи данных и выгрузить его на gitHub."
 
+### Запросы локальной сессии ZCode (2026-08-22, вечер):
+> 5. "Исправление, сломалась реакция на изменение скорости при интеграции тиковой системы… запусти аудит и ревю кода, после начинай реализацию фич согласно истории и документации. Полностью автоматически, периодические сохранения в GitHub и чекпоинты." → фикс скорости + P0-фазы NPC_COMBAT_PREP.
+> 6. Playtest-баги: зависание после диалога; скорость игрока; зум в инвентаре; дублирование экипировки спамом двойного клика. → все исправлены.
+> 7. "Начинаем реализацию слотов быстрого запуска. При одевании пояса должны появляться слоты быстрого доступа на главном экране и в инвентаре возможность поместить расходники в слоты пояса. Использование расходников." → BeltService + HotbarPanel + BeltSlotRow.
+> 8. "Начни работу с генератором оборудования и экипировки. На основе документации реализуй скелет генератора." → EquipmentGenerator «Матрёшка».
+> 9. "Выполни подключение. Финал — играбельный прототип физической части (духовную часть, глобальную карту, квесты не трогаем). Простой ИИ для гуманоидов: враги, друзья, нейтралы, торговцы. Малая локация." → 5 этапов, коммит 1549919.
+> 10. Текущий: обновить контекст-файлы и выгрузить на GitHub.
+
 ---
 
 ## 5. КОНЦЕПТУАЛЬНЫЕ РЕШЕНИЯ (14 ответов пользователя)
@@ -255,35 +293,28 @@ game/src/
 
 ## 7. СЛЕДУЮЩИЕ ШАГИ
 
-### План NPC_COMBAT_PREP.md (9 phases, ~5110 LOC)
+### P0 — live-проверка прототипа (первое, что делать в облаке)
+1. Запустить в редакторе (scenes/MainMenu.tscn → Новая игра). Проверить:
+   - Бандит (оранжевый круг) агрится в 5 тайлах, бьёт игрока (HP-бар падает, тосты «💥 −X»)
+   - Space — ответный удар, убийство → лут на земле (E — подбор)
+   - Страж (синий) рядом вступается за игрока
+   - Смерть игрока → респавн в центре через 3с
+   - Пояс: надеть (B, двойной клик) → хотбар 3-9 появился → drag&drop пилюли → клавиша 3 → HP восстановился
+   - Диалоги E у торговца/прохожих; закрытие кликом выбора НЕ зависает
+2. Если урон NPC→игрок не доходит: смотреть цепочку AttackIntentEvent(npc,"player_0") → CombatModule.OnAttackIntent → CombatService.ExecuteAttack → DamageAppliedEvent (target=player_0) → BodyService игрока.
 
-**P0 — BLOCKERS (следующая сессия):**
-1. **Phase 1: NPC Spawn + Render** (~480 LOC)
-   - NPCSpawnPhase (для NPC, не животных)
-   - NPCVisualService (Godot рендеринг)
-   - Wire InteractionService к реальным NPC позициям
-   - IsInteractPressed уже экспортирован
+### P1 — по плану NPC_COMBAT_PREP.md (фазы 1/2/6 ГОТОВЫ)
+3. Phase 7: Combat Visuals — HP-бар над NPC, DamageNumber (~330 LOC)
+4. Phase 4-5: Trade — торговец уже спавнится, диалог есть
+5. Phase 3: Faction Port
+6. Phase 8: Weapon Variety wiring — 5 TODO в CombatService (penetration/dodge/parry/shield/crit ← StatBonuses «Матрёшки» + EquipmentData); генератор уже выдаёт значения
+7. Баг: Cultivator technique cap=0 (TechniqueGeneratorService)
 
-2. **Phase 2: Test Chat** (~450 LOC)
-   - DialogueWindow (Control) — простой чат
-   - Wire DialogueService → DialogueWindow
-   - Тестовые диалоги (JSON or hardcoded)
-
-3. **Phase 6: Combat Activation** (~630 LOC)
-   - PlayerCombatAdapter (full, 241 LOC из Ai-game3-ref)
-   - Register в PlayerModuleServices
-   - Target selection service
-   - Wire equipment data (5 TODOs в CombatService)
-
-**P1:**
-4. Phase 3: Faction Port (~400 LOC) — из Ai-game3-ref
-5. Phase 4: Trade Foundation (~520 LOC) — с нуля
-6. Phase 5: Trade UI (~650 LOC) — с нуля
-
-**P2:**
-7. Phase 7: Combat Visuals (~330 LOC)
-8. Phase 8: Weapon Variety + Ammo (~1000 LOC)
-9. Phase 9: Thrown + Dual Wield (~650 LOC)
+### Проверенные фиксы (не ломать)
+- Экипировка: возврат старого предмета ТОЛЬКО через событие OldItemId → InventoryModule (CharacterDollPanel больше не делает TryAddItem вручную — иначе дубль)
+- Resume после диалога: только через DialogueEndedEvent-подписку GameWorldController
+- Зум/движение мыши: modalOpen-гвард в _UnhandledInput
+- Скорость игрока: gameSpeedMult = Fast→2.0 / Quick→3.5 (Q7 уточнён пользователем)
 
 ---
 
@@ -317,10 +348,13 @@ dotnet build CultivationGame.csproj
 GODOT=/home/z/godot/Godot_v4.7.1-stable_mono_linux_x86_64/Godot_v4.7.1-stable_mono_linux.x86_64
 timeout 15 "$GODOT" --headless --path . scenes/GameWorld.tscn
 
+# Full flow headless (scene-assembly: NPC spawn, dialogues, state=Playing)
+GODOT_NEWGAME=1 timeout 15 "$GODOT" --headless --path . scenes/MainMenu.tscn
+
 # Large world test (500×500)
 GODOT_MAP_SIZE=500 timeout 20 "$GODOT" --headless --path . scenes/GameWorld.tscn
 
-# Generator debug
+# Generator debug (включая дамп «Матрёшки»: все подтипы + зачарование)
 GODOT_GEN_DEBUG=1 timeout 15 "$GODOT" --headless --path . scenes/GameWorld.tscn
 
 # Git
@@ -364,26 +398,29 @@ git status
 ### Hotkeys
 | Key | Action |
 |-----|--------|
-| WASD | Movement (real-time, не зависит от Time.Speed) |
+| WASD | Movement (real-time; ускоряется на Fast ×2 / Quick ×3.5) |
 | Shift | Run (1.8× speed) |
 | LMB | Move to point (world) / drag items (inventory) |
-| RMB | Info (inventory items) |
-| Wheel | Zoom (world) / scroll (inventory) |
+| RMB | Info (inventory items) / вернуть из слота пояса |
+| Wheel | Zoom (world; заблокирован при открытом инвентаре) / scroll (inventory) |
 | Middle | Reset zoom to 3× |
-| E | Pick up nearest ground item |
+| **Space** | **Атака ближайшего NPC в 2.5 тайла** |
+| E | Диалог с NPC рядом (приоритет) / pick up ground item |
 | B | Toggle Inventory (pause game) |
 | C | Toggle Character Sheet (pause game) |
 | F | Harvest resource at cursor |
-| Esc | Pause / close inventory / close character sheet |
-| PageUp/Down | Time speed (Normal/Fast/Quick) |
+| Esc | Pause / close inventory / character sheet / dialogue |
+| PageUp/Down | Time speed (Normal/Fast/Quick, тосты) |
+| **1-9** | **Хотбар: 1-2 оружие (инфо), 3-9 использование расходников пояса** |
 | V | Meditate (action registered, effect TBD) |
 
 ### Env vars
 | Var | Purpose |
 |-----|---------|
 | `GODOT_MAP_SIZE=500` | Override map size for perf testing |
-| `GODOT_GEN_DEBUG=1` | Dump generated items + techniques |
+| `GODOT_GEN_DEBUG=1` | Dump generated items + techniques (вкл. «Матрёшку»: все подтипы оружия/брони + зачарование) |
 | `GODOT_SCREENSHOT=path` | Take screenshot on startup |
+| `GODOT_NEWGAME=1` | Автостарт новой игры из MainMenu (headless полный флоу scene-assembly; GameWorld.tscn напрямую фазы НЕ запускает!) |
 
 ### DI registration order (GameLifetimeScope.cs)
 World → Tile → Body → Qi → Buff → Inventory → Combat → Formation → NPC → Player → Quest → Interaction → UI → **Charger** → Save → Generator
