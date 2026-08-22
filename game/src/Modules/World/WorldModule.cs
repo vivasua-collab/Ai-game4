@@ -19,10 +19,15 @@ public sealed class WorldModule : IModule
     [Inject] private readonly ITimeService _timeService = null!;
     [Inject] private readonly IWorldService _worldService = null!;
     [Inject] private readonly IPublisher<TimeTickEvent> _tickPublisher = null!;
+    [Inject] private readonly IPublisher<TimeChangedEvent> _timeChangedPublisher = null!;
+    [Inject] private readonly IPublisher<DayChangedEvent> _dayChangedPublisher = null!;
+    [Inject] private readonly IPublisher<MonthChangedEvent> _monthChangedPublisher = null!;
+    [Inject] private readonly IPublisher<YearChangedEvent> _yearChangedPublisher = null!;
     [Inject] private readonly ISubscriber<SaveRequestedEvent> _saveSub = null!;
 
     private IDisposable? _saveSubToken;
     private WorldConfig _config = new();
+    private int _lastDay = -1, _lastMonth = -1, _lastYear = -1;
 
     public void Start()
     {
@@ -63,6 +68,20 @@ public sealed class WorldModule : IModule
             ts.AdvanceTick();
             var t = ts.CurrentTime;
             _tickPublisher.Publish(new TimeTickEvent(ts.TickCount, t.Day, t.Hour, t.Minute));
+            _timeChangedPublisher.Publish(new TimeChangedEvent(1f / 60f, t.Day, t.Hour, t.TimeOfDay));
+
+            // Docs (MODULE_STRUCTURE §WorldContracts): Day/Month/YearChanged fire
+            // when the calendar component rolls over. Consumed by quests, buffs,
+            // cultivation — anything that reacts to game-calendar boundaries.
+            if (t.Day != _lastDay)
+            {
+                _dayChangedPublisher.Publish(new DayChangedEvent(t.Day));
+                if (t.Month != _lastMonth)
+                    _monthChangedPublisher.Publish(new MonthChangedEvent(t.Month, t.Year));
+                if (t.Year != _lastYear)
+                    _yearChangedPublisher.Publish(new YearChangedEvent(t.Year));
+                _lastDay = t.Day; _lastMonth = t.Month; _lastYear = t.Year;
+            }
         }
     }
 

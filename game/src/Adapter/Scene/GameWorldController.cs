@@ -626,18 +626,14 @@ public partial class GameWorldController : Node2D
             {
                 if (Time.IsPaused) { Time.Resume(); Time.Speed = TimeSpeed.Normal; }
                 else Time.Speed = CycleSpeedUp(Time.Speed);
-#if DEBUG_SPEED_LOG
-                GD.Print($"[GameWorld] Time speed UP → {Time.Speed} ({(int)Time.Speed} tps)");
-#endif
+                ShowToast($"⏩ Скорость: {SpeedLabel(Time.Speed)} ({(int)Time.Speed} тик/сек)");
                 _speedChangeCooldown = SpeedChangeCooldownSec;
             }
             else if (PlayerInput.IsTimeSpeedDownPressed)
             {
                 if (Time.IsPaused) { Time.Resume(); Time.Speed = TimeSpeed.Normal; }
                 else Time.Speed = CycleSpeedDown(Time.Speed);
-#if DEBUG_SPEED_LOG
-                GD.Print($"[GameWorld] Time speed DOWN → {Time.Speed} ({(int)Time.Speed} tps)");
-#endif
+                ShowToast($"⏪ Скорость: {SpeedLabel(Time.Speed)} ({(int)Time.Speed} тик/сек)");
                 _speedChangeCooldown = SpeedChangeCooldownSec;
             }
         }
@@ -782,6 +778,16 @@ public partial class GameWorldController : Node2D
             _ => TimeSpeed.Normal,
         };
     }
+
+    /// <summary>Human-readable speed name for HUD/toast (matches GLOSSARY TimeSpeed).</summary>
+    private static string SpeedLabel(TimeSpeed speed) => speed switch
+    {
+        TimeSpeed.Paused => "Пауза",
+        TimeSpeed.Normal => "Обычно",
+        TimeSpeed.Fast   => "Быстро",
+        TimeSpeed.Quick  => "Очень быстро",
+        _ => speed.ToString(),
+    };
 
     /// <summary>Cycle speed down: Quick → Fast → Normal (no Paused).</summary>
     private static TimeSpeed CycleSpeedDown(TimeSpeed current)

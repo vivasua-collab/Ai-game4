@@ -19,11 +19,28 @@ namespace CultivationGame.Modules.World;
 /// </summary>
 public sealed class TimeService : ITimeService
 {
+    [Inject] private readonly IPublisher<TimeSpeedChangedEvent> _speedChangedPub = null!;
+
     public WorldTime CurrentTime { get; private set; } =
         new WorldTime(GameConstants.START_YEAR, 1, 1, 6, 0); // 06:00 on day 1
 
     public int TickCount { get; private set; }
-    public TimeSpeed Speed { get; set; } = TimeSpeed.Normal;
+
+    private TimeSpeed _speed = TimeSpeed.Normal;
+    public TimeSpeed Speed
+    {
+        get => _speed;
+        set
+        {
+            if (_speed == value) return;
+            _speed = value;
+            // Docs (MODULE_STRUCTURE §WorldContracts): speed changes MUST be
+            // published on the bus so UI/modules can react. Was missing after
+            // the tick-system integration — subscribers saw no speed changes.
+            _speedChangedPub?.Publish(new TimeSpeedChangedEvent(_speed));
+        }
+    }
+
     public bool IsPaused => Speed == TimeSpeed.Paused;
 
     // ITimeService — V1 stubs (real values derived from CurrentTime when needed).
