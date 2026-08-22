@@ -30,6 +30,9 @@ public static class SceneAssemblyRegistrar
         // (wolf/deer/rabbit) on the test polygon. Replaces the v1 stub
         // NPCSpawnPhase which logged "No NPCs in test polygon".
         builder.Register<AnimalSpawnPhase>(Lifetime.Singleton);
+        // NPC_COMBAT_PREP Phase 1 — spawn human NPCs (merchant/cultivator/
+        // guard/passerby) through the full assembly pipeline.
+        builder.Register<HumanNPCSpawnPhase>(Lifetime.Singleton);
         builder.Register<FormationInitPhase>(Lifetime.Singleton);
         builder.Register<ChargerInitPhase>(Lifetime.Singleton);
         builder.Register<QuestInitPhase>(Lifetime.Singleton);

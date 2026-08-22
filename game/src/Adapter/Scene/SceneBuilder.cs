@@ -50,6 +50,8 @@ public partial class SceneBuilder : Node
         SetupGroundItems();
         // Phase C: wandering animals (wolf/deer/rabbit) — drawn as coloured circles.
         SetupAnimals();
+        // NPC_COMBAT_PREP Phase 1: human NPCs — coloured circles per role.
+        SetupNPCs();
     }
 
     /// <summary>
@@ -161,6 +163,19 @@ public partial class SceneBuilder : Node
     {
         _animalRenderer = new AnimalSpriteRenderer();
         _worldRoot.AddChild(_animalRenderer);
+    }
+
+    /// <summary>
+    /// NPC_COMBAT_PREP Phase 1: human NPCs. Renderer queries NPCService each
+    /// frame and draws coloured circles per role. Spawn happens in
+    /// <see cref="Entry.Phases.HumanNPCSpawnPhase"/> (scene-assembly phase 6).
+    /// </summary>
+    private NPCSpriteRenderer? _npcRenderer;
+
+    private void SetupNPCs()
+    {
+        _npcRenderer = new NPCSpriteRenderer();
+        _worldRoot.AddChild(_npcRenderer);
     }
 
     /// <summary>

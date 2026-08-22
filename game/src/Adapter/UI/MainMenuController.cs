@@ -42,6 +42,16 @@ public partial class MainMenuController : Control
 
         BuildUI();
 
+        // Testability hook (same family as GODOT_MAP_SIZE / GODOT_GEN_DEBUG):
+        // GODOT_NEWGAME=1 auto-starts a new game so headless runs exercise the
+        // full scene-assembly pipeline (phases incl. NPC/animal spawn).
+        if (System.Environment.GetEnvironmentVariable("GODOT_NEWGAME") == "1")
+        {
+            GD.Print("[MainMenu] GODOT_NEWGAME=1 — auto-starting new game (50×50)");
+            CallDeferred(nameof(OnNewGame));
+            return;
+        }
+
         GD.Print("[MainMenu] Ready");
     }
 
