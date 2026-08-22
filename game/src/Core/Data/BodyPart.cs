@@ -3,6 +3,8 @@
 // Редактировано: 2026-05-09 12:00:00 UTC — аудит: DISC-01 одновременный split, BD-22 Severed guard, BD-27 комментарий, BD-29 IsVital
 // Редактировано: 2026-05-18 — +BodyPartFunction Functions, +SetMaxHP для Vitality пересчёта
 // Редактировано: 2026-05-18 13:10:29 UTC — P0-02 FIX: +Reattach(), P2-04 FIX: Functions→readonly, P1-04 FIX: BaseHitChance в ToData()
+// Редактировано: 2026-05-23 — IMPL-1: Moved from Modules/Body to Core/Data
+//   (fix Core→Modules architecture violation: NPCState in Core.Data references BodyPart, so BodyPart must be in Core.Data too).
 // Migrated from Ai-game3 (Unity) to Ai-game4 (Godot).
 // Данные части тела — мутабельный класс с двойной HP (Kenshi-style).
 // Источник: BODY_SYSTEM.md "Система двойной HP"
@@ -10,7 +12,7 @@ using System;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.Interfaces;
 
-namespace CultivationGame.Modules.Body
+namespace CultivationGame.Core.Data
 {
     /// <summary>
     /// Часть тела с Kenshi-style двойной HP.

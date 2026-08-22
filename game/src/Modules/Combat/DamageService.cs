@@ -1,5 +1,6 @@
 #nullable enable
 // Создано: 2026-05-09
+// Редактировано: 2026-08-22 — IMPL-6 (Q5): Random.Shared → ICombatRng (детерминированный бой).
 // Редактировано: 2026-05-09 — CMB-A01: порядок пайплайна урона (QiBuffer ДО брони)
 // Редактировано: 2026-05-09 — CMB-A02: интеграция LevelSuppression через DamageRequest
 // Редактировано: 2026-05-09 — CMB-A05: вызов DetermineAttackResult()
@@ -75,6 +76,10 @@ namespace CultivationGame.Modules.Combat
         // Спринт 4 B8: per-entity QiBuffer через IQiDataProvider
         private readonly IQiDataProvider _qiDataProvider;
 
+        // IMPL-6 (Q5): детерминированный RNG для боя — заменяет Random.Shared.
+        // Инжектируется через конструктор, бои воспроизводимы при том же seed.
+        private readonly ICombatRng _rng;
+
         // EVT-01: кэш состояния из событий
         private bool _cachedBufferIsActive;
         private QiBufferMode _cachedBufferMode;
@@ -97,7 +102,8 @@ namespace CultivationGame.Modules.Combat
             IEquipmentDataProvider equipmentDataProvider, // Фаза 3 (3.M)
             IBuffService buffService, // Спринт 2 B2
             IFormationService formationService, // Спринт 2 B2/C9
-            IQiDataProvider qiDataProvider) // Спринт 4 B8: per-entity QiBuffer
+            IQiDataProvider qiDataProvider, // Спринт 4 B8: per-entity QiBuffer
+            ICombatRng combatRng) // IMPL-6 (Q5): deterministic RNG
         {
             _damageAppliedPub = damageAppliedPub;
             _qiBufferStateChangedSub = qiBufferStateChangedSub;
@@ -108,6 +114,7 @@ namespace CultivationGame.Modules.Combat
             _buffService = buffService; // Спринт 2 B2
             _formationService = formationService; // Спринт 2 B2/C9
             _qiDataProvider = qiDataProvider; // Спринт 4 B8
+            _rng = combatRng ?? throw new ArgumentNullException(nameof(combatRng)); // Q5
 
             // EVT-01: подписка на кэш состояния буфера
             _qiBufferStateChangedSubscription = _qiBufferStateChangedSub.Subscribe((in QiBufferStateChangedEvent e) => {
@@ -170,12 +177,15 @@ namespace CultivationGame.Modules.Combat
 
             // === СЛОЙ 4: Определение части тела ===
             // Спринт 8 C10: передаём TargetMorphology для выбора таблицы попадания
-            BodyPartType hitPart = DamageCalculator.DetermineHitPart(request.TargetMorphology);
+            // Q5: передаём детерминированный RNG.
+            BodyPartType hitPart = DamageCalculator.DetermineHitPart(_rng, request.TargetMorphology);
 
             // === СЛОЙ 5: Активная защита (CMB-A05) ===
             // Спринт 5 C1/C2/C3: передаём статы для расчёта шансов
             // P2-5.2 FIX: передаём DefenderSTR для блока вместо AttackerSTR
+            // Q5: передаём детерминированный RNG.
             CombatAttackResult attackResult = DamageCalculator.DetermineAttackResult(
+                _rng,
                 request.ActiveDefense,
                 request.DefenderAGI,       // C1: для уклонения
                 request.ArmorDodgePenalty, // C1: штраф брони
@@ -277,11 +287,12 @@ namespace CultivationGame.Modules.Combat
             // Спринт 6 C5: Coverage roll — проверка покрытия брони
             // if (random() < armor.Coverage) → броня покрывает, применить DefenseProcessor
             // else → урон проходит напрямую мимо брони
+            // Q5: ICombatRng.Next вместо Random.Shared.Next.
             bool armorCoversHit = true;
             int armorCoverage = _equipmentDataProvider.GetArmorCoverage(request.TargetId);
             if (armorCoverage > 0 && armorCoverage < 100)
             {
-                int coverageRoll = Random.Shared.Next(0, 100);
+                int coverageRoll = _rng.Next(0, 100);
                 armorCoversHit = coverageRoll < armorCoverage;
             }
             else if (armorCoverage <= 0)

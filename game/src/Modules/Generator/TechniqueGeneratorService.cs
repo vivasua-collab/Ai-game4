@@ -14,7 +14,6 @@ using System.Collections.Generic;
 using CultivationGame.Core;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.Interfaces;
-using CultivationGame.Modules.NPC;
 
 namespace CultivationGame.Modules.Generator
 {
@@ -29,10 +28,14 @@ namespace CultivationGame.Modules.Generator
     /// - Grade множители: {1.0, 1.3, 1.6, 2.0} (НЕ {1.0, 1.2, 1.4, 1.6})
     /// - QiCost НЕ зависит от Grade! Всегда capacity × 0.15
     /// - Ultimate damage ×2.0 (НЕ ×1.3)
+    ///
+    /// IMPL-5 (Q6): весовые таблицы TechniqueGradeWeights и
+    /// TechniqueGradeMultipliers перенесены из NPCConfig в
+    /// Core.Data.GeneratorTables — Generator больше не зависит от
+    /// NPC-модуля.
     /// </summary>
     public sealed class TechniqueGeneratorService : ITechniqueGeneratorService
     {
-        private readonly NPCConfig _config;
         private readonly TechniqueRegistry _registry;
 
         // ===================================================================
@@ -196,11 +199,14 @@ namespace CultivationGame.Modules.Generator
         /// <summary>
         /// Конструктор TechniqueGeneratorService.
         /// </summary>
-        /// <param name="config">Конфигурация NPC (содержит TechniqueGradeWeights и TechniqueGradeMultipliers)</param>
         /// <param name="registry">Реестр техник (для регистрации сгенерированных техник)</param>
-        public TechniqueGeneratorService(NPCConfig config, TechniqueRegistry registry)
+        /// <remarks>
+        /// IMPL-5 (Q6): весовые таблицы TechniqueGradeWeights и
+        /// TechniqueGradeMultipliers больше не передаются через NPCConfig —
+        /// они читаются из статического <see cref="GeneratorTables"/> (Core.Data).
+        /// </remarks>
+        public TechniqueGeneratorService(TechniqueRegistry registry)
         {
-            _config = config ?? throw new ArgumentNullException(nameof(config));
             _registry = registry ?? throw new ArgumentNullException(nameof(registry));
         }
 
@@ -362,12 +368,13 @@ namespace CultivationGame.Modules.Generator
 
         /// <summary>
         /// Определить грейд техники через взвешенный рандом.
-        /// Веса из NPCConfig.TechniqueGradeWeights: {60, 30, 9, 1}
-        /// Множители из NPCConfig.TechniqueGradeMultipliers: {1.0, 1.3, 1.6, 2.0}
+        /// Веса из Core.Data.GeneratorTables.TechniqueGradeWeights: {60, 30, 9, 1}
+        /// Множители из Core.Data.GeneratorTables.TechniqueGradeMultipliers: {1.0, 1.3, 1.6, 2.0}
+        /// (Q6: перенесено из NPCConfig)
         /// </summary>
         private TechniqueGrade DetermineGrade(SeededRandom rng)
         {
-            int index = rng.NextWeighted(_config.TechniqueGradeWeights);
+            int index = rng.NextWeighted(GeneratorTables.TechniqueGradeWeights);
             // TechniqueGrade: Common=0, Refined=1, Perfect=2, Transcendent=3
             index = Math.Max(0, Math.Min(index, 3));
             return (TechniqueGrade)index;
@@ -422,14 +429,15 @@ namespace CultivationGame.Modules.Generator
         }
 
         /// <summary>
-        /// Получить множитель грейда из NPCConfig.
+        /// Получить множитель грейда из Core.Data.GeneratorTables.
         /// ВНИМАНИЕ: из ДОКУМЕНТАЦИИ {1.0, 1.3, 1.6, 2.0}, НЕ Legacy {1.0, 1.2, 1.4, 1.6}!
+        /// (Q6: перенесено из NPCConfig)
         /// </summary>
         private float GetGradeMultiplier(TechniqueGrade grade)
         {
             int index = (int)grade;
-            if (index >= 0 && index < _config.TechniqueGradeMultipliers.Length)
-                return _config.TechniqueGradeMultipliers[index];
+            if (index >= 0 && index < GeneratorTables.TechniqueGradeMultipliers.Length)
+                return GeneratorTables.TechniqueGradeMultipliers[index];
             // Fallback на GameConstants
             if (GameConstants.TechniqueGradeMultipliers.TryGetValue(grade, out float mult))
                 return mult;

@@ -35,26 +35,11 @@ public sealed class QuestModule : IModule
     [Inject] private readonly IQuestRewardService _rewardService = null!;
     [Inject] private readonly QuestRewardService _rewardServiceImpl = null!;
 
-    private QuestConfig _config = new();
-    private bool _isConfigured;
-
-    /// <summary>
-    /// Установить конфигурацию модуля. Вызывается из сборщика сцены до Start().
-    /// </summary>
-    public void SetConfig(QuestConfig config)
-    {
-        _config = config;
-        _isConfigured = true;
-    }
+    // IMPL-3: Config injected via DI (replaces obsolete SetConfig()).
+    [Inject] private readonly QuestConfig _config = null!;
 
     public void Start()
     {
-        if (!_isConfigured)
-        {
-            _config = new QuestConfig();
-            _isConfigured = true;
-        }
-
         _questServiceImpl.Initialize(_config);
         _rewardServiceImpl.Initialize();
         Console.WriteLine("[QuestModule] Started");

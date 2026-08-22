@@ -1,6 +1,9 @@
 #nullable enable
 // Создано: 2026-05-09 15:30:00 UTC
 // Редактировано: 2026-05-20 18:00:11 UTC — Фаза 0: П#1 CoreQualityMultipliers, П#2 AwakeningTypeWeights, П#4 ConductivityGrowthFactors
+// Редактировано: 2026-08-22 — IMPL-5 (Q6): весовые таблицы генерации техник/экипировки
+//   (TechniqueGradeWeights, TechniqueGradeMultipliers, EquipmentGradeWeightsByLevel)
+//   перенесены в Core.Data.GeneratorTables — Generator-модуль больше не зависит от NPC-модуля.
 // Конфигурация модуля NPC.
 // BD-48: class (не struct — mutable struct risk).
 namespace CultivationGame.Modules.NPC
@@ -78,27 +81,6 @@ namespace CultivationGame.Modules.NPC
         /// <summary>levelGrowthFactor проводимости по уровням: L0..L7+ (ПРОТИВОРЕЧИЕ #4 — расширенная формула)</summary>
         public float[] ConductivityGrowthFactors = { 1.0f, 1.2f, 1.5f, 2.0f, 3.0f, 5.0f, 8.0f, 12.0f };
 
-        // === Параметры генерации техник (Шаг 6) — Создано: 2026-05-20 ===
-
-        /// <summary>Веса грейда техники (Common, Refined, Perfect, Transcendent)</summary>
-        public float[] TechniqueGradeWeights = { 60f, 30f, 9f, 1f };
-
-        /// <summary>Множители грейда техники. ИЗ ДОКУМЕНТАЦИИ! НЕ использовать Legacy [1.0, 1.2, 1.4, 1.6]</summary>
-        public float[] TechniqueGradeMultipliers = { 1.0f, 1.3f, 1.6f, 2.0f };
-
-        // === Параметры генерации экипировки (Шаг 5) — Создано: 2026-05-20 ===
-
-        /// <summary>Веса грейда экипировки по уровню (5 градаций: Damaged..Transcendent)</summary>
-        public float[][] EquipmentGradeWeightsByLevel = new float[][]
-        {
-            new float[] { 30f, 60f, 10f, 0f, 0f },     // L1
-            new float[] { 20f, 50f, 25f, 5f, 0f },      // L2
-            new float[] { 10f, 50f, 35f, 5f, 0f },      // L3
-            new float[] { 5f, 30f, 45f, 20f, 0f },      // L5
-            new float[] { 0f, 20f, 40f, 35f, 5f },      // L7
-            new float[] { 0f, 10f, 30f, 40f, 20f }      // L9
-        };
-
         // === Таймауты AI — Создано: 2026-05-20 ===
 
         /// <summary>Таймаут бездействия (сек)</summary>
@@ -115,5 +97,12 @@ namespace CultivationGame.Modules.NPC
 
         /// <summary>Дистанция следования (ед)</summary>
         public float FollowDistance = 2f;
+
+        // NOTE (Q6 / IMPL-5, AUDIT-2 M6): весовые таблицы генерации экипировки
+        // и техник (EquipmentGradeWeightsByLevel, TechniqueGradeWeights,
+        // TechniqueGradeMultipliers) перенесены в Core.Data.GeneratorTables.
+        // Generator-модуль больше не зависит от NPC-модуля.
+        // NPC-специфичные веса (soul gen) остаются здесь — они используются
+        // только SoulGenerator внутри NPC-модуля.
     }
 }

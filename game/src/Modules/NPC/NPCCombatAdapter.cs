@@ -10,7 +10,6 @@ using System;
 using CultivationGame.Core;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Core.Messaging.Contracts;
-using CultivationGame.Modules.NPC.Data;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.Events;
 

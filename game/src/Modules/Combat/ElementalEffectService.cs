@@ -1,5 +1,6 @@
 #nullable enable
 // Создано: 2026-05-22 11:30:00 UTC
+// Редактировано: 2026-08-22 — IMPL-6 (Q5): Random.Shared → ICombatRng (детерминированный бой).
 // Редактировано: 2026-05-22 13:50:00 UTC — Этап 3.2: P2-7.1 FIX: ApplyPurify — .ToList() для безопасной итерации
 // Редактировано: 2026-05-23 07:30:00 UTC — FIX CS0246: убран IInitializable, подписка в конструкторе (как все сервисы)
 // Спринт 7, задача C8: Стихийные эффекты при попадании.
@@ -40,6 +41,7 @@ namespace CultivationGame.Modules.Combat
     {
         private readonly IBuffService _buffService;
         private readonly IBodyDataProvider _bodyDataProvider;
+        private readonly ICombatRng _rng; // Q5: deterministic RNG
         private readonly IDisposable _subscription;
 
         // Пороги и константы (integer math)
@@ -52,10 +54,12 @@ namespace CultivationGame.Modules.Combat
         public ElementalEffectService(
             ISubscriber<DamageAppliedEvent> damageAppliedSub,
             IBuffService buffService,
-            IBodyDataProvider bodyDataProvider)
+            IBodyDataProvider bodyDataProvider,
+            ICombatRng rng) // IMPL-6 (Q5): deterministic RNG
         {
             _buffService = buffService;
             _bodyDataProvider = bodyDataProvider;
+            _rng = rng ?? throw new ArgumentNullException(nameof(rng));
             // Подписка в конструкторе — стандартный паттерн проекта (как DamageService и др.)
             _subscription = damageAppliedSub.Subscribe(OnDamageApplied);
         }
@@ -140,10 +144,11 @@ namespace CultivationGame.Modules.Combat
         /// <summary>
         /// Earth → 15% шанс Stun.
         /// ЗАПРЕТ 3.9: integer roll через Random.Range(0, 1000).
+        /// Q5: ICombatRng.Next вместо Random.Shared.Next.
         /// </summary>
         private void ApplyEarthStun(DamageAppliedEvent e)
         {
-            int roll = Random.Shared.Next(0, 1000);
+            int roll = _rng.Next(0, 1000);
             if (roll >= EARTH_STUN_CHANCE_PERMIL) return;
 
             if (_buffService.HasBuff(e.TargetId, "elemental_earth_stun")) return;

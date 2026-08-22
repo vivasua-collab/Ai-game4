@@ -1,5 +1,6 @@
 #nullable enable
 // Создано: 2026-05-09
+// Редактировано: 2026-08-22 — IMPL-6 (Q5): Random.Shared → ICombatRng параметр (детерминированный бой).
 // Редактировано: 2026-05-25 06:23:33 UTC — ЗАПРЕТ 3.9: (int)(float*1000f) → _PERMIL константы
 // Редактировано: 2026-05-22 04:14:49 UTC — Спринт 3 B1: stat scaling (STR/AGI/INT), integer math
 // Редактировано: 2026-05-22 07:55:00 UTC — Аудит CRIT-1: Potency→PotencyPermil, полныи integer math
@@ -114,9 +115,12 @@ namespace CultivationGame.Modules.Combat
         /// Источник: GameConstants.BodyPartHitChances (гуманоид) или MorphologyHitTables (по морфологии).
         /// Спринт 8 C10: принимает targetMorphology для выбора таблицы.
         /// ЗАПРЕТ 3.9: целочисленная арифметика (промилле), Random.Range(0, totalWeight).
+        /// IMPL-6 (Q5): RNG передаётся через <paramref name="rng"/> (детерминированный бой).
         /// </summary>
-        public static BodyPartType DetermineHitPart(Morphology targetMorphology = Morphology.Humanoid)
+        public static BodyPartType DetermineHitPart(ICombatRng rng, Morphology targetMorphology = Morphology.Humanoid)
         {
+            if (rng is null) throw new ArgumentNullException(nameof(rng));
+
             // Выбрать таблицу по морфологии
             Dictionary<BodyPartType, int> hitTable;
             if (!GameConstants.MorphologyHitTables.TryGetValue(targetMorphology, out hitTable))
@@ -132,7 +136,8 @@ namespace CultivationGame.Modules.Combat
             if (totalWeight <= 0) return BodyPartType.Torso;
 
             // ЗАПРЕТ 3.9: integer roll вместо Random.value
-            int roll = Random.Shared.Next(0, totalWeight);
+            // Q5: ICombatRng.Next вместо Random.Shared.Next.
+            int roll = rng.Next(0, totalWeight);
             int cumulative = 0;
             foreach (var kvp in hitTable)
             {
@@ -151,8 +156,10 @@ namespace CultivationGame.Modules.Combat
         /// Спринт 5 C3: Парирование из AGI — parryChance = weaponParryBonus + (AGI-10)×3 промилле.
         /// P2-5.2 FIX: blockChance использует defenderSTR (сила ЗАЩИЩАЮЩЕГОСЯ), не атакующего.
         /// ЗАПРЕТ 3.9: Все расчёты в промилле (integer math), ролл через Random.Range(0, 1000).
+        /// IMPL-6 (Q5): RNG передаётся через <paramref name="rng"/> (детерминированный бой).
         /// </summary>
         public static CombatAttackResult DetermineAttackResult(
+            ICombatRng rng,
             DefenseSubtype defense,
             int defenderAGI = 10,
             int armorDodgePenalty = 0,
@@ -162,6 +169,8 @@ namespace CultivationGame.Modules.Combat
             int attackerLuck = 0,
             int techniqueCritBonus = 0)
         {
+            if (rng is null) throw new ArgumentNullException(nameof(rng));
+
             // C1: Уклонение из AGI — ALGORITHMS.md §4
             // dodgeChance = 5% + (AGI-10) × 0.5% - armorDodgePenalty
             // В промилле: 50 + (AGI-10) × 5 - armorDodgePenalty
@@ -169,7 +178,7 @@ namespace CultivationGame.Modules.Combat
             {
                 int dodgeChancePermil = 50 + (defenderAGI - 10) * 5 - armorDodgePenalty;
                 dodgeChancePermil = Math.Max(0, Math.Min(600, dodgeChancePermil)); // кап 60%
-                int dodgeRoll = Random.Shared.Next(0, 1000);
+                int dodgeRoll = rng.Next(0, 1000);
                 if (dodgeRoll < dodgeChancePermil)
                     return CombatAttackResult.Dodge;
             }
@@ -181,7 +190,7 @@ namespace CultivationGame.Modules.Combat
             {
                 int blockChancePermil = shieldBlock + (defenderSTR - 10) * 2;
                 blockChancePermil = Math.Max(0, Math.Min(700, blockChancePermil)); // кап 70%
-                int blockRoll = Random.Shared.Next(0, 1000);
+                int blockRoll = rng.Next(0, 1000);
                 if (blockRoll < blockChancePermil)
                     return CombatAttackResult.Block;
                 // Провал блока — обычный Hit
@@ -194,7 +203,7 @@ namespace CultivationGame.Modules.Combat
             {
                 int parryChancePermil = weaponParryBonus + (defenderAGI - 10) * 3;
                 parryChancePermil = Math.Max(0, Math.Min(500, parryChancePermil)); // кап 50%
-                int parryRoll = Random.Shared.Next(0, 1000);
+                int parryRoll = rng.Next(0, 1000);
                 if (parryRoll < parryChancePermil)
                     return CombatAttackResult.Parry;
             }
@@ -204,7 +213,7 @@ namespace CultivationGame.Modules.Combat
             // В промилле: 50 + luck × 10 + techniqueCritBonus
             int critChancePermil = 50 + attackerLuck * 10 + techniqueCritBonus;
             critChancePermil = Math.Max(0, Math.Min(500, critChancePermil)); // кап 50%
-            int critRoll = Random.Shared.Next(0, 1000);
+            int critRoll = rng.Next(0, 1000);
             if (critRoll < critChancePermil)
                 return CombatAttackResult.CriticalHit;
 

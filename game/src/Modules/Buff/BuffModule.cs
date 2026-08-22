@@ -21,28 +21,15 @@ public class BuffModule : IModule
     [Inject] private readonly BuffService _buffServiceImpl = null!;
     [Inject] private readonly ITimeService _timeService = null!;
 
-    private BuffConfig? _config;
-    private bool _isConfigured;
+    // IMPL-3: Config injected via DI (replaces obsolete SetConfig()).
+    [Inject] private readonly BuffConfig _config = null!;
 
     public string ModuleName => "Buff";
-
-    /// <summary>
-    /// Установить конфигурацию модуля.
-    /// Вызывается из BuffModuleServices.Register() до Start().
-    /// </summary>
-    public void SetConfig(BuffConfig config)
-    {
-        _config = config;
-        _isConfigured = true;
-    }
 
     public void Start()
     {
         // Phase 17C: прямая инъекция вместо concrete-cast
-        if (_isConfigured && _config != null)
-        {
-            _buffServiceImpl.Configure(_config);
-        }
+        _buffServiceImpl.Configure(_config);
     }
 
     public void Tick(int tickCount)

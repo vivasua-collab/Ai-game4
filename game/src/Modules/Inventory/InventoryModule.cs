@@ -40,8 +40,8 @@ public class InventoryModule : IModule
     [Inject] private readonly IPublisher<ItemAddedEvent> _itemAddedPub = null!;
     [Inject] private readonly IPublisher<ItemRemovedEvent> _itemRemovedPub = null!;
 
-    private InventoryConfig? _config;
-    private bool _isConfigured;
+    // IMPL-3: Config injected via DI (replaces obsolete SetConfig()).
+    [Inject] private readonly InventoryConfig _config = null!;
     private StorageService? _ringStorage;
 
     private IDisposable? _resourceHarvestedSubscription;
@@ -51,19 +51,10 @@ public class InventoryModule : IModule
 
     public string ModuleName => "Inventory";
 
-    public void SetConfig(InventoryConfig config)
-    {
-        _config = config;
-        _isConfigured = true;
-    }
-
     public void Start()
     {
-        if (_isConfigured && _config != null)
-        {
-            _inventoryServiceImpl.Configure(_config);
-            _craftingServiceImpl.RegisterRecipes(_config.Recipes);
-        }
+        _inventoryServiceImpl.Configure(_config);
+        _craftingServiceImpl.RegisterRecipes(_config.Recipes);
 
         _equipmentServiceImpl.Initialize("player");
         _materialService.InitializeDefaults();
@@ -73,7 +64,7 @@ public class InventoryModule : IModule
         // Создание Ring Storage
         _ringStorage = new StorageService(
             StorageType.Ring,
-            _config?.RingStorageCapacity ?? 10,
+            _config.RingStorageCapacity,
             _itemAddedPub,
             _itemRemovedPub);
 

@@ -2,9 +2,9 @@
 // Создано: 2026-05-08 10:07:00 UTC
 // Редактировано: 2026-05-20 18:00:11 UTC — Фаза 1: INPCSpawnerService + новая сигнатура SpawnNPC (C8)
 // Редактировано: 2026-05-22 07:55:00 UTC — Аудит MED-1: +GetNPCState() для DI compliance
+// Редактировано: 2026-05-23 — IMPL-1: NPCState moved from Modules.NPC.Data to Core.Data
 using System.Collections.Generic;
 using CultivationGame.Core.Data;
-using CultivationGame.Modules.NPC.Data;
 
 using CultivationGame.Core;
 namespace CultivationGame.Core.Interfaces

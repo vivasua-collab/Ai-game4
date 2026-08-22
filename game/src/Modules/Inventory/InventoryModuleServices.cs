@@ -29,6 +29,9 @@ public static class InventoryModuleServices
         // === Ground items (dropped on world) ===
         builder.Register<IGroundItemService, GroundItemService>(Lifetime.Singleton);
 
+        // === Spirit Storage (Q9: separated from unified StorageService) ===
+        builder.Register<ISpiritStorageService, SpiritStorageService>(Lifetime.Singleton);
+
         // === Точка входа модуля ===
         builder.Register<InventoryModule>(Lifetime.Singleton);
 

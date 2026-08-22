@@ -19,31 +19,16 @@ public class ChargerModule : IModule
     [Inject] private readonly IChargerService _chargerService = null!;
     [Inject] private readonly ChargerService _chargerServiceImpl = null!;
 
-    // Конфигурация — устанавливается через SetConfig перед Start
-    private ChargerBufferConfig _bufferConfig;
-    private List<ChargerSlotConfig> _slotConfigs = new();
-    private bool _isConfigured;
+    // IMPL-3: Configs injected via DI (replaces obsolete SetConfig()).
+    [Inject] private readonly ChargerBufferConfig _bufferConfig = null!;
+    [Inject] private readonly List<ChargerSlotConfig> _slotConfigs = null!;
 
     public string ModuleName => "Charger";
-
-    /// <summary>
-    /// Установить конфигурацию зарядника.
-    /// Вызывается до Start() из ChargerModuleServices.Register().
-    /// </summary>
-    public void SetConfig(ChargerBufferConfig bufferConfig, List<ChargerSlotConfig> slotConfigs)
-    {
-        _bufferConfig = bufferConfig;
-        _slotConfigs = slotConfigs;
-        _isConfigured = true;
-    }
 
     public void Start()
     {
         // Phase 17C: прямая инъекция вместо concrete-cast
-        if (_isConfigured)
-        {
-            _chargerServiceImpl.Configure(_bufferConfig, _slotConfigs);
-        }
+        _chargerServiceImpl.Configure(_bufferConfig, _slotConfigs);
 
         // Автоактивация при старте
         _chargerService.Activate();

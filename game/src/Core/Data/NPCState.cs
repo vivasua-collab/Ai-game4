@@ -4,17 +4,18 @@
 // Редактировано: 2026-05-20 18:43:21 UTC — Фаза 3: статы STR/AGI/VIT/INT (задача 3.3)
 // Редактировано: 2026-05-20 19:11:00 UTC — Фаза 4, задача 4.6: AwakeningAge поле
 // Редактировано: 2026-05-22 04:14:49 UTC — Спринт 3 B6: InnateElement
+// Редактировано: 2026-05-23 — IMPL-1: Moved from Modules/NPC/Data to Core/Data
+//   (fix Core→Modules architecture violation: NPCState references BodyPart which now also lives in Core.Data).
 // Runtime-состояние экземпляра NPC.
 // Хранит изменяемые данные для каждой NPC-сущности.
 // NPCRole и NPCAIState определены в Core/Data/Enums.cs (общие для всего проекта).
 using System.Collections.Generic;
 using CultivationGame.Core;
 using CultivationGame.Core.Data;
-using CultivationGame.Modules.Body;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Core.Messaging.Contracts;
 
-namespace CultivationGame.Modules.NPC.Data
+namespace CultivationGame.Core.Data
 {
     /// <summary>
     /// Runtime-состояние экземпляра NPC.

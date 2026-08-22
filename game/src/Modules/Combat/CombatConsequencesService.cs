@@ -1,5 +1,6 @@
 #nullable enable
 // Создано: 2026-05-22 11:30:00 UTC
+// Редактировано: 2026-08-22 — IMPL-6 (Q5): Random.Shared → ICombatRng (детерминированный бой).
 // Редактировано: 2026-05-22 13:08:27 UTC — P0-7.1 FIX: Stun chance ×1000→×100 (завышен в 10 раз)
 // Редактировано: 2026-05-22 13:55:00 UTC — Этап 3.5: P2-7.3 FIX: кровотечение различает slashing/piercing от blunt (MeleeStrike)
 // Редактировано: 2026-05-25 07:01:36 UTC — ЗАПРЕТ 3.9: float duration → int тики + конверсия на границе Unity Time API
@@ -30,6 +31,7 @@ namespace CultivationGame.Modules.Combat
     {
         private readonly IBuffService _buffService;
         private readonly IBodyDataProvider _bodyDataProvider;
+        private readonly ICombatRng _rng; // Q5: deterministic RNG
         private readonly IDisposable _subscription;
 
         // Пороги из документации (в процентах, для integer math)
@@ -44,10 +46,12 @@ namespace CultivationGame.Modules.Combat
         public CombatConsequencesService(
             ISubscriber<DamageAppliedEvent> damageAppliedSub,
             IBuffService buffService,
-            IBodyDataProvider bodyDataProvider)
+            IBodyDataProvider bodyDataProvider,
+            ICombatRng rng) // IMPL-6 (Q5): deterministic RNG
         {
             _buffService = buffService;
             _bodyDataProvider = bodyDataProvider;
+            _rng = rng ?? throw new ArgumentNullException(nameof(rng));
             // Подписка в конструкторе — стандартный паттерн проекта (как DamageService и др.)
             _subscription = damageAppliedSub.Subscribe(OnDamageApplied);
         }
@@ -139,7 +143,8 @@ namespace CultivationGame.Modules.Combat
             stunChancePermil = Math.Min(800, stunChancePermil);
 
             // ЗАПРЕТ 3.9: integer roll вместо Random.value
-            int stunRoll = Random.Shared.Next(0, 1000);
+            // Q5: ICombatRng.Next вместо Random.Shared.Next.
+            int stunRoll = _rng.Next(0, 1000);
             if (stunRoll < stunChancePermil)
             {
                 // Не накладывать, если уже есть оглушение

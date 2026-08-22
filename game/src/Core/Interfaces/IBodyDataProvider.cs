@@ -4,8 +4,8 @@
 // Позволяет получать/устанавливать BodyParts по entityId.
 // Единая система через BodyParts для всех сущностей (решение ПРОТИВОРЕЧИЯ #3/#6).
 // BodyDataProvider использует List<BodyPart> — не Dictionary, не BodyPartData.
+// Редактировано: 2026-05-23 — IMPL-1: BodyPart moved from Modules.Body to Core.Data
 using System.Collections.Generic;
-using CultivationGame.Modules.Body;
 
 using CultivationGame.Core;
 using CultivationGame.Core.Data;

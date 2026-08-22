@@ -23,6 +23,8 @@ public sealed class PlayerService : IPlayerService, IDisposable
     [Inject] private readonly IPublisher<PlayerReviveEvent> _revivePub = null!;
     [Inject] private readonly IPublisher<PlayerPositionChangedEvent> _positionPub = null!;
     [Inject] private readonly ISubscriber<QiChangedEvent> _qiChangedSub = null!;
+    [Inject] private readonly ISubscriber<BodyCriticalEvent> _bodyCriticalSub = null!;
+    [Inject] private readonly IBodyService _bodyService = null!;
 
     private readonly CharacterData _data = new();
     private readonly List<string> _assignedTechniques = new();
@@ -33,6 +35,7 @@ public sealed class PlayerService : IPlayerService, IDisposable
     private long _cachedCurrentQi;
 
     private IDisposable? _qiChangedToken;
+    private IDisposable? _bodyCriticalToken;
 
     /// <summary>Internal — exposed for module-internal spawn logic.</summary>
     public bool IsSpawned => _spawned;
@@ -44,7 +47,24 @@ public sealed class PlayerService : IPlayerService, IDisposable
 
     public string PlayerId => _data.Id;
     public Position2D Position => _data.Position;
-    public bool IsAlive => _data.Health > 0f;
+    /// <summary>
+    /// IsAlive delegates to BodyService (Q4: единая HP система).
+    /// Player is alive if Heart is not severed. Falls back to _data.Health
+    /// if BodyService is not yet initialized (before Spawn).
+    /// </summary>
+    public bool IsAlive
+    {
+        get
+        {
+            if (_bodyService != null && !string.IsNullOrEmpty(_bodyService.EntityId))
+            {
+                // Heart severed = dead. Also check if any vital part is disabled.
+                return !_bodyService.IsPartSevered(BodyPartType.Heart);
+            }
+            // Fallback before BodyService initialized.
+            return _data.Health > 0f;
+        }
+    }
     public bool IsSleeping => SleepState != PlayerSleepState.Awake;
     public PlayerSleepState SleepState { get; private set; } = PlayerSleepState.Awake;
     public PlayerStance Stance { get; private set; } = PlayerStance.Normal;
@@ -108,13 +128,14 @@ public sealed class PlayerService : IPlayerService, IDisposable
         _data.Id = "player_0";
         _data.Name = "Практик";
         _data.Position = position;
-        _data.Health = 100f;
+        _data.Health = 100f;  // Fallback only; IsAlive delegates to BodyService.
         _data.CultivationLevel = 1;
         _data.CurrentQi = 0;
         _data.Age = 16;
         _spawned = true;
         _qiChangedToken = _qiChangedSub.Subscribe(OnQiChanged);
-        Console.WriteLine($"[PlayerService] Player spawned @ {position}, hp {_data.Health}");
+        _bodyCriticalToken = _bodyCriticalSub.Subscribe(OnBodyCritical);
+        Console.WriteLine($"[PlayerService] Player spawned @ {position}, hp delegated to BodyService");
     }
 
     /// <summary>Snap player to a tile (used by PlayerModule.Tick for tile-grid movement).</summary>
@@ -145,9 +166,27 @@ public sealed class PlayerService : IPlayerService, IDisposable
         _cachedCultivationLevel = (CultivationLevel)e.CultivationLevel;
     }
 
+    /// <summary>
+    /// Handle BodyCriticalEvent — if Heart is disabled/severed, player dies.
+    /// Q4: единая HP система, смерть через BodyService events.
+    /// </summary>
+    private void OnBodyCritical(in BodyCriticalEvent e)
+    {
+        // Only react to player's body events.
+        if (e.EntityId != _data.Id && e.EntityId != "player") return;
+
+        // Heart disabled/severed = death.
+        if (e.Part == BodyPartType.Heart && e.State == BodyPartState.Disabled)
+        {
+            Die($"Сердце остановлено ({e.HealthRatio:P0} HP)");
+        }
+    }
+
     public void Dispose()
     {
         _qiChangedToken?.Dispose();
         _qiChangedToken = null;
+        _bodyCriticalToken?.Dispose();
+        _bodyCriticalToken = null;
     }
 }

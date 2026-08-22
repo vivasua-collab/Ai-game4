@@ -18,20 +18,16 @@ public class InteractionModule : IModule
     [Inject] private readonly DialogueTypewriter _typewriter = null!;
     [Inject] private readonly ITimeService _timeService = null!;
 
-    private InteractionConfig? _config;
+    // IMPL-3: Config injected via DI (replaces obsolete SetConfig()).
+    [Inject] private readonly InteractionConfig _config = null!;
     private bool _isConfigured;
 
     public string ModuleName => "Interaction";
 
-    public void SetConfig(InteractionConfig config)
-    {
-        _config = config;
-        _isConfigured = true;
-    }
-
     public void Start()
     {
-        if (!_isConfigured || _config == null) return;
+        // IMPL-3: Config injected via DI. Flag still used by Tick.
+        _isConfigured = true;
 
         _interactionServiceImpl.Initialize(_config);
         _dialogueServiceImpl.Initialize(_config);

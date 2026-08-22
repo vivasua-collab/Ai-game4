@@ -9,7 +9,6 @@ using System;
 using Vector2 = CultivationGame.Core.Data.Position2D;
 using CultivationGame.Core;
 using CultivationGame.Core.Messaging.Contracts;
-using CultivationGame.Modules.NPC.Data;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.Events;
 using CultivationGame.Core.Interfaces;

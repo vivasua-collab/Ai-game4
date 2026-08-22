@@ -37,20 +37,16 @@ public class NPCModule : IModule
 
     [Inject] private readonly IPublisher<NPCDeathEvent> _npcDeathPub = null!;
 
-    private NPCConfig? _config;
+    // IMPL-3: Config injected via DI (replaces obsolete SetConfig()).
+    [Inject] private readonly NPCConfig _config = null!;
     private bool _isConfigured;
 
     public string ModuleName => "NPC";
 
-    public void SetConfig(NPCConfig config)
-    {
-        _config = config;
-        _isConfigured = true;
-    }
-
     public void Start()
     {
-        if (!_isConfigured) return;
+        // IMPL-3: Config injected via DI. Inner services also receive it via constructor injection.
+        _isConfigured = true;
 
         _npcServiceImpl.Initialize();
         _relationshipService.Initialize();

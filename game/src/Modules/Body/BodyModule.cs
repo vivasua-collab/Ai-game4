@@ -45,33 +45,19 @@ public class BodyModule : IModule
     [Inject] private readonly ISubscriber<StatChangedEvent> _statChangedSub = null!;
     private IDisposable? _statChangedSubscription;
 
-    private bool _isConfigured;
-    private BodyConfig? _config;
+    [Inject] private readonly BodyConfig _config = null!;
 
     public string ModuleName => "Body";
 
-    /// <summary>
-    /// Установить конфигурацию тела.
-    /// Вызывается из BodyModuleServices.Register() до Start().
-    /// </summary>
-    public void SetConfig(BodyConfig config)
-    {
-        _config = config;
-        _isConfigured = true;
-    }
-
     public void Start()
     {
-        // Инициализация через интерфейс IBodyService (P1-06 FIX)
-        if (_isConfigured && _config != null)
-        {
-            _bodyService.Initialize(
-                _config.EntityId,
-                _config.Morphology,
-                _config.Material,
-                _config.Size,
-                _config.Vitality);
-        }
+        // IMPL-3: Config injected via DI (replaces obsolete SetConfig()).
+        _bodyService.Initialize(
+            _config.EntityId,
+            _config.Morphology,
+            _config.Material,
+            _config.Size,
+            _config.Vitality);
 
         // B5-E02: Подписка на BuffTickedEvent — обработка тиков HoT/DoT
         _buffTickedSubscription = _buffTickedSub.Subscribe(OnBuffTicked);

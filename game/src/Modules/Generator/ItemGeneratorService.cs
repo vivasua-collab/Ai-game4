@@ -8,7 +8,6 @@ using System.Collections.Generic;
 using CultivationGame.Core;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.Interfaces;
-using CultivationGame.Modules.NPC;
 
 namespace CultivationGame.Modules.Generator
 {
@@ -18,15 +17,19 @@ namespace CultivationGame.Modules.Generator
     /// заполняет поля по формулам на основе уровня культивации и сида,
     /// затем регистрирует в ItemDatabaseService.
     ///
-    /// Task 2.2: добавлена зависимая от уровня дистрибуция грейда (NPCConfig.EquipmentGradeWeightsByLevel),
+    /// Task 2.2: добавлена зависимая от уровня дистрибуция грейда
+    /// (Core.Data.GeneratorTables.EquipmentGradeWeightsByLevel),
     /// генерация зарядников Ци, тир материала clamp((level+1)/2,1,5),
     /// бонусные свойства для грейда Refined+.
+    ///
+    /// IMPL-5 (Q6): weight tables moved from NPCConfig to
+    /// Core.Data.GeneratorTables — Generator no longer depends on the NPC
+    /// module for configuration data.
     /// </summary>
     public class ItemGeneratorService : IItemGeneratorService
     {
         // === Зависимости ===
         private readonly IItemDatabaseService _itemDatabase;
-        private readonly NPCConfig _npcConfig;
 
         // === Счётчик для уникальных ID (на случай seed=0) ===
         private long _generationCounter;
@@ -42,15 +45,15 @@ namespace CultivationGame.Modules.Generator
         };
 
         /// <summary>
-        /// Конструктор. Принимает сервис базы данных предметов и NPCConfig
-        /// для весов грейда экипировки по уровню.
+        /// Конструктор. Принимает сервис базы данных предметов.
+        /// Весовые таблицы для генерации грейда берутся из статического
+        /// <see cref="GeneratorTables"/> (Core.Data) — больше не зависит
+        /// от NPCConfig (Q6).
         /// </summary>
         /// <param name="itemDatabase">Сервис базы данных предметов.</param>
-        /// <param name="npcConfig">Конфигурация NPC (содержит EquipmentGradeWeightsByLevel).</param>
-        public ItemGeneratorService(IItemDatabaseService itemDatabase, NPCConfig npcConfig)
+        public ItemGeneratorService(IItemDatabaseService itemDatabase)
         {
             _itemDatabase = itemDatabase ?? throw new ArgumentNullException(nameof(itemDatabase));
-            _npcConfig = npcConfig ?? throw new ArgumentNullException(nameof(npcConfig));
             _generationCounter = 0;
         }
 
@@ -398,12 +401,13 @@ namespace CultivationGame.Modules.Generator
 
         /// <summary>
         /// Бросить грейд экипировки по весам, зависимым от уровня.
-        /// Использует NPCConfig.EquipmentGradeWeightsByLevel.
+        /// Использует Core.Data.GeneratorTables.EquipmentGradeWeightsByLevel
+        /// (Q6: перенесено из NPCConfig).
         /// </summary>
         private EquipmentGrade RollGradeForLevel(int level, SeededRandom rng)
         {
             int index = LevelToGradeWeightsIndex(level);
-            float[] weights = _npcConfig.EquipmentGradeWeightsByLevel[index];
+            float[] weights = GeneratorTables.EquipmentGradeWeightsByLevel[index];
 
             int gradeIndex = rng.NextWeighted(weights);
             // Гарантируем валидный индекс грейда

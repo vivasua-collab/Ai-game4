@@ -46,7 +46,8 @@ public class CombatModule : IModule
     [Inject] private readonly ISubscriber<AttackIntentEvent> _attackIntentSub = null!;
 
     // === Состояние ===
-    private CombatConfig? _config;
+    // IMPL-3: Config injected via DI (replaces obsolete SetConfig()).
+    [Inject] private readonly CombatConfig _config = null!;
     private bool _isConfigured;
     private IDisposable? _enemyKilledSubscription;
     private IDisposable? _combatEndedSubscription;
@@ -61,25 +62,16 @@ public class CombatModule : IModule
 
     public string ModuleName => "Combat";
 
-    /// <summary>
-    /// Установить конфигурацию модуля.
-    /// </summary>
-    public void SetConfig(CombatConfig config)
-    {
-        _config = config;
-        _isConfigured = true;
-    }
-
     public void Start()
     {
-        // === Конфигурация сервисов ===
-        if (_isConfigured && _config != null)
-        {
-            _combatServiceImpl.Configure(_config);
+        // IMPL-3: Config injected via DI. Flag still used by Tick/handlers.
+        _isConfigured = true;
 
-            // Инициализация AI
-            _combatAIService.Initialize("enemy", AIPersonality.CreateBalanced());
-        }
+        // === Конфигурация сервисов ===
+        _combatServiceImpl.Configure(_config);
+
+        // Инициализация AI
+        _combatAIService.Initialize("enemy", AIPersonality.CreateBalanced());
 
         // === Подписка на кросс-модульные события ===
         _enemyKilledSubscription = _enemyKilledSub.Subscribe(OnEnemyKilled);

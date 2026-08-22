@@ -18,30 +18,19 @@ public class FormationModule : IModule
     [Inject] private readonly FormationService _formationServiceImpl = null!;
     [Inject] private readonly ITimeService _timeService = null!;
 
-    private FormationConfig? _config;
-    private bool _isConfigured;
+    // IMPL-3: Config injected via DI (replaces obsolete SetConfig()).
+    [Inject] private readonly FormationConfig _config = null!;
     private float _realTimeAccumulator;
 
     public string ModuleName => "Formation";
 
-    public void SetConfig(FormationConfig config)
-    {
-        _config = config;
-        _isConfigured = true;
-    }
-
     public void Start()
     {
-        if (_isConfigured && _config != null)
-        {
-            _formationServiceImpl.Initialize(_config);
-        }
+        _formationServiceImpl.Initialize(_config);
     }
 
     public void Tick(int tickCount)
     {
-        if (!_isConfigured) return;
-
         float delta = _timeService.DeltaTime;
         _realTimeAccumulator += delta;
 

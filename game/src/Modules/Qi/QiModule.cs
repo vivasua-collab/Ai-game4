@@ -25,27 +25,14 @@ public class QiModule : IModule
     [Inject] private readonly IQiBufferService _qiBufferService = null!;
     [Inject] private readonly ITimeService _timeService = null!;
 
-    private QiConfig? _config;
-    private bool _isConfigured;
+    // IMPL-3: Config injected via DI (replaces obsolete SetConfig()).
+    [Inject] private readonly QiConfig _config = null!;
 
     public string ModuleName => "Qi";
 
-    /// <summary>
-    /// Установить конфигурацию модуля Ци.
-    /// Вызывается из QiModuleServices.Register() build callback до Start().
-    /// </summary>
-    public void SetConfig(QiConfig config)
-    {
-        _config = config;
-        _isConfigured = true;
-    }
-
     public void Start()
     {
-        if (_isConfigured && _config != null)
-        {
-            _qiServiceImpl.Initialize(_config);
-        }
+        _qiServiceImpl.Initialize(_config);
     }
 
     public void Tick(int tickCount)

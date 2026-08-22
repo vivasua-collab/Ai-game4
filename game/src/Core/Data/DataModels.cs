@@ -62,8 +62,9 @@ public class CharacterData
 }
 
 // ── NPC ─────────────────────────────────────────────────────────────────
-// NOTE: NPCState moved to Modules/NPC/Data/NPCState.cs (canonical Ai-game3 version).
-// Core.Data NPCState stub removed to avoid ambiguity with the richer Modules.NPC.Data.NPCState.
+// NPCState is defined in Core/Data/NPCState.cs (IMPL-1: moved back from Modules/NPC/Data
+// to fix Core→Modules architecture violation — BodyPart now also lives in Core.Data).
+// BodyPart is defined in Core/Data/BodyPart.cs (moved from Modules/Body for the same reason).
 
 // ── Tile ────────────────────────────────────────────────────────────────
 [Serializable]

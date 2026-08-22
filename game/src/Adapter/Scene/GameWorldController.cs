@@ -437,12 +437,14 @@ public partial class GameWorldController : Node2D
         // Get input vector (normalized -1..1 per axis).
         Vector2 moveVec = Godot.Input.GetVector("move_left", "move_right", "move_up", "move_down");
 
-        // Speed: base pixels/sec × delta × run multiplier × time speed multiplier.
+        // Speed: base pixels/sec × delta × run multiplier.
+        // Q7: Movement is real-time (player input needs immediate response).
+        // Time.Speed does NOT affect movement speed — game speed only affects
+        // tick-based simulation (regen, cooldowns, AI). This prevents extreme
+        // speeds at Quick (15×) that caused camera lag.
+        // Future: full tick-based movement migration (PlayerModule.Tick).
         float speedMult = 1.0f;
         if (Godot.Input.IsActionPressed("run")) speedMult = RunSpeedMultiplier;
-
-        // Time speed affects movement (faster game = faster movement).
-        if (Time != null) speedMult *= (int)Time.Speed;
 
         // Overweight penalty: movement speed drops as carry weight exceeds max.
         // Ratio 0 = no penalty, 1.0 (2× max) = 0.5× speed, 3.0 (4× max) = 0.25× speed.
@@ -583,17 +585,11 @@ public partial class GameWorldController : Node2D
             _inputAdapter.SetOverUI(_inventoryWindow.Visible);
         }
 
-        if (PlayerInput.IsQuickSavePressed)
-        {
-            GD.Print("[GameWorld] Quick save (stub)");
-            // SaveService?.Save("quicksave", SaveSlotType.QuickSave);
-        }
-
-        if (PlayerInput.IsQuickLoadPressed)
-        {
-            GD.Print("[GameWorld] Quick load (stub)");
-            // SaveService?.Load("quicksave");
-        }
+        // Save/load DISABLED (Q8: user decision — saves invalid after each fix).
+        // Will be re-enabled when save system is stable.
+        // F5/F9 do nothing — no toast, no log, no action.
+        // if (PlayerInput.IsQuickSavePressed) { ... }
+        // if (PlayerInput.IsQuickLoadPressed) { ... }
 
         // Time speed control: PageUp = faster, PageDown = slower.
         // Debounce: max 1 change per real second (prevents rapid cycling).

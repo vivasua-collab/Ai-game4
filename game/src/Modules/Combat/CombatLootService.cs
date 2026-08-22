@@ -1,5 +1,6 @@
 #nullable enable
 // Создано: 2026-05-09
+// Редактировано: 2026-08-22 — IMPL-6 (Q5): Random → ICombatRng (детерминированный бой).
 // Редактировано: 2026-05-09 — CMB-A09: вызов IInventoryService.TryAddItem() в GrantLoot
 // Редактировано: 2026-05-09 — EVT-02: убрана инъекция IInventoryService,
 //   добавление лута через ItemAddRequestEvent вместо прямого вызова
@@ -36,6 +37,7 @@ namespace CultivationGame.Modules.Combat
         private readonly IItemGeneratorService _generator;
         private readonly IPublisher<ItemAddRequestEvent> _itemAddRequestPub; // EVT-02: command-событие
         private readonly IItemDatabaseService _itemDatabase; // 4.1: для определения редкости экипировки NPC
+        private readonly ICombatRng _rng; // Q5: deterministic RNG
 
         // === Настройки ===
         private const int MinLootItems = 1;
@@ -45,17 +47,16 @@ namespace CultivationGame.Modules.Combat
         private const string SpiritStoneShardId = "spirit_stone_shard";
         private const string SpiritStoneFragmentId = "spirit_stone_fragment";
 
-        // === Случайный генератор (замена UnityEngine.Random) ===
-        private static readonly Random _random = new Random();
-
         // === Конструктор ===
         public CombatLootService(
             IItemGeneratorService generator,
             IPublisher<ItemAddRequestEvent> itemAddRequestPub,
+            ICombatRng rng, // IMPL-6 (Q5): deterministic RNG (заменяет static Random)
             IItemDatabaseService itemDatabase = null)
         {
             _generator = generator ?? throw new System.ArgumentNullException(nameof(generator));
             _itemAddRequestPub = itemAddRequestPub;
+            _rng = rng ?? throw new ArgumentNullException(nameof(rng));
             _itemDatabase = itemDatabase; // Опциональная зависимость — для редкости экипировки
         }
 
@@ -63,16 +64,17 @@ namespace CultivationGame.Modules.Combat
         /// Сгенерировать лут из убитого врага.
         /// P0-04 FIX: Использует IItemGeneratorService для реальных предметов
         /// вместо placeholder IDs вида "loot_enemy_Common_0".
+        /// Q5: броски через ICombatRng (детерминированный бой).
         /// </summary>
         public List<LootEntry> GenerateLoot(string enemyId, int enemyLevel)
         {
             var loot = new List<LootEntry>();
-            int itemCount = _random.Next(MinLootItems, MaxLootItems + 1);
+            int itemCount = _rng.Next(MinLootItems, MaxLootItems + 1);
 
             for (int i = 0; i < itemCount; i++)
             {
                 // 70% экипировка, 30% расходники
-                if (_random.NextDouble() < 0.7f)
+                if (_rng.NextBool(0.7f))
                 {
                     var equip = _generator.GenerateRandomEquipment(enemyLevel);
                     loot.Add(new LootEntry(equip.ItemId, 1, equip.Rarity, "combat"));

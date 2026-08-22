@@ -1,5 +1,6 @@
 #nullable enable
 // Создано: 2026-05-09
+// Редактировано: 2026-08-22 — IMPL-6 (Q5): Random.Shared → ICombatRng (детерминированный бой).
 // Редактировано: 2026-05-09 — CMB-C02: использование Aggressiveness в UpdateAI
 // AI противников — управление поведением NPC в бою.
 // Перенесено из legacy Combat/CombatAI.cs с адаптацией.
@@ -19,11 +20,15 @@ namespace CultivationGame.Modules.Combat
     ///
     /// CMB-C02: Aggressiveness теперь влияет на выбор действия.
     /// Высокая агрессивность → шанс атаки увеличивается, защиты уменьшается.
+    ///
+    /// IMPL-6 (Q5): все броски рандома идут через инжектированный
+    /// <see cref="ICombatRng"/> — бои воспроизводимы при том же seed.
     /// </summary>
     public class CombatAIService
     {
         // === Зависимости ===
         private readonly ICombatService _combatService;
+        private readonly ICombatRng _rng; // Q5: deterministic RNG
 
         // === Состояние ===
         private AIPersonality _personality;
@@ -32,9 +37,10 @@ namespace CultivationGame.Modules.Combat
         private bool _isActive;
 
         // === Конструктор ===
-        public CombatAIService(ICombatService combatService)
+        public CombatAIService(ICombatService combatService, ICombatRng rng)
         {
             _combatService = combatService;
+            _rng = rng ?? throw new ArgumentNullException(nameof(rng));
         }
 
         /// <summary>
@@ -73,7 +79,8 @@ namespace CultivationGame.Modules.Combat
             // CMB-C02: Выбор действия на основе личности
             // Aggressiveness определяет базовый шанс атаки
             // Остаток делится между защитой и техниками
-            float roll = (float)Random.Shared.NextDouble();
+            // Q5: ICombatRng.NextFloat вместо (float)Random.Shared.NextDouble.
+            float roll = _rng.NextFloat();
 
             // Агрессивность масштабирует шанс атаки
             float attackChance = _personality.Aggressiveness;
@@ -112,7 +119,8 @@ namespace CultivationGame.Modules.Combat
         {
             if (_personality == null) return DefenseSubtype.Block;
 
-            float roll = (float)Random.Shared.NextDouble();
+            // Q5: ICombatRng.NextFloat вместо (float)Random.Shared.NextDouble.
+            float roll = _rng.NextFloat();
             if (roll < 0.3f) return DefenseSubtype.Dodge;
             if (roll < 0.6f) return DefenseSubtype.Block;
             if (roll < 0.8f) return DefenseSubtype.Parry;

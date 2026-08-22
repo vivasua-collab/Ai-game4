@@ -1,5 +1,6 @@
 #nullable enable
 // Создано: 2026-05-10 — Phase 17B: делегат регистрации модуля
+// Редактировано: 2026-08-22 — IMPL-6 (Q5): регистрация ICombatRng (CombatRng seed=12345).
 // Migrated from Ai-game3 (Unity+VContainer+MessagePipe) to Ai-game4 (Godot+DI+EventBus) 2026-08-15.
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Interfaces;
@@ -16,6 +17,12 @@ public static class CombatModuleServices
     /// </summary>
     public static void Register(IContainerBuilder builder)
     {
+        // === Детерминированный RNG для боя (Q5 / AUDIT-2 M7) ===
+        // Фиксированный сид 12345 — все бои воспроизводимы при том же seed.
+        // В будущем seed должен браться из GameSession (параметр мира).
+        // Pre-built singleton instance — CombatRng не имеет других зависимостей.
+        builder.RegisterInstance<ICombatRng>(new CombatRng(seed: 12345));
+
         // === Публичные сервисы ===
         builder.Register<ICombatService, CombatService>(Lifetime.Singleton);
         builder.Register<IDamageService, DamageService>(Lifetime.Singleton);
