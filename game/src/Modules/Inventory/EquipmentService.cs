@@ -157,6 +157,16 @@ namespace CultivationGame.Modules.Inventory
             return EquipmentStatAggregator.GetTotalDamage(_equipment);
         }
 
+        public float GetTotalWeight()
+        {
+            return EquipmentStatAggregator.GetTotalWeight(_equipment);
+        }
+
+        public float GetTotalMoveSpeedPenalty()
+        {
+            return EquipmentStatAggregator.GetTotalMoveSpeedPenalty(_equipment);
+        }
+
         public WeaponHandType GetWeaponHandType()
         {
             return EquipmentStatAggregator.GetWeaponHandType(_equipment);

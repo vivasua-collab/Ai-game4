@@ -38,6 +38,7 @@ public partial class GameWorldController : Node2D
     [Inject] private IItemDatabaseService ItemDatabase { get; set; } = null!;
     [Inject] private IInventoryService   Inventory   { get; set; } = null!;
     [Inject] private IGroundItemService  GroundItems { get; set; } = null!;
+    [Inject] private IEquipmentService   Equipment   { get; set; } = null!;
     [Inject] private INPCService         Npcs        { get; set; } = null!;
     [Inject] private Modules.Interaction.DialogueService DialogueService { get; set; } = null!;
     [Inject] private Modules.Player.PlayerCombatAdapter CombatAdapter { get; set; } = null!;
@@ -529,26 +530,38 @@ public partial class GameWorldController : Node2D
         if (_camera != null)
             _camera.PositionSmoothingSpeed = 8.0f * gameSpeedMult;
 
-        // Overweight penalty: movement speed drops as carry weight exceeds max.
-        // Ratio 0 = no penalty, 1.0 (2× max) = 0.5× speed, 3.0 (4× max) = 0.25× speed.
-        // Formula: speedMult *= 1.0 / (1.0 + ratio). Capped ratio at 3.0 → min 0.25× speed.
-        if (Inventory != null && Inventory.IsOverweight)
+        // === Global weight penalty (inventory + equipment) ===
+        // Weight = inventory items + equipped items. Both contribute to overweight.
+        // Also applies equipment MoveSpeedPenalty (e.g. heavy armor = -15% speed).
+        float invWeight = Inventory?.GetCurrentWeight() ?? 0f;
+        float equipWeight = Equipment?.GetTotalWeight() ?? 0f;
+        float totalWeight = invWeight + equipWeight;
+        float maxWeight = Inventory?.GetEffectiveMaxWeight() ?? 50f;
+
+        // Equipment move speed penalty (negative %, e.g. -15 → multiply by 0.85).
+        float equipPenaltyPercent = Equipment?.GetTotalMoveSpeedPenalty() ?? 0f;
+        if (equipPenaltyPercent < 0f)
         {
-            float ratio = Inventory.OverweightRatio;
+            speedMult *= 1.0f + (equipPenaltyPercent / 100f); // pen=-15 → ×0.85
+        }
+
+        // Overweight penalty: total weight > max → speed drops.
+        if (totalWeight > maxWeight)
+        {
+            float ratio = maxWeight > 0f
+                ? System.Math.Min(3.0f, (totalWeight - maxWeight) / maxWeight)
+                : 3.0f;
             float overweightPenalty = 1.0f / (1.0f + ratio);
             speedMult *= overweightPenalty;
-            // Show overweight toast once when crossing threshold (debounced).
+
             if (!_overweightNotified)
             {
                 _overweightNotified = true;
-                float curW = Inventory.GetCurrentWeight();
-                float maxW = Inventory.GetEffectiveMaxWeight();
-                ShowToast($"⚠ Перевес! {curW:F1}/{maxW:F1} кг — скорость снижена");
+                ShowToast($"⚠ Перевес! {totalWeight:F1}/{maxWeight:F1} кг — скорость снижена");
             }
         }
         else if (_overweightNotified)
         {
-            // Reset notification when back to normal weight.
             _overweightNotified = false;
             ShowToast("Вес в норме");
         }

@@ -206,5 +206,36 @@ namespace CultivationGame.Modules.Inventory
             // Пока — предполагаем Pristine (1.0)
             return 1.0f;
         }
+
+        /// <summary>
+        /// Подсчитать суммарный вес всей надетой экипировки (кг).
+        /// Для глобального расчёта веса персонажа (инвентарь + экипировка).
+        /// </summary>
+        public static float GetTotalWeight(Dictionary<EquipmentSlot, EquipmentData> equipment)
+        {
+            float total = 0f;
+            foreach (var kvp in equipment)
+            {
+                if (kvp.Value != null)
+                    total += kvp.Value.Weight;
+            }
+            return total;
+        }
+
+        /// <summary>
+        /// Подсчитать суммарный штраф скорости от экипировки (%).
+        /// EquipmentData.MoveSpeedPenalty — отрицательное значение (например, -15 = -15%).
+        /// Возвращает сумму (отрицательное число).
+        /// </summary>
+        public static float GetTotalMoveSpeedPenalty(Dictionary<EquipmentSlot, EquipmentData> equipment)
+        {
+            float total = 0f;
+            foreach (var kvp in equipment)
+            {
+                if (kvp.Value != null)
+                    total += kvp.Value.MoveSpeedPenalty;
+            }
+            return total;
+        }
     }
 }

@@ -33,6 +33,11 @@ public static class SceneAssemblyRegistrar
         // NPC_COMBAT_PREP Phase 1 — spawn human NPCs (merchant/cultivator/
         // guard/passerby) through the full assembly pipeline.
         builder.Register<HumanNPCSpawnPhase>(Lifetime.Singleton);
+        // GROUP-SPAWN Phase 7 — spawns NPC groups (wolf pack, guard patrol,
+        // trade caravan, deer herd) on the large world. Each group is created
+        // via INPCGroupService and populated with members spawned through
+        // NPCSpawnerService (NPCs) or AnimalService (animals).
+        builder.Register<GroupSpawnPhase>(Lifetime.Singleton);
         builder.Register<FormationInitPhase>(Lifetime.Singleton);
         builder.Register<ChargerInitPhase>(Lifetime.Singleton);
         builder.Register<QuestInitPhase>(Lifetime.Singleton);

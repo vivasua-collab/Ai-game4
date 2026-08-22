@@ -13,6 +13,8 @@ namespace CultivationGame.Core.Interfaces
         bool IsSlotBlocked(EquipmentSlot slot);
         float GetTotalArmor();
         float GetTotalDamage();
+        float GetTotalWeight();
+        float GetTotalMoveSpeedPenalty();
         WeaponHandType GetWeaponHandType();
         bool IsTwoHandEquipped { get; }
     }

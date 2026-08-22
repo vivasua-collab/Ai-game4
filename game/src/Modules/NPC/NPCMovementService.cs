@@ -35,6 +35,10 @@ namespace CultivationGame.Modules.NPC
         private readonly NPCService _npcService;
         private readonly NPCConfig _config;
         private readonly ITimeService _timeService;
+        // GROUP-SPAWN: групповой сервис — overlay над индивидуальным AI.
+        // Если NPC состоит в активной группе с CurrentGroupTarget, движение
+        // к этой цели имеет приоритет над wander/patrol/attack индивидуального AI.
+        private readonly INPCGroupService? _groupService;
 
         // === MessagePipe: подписки ===
         private readonly ISubscriber<PlayerPositionChangedEvent> _playerPosChangedSub;
@@ -57,12 +61,16 @@ namespace CultivationGame.Modules.NPC
             NPCService npcService,
             NPCConfig config,
             ITimeService timeService,
-            ISubscriber<PlayerPositionChangedEvent> playerPosChangedSub)
+            ISubscriber<PlayerPositionChangedEvent> playerPosChangedSub,
+            // GROUP-SPAWN: опциональная зависимость (null-tolerant для тестов).
+            // DI регистрирует INPCGroupService как singleton в NPCModuleServices.
+            INPCGroupService? groupService = null)
         {
             _npcService = npcService;
             _config = config;
             _timeService = timeService;
             _playerPosChangedSub = playerPosChangedSub;
+            _groupService = groupService;
         }
 
         /// <summary>
@@ -122,9 +130,26 @@ namespace CultivationGame.Modules.NPC
 
         /// <summary>
         /// Обработать движение одного NPC на основе AIState.
+        /// GROUP-SPAWN overlay: если NPC состоит в активной группе с
+        /// CurrentGroupTarget, движение к этой цели имеет приоритет над
+        /// индивидуальным AI. Это LIGHT overlay — followers пока не имеют
+        /// formation offsets (v1: все участники движутся к одной цели).
         /// </summary>
         private void ProcessNPCMovement(NPCState state, float deltaTime)
         {
+            // === GROUP-SPAWN overlay ===
+            // Проверяем принадлежность к группе до индивидуального AI.
+            // Если группа активна и имеет CurrentGroupTarget — двигаемся к ней.
+            if (_groupService != null)
+            {
+                var group = _groupService.GetGroupByMember(state.NpcId);
+                if (group != null && group.IsActive && group.CurrentGroupTarget.HasValue)
+                {
+                    MoveToward(state, group.CurrentGroupTarget.Value, _config.DefaultMoveSpeed, deltaTime);
+                    return;  // Skip individual AI logic for this tick.
+                }
+            }
+
             switch (state.AIState)
             {
                 case NPCAIState.Idle:

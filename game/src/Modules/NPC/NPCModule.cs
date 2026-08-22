@@ -30,6 +30,11 @@ public class NPCModule : IModule
     [Inject] private readonly NPCQiRegenService _qiRegenService = null!;
     [Inject] private readonly NPCVisualService _visualService = null!;
 
+    // GROUP-SPAWN: групповой сервис — надстройка над индивидуальным AI.
+    // Tick() обновляет CurrentGroupTarget для участников групп; NPCMovementService
+    // читает это поле как overlay (приоритет над индивидуальным AI).
+    [Inject] private readonly INPCGroupService _groupService = null!;
+
     [Inject] private readonly ISubscriber<NPCAIStateChangedEvent> _aiStateChangedSub = null!;
     private IDisposable? _aiStateChangedSubscription;
 
@@ -84,6 +89,10 @@ public class NPCModule : IModule
         if (!_isConfigured) return;
 
         _aiService.Tick();
+        // GROUP-SPAWN: обновляем цели групп (CurrentGroupTarget для участников).
+        // Вызывается после AI (чтобы видеть смену состояний NPC) и до движения
+        // (чтобы NPCMovementService видел актуальные групповые цели).
+        _groupService?.Tick(tickCount);
         _movementService.ProcessMovement();
         _visualService.UpdateVisualPositions();
         ProcessNpcAttacks();

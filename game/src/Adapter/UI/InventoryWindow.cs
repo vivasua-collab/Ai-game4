@@ -38,6 +38,7 @@ public partial class InventoryWindow : Control
     [Inject] private IInventoryService InventoryService { get; set; } = null!;
     [Inject] private IItemDatabaseService ItemDatabase { get; set; } = null!;
     [Inject] private IGroundItemService GroundItems { get; set; } = null!;
+    [Inject] private IEquipmentService EquipmentService { get; set; } = null!;
     [Inject] private IPlayerService PlayerService { get; set; } = null!;
     [Inject] private IEquipmentGenerator EquipmentGenerator { get; set; } = null!;
 
@@ -439,17 +440,19 @@ public partial class InventoryWindow : Control
             }
         }
 
-        // Update weight/volume — red color if overweight.
-        float curWeight = InventoryService?.GetCurrentWeight() ?? 0f;
+        // Update weight/volume — show GLOBAL weight (inventory + equipment).
+        float invWeight = InventoryService?.GetCurrentWeight() ?? 0f;
+        float equipWeight = EquipmentService?.GetTotalWeight() ?? 0f;
+        float curWeight = invWeight + equipWeight;  // global weight
         float maxWeight = InventoryService?.GetEffectiveMaxWeight() ?? 50f;
         float curVol = InventoryService?.GetCurrentVolume() ?? 0f;
         float maxVol = InventoryService?.GetEffectiveMaxVolume() ?? 100f;
-        bool isOverweight = InventoryService?.IsOverweight ?? false;
+        bool isOverweight = curWeight > maxWeight;
         bool isVolumeFull = curVol >= maxVol;
 
         string weightStatus = isOverweight ? " ⚠ ПЕРЕВЕС" : "";
         string volStatus = isVolumeFull ? " ⚠ ПОЛНО" : "";
-        _weightLabel.Text = $"Вес: {curWeight:F1} / {maxWeight:F1} кг{weightStatus} | Объём: {curVol:F1} / {maxVol:F1}{volStatus}";
+        _weightLabel.Text = $"Вес: {curWeight:F1} / {maxWeight:F1} кг{weightStatus} (ргкз: {invWeight:F1}+экп: {equipWeight:F1}) | Объём: {curVol:F1} / {maxVol:F1}{volStatus}";
 
         // Color: red if overweight or volume full, gold if near limit, else faded.
         Color weightColor;

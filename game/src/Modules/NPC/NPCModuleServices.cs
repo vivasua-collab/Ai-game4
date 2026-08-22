@@ -53,6 +53,13 @@ public static class NPCModuleServices
         // BodyModuleServices); ITileService (TileModule); SpeciesRegistry (Body).
         builder.Register<AnimalService>(Lifetime.Singleton);
 
+        // === GROUP-SPAWN: группы NPC (патруль, escort, guard area, hunting pack) ===
+        // NPCGroupService — Singleton; управляет составом групп и обновляет
+        // CurrentGroupTarget для участников в Tick(). NPCModule.Tick() вызывает
+        // _groupService.Tick(tickCount) после _aiService.Tick(). NPCMovementService
+        // читает CurrentGroupTarget как overlay над индивидуальным AI.
+        builder.Register<INPCGroupService, NPCGroupService>(Lifetime.Singleton);
+
         // === Точка входа модуля ===
         builder.Register<NPCModule>(Lifetime.Singleton);
     }
