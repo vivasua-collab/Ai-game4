@@ -109,6 +109,72 @@ namespace CultivationGame.Modules.NPC
         // === Принятие решений ===
 
         /// <summary>
+        /// Player entity id (PlayerService._data.Id). StatProviderAdapter
+        /// treats any non-NPC id as the player, so the exact value only
+        /// matters for threat targeting.
+        /// </summary>
+        private const string PlayerId = "player_0";
+
+        /// <summary>
+        /// Диспозиционный ИИ (2026-08-22, физический прототип):
+        /// - Hostile: игрок в AggroRadius → угроза выше порога (агро).
+        /// - Friendly: враг (Hostile NPC) в бою с игроком в радиусе → угроза врагу.
+        /// - Neutral/Merchant: ничего (мирные, блуждание/торговля).
+        /// </summary>
+        private void ProcessDisposition(NPCState state)
+        {
+            switch (state.Disposition)
+            {
+                case NPCDisposition.Hostile:
+                {
+                    float distToPlayer = Vector2.Distance(state.Position, _playerPosition);
+                    if (distToPlayer <= _config.AggroRadius)
+                    {
+                        // Мгновенный агро: threat выше порога (50).
+                        state.Threats[PlayerId] = System.MathF.Max(
+                            state.Threats.TryGetValue(PlayerId, out var t) ? t : 0f,
+                            _config.ThreatThreshold + 10f);
+                    }
+                    break;
+                }
+
+                case NPCDisposition.Friendly:
+                {
+                    // Защита игрока: ищем Hostile NPC в бою с игроком рядом с нами.
+                    float distToPlayer = Vector2.Distance(state.Position, _playerPosition);
+                    if (distToPlayer > _config.AggroRadius * 2f) break;
+
+                    foreach (var other in _npcService.GetAllStates())
+                    {
+                        if (other.NpcId == state.NpcId || !other.IsAlive) continue;
+                        if (other.Disposition != NPCDisposition.Hostile) continue;
+                        if (other.TargetId != PlayerId && other.TargetId != "player") continue;
+
+                        float dist = Vector2.Distance(state.Position, other.Position);
+                        if (dist <= _config.AggroRadius * 2f)
+                        {
+                            state.Threats[other.NpcId] = _config.ThreatThreshold + 10f;
+                            break; // одна цель за проход
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
+        /// <summary>Источник максимальной угрозы (или null).</summary>
+        private string? GetTopThreatId(NPCState state)
+        {
+            string? topId = null;
+            float max = 0f;
+            foreach (var kvp in state.Threats)
+            {
+                if (kvp.Value > max) { max = kvp.Value; topId = kvp.Key; }
+            }
+            return topId;
+        }
+
+        /// <summary>
         /// Оценить ситуацию и принять решение о следующем AI-состоянии.
         /// Упрощённый Behaviour Tree с весами на основе PersonalityTrait.
         /// </summary>
@@ -116,6 +182,19 @@ namespace CultivationGame.Modules.NPC
         {
             // В бою — не меняем AIState (управляет CombatAdapter)
             if (state.IsInCombat) return;
+
+            // === Диспозиционный ИИ (2026-08-22, физический прототип) ===
+            // Hostile: игрок в радиусе обнаружения → мгновенная угроза.
+            // Friendly: враг атакует игрока рядом → защита (угроза врагу).
+            ProcessDisposition(state);
+
+            // Торговец стоит на месте (лавка) — не блуждает и не патрулирует.
+            if (state.Disposition == NPCDisposition.Merchant
+                && state.AIState is not (NPCAIState.Idle or NPCAIState.Fleeing))
+            {
+                _npcService.SetAIState(state.NpcId, NPCAIState.Idle);
+                return;
+            }
 
             // Проверка: нужно ли сбежать (мало здоровья)
             float healthRatio = state.MaxHealth > 0
@@ -132,8 +211,15 @@ namespace CultivationGame.Modules.NPC
             float maxThreat = GetMaxThreat(state);
             if (maxThreat >= _config.ThreatThreshold && state.AIState != NPCAIState.Attacking)
             {
-                _npcService.SetAIState(state.NpcId, NPCAIState.Attacking);
-                return;
+                // Назначаем цель = источник максимальной угрозы (до этого
+                // TargetId никто не заполнял — Attacking двигался в никуда).
+                string? topThreat = GetTopThreatId(state);
+                if (!string.IsNullOrEmpty(topThreat))
+                {
+                    state.TargetId = topThreat;
+                    _npcService.SetAIState(state.NpcId, NPCAIState.Attacking);
+                    return;
+                }
             }
 
             // Проверка: таймаут текущего состояния

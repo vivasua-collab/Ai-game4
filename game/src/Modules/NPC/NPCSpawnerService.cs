@@ -47,6 +47,9 @@ namespace CultivationGame.Modules.NPC
 
         // === MessagePipe: подписки (Задача 3.B) ===
         private readonly ISubscriber<LocationChangedEvent> _locationChangedSub;
+
+        // 2026-08-22, этап 2: генератор экипировки «Матрёшка»
+        private readonly IEquipmentGenerator _equipmentGenerator;
         private IDisposable _locationChangedSubscription;
 
         // === Состояние ===
@@ -67,7 +70,8 @@ namespace CultivationGame.Modules.NPC
             IBuffService buffService, // Этап 3.3: очистка баффов при деспавне
             IPublisher<NPCSpawnedEvent> spawnedPub,
             IPublisher<NPCDespawnedEvent> despawnedPub,
-            ISubscriber<LocationChangedEvent> locationChangedSub)
+            ISubscriber<LocationChangedEvent> locationChangedSub,
+            IEquipmentGenerator equipmentGenerator) // 2026-08-22, этап 2
         {
             _npcService = npcService;
             _movementService = movementService;
@@ -82,6 +86,7 @@ namespace CultivationGame.Modules.NPC
             _spawnedPub = spawnedPub;
             _despawnedPub = despawnedPub;
             _locationChangedSub = locationChangedSub;
+            _equipmentGenerator = equipmentGenerator;
 
             // Инициализация текущей локации (Задача 1.9)
             _currentLocationId = _worldService?.CurrentLocationId;
@@ -151,6 +156,14 @@ namespace CultivationGame.Modules.NPC
             if (string.IsNullOrEmpty(state.CurrentLocation))
                 state.CurrentLocation = _currentLocationId;
 
+            // 2026-08-22, физический прототип: диспозиция к игроку по роли.
+            state.Disposition = RoleToDisposition(roleId);
+
+            // 2026-08-22 (этап 2): экипировка из генератора «Матрёшка» —
+            // реальные Damage/Penetration/Defense вместо упрощённой формулы
+            // «+5 за предмет». Enemy получает оружие уровнем выше.
+            EquipFromGenerator(state, roleId, locationLevel, seed);
+
             // Регистрация в NPCService
             _npcService.RegisterNPC(state);
             _spawnedIds.Add(npcId);
@@ -161,12 +174,11 @@ namespace CultivationGame.Modules.NPC
             _qiDataProvider.SetQiState(npcId, state.CurrentQi, state.MaxQi, state.Conductivity);
             _equipmentDataProvider.SetEquipment(npcId, state.EquipmentIds);
             // Спринт 8 C12: TotalArmor = equipment armor + BaseDefense (NaturalArmor)
-            // BaseDefense уже включает NaturalArmor из NPCAssemblyService.CalculateBaseDefense().
-            // equipmentArmor рассчитывается по количеству предметов экипировки.
             int equipmentArmor = CalculateEquipmentArmor(state);
             int totalArmor = equipmentArmor + state.BaseDefense;
             _equipmentDataProvider.SetTotalArmor(npcId, totalArmor);
-            _equipmentDataProvider.SetTotalDamage(npcId, state.BaseDamage);
+            _equipmentDataProvider.SetTotalDamage(npcId, state.BaseDamage + _generatedDamage.GetValueOrDefault(npcId));
+            _generatedDamage.Remove(npcId);
 
             // Регистрация точки спавна в сервисе движения
             _movementService.RegisterSpawnPosition(npcId, position);
@@ -223,6 +235,57 @@ namespace CultivationGame.Modules.NPC
         public int ActiveNPCCount => _spawnedIds.Count;
 
         // === Внутренние методы (legacy-маппинг) ===
+
+        // Сгенерированный урон оружия по npcId (до регистрации в провайдере).
+        private readonly Dictionary<string, int> _generatedDamage = new();
+
+        /// <summary>
+        /// Экипировка NPC из генератора «Матрёшка» (2026-08-22, этап 2):
+        /// оружие всем гуманоидам; броня — 60% шанс. Предметы регистрируются
+        /// в ItemDatabase, экипируется в state.EquipmentIds, урон оружия
+        /// добавляется к BaseDamage. Enemy/Monster — оружие уровнем выше.
+        /// </summary>
+        private void EquipFromGenerator(NPCState state, NPCRole role, int locationLevel, long seed)
+        {
+            if (_equipmentGenerator == null || state.EquipmentIds == null) return;
+
+            int weaponLevel = System.Math.Clamp(
+                locationLevel + (state.Disposition == NPCDisposition.Hostile ? 1 : 0), 1, 9);
+
+            try
+            {
+                var weapon = _equipmentGenerator.GenerateWeapon(weaponLevel, null, seed);
+                state.EquipmentIds[EquipmentSlot.WeaponMain] = weapon.ItemId;
+                _generatedDamage[state.NpcId] = weapon.Damage;
+
+                // Armor: 60% шанс, торс или голова.
+                var equipRng = new SeededRandom(seed ^ 0x5EED);
+                if (equipRng.Next(0, 100) < 60)
+                {
+                    string armorSub = (seed & 1) == 0 ? "armor_torso" : "armor_head";
+                    var armor = _equipmentGenerator.GenerateArmor(locationLevel, armorSub, seed + 2);
+                    state.EquipmentIds[armor.Slot] = armor.ItemId;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[NPCSpawnerService] EquipFromGenerator failed for {state.NpcId}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Диспозиция к игроку по роли (2026-08-22, физический прототип):
+        /// Enemy/Monster — Hostile; Guard — Friendly; Merchant — Merchant;
+        /// остальные (Passerby/Cultivator/Elder/Disciple) — Neutral.
+        /// </summary>
+        private static NPCDisposition RoleToDisposition(NPCRole role) => role switch
+        {
+            NPCRole.Enemy   => NPCDisposition.Hostile,
+            NPCRole.Monster => NPCDisposition.Hostile,
+            NPCRole.Guard   => NPCDisposition.Friendly,
+            NPCRole.Merchant => NPCDisposition.Merchant,
+            _ => NPCDisposition.Neutral,
+        };
 
         /// <summary>
         /// Определить роль NPC из идентификатора пресета.

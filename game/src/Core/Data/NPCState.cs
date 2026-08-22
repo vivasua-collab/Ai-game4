@@ -34,6 +34,13 @@ namespace CultivationGame.Core.Data
 
         // === Классификация ===
         public NPCRole Role;
+        /// <summary>
+        /// Диспозиция к игроку (2026-08-22, физический прототип): Hostile —
+        /// атакует при виде; Friendly — защищает игрока; Neutral — мирный;
+        /// Merchant — торговец (нейтрал с диалогом торговли). Наследуется от Role
+        /// при спавне (NPCSpawnerService.RoleToDisposition).
+        /// </summary>
+        public NPCDisposition Disposition;
         public NPCCategory Category;
         public PersonalityTrait Personality;
         public SoulType SoulType;

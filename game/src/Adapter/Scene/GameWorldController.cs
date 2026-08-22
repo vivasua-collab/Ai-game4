@@ -42,6 +42,9 @@ public partial class GameWorldController : Node2D
     [Inject] private Modules.Interaction.DialogueService DialogueService { get; set; } = null!;
     [Inject] private Modules.Player.PlayerCombatAdapter CombatAdapter { get; set; } = null!;
     [Inject] private Modules.Inventory.BeltService BeltService { get; set; } = null!;
+    [Inject] private IBodyService BodyService { get; set; } = null!;
+    [Inject] private ISubscriber<Core.Messaging.Contracts.PlayerDeathEvent> PlayerDeathSub { get; set; } = null!;
+    [Inject] private ISubscriber<Core.Messaging.Contracts.DamageAppliedEvent> DamageSub { get; set; } = null!;
     [Inject] private ISubscriber<Core.Messaging.Contracts.DialogueEndedEvent> DialogueEndedSub { get; set; } = null!;
 
     private Node2D        _worldRoot     = null!;
@@ -54,6 +57,9 @@ public partial class GameWorldController : Node2D
     private CharacterSheetWindow _characterSheetWindow = null!;
     private UI.DialogueWindow _dialogueWindow = null!;
     private UI.HotbarPanel _hotbarPanel = null!;
+    private Godot.ProgressBar _hpBar = null!;
+    private System.IDisposable? _playerDeathToken;
+    private System.IDisposable? _playerDamageToken;
     private CanvasLayer   _hudCanvas     = null!;
     private Label         _timeLabel     = null!;
     private Label         _hudLabel      = null!;
@@ -110,6 +116,9 @@ public partial class GameWorldController : Node2D
         SetupHUD();
         // Phase 6: subscribe the combat bridge (attack intent → combat module).
         CombatAdapter?.Start();
+        // Этап 4 (2026-08-22): смерть игрока → респавн; урон игроку → тост.
+        _playerDeathToken = PlayerDeathSub?.Subscribe(OnPlayerDeath);
+        _playerDamageToken = DamageSub?.Subscribe(OnPlayerDamaged);
         // Phase 2 fix: dialogue can end from MANY paths (E advance, Esc, choice
         // button click, digit key 1-4) — each closed the window its own way and
         // only E/Esc resumed time, leaving the game silently paused after a
@@ -281,6 +290,19 @@ public partial class GameWorldController : Node2D
         _timeLabel.Position = new Vector2(20, 10);
         _hudCanvas.AddChild(_timeLabel);
 
+        // Player HP bar (этап 4, 2026-08-22): под временем. HP = Σ RedHP по
+        // частям тела (Q4). Цвет от зелёного к красному по мере потерь.
+        _hpBar = new ProgressBar
+        {
+            Name = "HpBar",
+            MinValue = 0,
+            ShowPercentage = false,
+            CustomMinimumSize = new Vector2(260, 18),
+            Position = new Vector2(20, 38),
+        };
+        _hpBar.AddThemeFontSizeOverride("font_size", 12);
+        _hudCanvas.AddChild(_hpBar);
+
         // Hotkey legend — BOTTOM of screen, black color.
         _hudLabel = new Label
         {
@@ -380,6 +402,25 @@ public partial class GameWorldController : Node2D
         {
             var t = Time.CurrentTime;
             _timeLabel.Text = $"{t.Year} г. {t.Month:D2}/{t.Day:D2} {t.Hour:D2}:{t.Minute:D2} | Скорость: {Time.Speed}";
+        }
+
+        // Этап 4: HP bar — сумма RedHP по частям тела (Q4).
+        if (_hpBar != null && BodyService != null)
+        {
+            int cur = 0, max = 0;
+            var parts = BodyService.GetAllParts();
+            if (parts != null)
+            {
+                foreach (var p in parts) { cur += p.CurrentRedHP; max += p.MaxRedHP; }
+            }
+            if (max > 0)
+            {
+                _hpBar.MaxValue = max;
+                _hpBar.Value = cur;
+                float ratio = (float)cur / max;
+                _hpBar.Modulate = new Color(
+                    0.35f + 0.65f * (1f - ratio), 0.3f + 0.6f * ratio, 0.25f);
+            }
         }
 
         // Toast timer: hide toast after expiry.
@@ -735,6 +776,56 @@ public partial class GameWorldController : Node2D
                 ShowToast($"Слот {hotbarSlot} пуст");
             }
         }
+    }
+
+    /// <summary>
+    /// Этап 4 (2026-08-22): урон игроку → тост-фидбек.
+    /// </summary>
+    private void OnPlayerDamaged(in Core.Messaging.Contracts.DamageAppliedEvent e)
+    {
+        if (e.TargetId is not ("player_0" or "player")) return;
+        ShowToast($"💥 −{e.Damage} HP");
+    }
+
+    /// <summary>
+    /// Этап 4: смерть игрока → респавн через 3 секунды: полное лечение
+    /// частей тела, Revive, телепорт в центр карты.
+    /// </summary>
+    private void OnPlayerDeath(in Core.Messaging.Contracts.PlayerDeathEvent e)
+    {
+        ShowToast($"☠ Вы погибли ({e.Cause}) — возрождение...");
+        GD.Print($"[GameWorld] Player death: {e.Cause} — respawn in 3s");
+        CallDeferred(nameof(RespawnAfterDeath));
+    }
+
+    private async void RespawnAfterDeath()
+    {
+        await ToSignal(GetTree().CreateTimer(3.0), SceneTreeTimer.SignalName.Timeout);
+
+        // Полное лечение всех частей (Q4: HP = Σ RedHP).
+        if (BodyService != null)
+        {
+            var parts = BodyService.GetAllParts();
+            if (parts != null)
+            {
+                foreach (var p in parts)
+                {
+                    int missing = p.MaxRedHP - p.CurrentRedHP;
+                    if (missing > 0) BodyService.HealPart(p.Type, missing);
+                }
+            }
+        }
+        (Player as Modules.Player.PlayerService)?.Revive();
+
+        // Телепорт в центр карты.
+        int cx = (Tiles is { MapWidth: > 0 } ? Tiles.MapWidth : 50) / 2;
+        int cy = (Tiles is { MapHeight: > 0 } ? Tiles.MapHeight : 50) / 2;
+        _visualPosition = new Vector2(
+            cx * GameConstants.TILE_PIXELS + GameConstants.TILE_PIXELS / 2f,
+            cy * GameConstants.TILE_PIXELS + GameConstants.TILE_PIXELS / 2f);
+        Player?.SetPosition(new Position2D(cx, cy));
+        _mouseTarget = null;
+        ShowToast("✦ Вы возродились");
     }
 
     /// <summary>

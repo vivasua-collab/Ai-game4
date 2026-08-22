@@ -6,6 +6,7 @@
 //   - using VContainer/VContainer.Unity → using CultivationGame.Core.DI / CultivationGame.Core.Interfaces
 //   - Handler signature: void OnXxx(XxxEvent e) → void OnXxx(in XxxEvent e)
 using System;
+using System.Collections.Generic;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Events;
@@ -33,6 +34,12 @@ public class NPCModule : IModule
     private IDisposable? _aiStateChangedSubscription;
 
     [Inject] private readonly ISubscriber<YearChangedEvent> _yearChangedSub = null!;
+    [Inject] private readonly IPublisher<AttackIntentEvent> _attackIntentPub = null!;
+    [Inject] private readonly ISubscriber<NPCDeathEvent> _npcDeathSub = null!;
+    private IDisposable? _npcDeathSubscription;
+    [Inject] private readonly IEquipmentGenerator _equipmentGenerator = null!;
+    [Inject] private readonly IGroundItemService _groundItems = null!;
+    [Inject] private readonly ITimeService _timeService = null!;
     private IDisposable? _yearChangedSubscription;
 
     [Inject] private readonly IPublisher<NPCDeathEvent> _npcDeathPub = null!;
@@ -42,6 +49,9 @@ public class NPCModule : IModule
     private bool _isConfigured;
 
     public string ModuleName => "NPC";
+
+    /// NPC attack cooldown (seconds of game time).
+    private const float NpcAttackCooldownSec = 1.6f;
 
     public void Start()
     {
@@ -59,7 +69,15 @@ public class NPCModule : IModule
 
         _aiStateChangedSubscription = _aiStateChangedSub.Subscribe(OnAIStateChanged);
         _yearChangedSubscription = _yearChangedSub.Subscribe(OnYearChanged);
+        _npcDeathSubscription = _npcDeathSub.Subscribe(OnNPCDeathForLoot);
     }
+
+    /// <summary>
+    /// NPC attack loop (2026-08-22, физический прототип): NPC в состоянии
+    /// Attacking с целью в радиусе атаки публикует AttackIntentEvent с
+    /// кулдауном. CombatModule выполняет полный damage pipeline.
+    /// </summary>
+    private readonly Dictionary<string, float> _npcAttackTimers = new();
 
     public void Tick(int tickCount)
     {
@@ -68,6 +86,43 @@ public class NPCModule : IModule
         _aiService.Tick();
         _movementService.ProcessMovement();
         _visualService.UpdateVisualPositions();
+        ProcessNpcAttacks();
+    }
+
+    private void ProcessNpcAttacks()
+    {
+        if (_npcServiceImpl == null || _attackIntentPub == null) return;
+        float now = _timeService?.TotalTime ?? 0f;
+
+        foreach (var state in _npcServiceImpl.GetAllStates())
+        {
+            if (!state.IsAlive || state.AIState != NPCAIState.Attacking) continue;
+            if (string.IsNullOrEmpty(state.TargetId)) continue;
+
+            var target = _npcServiceImpl.GetNPCState(state.TargetId);
+            /// Цель — NPC или игрок: дистанция по тайлам (Position2D).
+            int dx, dy;
+            if (target != null)
+            {
+                dx = System.Math.Abs(target.Position.X - state.Position.X);
+                dy = System.Math.Abs(target.Position.Y - state.Position.Y);
+            }
+            else
+            {
+                /// Игрок — через AI-кэш недоступен здесь; атакуем, если цель не NPC
+                /// и NPC стоит в AttackRadius (Movement уже довёл до цели).
+                dx = 0; dy = 0;
+            }
+            int dist = System.Math.Max(dx, dy);
+            if (dist > 2) continue; /// вне физической досягаемости
+
+            if (!_npcAttackTimers.TryGetValue(state.NpcId, out var last)) last = -999f;
+            if (now - last < NpcAttackCooldownSec) continue;
+
+            _npcAttackTimers[state.NpcId] = now;
+            _attackIntentPub.Publish(new AttackIntentEvent(
+                state.NpcId, state.TargetId, "npc_strike", false));
+        }
     }
 
     public void Dispose()
@@ -81,10 +136,42 @@ public class NPCModule : IModule
         _qiRegenService?.Dispose();
         _visualService?.Dispose();
 
+        _npcDeathSubscription?.Dispose();
+        _npcDeathSubscription = null;
         _aiStateChangedSubscription?.Dispose();
         _aiStateChangedSubscription = null;
         _yearChangedSubscription?.Dispose();
         _yearChangedSubscription = null;
+    }
+
+    /// <summary>
+    /// Этап 3 (2026-08-22): смерть NPC → лут из EquipmentGenerator падает
+    /// на землю у места смерти (1-2 предмета, подбор — E).
+    /// </summary>
+    private void OnNPCDeathForLoot(in NPCDeathEvent e)
+    {
+        if (_equipmentGenerator == null || _groundItems == null) return;
+
+        var state = _npcServiceImpl.GetNPCState(e.NpcId);
+        float px = (state?.Position.X ?? 25) * GameConstants.TILE_PIXELS + GameConstants.TILE_PIXELS / 2f;
+        float py = (state?.Position.Y ?? 25) * GameConstants.TILE_PIXELS + GameConstants.TILE_PIXELS / 2f;
+
+        int level = 1 + (int)(state?.SubLevel ?? 0);
+        try
+        {
+            int drops = (e.NpcId.GetHashCode() & 1) == 0 ? 1 : 2;
+            for (int i = 0; i < drops; i++)
+            {
+                var item = _equipmentGenerator.GenerateRandom(
+                    System.Math.Clamp(level + i, 1, 9), seed: e.NpcId.GetHashCode() + i);
+                _groundItems.DropItem(item.ItemId, 1, px + i * 20f - 10f, py + i * 12f - 6f);
+            }
+            Console.WriteLine($"[NPCLoot] {e.NpcId} dropped {drops} item(s) at ({px:F0},{py:F0})");
+        }
+        catch (System.Exception ex)
+        {
+            Console.WriteLine($"[NPCLoot] failed for {e.NpcId}: {ex.Message}");
+        }
     }
 
     /// <summary>

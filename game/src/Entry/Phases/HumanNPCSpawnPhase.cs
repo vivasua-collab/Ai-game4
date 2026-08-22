@@ -34,12 +34,17 @@ public sealed class HumanNPCSpawnPhase : AbstractSceneAssemblyPhase
     private const int MaxSpawnAttempts = 200;
     private const int MinDistanceFromPlayer = 5;
 
+    // Этап 5 (2026-08-22): играбельный состав малой локации —
+    // враги, союзник, нейтралы, торговец. Диспозиции назначает
+    // NPCSpawnerService.RoleToDisposition (Hostile/Friendly/Neutral/Merchant).
     private static readonly (NPCRole Role, int Level)[] SpawnRoles =
     {
-        (NPCRole.Merchant,   1),
-        (NPCRole.Cultivator, 3),
-        (NPCRole.Guard,      2),
-        (NPCRole.Passerby,   0),
+        (NPCRole.Enemy,    1),  // бандит #1 — Hostile
+        (NPCRole.Enemy,    2),  // бандит #2 — Hostile
+        (NPCRole.Guard,    2),  // страж — Friendly (вступается за игрока)
+        (NPCRole.Passerby, 0),  // нейтрал #1
+        (NPCRole.Passerby, 1),  // нейтрал #2
+        (NPCRole.Merchant, 1),  // торговец (E → диалог, стоит на месте)
     };
 
     public override Task ExecuteAsync()
@@ -59,13 +64,16 @@ public sealed class HumanNPCSpawnPhase : AbstractSceneAssemblyPhase
                 continue;
             }
 
-            long seed = loc.Seed + NpcSeedOffset + (long)role;
+            long seed = loc.Seed + NpcSeedOffset + (long)role + spawned;
             string npcId = _spawner.SpawnNPC("human", role, level, pos.Value, seed);
             if (!string.IsNullOrEmpty(npcId))
             {
                 spawned++;
                 // Phase 2: bind a role dialogue so E-key interaction opens chat.
-                _dialogues?.MapNpcDialogue(npcId, DialogueIdForRole(role));
+                // Enemy (бандиты) — без диалога: только бой.
+                string? dialogueId = DialogueIdForRole(role);
+                if (dialogueId != null)
+                    _dialogues?.MapNpcDialogue(npcId, dialogueId);
                 Console.WriteLine($"[HumanNPCSpawn] Spawned {role} #{npcId} at ({pos.Value.X}, {pos.Value.Y})");
             }
         }
@@ -75,13 +83,14 @@ public sealed class HumanNPCSpawnPhase : AbstractSceneAssemblyPhase
         return Task.CompletedTask;
     }
 
-    private static string DialogueIdForRole(NPCRole role) => role switch
+    private static string? DialogueIdForRole(NPCRole role) => role switch
     {
         NPCRole.Merchant   => "dialogue_merchant",
         NPCRole.Cultivator => "dialogue_cultivator",
         NPCRole.Guard      => "dialogue_guard",
         NPCRole.Elder      => "dialogue_elder",
-        _                  => "dialogue_passerby",
+        NPCRole.Passerby   => "dialogue_passerby",
+        _                  => null, // Enemy/Monster — только бой
     };
 
     private Position2D? FindWalkablePosition(SeededRandom rng, int width, int height)

@@ -671,6 +671,19 @@ namespace CultivationGame.Core.Data
     }
 
     /// <summary>
+    /// Диспозиция NPC к игроку (2026-08-22, физический прототип).
+    /// Упрощённый ИИ: Hostile агрится в радиусе, Friendly защищает игрока,
+    /// Neutral/Merchant мирные (Merchant + E → диалог).
+    /// </summary>
+    public enum NPCDisposition
+    {
+        Hostile,        // Враг: атакует игрока при обнаружении
+        Friendly,       // Союзник: вступается за игрока в бою
+        Neutral,        // Нейтрал: блуждает, не участвует в бою
+        Merchant        // Торговец: стоит на месте, диалог
+    }
+
+    /// <summary>
     /// Состояние AI NPC
     /// </summary>
     public enum NPCAIState

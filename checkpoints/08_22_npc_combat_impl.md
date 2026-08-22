@@ -141,3 +141,33 @@ ScrollContainer потребляет колесо только пока спис
 **Проверка (GODOT_GEN_DEBUG=1 headless):** 7 видов оружия (разные dmg/pen/range/hand), 6 видов брони (разные слоты/покрытие/штрафы), зачарование «Удача» наложено. 0 ошибок.
 
 **Скелет без (будущие фазы):** сетовые бонусы §9, даруемые техники §12, износ/ремонт §6 (только MaxDurability), ammo для лука (Phase 8), интеграция в лут/NPC (замена вызовов ItemGeneratorService на EquipmentGenerator по мере фич).
+
+---
+
+## Играбельный прототип физической части (2026-08-22, ночь)
+
+**Цель:** подключение генератора + простой ИИ гуманоидов + враги/союзники/нейтралы/торговцы на малой локации. Духовная часть/глобальная карта/квесты — вне скоупа.
+
+### Этап 1 — Диспозиционный ИИ
+- `NPCDisposition` (Enums): Hostile / Friendly / Neutral / Merchant; `NPCState.Disposition`; назначение при спавне (Enemy+Monster→Hostile, Guard→Friendly, Merchant→Merchant, прочие→Neutral).
+- `NPCAIService.ProcessDisposition`: Hostile — игрок в AggroRadius (5 тайлов) → мгновенная угроза (агро); Friendly — враг в бою с игроком в 2×AggroRadius → угроза врагу (союзник вступается). При Attacking назначается TargetId = argmax threat (раньше цель не ставилась — NPC «атаковал» в никуда).
+- `NPCModule.ProcessNpcAttacks`: атакующий цикл — NPC в Attacking с целью в 2 тайлах публикует AttackIntentEvent(npc, target, "npc_strike") с кулдауном 1.6 сек → полный damage pipeline CombatService (статы NPC через StatProviderAdapter, статы игрока для любых не-NPC id).
+- Merchant стоит на месте (Idle), не блуждает.
+
+### Этап 2 — Экипировка NPC из «Матрёшки»
+- `NPCSpawnerService.EquipFromGenerator`: оружие всем (Enemy — уровнем выше), броня 60% (torso/head); `EquipmentIds[slot] = itemId` (предмет зарегистрирован генератором в ItemDatabase); TotalDamage = BaseDamage + сгенерированный урон оружия.
+
+### Этап 3 — Лут
+- `NPCModule.OnNPCDeathForLoot` (NPCDeathEvent): 1-2 предмета из EquipmentGenerator → GroundItemService.DropItem у места смерти; подбор E.
+
+### Этап 4 — Игрок
+- HP-бар в HUD (Σ RedHP частей, Q4), цвет зелёный→красный.
+- Тост «💥 −X HP» при DamageAppliedEvent по игроку.
+- Смерть: PlayerDeathEvent → тост → 3 сек → полное лечение частей + Revive + телепорт в центр («✦ Вы возродились»).
+
+### Этап 5 — Состав малой локации
+- HumanNPCSpawnPhase: Enemy×2 (бандиты, без диалога), Guard×1 (союзник), Passerby×2, Merchant×1 (торговец). Seed сдвинут на номер спавна (2 Passerby → разные позиции).
+
+**Проверка:** build 0 ошибок; headless GODOT_NEWGAME=1: 6/6 NPC (2 Enemy, 1 Guard, 2 Passerby, 1 Merchant), state=Playing, 0 ошибок.
+
+**Живой тест-сценарий:** подойти к бандиту (красный не подойдёт — цвет по роли: Enemy=оранжевый) в 5 тайлах → он атакует (движется, бьёт раз в 1.6с, тосты урона, HP-бар падает); Space — ответный удар; убить → лут на земле (E — подбор); страж рядом вступается; смерть игрока → респавн в центре.
