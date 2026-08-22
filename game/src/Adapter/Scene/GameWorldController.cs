@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Godot;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Data;
+using CultivationGame.Core.Events;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Adapter.Di;
 using CultivationGame.Adapter.Input;
@@ -40,6 +41,7 @@ public partial class GameWorldController : Node2D
     [Inject] private INPCService         Npcs        { get; set; } = null!;
     [Inject] private Modules.Interaction.DialogueService DialogueService { get; set; } = null!;
     [Inject] private Modules.Player.PlayerCombatAdapter CombatAdapter { get; set; } = null!;
+    [Inject] private ISubscriber<Core.Messaging.Contracts.DialogueEndedEvent> DialogueEndedSub { get; set; } = null!;
 
     private Node2D        _worldRoot     = null!;
     private Camera2D      _camera        = null!;
@@ -76,6 +78,7 @@ public partial class GameWorldController : Node2D
     private const float TalkRangeTiles = 2.5f;
     private bool _positionInitialized;
     private bool _wasPausedBeforeInventory; // track if game was paused before opening inventory
+    private System.IDisposable? _dialogueEndedToken;
     private bool _overweightNotified; // debounce overweight toast
 
     // Speed change debounce — prevents rapid cycling when key held.
@@ -105,6 +108,11 @@ public partial class GameWorldController : Node2D
         SetupHUD();
         // Phase 6: subscribe the combat bridge (attack intent → combat module).
         CombatAdapter?.Start();
+        // Phase 2 fix: dialogue can end from MANY paths (E advance, Esc, choice
+        // button click, digit key 1-4) — each closed the window its own way and
+        // only E/Esc resumed time, leaving the game silently paused after a
+        // choice-click finish. Single authoritative resume point: the bus event.
+        _dialogueEndedToken = DialogueEndedSub?.Subscribe(OnDialogueEnded);
         GD.Print("[GameWorldController] Ready");
     }
 
@@ -678,6 +686,20 @@ public partial class GameWorldController : Node2D
                 _speedChangeCooldown = SpeedChangeCooldownSec;
             }
         }
+    }
+
+    /// <summary>
+    /// Phase 2 fix: authoritative resume point for the dialogue pause.
+    /// DialogueEndedEvent fires from EVERY end path (E advance, Esc, choice
+    /// button click, digit-key selection) — resume ticks here regardless of
+    /// which UI path closed the window.
+    /// </summary>
+    private void OnDialogueEnded(in Core.Messaging.Contracts.DialogueEndedEvent e)
+    {
+        if (_dialogueWindow is { IsOpen: true })
+            _dialogueWindow.Close();
+        if (!_wasPausedBeforeInventory && Time is { IsPaused: true })
+            Time.Resume();
     }
 
     /// <summary>
