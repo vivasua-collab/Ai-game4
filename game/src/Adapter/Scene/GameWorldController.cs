@@ -41,6 +41,7 @@ public partial class GameWorldController : Node2D
     [Inject] private INPCService         Npcs        { get; set; } = null!;
     [Inject] private Modules.Interaction.DialogueService DialogueService { get; set; } = null!;
     [Inject] private Modules.Player.PlayerCombatAdapter CombatAdapter { get; set; } = null!;
+    [Inject] private Modules.Inventory.BeltService BeltService { get; set; } = null!;
     [Inject] private ISubscriber<Core.Messaging.Contracts.DialogueEndedEvent> DialogueEndedSub { get; set; } = null!;
 
     private Node2D        _worldRoot     = null!;
@@ -52,6 +53,7 @@ public partial class GameWorldController : Node2D
     private InventoryWindow _inventoryWindow = null!;
     private CharacterSheetWindow _characterSheetWindow = null!;
     private UI.DialogueWindow _dialogueWindow = null!;
+    private UI.HotbarPanel _hotbarPanel = null!;
     private CanvasLayer   _hudCanvas     = null!;
     private Label         _timeLabel     = null!;
     private Label         _hudLabel      = null!;
@@ -321,6 +323,11 @@ public partial class GameWorldController : Node2D
         // Dialogue window (opens with E key near an NPC) — NPC_COMBAT_PREP Phase 2.
         _dialogueWindow = new UI.DialogueWindow { Name = "DialogueWindow" };
         _hudCanvas.AddChild(_dialogueWindow);
+
+        // Hotbar (2026-08-22): 9 quick slots bottom-center; belt slots 3-9
+        // appear when a belt is equipped.
+        _hotbarPanel = new UI.HotbarPanel { Name = "HotbarPanel" };
+        _hudCanvas.AddChild(_hotbarPanel);
     }
 
     // ---- Per-frame logic ----
@@ -706,6 +713,26 @@ public partial class GameWorldController : Node2D
                 else Time.Speed = CycleSpeedDown(Time.Speed);
                 ShowToast($"⏪ Скорость: {SpeedLabel(Time.Speed)} ({(int)Time.Speed} тик/сек)");
                 _speedChangeCooldown = SpeedChangeCooldownSec;
+            }
+        }
+
+        // Hotbar keys 1-9 (HOTKEYS §8): 1-2 select weapons (info), 3-9 use
+        // the belt consumable (gated by equipped belt inside BeltService).
+        int hotbarSlot = PlayerInput.SelectedTechniqueSlot;
+        if (hotbarSlot >= Modules.Inventory.BeltService.HotbarFirstIndex && BeltService != null)
+        {
+            int beltIndex = hotbarSlot - Modules.Inventory.BeltService.HotbarFirstIndex;
+            if (BeltService.Use(beltIndex))
+            {
+                var slots = BeltService.GetSlots();
+                var used = slots[beltIndex];
+                ShowToast(used.Count > 0
+                    ? $"Использовано ({hotbarSlot}): осталось {used.Count}"
+                    : $"Использовано ({hotbarSlot}) — слот пуст");
+            }
+            else if (BeltService.IsBeltEquipped)
+            {
+                ShowToast($"Слот {hotbarSlot} пуст");
             }
         }
     }

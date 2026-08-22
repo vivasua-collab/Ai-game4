@@ -44,6 +44,8 @@ public class InventoryModule : IModule
     [Inject] private readonly InventoryConfig _config = null!;
     private StorageService? _ringStorage;
 
+    [Inject] private readonly BeltService _beltService = null!;
+
     private IDisposable? _resourceHarvestedSubscription;
     private IDisposable? _itemAddRequestSubscription;
     private IDisposable? _equipChangedSubscription;
@@ -60,6 +62,7 @@ public class InventoryModule : IModule
         _materialService.InitializeDefaults();
         _backpackService.Initialize();
         _storageRingService.Initialize();
+        _beltService.Initialize();
 
         // Создание Ring Storage
         _ringStorage = new StorageService(

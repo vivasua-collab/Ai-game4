@@ -197,6 +197,15 @@ public partial class InventoryWindow : Control
         };
         _contentRow.AddChild(trashZone);
 
+        // Belt quick-slot strip (2026-08-22): visible only with an equipped
+        // belt; accepts consumable drops from the item list.
+        var beltRow = new BeltSlotRow
+        {
+            Name = "BeltSlotRow",
+            CustomMinimumSize = new Vector2(0, 72),
+        };
+        outer.AddChild(beltRow);
+
         // Footer hint.
         var footer = new Label
         {

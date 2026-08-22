@@ -90,3 +90,23 @@ ScrollContainer потребляет колесо только пока спис
 Старый предмет возвращался в инвентарь ДВАЖДЫ: вручную в CharacterDollPanel (TryAddItem) + событийно (EquipmentChangedEvent.OldItemId → InventoryModule.OnEquipmentChanged, INV-B05/P1-02). Спам двойным кликом плодил копии «Стального нагрудника». Фикс: убрать ручные TryAddItem из HandleDropOnSlot (замена), 2H-ветки и HandleUnequip — событийный путь канонический. Overflow-безопасность: TryAddItem дропает излишек на землю.
 
 **Проверка:** build 0 ошибок; headless GODOT_NEWGAME=1 — state=Playing, 0 ошибок.
+
+---
+
+## Слоты быстрого запуска пояса (2026-08-22, вечер)
+
+**Источники:** HOTKEYS.md §8 (хотбар 1-9), UI_DESIGN.md §6.1 View #3, запрос пользователя (слоты 3-9 гейтятся поясом).
+
+**Новые файлы:**
+- `Core/Messaging/Contracts/BeltContracts.cs` — BeltSlotsChangedEvent, ConsumableUsedEvent.
+- `Modules/Inventory/BeltService.cs` — 7 слотов (хотбар 3-9), гейт IsBeltEquipped (EquipmentSlot.Belt), TryAssign (весь стек из инвентаря), Use (эффекты: heal → BodyService.HealPart по самым раненым частям; qi_restore → QiService.AddQi; прочие — заглушка до будущих фаз), TryTakeBack; при снятии пояса содержимое возвращается в инвентарь (overflow → на землю).
+- `Adapter/UI/HotbarPanel.cs` — HUD-хотбар внизу по центру: 1-2 оружие (зеркало экипировки), 3-9 пояс (видны только при поясе), клик = использовать.
+- `Adapter/UI/BeltSlotRow.cs` — ряд слотов пояса в InventoryWindow: drag&drop расходника (весь стек), ПКМ — вернуть; видимость по поясу.
+
+**Изменено:**
+- `InventoryModuleServices/InventoryModule`: регистрация + Initialize (подписка на EquipmentChangedEvent для гейта).
+- `GameWorldController`: клавиши 1-9 (hotbar_i уже в InputMap) → слоты 3-9 = BeltService.Use + toast; HotbarPanel в HUD.
+
+**Паттерн Godot:** встроенного хотбара нет; канонический подход (форум/туториалы) — Control drag&drop API (_GetDragData/_CanDropData/_DropData) + контейнеры + input actions — реализация следует ему.
+
+**Проверка:** build 0 ошибок; headless GODOT_NEWGAME=1 — HotbarPanel Ready, Inventory Ready, state=Playing.

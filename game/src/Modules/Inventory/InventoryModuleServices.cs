@@ -32,6 +32,9 @@ public static class InventoryModuleServices
         // === Spirit Storage (Q9: separated from unified StorageService) ===
         builder.Register<ISpiritStorageService, SpiritStorageService>(Lifetime.Singleton);
 
+        // === Belt quick slots (2026-08-22: хотбар 3-9, гейт по поясу) ===
+        builder.Register<BeltService>(Lifetime.Singleton);
+
         // === Точка входа модуля ===
         builder.Register<InventoryModule>(Lifetime.Singleton);
 
