@@ -110,3 +110,34 @@ ScrollContainer потребляет колесо только пока спис
 **Паттерн Godot:** встроенного хотбара нет; канонический подход (форум/туториалы) — Control drag&drop API (_GetDragData/_CanDropData/_DropData) + контейнеры + input actions — реализация следует ему.
 
 **Проверка:** build 0 ошибок; headless GODOT_NEWGAME=1 — HotbarPanel Ready, Inventory Ready, state=Playing.
+
+---
+
+## Генератор экипировки «Матрёшка» (2026-08-22, поздний вечер)
+
+**Источник:** EQUIPMENT_SYSTEM.md §2 (База × Материал × Грейд × Зачарование), §4-§5, §7-§8, §10-§11.
+
+**Новые файлы:**
+- `Core/Data/EquipmentGenerationTables.cs` — слой таблиц:
+  - WeaponBaseClass (7 подтипов §10.2: dagger/sword/axe/spear/greatsword/bow/staff — база урона/пробития/дальности/веса, класс скорости, HandType);
+  - ArmorBaseClass (6 подтипов §11.2: head/torso/arms/hands→нейминг arms, legs/feet/belt — слот, защита, покрытие min-max, вес, штраф уклонения);
+  - MaterialDef (14 материалов §5.1/§5.3: тиры 1-5, бонусы урона/защиты, множители веса/ценности);
+  - GradeProfiles (§4.1 множители эффективности/прочности; §7.3 кол-во/сила бонусов);
+  - MaterialDurabilityByTier (§5.1: 35/65/115/275/500);
+  - EnchantDefinition (§8.2-8.3: 5 зачарований, тиры, MinGrade, диапазон силы).
+- `Core/Interfaces/IEquipmentGenerator.cs` — GenerateWeapon/GenerateArmor/GenerateRandom/TryApplyEnchant.
+- `Modules/Generator/EquipmentGenerator.cs` — реализация:
+  - Формулы §2: Эффективность = Base × GradeEff × (1+MaterialBonus); Прочность = MaterialDurability × GradeDurMult; Coverage/DamageReduction/dodge/spd-штрафы §11; объём clamp(weight,1,4) §11.5.
+  - Тир материала = clamp((level+1)/2,1,5) §5.1; грейд — GeneratorTables.EquipmentGradeWeightsByLevel §4.2.
+  - StatBonuses по грейду §7.3 (пул §7.1).
+  - Зачарование §8.4: сила × GradeEfficiency, MinGrade-гейт, имя «…«Название»».
+  - ItemId eq_wep/arm_{subtype}_L{n}_{seed}_{counter} — фикс коллизий modulo-1000.
+  - Регистрирует предметы в IItemDatabaseService.
+
+**Изменено:** GeneratorModuleServices (регистрация IEquipmentGenerator), GeneratorModule (инжект + секция debug dump: все 13 подтипов + зачарование).
+
+**Решено из NPC_COMBAT_PREP §8:** weapon variety ✅, armor slots variety ✅, penetration≠0 ✅, dodge≠0 ✅, ItemId collision ✅. Осталось: Cultivator technique cap=0 (отдельный баг TechniqueGenerator), интеграция в CombatService 5 TODO (Phase 8 wire).
+
+**Проверка (GODOT_GEN_DEBUG=1 headless):** 7 видов оружия (разные dmg/pen/range/hand), 6 видов брони (разные слоты/покрытие/штрафы), зачарование «Удача» наложено. 0 ошибок.
+
+**Скелет без (будущие фазы):** сетовые бонусы §9, даруемые техники §12, износ/ремонт §6 (только MaxDurability), ammo для лука (Phase 8), интеграция в лут/NPC (замена вызовов ItemGeneratorService на EquipmentGenerator по мере фич).

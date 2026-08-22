@@ -19,6 +19,8 @@ public static class GeneratorModuleServices
 
         // === Генератор предметов ===
         builder.Register<IItemGeneratorService, ItemGeneratorService>(Lifetime.Singleton);
+        // 2026-08-22: генератор экипировки «Матрёшка» (EQUIPMENT_SYSTEM.md §2)
+        builder.Register<IEquipmentGenerator, EquipmentGenerator>(Lifetime.Singleton);
 
         // === Реестр техник ===
         builder.Register<TechniqueRegistry>(Lifetime.Singleton);

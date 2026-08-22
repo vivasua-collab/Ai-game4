@@ -18,6 +18,7 @@ public class GeneratorModule : IModule
 {
     [Inject] private readonly IItemDatabaseService _itemDatabase = null!;
     [Inject] private readonly IItemGeneratorService _itemGenerator = null!;
+    [Inject] private readonly IEquipmentGenerator _equipmentGenerator = null!;
     [Inject] private readonly ITechniqueGeneratorService _techniqueGenerator = null!;
 
     public string ModuleName => "Generator";
@@ -91,6 +92,37 @@ public class GeneratorModule : IModule
         catch (Exception ex)
         {
             Console.WriteLine($"  ❌ Item generation FAILED: {ex.GetType().Name}: {ex.Message}");
+        }
+
+        // === «Матрёшка» (2026-08-22): все подтипы оружия/брони, материалы, грейды ===
+        Console.WriteLine("");
+        Console.WriteLine("── EquipmentGenerator «Матрёшка» (EQUIPMENT_SYSTEM.md §2) ──");
+        try
+        {
+            // По одному оружию каждого подтипа (§10.2), уровень 5.
+            foreach (var w in Core.Data.EquipmentGenerationTables.Weapons)
+            {
+                var item = _equipmentGenerator.GenerateWeapon(5, w.Id, seed: 7000 + w.Id.Length);
+                Console.WriteLine($"  [W:{w.Id,-10}] {item.ItemId} | {item.NameRu} | {item.Grade} | mat={item.MaterialId} T{item.MaterialTier}" +
+                                  $" | dmg={item.Damage} | pen={item.Penetration} | range={item.AttackRange} | hand={item.HandType} | wt={item.Weight:F1}");
+            }
+
+            // По одной брони каждого подтипа (§11.2), уровень 5.
+            foreach (var a in Core.Data.EquipmentGenerationTables.Armors)
+            {
+                var item = _equipmentGenerator.GenerateArmor(5, a.Id, seed: 8000 + a.Id.Length);
+                Console.WriteLine($"  [A:{a.Id,-10}] {item.ItemId} | {item.NameRu} | {item.Grade} | mat={item.MaterialId} T{item.MaterialTier}" +
+                                  $" | def={item.Defense} | cov={item.Coverage:F0}% | dr={item.DamageReduction:F0}% | dodge={item.DodgeBonus:F1} | spd={item.MoveSpeedPenalty:F1} | dur={item.MaxDurability}");
+            }
+
+            // Зачарование (§8): наложить на предмет высокого грейда.
+            var enchantable = _equipmentGenerator.GenerateWeapon(7, "sword", seed: 9001);
+            bool enchanted = _equipmentGenerator.TryApplyEnchant(enchantable, null, seed: 9002);
+            Console.WriteLine($"  [Enchant]  {enchantable.NameRu} | enchanted={enchanted} | effects={enchantable.SpecialEffects.Count} | bonuses={enchantable.StatBonuses.Count}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  ❌ EquipmentGenerator FAILED: {ex.GetType().Name}: {ex.Message}");
         }
 
         // === Techniques: 3 samples for different roles ===
