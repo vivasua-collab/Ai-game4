@@ -419,12 +419,22 @@ public partial class GameWorldController : Node2D
     {
         if (Player == null || _camera == null) return;
 
+        // Any modal window open (inventory / character sheet / dialogue) —
+        // world mouse handling is off. The wheel case matters most: a
+        // ScrollContainer consumes wheel events only while it CAN scroll;
+        // at the list end the event leaks to _UnhandledInput and used to
+        // change the camera zoom (user report 2026-08-22).
+        bool modalOpen = (_inventoryWindow is { Visible: true })
+                      || (_characterSheetWindow is { Visible: true })
+                      || (_dialogueWindow is { IsOpen: true });
+
         if (@event is InputEventMouseButton mb && mb.Pressed)
         {
             switch (mb.ButtonIndex)
             {
                 case MouseButton.Left:
                 {
+                    if (modalOpen) break; // clicks belong to the window, not the world
                     // LMB click → set pixel target for free movement.
                     var mouseWorldPos = GetGlobalMousePosition();
                     int mapW = Tiles != null && Tiles.MapWidth > 0 ? Tiles.MapWidth : GameConstants.DEFAULT_MAP_WIDTH;
@@ -439,6 +449,7 @@ public partial class GameWorldController : Node2D
                 }
                 case MouseButton.WheelUp:
                 {
+                    if (modalOpen) break; // no zoom while inventory is scrolled to the end
                     var zoomIn = _camera.Zoom with { X = _camera.Zoom.X + 0.5f, Y = _camera.Zoom.Y + 0.5f };
                     if (zoomIn.X <= 8.0f)
                         _camera.Zoom = zoomIn;
@@ -446,12 +457,14 @@ public partial class GameWorldController : Node2D
                 }
                 case MouseButton.WheelDown:
                 {
+                    if (modalOpen) break;
                     var zoomOut = _camera.Zoom with { X = _camera.Zoom.X - 0.5f, Y = _camera.Zoom.Y - 0.5f };
                     if (zoomOut.X >= 1.0f)
                         _camera.Zoom = zoomOut;
                     break;
                 }
                 case MouseButton.Middle:
+                    if (modalOpen) break;
                     _camera.Zoom = new Vector2(3f, 3f);
                     break;
             }
@@ -474,13 +487,22 @@ public partial class GameWorldController : Node2D
         Vector2 moveVec = Godot.Input.GetVector("move_left", "move_right", "move_up", "move_down");
 
         // Speed: base pixels/sec × delta × run multiplier.
-        // Q7: Movement is real-time (player input needs immediate response).
-        // Time.Speed does NOT affect movement speed — game speed only affects
-        // tick-based simulation (regen, cooldowns, AI). This prevents extreme
-        // speeds at Quick (15×) that caused camera lag.
-        // Future: full tick-based movement migration (PlayerModule.Tick).
-        float speedMult = 1.0f;
-        if (Godot.Input.IsActionPressed("run")) speedMult = RunSpeedMultiplier;
+        // Q7 (refined 2026-08-22 per user report): movement must feel faster
+        // at higher game speeds, but the OLD linear multiplier (×5/×15) caused
+        // extreme speeds and camera lag. Moderated curve instead:
+        // Normal ×1.0, Fast ×2.0, Quick ×3.5 — perceptible, stays controllable.
+        float gameSpeedMult = Time?.Speed switch
+        {
+            TimeSpeed.Fast   => 2.0f,
+            TimeSpeed.Quick  => 3.5f,
+            _                => 1.0f,
+        };
+        float speedMult = gameSpeedMult;
+        if (Godot.Input.IsActionPressed("run")) speedMult *= RunSpeedMultiplier;
+
+        // Camera must keep up with the faster player — scale smoothing too.
+        if (_camera != null)
+            _camera.PositionSmoothingSpeed = 8.0f * gameSpeedMult;
 
         // Overweight penalty: movement speed drops as carry weight exceeds max.
         // Ratio 0 = no penalty, 1.0 (2× max) = 0.5× speed, 3.0 (4× max) = 0.25× speed.

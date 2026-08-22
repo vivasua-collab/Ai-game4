@@ -232,20 +232,19 @@ public partial class CharacterDollPanel : Control
             return false;
         }
 
-        // If slot occupied — return old item to inventory.
-        var oldItem = EquipmentService.GetEquipped(slot);
-        if (oldItem != null)
-        {
-            InventoryService.TryAddItem(oldItem, 1);
-        }
+        // REPLACED-item return: DO NOT add the old item back here manually.
+        // EquipmentService.TryEquip publishes EquipmentChangedEvent with
+        // OldItemId and InventoryModule.OnEquipmentChanged returns it to the
+        // inventory (INV-B05 / P1-02). The manual TryAddItem here DUPLICATED
+        // the old item (user report 2026-08-22: spam double-click equipping
+        // filled the inventory with copies of the replaced chest piece).
 
         // 2H weapon: also unequip off-hand if equipping 2H in main.
+        // Same rule — TryUnequip's own event returns the off-hand item.
         if (eq.HandType == WeaponHandType.TwoHand && slot == EquipmentSlot.WeaponMain)
         {
-            var offItem = EquipmentService.GetEquipped(EquipmentSlot.WeaponOff);
-            if (offItem != null)
+            if (EquipmentService.GetEquipped(EquipmentSlot.WeaponOff) != null)
             {
-                InventoryService.TryAddItem(offItem, 1);
                 EquipmentService.TryUnequip(EquipmentSlot.WeaponOff, out _);
                 RefreshSlot(EquipmentSlot.WeaponOff);
             }
@@ -274,12 +273,12 @@ public partial class CharacterDollPanel : Control
         var item = EquipmentService.GetEquipped(slot);
         if (item == null) return false;
 
-        if (!InventoryService.TryAddItem(item, 1))
-        {
-            GD.Print($"[CharacterDoll] Cannot add {item.NameRu} back to inventory (full?)");
-            return false;
-        }
-
+        // DO NOT add the item back here: TryUnequip publishes
+        // EquipmentChangedEvent with OldItemId and InventoryModule returns it
+        // to the inventory (a manual TryAddItem duplicated the item —
+        // same bug family as the equip path, fixed 2026-08-22).
+        // Overflow safety: InventoryService.TryAddItem drops surplus on the
+        // ground, so a full inventory cannot lose the item.
         EquipmentService.TryUnequip(slot, out _);
         GD.Print($"[CharacterDoll] Unequipped {item.NameRu} from {slot}");
         RefreshSlot(slot);

@@ -72,3 +72,21 @@
 - Phase 8: Weapon Variety + Ammo (+ 5 TODO экипировки в CombatService, генераторы penetration/dodge).
 - Phase 3-5: Faction port, Trade foundation + UI.
 - Live playtest: Space у NPC, диалоги, скорость PageUp/PageDown, тосты.
+
+---
+
+## Багфиксы по playtest-отчёту пользователя (2026-08-22, позднее)
+
+### FIX-2: Зависание после диалога (коммит 219b3fc)
+Диалог ставил паузу при открытии, но Resume был только в ветках E/Esc. Завершение кликом по выбору («Прощай») закрывало окно без снятия паузы → движение мертво (HandleFreeMovement: `if (Time.IsPaused) return`). Фикс: единая точка — подписка GameWorldController на DialogueEndedEvent (все пути завершения).
+
+### FIX-3: Скорость игры не влияла на игрока
+Q7 убрал Time.Speed из движения полностью — игрок «отставал» от ускорившегося мира. Решение: умеренный множитель вместо линейного (который давал экстремальные скорости): Normal ×1.0, Fast ×2.0, Quick ×3.5 + PositionSmoothingSpeed камеры масштабируется тем же множителем. Q7 уточнён по просьбе пользователя.
+
+### FIX-4: Зум колесом при открытом инвентаре
+ScrollContainer потребляет колесо только пока список прокручивается; на упоре событие проваливалось в _UnhandledInput и меняло зум. Фикс: modalOpen-гвард (инвентарь/лист персонажа/диалог) на LMB/Wheel/Middle в _UnhandledInput.
+
+### FIX-5: Дублирование экипировки (критичный)
+Старый предмет возвращался в инвентарь ДВАЖДЫ: вручную в CharacterDollPanel (TryAddItem) + событийно (EquipmentChangedEvent.OldItemId → InventoryModule.OnEquipmentChanged, INV-B05/P1-02). Спам двойным кликом плодил копии «Стального нагрудника». Фикс: убрать ручные TryAddItem из HandleDropOnSlot (замена), 2H-ветки и HandleUnequip — событийный путь канонический. Overflow-безопасность: TryAddItem дропает излишек на землю.
+
+**Проверка:** build 0 ошибок; headless GODOT_NEWGAME=1 — state=Playing, 0 ошибок.
