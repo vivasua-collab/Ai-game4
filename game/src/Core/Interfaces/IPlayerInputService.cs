@@ -40,6 +40,9 @@ namespace CultivationGame.Core.Interfaces
         /// <summary>Нажат ли инвентарь (I, однократное)</summary>
         bool IsInventoryPressed { get; }
 
+        /// <summary>Нажат ли лист персонажа (C, однократное)</summary>
+        bool IsCharacterSheetPressed { get; }
+
         /// <summary>Raw-флаг инвентаря, БЕЗ проверки InputDisabled (для toggle)</summary>
         bool IsInventoryPressedRaw { get; }
 

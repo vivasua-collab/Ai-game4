@@ -48,6 +48,8 @@ public partial class SceneBuilder : Node
         SetupObjectLayer();
         // Ground items (dropped from inventory overflow + player throw).
         SetupGroundItems();
+        // Phase C: wandering animals (wolf/deer/rabbit) — drawn as coloured circles.
+        SetupAnimals();
     }
 
     /// <summary>
@@ -145,6 +147,20 @@ public partial class SceneBuilder : Node
     {
         _groundItemRenderer = new GroundItemRenderer();
         _worldRoot.AddChild(_groundItemRenderer);
+    }
+
+    /// <summary>
+    /// Phase C: wandering animals (wolf/deer/rabbit). Renderer subscribes
+    /// to <see cref="Modules.NPC.AnimalService.GetAllAnimals"/> each frame
+    /// and draws coloured circles per species. Spawn happens in
+    /// <see cref="Entry.Phases.AnimalSpawnPhase"/> (scene-assembly phase 5).
+    /// </summary>
+    private AnimalSpriteRenderer? _animalRenderer;
+
+    private void SetupAnimals()
+    {
+        _animalRenderer = new AnimalSpriteRenderer();
+        _worldRoot.AddChild(_animalRenderer);
     }
 
     /// <summary>

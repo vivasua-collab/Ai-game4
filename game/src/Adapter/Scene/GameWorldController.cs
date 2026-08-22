@@ -45,6 +45,7 @@ public partial class GameWorldController : Node2D
     private InputAdapter  _inputAdapter  = null!;
     private SceneBuilder  _sceneBuilder  = null!;
     private InventoryWindow _inventoryWindow = null!;
+    private CharacterSheetWindow _characterSheetWindow = null!;
     private CanvasLayer   _hudCanvas     = null!;
     private Label         _timeLabel     = null!;
     private Label         _hudLabel      = null!;
@@ -266,9 +267,9 @@ public partial class GameWorldController : Node2D
         {
             Name = "HudHint",
             Text = "WASD — движение | Shift — бег | ЛКМ — идти к точке | Колесо — зум\n" +
-                   "Esc — пауза | PageUp/PageDown — скорость | F5 — сохранение | F9 — загрузка\n" +
-                   "E — взаимодействие | B — инвентарь | R — отдых | F — добыча\n" +
-                   "J — журнал | T — техники | C — персонаж | Q — квесты | M — карта | N — миникарта",
+                   "Esc — пауза | PageUp/PageDown — скорость\n" +
+                   "E — подобрать | B — инвентарь | R — отдых | F — добыча\n" +
+                   "C — персонаж | J — журнал | T — техники | Q — квесты | M — карта | N — миникарта",
         };
         _hudLabel.AddThemeFontSizeOverride("font_size", 13);
         _hudLabel.AddThemeColorOverride("font_color", new Color(0.1f, 0.08f, 0.05f));  // near-black
@@ -295,6 +296,10 @@ public partial class GameWorldController : Node2D
         // Inventory window (opens with B key) — must be created AFTER _hudCanvas.
         _inventoryWindow = new InventoryWindow { Name = "InventoryWindow" };
         _hudCanvas.AddChild(_inventoryWindow);
+
+        // Character sheet window (opens with C key).
+        _characterSheetWindow = new CharacterSheetWindow { Name = "CharacterSheetWindow" };
+        _hudCanvas.AddChild(_characterSheetWindow);
     }
 
     // ---- Per-frame logic ----
@@ -571,6 +576,26 @@ public partial class GameWorldController : Node2D
         if (PlayerInput.IsHarvestPressed)
         {
             HandleHarvest();
+        }
+
+        // C key: toggle Character Sheet (body status + stats).
+        if (PlayerInput.IsCharacterSheetPressed)
+        {
+            _characterSheetWindow?.Toggle();
+            // Pause game when character sheet opens (same as inventory).
+            if (_characterSheetWindow != null && Time != null)
+            {
+                if (_characterSheetWindow.Visible)
+                {
+                    _wasPausedBeforeInventory = Time.IsPaused;
+                    if (!Time.IsPaused) Time.Pause();
+                }
+                else
+                {
+                    if (!_wasPausedBeforeInventory && Time.IsPaused)
+                        Time.Resume();
+                }
+            }
         }
 
         // E key: pick up nearest ground item (within pickup distance).

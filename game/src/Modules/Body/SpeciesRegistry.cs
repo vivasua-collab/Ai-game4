@@ -61,6 +61,17 @@ namespace CultivationGame.Modules.Body
                 baseStrength: 8, baseAgility: 14, baseVitality: 10, baseIntelligence: 4,
                 baseAgeRange: (1, 3), lifespanRange: (10, 15)));
 
+            // Phase C (BODY-IMPL-PLAN): simple wandering animals on the test polygon.
+            // Deer and rabbit added so AnimalSpawnPhase has the full {wolf, deer, rabbit}
+            // pool to pick from. Stats per checkpoints/08_22_body_impl_plan.md.
+            Register(new SpeciesData("deer", SoulType.Creature, Morphology.Quadruped, BodyMaterial.Organic, SizeClass.Medium,
+                baseStrength: 6, baseAgility: 12, baseVitality: 8, baseIntelligence: 2,
+                baseAgeRange: (1, 4), lifespanRange: (10, 20)));
+
+            Register(new SpeciesData("rabbit", SoulType.Creature, Morphology.Quadruped, BodyMaterial.Organic, SizeClass.Small,
+                baseStrength: 3, baseAgility: 14, baseVitality: 4, baseIntelligence: 1,
+                baseAgeRange: (0, 2), lifespanRange: (3, 7)));
+
             Register(new SpeciesData("tiger", SoulType.Creature, Morphology.Quadruped, BodyMaterial.Organic, SizeClass.Large,
                 baseStrength: 14, baseAgility: 12, baseVitality: 12, baseIntelligence: 4,
                 baseAgeRange: (2, 5), lifespanRange: (15, 25)));

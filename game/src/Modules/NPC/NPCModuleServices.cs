@@ -1,6 +1,7 @@
 #nullable enable
 // Создано: 2026-05-10 — Phase 17B: делегат регистрации модуля
 // Migrated from Ai-game3 (Unity+VContainer+MessagePipe) to Ai-game4 (Godot+DI+EventBus) 2026-08-15.
+// Редактировано: 2026-08-22 — Phase C: регистрация AnimalService (простые животные).
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Modules.Inventory;
@@ -44,6 +45,13 @@ public static class NPCModuleServices
         builder.Register<IPerkService, PerkService>(Lifetime.Singleton);
         builder.Register<NPCMovementService>(Lifetime.Singleton);
         builder.Register<NPCVisualService>(Lifetime.Singleton);
+
+        // === Phase C: простые животные (волк/олень/кролик) ===
+        // AnimalService — ITickable singleton; collected by GameEntryPoint's
+        // ResolveAll<ITickable>() and ticked once per game tick for wandering.
+        // Body assembly uses IBodyFactory + IBodyDataProvider (registered in
+        // BodyModuleServices); ITileService (TileModule); SpeciesRegistry (Body).
+        builder.Register<AnimalService>(Lifetime.Singleton);
 
         // === Точка входа модуля ===
         builder.Register<NPCModule>(Lifetime.Singleton);

@@ -5,7 +5,7 @@ using CultivationGame.Entry.Phases;
 namespace CultivationGame.Entry;
 
 /// <summary>
-/// Registers the <see cref="SceneOrchestrator"/> and the 10 scene-assembly
+/// Registers the <see cref="SceneOrchestrator"/> and the scene-assembly
 /// phases with the root DI container. Called from <see cref="GameLifetimeScope"/>.
 /// </summary>
 /// <remarks>
@@ -20,13 +20,16 @@ public static class SceneAssemblyRegistrar
         // Orchestrator
         builder.Register<SceneOrchestrator>(Lifetime.Singleton);
 
-        // 10 phases in execution order (orchestrator sorts by PhaseOrder at
+        // Phases in execution order (orchestrator sorts by PhaseOrder at
         // runtime, so registration order here is purely cosmetic).
         builder.Register<CoreValidationPhase>(Lifetime.Singleton);
         builder.Register<TileMapGenPhase>(Lifetime.Singleton);
         builder.Register<WorldInitPhase>(Lifetime.Singleton);
         builder.Register<PlayerSpawnPhase>(Lifetime.Singleton);
-        builder.Register<NPCSpawnPhase>(Lifetime.Singleton);
+        // Phase 5 — Phase C (BODY-IMPL-PLAN): spawn simple wandering animals
+        // (wolf/deer/rabbit) on the test polygon. Replaces the v1 stub
+        // NPCSpawnPhase which logged "No NPCs in test polygon".
+        builder.Register<AnimalSpawnPhase>(Lifetime.Singleton);
         builder.Register<FormationInitPhase>(Lifetime.Singleton);
         builder.Register<ChargerInitPhase>(Lifetime.Singleton);
         builder.Register<QuestInitPhase>(Lifetime.Singleton);
