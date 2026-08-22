@@ -45,6 +45,9 @@ public partial class NPCSpriteRenderer : Node2D
         QueueRedraw();
     }
 
+    // Cached sprites per role.
+    private readonly Dictionary<NPCRole, Texture2D> _spriteCache = new();
+
     public override void _Draw()
     {
         if (_npcService == null) return;
@@ -54,7 +57,6 @@ public partial class NPCSpriteRenderer : Node2D
             _idSnapshot.Add(id);
 
         float halfTile = _tilePixels * 0.5f;
-        const float radius = 12f; // human — Medium humanoid, slightly larger than wolves
 
         foreach (var id in _idSnapshot)
         {
@@ -64,12 +66,17 @@ public partial class NPCSpriteRenderer : Node2D
             float cx = npc.Position.X * _tilePixels + halfTile;
             float cy = npc.Position.Y * _tilePixels + halfTile;
 
-            Color bodyColour = GetColourForRole(npc.Role);
+            // Get or create sprite for this role.
+            if (!_spriteCache.TryGetValue(npc.Role, out var tex))
+            {
+                tex = ProceduralSpriteGenerator.CreateNPCSprite(npc.Role);
+                _spriteCache[npc.Role] = tex;
+            }
 
-            DrawCircle(new Vector2(cx + 2f, cy + 3f), radius * 0.95f, ShadowColour);
-            DrawCircle(new Vector2(cx, cy), radius, bodyColour);
-            DrawArc(new Vector2(cx, cy), radius, 0f, Mathf.Tau,
-                Mathf.Max(12, (int)(radius * 2f)), OutlineColour, 1.5f);
+            // Draw sprite centered on tile.
+            float spriteSize = tex.GetWidth();
+            var pos = new Vector2(cx - spriteSize / 2f, cy - spriteSize / 2f);
+            DrawTexture(tex, pos);
         }
     }
 

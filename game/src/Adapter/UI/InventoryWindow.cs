@@ -39,6 +39,7 @@ public partial class InventoryWindow : Control
     [Inject] private IItemDatabaseService ItemDatabase { get; set; } = null!;
     [Inject] private IGroundItemService GroundItems { get; set; } = null!;
     [Inject] private IPlayerService PlayerService { get; set; } = null!;
+    [Inject] private IEquipmentGenerator EquipmentGenerator { get; set; } = null!;
 
     private bool _isVisible;
     private Panel _panel = null!;
@@ -59,13 +60,14 @@ public partial class InventoryWindow : Control
             ContainerAdapter.InjectProperties(this, container);
         }
 
-        // Seed test items on first open (debug/test data — DEBUG builds only).
+        // Generate starting equipment via EquipmentGenerator (replaces hardcoded TestItemSeeder).
+        // Generates: 3 weapons + 3 armor + 2 accessories + 4 consumables + 4 materials.
 #if DEBUG
         if (!_itemsSeeded)
         {
-            TestItemSeeder.Seed(ItemDatabase, InventoryService);
+            SeedGeneratedItems();
             _itemsSeeded = true;
-            GD.Print("[Inventory] Test items seeded");
+            GD.Print("[Inventory] Generated items seeded via EquipmentGenerator");
         }
 #endif
 
@@ -229,6 +231,111 @@ public partial class InventoryWindow : Control
     }
 
     // Note: B and Esc handling done by GameWorldController.HandleStickyInput.
+
+    /// <summary>
+    /// Generate starting items via EquipmentGenerator (replaces TestItemSeeder).
+    /// Generates diverse equipment + materials + consumables.
+    /// </summary>
+    private void SeedGeneratedItems()
+    {
+        long seed = 1000;
+
+        // === Equipment (via EquipmentGenerator "Matryoshka") ===
+        // 4 weapons (varied subtypes).
+        for (int i = 0; i < 4; i++)
+        {
+            var weapon = EquipmentGenerator.GenerateWeapon(level: 1 + i, seed: seed + i);
+            if (weapon != null)
+            {
+                ItemDatabase.Register(weapon);
+                InventoryService.TryAddItem(weapon, 1);
+            }
+        }
+
+        // 4 armor pieces (varied slots).
+        for (int i = 0; i < 4; i++)
+        {
+            var armor = EquipmentGenerator.GenerateArmor(level: 1 + i, seed: seed + 100 + i);
+            if (armor != null)
+            {
+                ItemDatabase.Register(armor);
+                InventoryService.TryAddItem(armor, 1);
+            }
+        }
+
+        // 2 random equipment (could be weapon or armor).
+        for (int i = 0; i < 2; i++)
+        {
+            var eq = EquipmentGenerator.GenerateRandom(level: 2, seed: seed + 200 + i);
+            if (eq != null)
+            {
+                ItemDatabase.Register(eq);
+                InventoryService.TryAddItem(eq, 1);
+            }
+        }
+
+        // === Materials (for crafting + harvest resolution) ===
+        var materials = new[]
+        {
+            ("material_wood", "Древесина", 0.5f, 1.0f, ItemRarity.Common, 100),
+            ("material_stone", "Камень", 1.0f, 1.0f, ItemRarity.Common, 100),
+            ("material_iron_ore", "Железная руда", 1.5f, 1.0f, ItemRarity.Uncommon, 50),
+            ("material_fiber", "Растительное волокно", 0.05f, 0.2f, ItemRarity.Common, 100),
+        };
+
+        foreach (var (id, name, weight, volume, rarity, maxStack) in materials)
+        {
+            var item = new ItemData
+            {
+                ItemId = id,
+                NameRu = name,
+                NameEn = name,
+                Description = "Материал",
+                Category = ItemCategory.Material,
+                ItemType = "Material",
+                Rarity = rarity,
+                Stackable = true,
+                MaxStack = maxStack,
+                Weight = weight,
+                Volume = volume,
+                Value = 5,
+                HasDurability = false,
+            };
+            ItemDatabase.Register(item);
+            InventoryService.TryAddItem(item, 5);
+        }
+
+        // === Consumables ===
+        var consumables = new[]
+        {
+            ("consumable_berry", "Ягоды", 0.05f, 0.1f, ItemRarity.Common, 50, "heal", 5),
+            ("consumable_herb", "Лекарственная трава", 0.03f, 0.1f, ItemRarity.Uncommon, 50, "material", 0),
+            ("con_pill_healing", "Пилюля лечения", 0.05f, 0.1f, ItemRarity.Common, 20, "heal", 30),
+            ("con_pill_qi", "Пилюля Ци", 0.05f, 0.1f, ItemRarity.Uncommon, 20, "qi_restore", 50),
+        };
+
+        foreach (var (id, name, weight, volume, rarity, maxStack, effect, value) in consumables)
+        {
+            var item = new ItemData
+            {
+                ItemId = id,
+                NameRu = name,
+                NameEn = name,
+                Description = "Расходник",
+                Category = ItemCategory.Consumable,
+                ItemType = "Consumable",
+                Rarity = rarity,
+                Stackable = true,
+                MaxStack = maxStack,
+                Weight = weight,
+                Volume = volume,
+                Value = value,
+                HasDurability = false,
+            };
+            ItemDatabase.Register(item);
+            InventoryService.TryAddItem(item, 5);
+        }
+    }
 
     /// <summary>Toggle inventory visibility.</summary>
     public void Toggle()

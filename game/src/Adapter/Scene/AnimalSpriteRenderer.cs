@@ -62,13 +62,13 @@ public partial class AnimalSpriteRenderer : Node2D
         QueueRedraw();
     }
 
+    // Cached sprites per species.
+    private readonly Dictionary<string, Texture2D> _spriteCache = new();
+
     public override void _Draw()
     {
         if (_animalService == null) return;
 
-        // Take a snapshot of current animal positions (avoid concurrent
-        // mutation during iteration — Tick runs on the same thread but
-        // defensive copying is cheap at this count).
         _snapshot.Clear();
         foreach (var a in _animalService.GetAllAnimals())
             _snapshot.Add(a);
@@ -82,38 +82,17 @@ public partial class AnimalSpriteRenderer : Node2D
             float cx = animal.Position.X * _tilePixels + halfTile;
             float cy = animal.Position.Y * _tilePixels + halfTile;
 
-            float radius = GetRadiusForSize(animal.Size);
-            Color bodyColour = GetColourForSpecies(animal.Species);
-
-            // Soft shadow (offset down-right).
-            DrawCircle(new Vector2(cx + 2f, cy + 3f), radius * 0.95f, ShadowColour);
-
-            // Body.
-            DrawCircle(new Vector2(cx, cy), radius, bodyColour);
-
-            // Outline (DrawArc — pointCount ≈ 2π × radius for smooth circle).
-            int arcPoints = Mathf.Max(12, (int)(radius * 2f));
-            DrawArc(
-                new Vector2(cx, cy),
-                radius,
-                startAngle: 0f,
-                endAngle: Mathf.Tau,
-                pointCount: arcPoints,
-                color: OutlineColour,
-                width: 1.5f);
-
-            // Small eye-dot to indicate facing direction (towards Target).
-            if (animal.Target is { } target)
+            // Get or create sprite for this species.
+            if (!_spriteCache.TryGetValue(animal.Species, out var tex))
             {
-                int dx = System.Math.Sign(target.X - animal.Position.X);
-                int dy = System.Math.Sign(target.Y - animal.Position.Y);
-                if (dx != 0 || dy != 0)
-                {
-                    float eyeX = cx + dx * radius * 0.45f;
-                    float eyeY = cy + dy * radius * 0.45f;
-                    DrawCircle(new Vector2(eyeX, eyeY), Mathf.Max(1.2f, radius * 0.18f), OutlineColour);
-                }
+                tex = ProceduralSpriteGenerator.CreateAnimalSprite(animal.Species, animal.Size);
+                _spriteCache[animal.Species] = tex;
             }
+
+            // Draw sprite centered on tile.
+            float spriteSize = tex.GetWidth();
+            var pos = new Vector2(cx - spriteSize / 2f, cy - spriteSize / 2f);
+            DrawTexture(tex, pos);
         }
     }
 

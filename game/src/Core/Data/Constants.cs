@@ -61,8 +61,8 @@ namespace CultivationGame.Core.Data
         /// </summary>
         public const float BASE_CONDUCTIVITY = 2.78f;
 
-        /// <summary>Базовый вес переносимого груза (STR=10)</summary>
-        public const float BASE_CARRY_WEIGHT = 10f;
+        /// <summary>Базовый вес переносимого груза (STR=10) — 50 кг per user request 2026-08-22</summary>
+        public const float BASE_CARRY_WEIGHT = 50f;
 
         #endregion
 

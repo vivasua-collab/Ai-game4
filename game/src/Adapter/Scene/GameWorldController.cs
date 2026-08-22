@@ -191,32 +191,9 @@ public partial class GameWorldController : Node2D
         _worldRoot.AddChild(_sceneBuilder);
     }
 
-    private static ImageTexture CreatePlayerTexture()
+    private static Texture2D CreatePlayerTexture()
     {
-        var img = Image.CreateEmpty(48, 48, false, Image.Format.Rgba8);
-        img.Fill(new Color(0, 0, 0, 0));
-        // Robe body (purple).
-        for (int y = 16; y < 40; y++)
-            for (int x = 12; x < 36; x++)
-                img.SetPixel(x, y, new Color(0.30f, 0.20f, 0.50f));
-        // Head (skin).
-        for (int y = 4; y < 16; y++)
-            for (int x = 16; x < 32; x++)
-                img.SetPixel(x, y, new Color(0.90f, 0.75f, 0.60f));
-        // Hair (black).
-        for (int y = 4; y < 10; y++)
-            for (int x = 16; x < 32; x++)
-                img.SetPixel(x, y, new Color(0.10f, 0.05f, 0.02f));
-        // Eyes.
-        img.SetPixel(20, 12, new Color(0.05f, 0.05f, 0.05f));
-        img.SetPixel(27, 12, new Color(0.05f, 0.05f, 0.05f));
-        // Robe trim (gold accent).
-        for (int x = 12; x < 36; x++)
-        {
-            img.SetPixel(x, 16, new Color(0.72f, 0.53f, 0.04f));
-            img.SetPixel(x, 38, new Color(0.72f, 0.53f, 0.04f));
-        }
-        return ImageTexture.CreateFromImage(img);
+        return ProceduralSpriteGenerator.CreatePlayerSprite();
     }
 
     /// <summary>Simple ellipse shadow texture (32×16).</summary>
