@@ -183,3 +183,31 @@ public readonly struct QiBufferStateChangedEvent
     public QiBufferStateChangedEvent(bool isActive, QiBufferMode mode, long qiInvested, string entityId)
         { IsActive = isActive; Mode = mode; QiInvested = qiInvested; EntityId = entityId; }
 }
+
+// === Медитация (QI_SYSTEM.md §5.2) — события этапа 1 внедрения ЦИ (2026-08-23) ===
+
+/// <summary>
+/// Команда: переключить состояние медитации игрока.
+/// Публикуется Adapter (клавиша V) и модулями-потребителями (бой/движение — отмена).
+/// QiModule подписывается, владеет состоянием, публикует MeditationStateChangedEvent.
+/// </summary>
+public readonly struct MeditationToggleRequestedEvent
+{
+    public readonly bool DesiredState; // true = включить, false = выключить (toggle при DesiredState != текущего)
+
+    public MeditationToggleRequestedEvent(bool desiredState)
+        { DesiredState = desiredState; }
+}
+
+/// <summary>
+/// Событие: изменилось состояние медитации игрока.
+/// Публикуется QiModule. Потребители: Adapter (индикация), Combat (отмена).
+/// </summary>
+public readonly struct MeditationStateChangedEvent
+{
+    public readonly bool IsActive;
+    public readonly float RatePerSecond; // текущая скорость поглощения (conductivity × environmentMult)
+
+    public MeditationStateChangedEvent(bool isActive, float ratePerSecond)
+        { IsActive = isActive; RatePerSecond = ratePerSecond; }
+}

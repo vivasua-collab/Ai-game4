@@ -1428,6 +1428,13 @@ namespace CultivationGame.Core.Data
         /// <summary>Qi regeneration batch interval (in ticks).</summary>
         public const int QI_REGEN_BATCH_TICKS = 10;
 
+        // ── Медитация / среда (QI_SYSTEM.md §5.2, FORMATION_SYSTEM.md §10.2) ──
+        /// <summary>
+        /// Базовый множитель среды для медитации («Обычная» местность, ×0.5).
+        /// Формации Gathering повышают множитель в зоне действия.
+        /// </summary>
+        public const float ENVIRONMENT_MULT_NORMAL = 0.5f;
+
         // ── Tile / rendering ────────────────────────────────────────────────
         /// <summary>Tile edge length in meters (tile is 2×2 m).</summary>
         public const int TILE_SIZE_M = 2;

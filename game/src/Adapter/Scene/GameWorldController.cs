@@ -44,6 +44,9 @@ public partial class GameWorldController : Node2D
     [Inject] private Modules.Player.PlayerCombatAdapter CombatAdapter { get; set; } = null!;
     [Inject] private Modules.Inventory.BeltService BeltService { get; set; } = null!;
     [Inject] private IBodyService BodyService { get; set; } = null!;
+    [Inject] private IQiService QiService { get; set; } = null!;
+    [Inject] private IPublisher<Core.Messaging.Contracts.MeditationToggleRequestedEvent> MeditationTogglePub { get; set; } = null!;
+    [Inject] private ISubscriber<Core.Messaging.Contracts.MeditationStateChangedEvent> MeditationStateSub { get; set; } = null!;
     [Inject] private ISubscriber<Core.Messaging.Contracts.PlayerDeathEvent> PlayerDeathSub { get; set; } = null!;
     [Inject] private ISubscriber<Core.Messaging.Contracts.DamageAppliedEvent> DamageSub { get; set; } = null!;
     [Inject] private ISubscriber<Core.Messaging.Contracts.DialogueEndedEvent> DialogueEndedSub { get; set; } = null!;
@@ -59,6 +62,11 @@ public partial class GameWorldController : Node2D
     private UI.DialogueWindow _dialogueWindow = null!;
     private UI.HotbarPanel _hotbarPanel = null!;
     private Godot.ProgressBar _hpBar = null!;
+    private Godot.ProgressBar _qiBar = null!;
+    private Label _qiLabel = null!;
+    private Label _meditationLabel = null!;
+    private bool _meditationActive;           // кэш из MeditationStateChangedEvent
+    private System.IDisposable? _meditationStateToken;
     private System.IDisposable? _playerDeathToken;
     private System.IDisposable? _playerDamageToken;
     private CanvasLayer   _hudCanvas     = null!;
@@ -125,7 +133,19 @@ public partial class GameWorldController : Node2D
         // only E/Esc resumed time, leaving the game silently paused after a
         // choice-click finish. Single authoritative resume point: the bus event.
         _dialogueEndedToken = DialogueEndedSub?.Subscribe(OnDialogueEnded);
+        // Этап 1 внедрения ЦИ: индикация медитации (V).
+        _meditationStateToken = MeditationStateSub?.Subscribe(OnMeditationStateChanged);
         GD.Print("[GameWorldController] Ready");
+    }
+
+    /// <summary>Этап 1 внедрения ЦИ: обновление индикатора медитации.</summary>
+    private void OnMeditationStateChanged(in Core.Messaging.Contracts.MeditationStateChangedEvent e)
+    {
+        _meditationActive = e.IsActive;
+        if (_meditationLabel != null) _meditationLabel.Visible = e.IsActive;
+        ShowToast(e.IsActive
+            ? $"☯ Медитация начата (+{e.RatePerSecond:F1} Ци/с)"
+            : "☯ Медитация завершена");
     }
 
     // ---- World setup ----
@@ -281,13 +301,41 @@ public partial class GameWorldController : Node2D
         _hpBar.AddThemeFontSizeOverride("font_size", 12);
         _hudCanvas.AddChild(_hpBar);
 
+        // Qi bar (этап 1 внедрения ЦИ, 2026-08-23): под HP-баром, золотой цвет.
+        // Ци игрока из QiService (long — отображаем как double в ProgressBar).
+        _qiBar = new ProgressBar
+        {
+            Name = "QiBar",
+            MinValue = 0,
+            ShowPercentage = false,
+            CustomMinimumSize = new Vector2(260, 14),
+            Position = new Vector2(20, 60),
+        };
+        _qiBar.AddThemeFontSizeOverride("font_size", 11);
+        _qiBar.AddThemeColorOverride("font_color", new Color(0.98f, 0.85f, 0.3f));
+        _hudCanvas.AddChild(_qiBar);
+
+        // Подпись Ци (значения + уровень культивации).
+        _qiLabel = new Label { Name = "QiLabel", Position = new Vector2(288, 60) };
+        _qiLabel.AddThemeFontSizeOverride("font_size", 12);
+        _qiLabel.AddThemeColorOverride("font_color", new Color(0.94f, 0.83f, 0.66f));
+        _hudCanvas.AddChild(_qiLabel);
+
+        // Индикатор медитации (V): статус под Ци-баром.
+        _meditationLabel = new Label { Name = "MeditationLabel", Position = new Vector2(20, 78), Visible = false };
+        _meditationLabel.AddThemeFontSizeOverride("font_size", 13);
+        _meditationLabel.AddThemeColorOverride("font_color", new Color(0.55f, 0.75f, 0.95f));
+        _meditationLabel.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.9f));
+        _meditationLabel.Text = "☯ Медитация — поглощение Ци (движение прерывает)";
+        _hudCanvas.AddChild(_meditationLabel);
+
         // Hotkey legend — BOTTOM of screen, black color.
         _hudLabel = new Label
         {
             Name = "HudHint",
             Text = "WASD — движение | Shift — бег | ЛКМ — идти к точке | Колесо — зум\n" +
                    "Esc — пауза | PageUp/PageDown — скорость\n" +
-                   "E — подобрать | B — инвентарь | R — отдых | F — добыча\n" +
+                   "E — подобрать | B — инвентарь | F — добыча | V — медитация\n" +
                    "C — персонаж | J — журнал | T — техники | Q — квесты | M — карта | N — миникарта",
         };
         _hudLabel.AddThemeFontSizeOverride("font_size", 13);
@@ -401,6 +449,23 @@ public partial class GameWorldController : Node2D
             }
         }
 
+        // Этап 1 внедрения ЦИ: Qi bar — текущее Ци / MaxQi (long → double).
+        if (_qiBar != null && QiService != null)
+        {
+            double qiMax = QiService.MaxQi;
+            if (qiMax > 0)
+            {
+                _qiBar.MaxValue = qiMax;
+                _qiBar.Value = QiService.CurrentQi;
+                float qiRatio = (float)(QiService.CurrentQi / qiMax);
+                // Золотой → тускло-серый при истощении.
+                _qiBar.Modulate = new Color(
+                    0.55f + 0.45f * qiRatio, 0.45f + 0.4f * qiRatio, 0.15f + 0.15f * qiRatio);
+                _qiLabel.Text = $"Ци {QiService.CurrentQi}/{qiMax} | L{(int)QiService.CultivationLevel}.{QiService.SubLevel}" +
+                                $" | пров. {QiService.Conductivity:F1}/с";
+            }
+        }
+
         // Toast timer: hide toast after expiry.
         if (_toastLabel != null && _toastLabel.Visible)
         {
@@ -412,6 +477,13 @@ public partial class GameWorldController : Node2D
         }
 
         HandleStickyInput();
+
+        // Этап 1 внедрения ЦИ: V — переключить медитацию (поглощение Ци из среды).
+        if (PlayerInput is { IsMeditatePressed: true })
+        {
+            MeditationTogglePub.Publish(
+                new Core.Messaging.Contracts.MeditationToggleRequestedEvent(!_meditationActive));
+        }
 
         // Phase 6: player combat bridge — Space publishes AttackIntentEvent
         // with the nearest NPC target. Must run BEFORE ResetFrameFlags below.
@@ -511,6 +583,13 @@ public partial class GameWorldController : Node2D
 
         // Get input vector (normalized -1..1 per axis).
         Vector2 moveVec = Godot.Input.GetVector("move_left", "move_right", "move_up", "move_down");
+
+        // Этап 1 внедрения ЦИ: движение прерывает медитацию (концентрация).
+        if (_meditationActive && moveVec != Vector2.Zero)
+        {
+            MeditationTogglePub.Publish(
+                new Core.Messaging.Contracts.MeditationToggleRequestedEvent(false));
+        }
 
         // Speed: base pixels/sec × delta × run multiplier.
         // Q7 (refined 2026-08-22 per user report): movement must feel faster

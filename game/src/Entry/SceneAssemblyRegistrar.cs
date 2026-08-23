@@ -26,6 +26,9 @@ public static class SceneAssemblyRegistrar
         builder.Register<TileMapGenPhase>(Lifetime.Singleton);
         builder.Register<WorldInitPhase>(Lifetime.Singleton);
         builder.Register<PlayerSpawnPhase>(Lifetime.Singleton);
+        // Этап 1 внедрения ЦИ (2026-08-23): случайный тест-набор техник игроку
+        // (слоты по TECHNIQUE_SYSTEM.md §12).
+        builder.Register<TechniqueGrantPhase>(Lifetime.Singleton);
         // Phase 5 — Phase C (BODY-IMPL-PLAN): spawn simple wandering animals
         // (wolf/deer/rabbit) on the test polygon. Replaces the v1 stub
         // NPCSpawnPhase which logged "No NPCs in test polygon".

@@ -248,16 +248,18 @@ namespace CultivationGame.Modules.Generator
 
             // === Шаг 6.7: Расчёт параметров ===
             int baseCapacity = GetBaseCapacity(techniqueType);
-            int capacity = CalculateCapacity(baseCapacity, level, mastery);
+            // Cultivation — пассивная техника (§11.5): capacity=null, qiCost=0.
+            bool isPassive = techniqueType == TechniqueType.Cultivation;
+            int capacity = isPassive ? 0 : CalculateCapacity(baseCapacity, level, mastery);
             float gradeMultiplier = GetGradeMultiplier(grade);
-            long qiCost = CalculateQiCost(baseCapacity, level);
-            float baseDamage = CalculateBaseDamage(capacity, gradeMultiplier);
+            long qiCost = isPassive ? 0 : CalculateQiCost(baseCapacity, level);
+            float baseDamage = isPassive ? 0f : CalculateBaseDamage(capacity, gradeMultiplier);
             float cooldown = GetBaseCooldown(techniqueType);
             float range = GetBaseRange(subtype);
             float castTime = GetBaseCastTime(subtype);
 
-            // === Шаг 6.8: Ultimate (5% шанс для Transcendent) ===
-            bool isUltimate = grade == TechniqueGrade.Transcendent && rng.NextBool(0.05f);
+            // === Шаг 6.8: Ultimate (5% шанс для Transcendent; пассивные исключены) ===
+            bool isUltimate = !isPassive && grade == TechniqueGrade.Transcendent && rng.NextBool(0.05f);
             if (isUltimate)
             {
                 baseDamage *= GameConstants.ULTIMATE_DAMAGE_MULTIPLIER; // ×2.0, НЕ ×1.3!
@@ -320,6 +322,81 @@ namespace CultivationGame.Modules.Generator
                 results.Add(technique);
             }
             return results;
+        }
+
+        /// <summary>
+        /// Этап 1 внедрения ЦИ: сгенерировать технику заданного типа.
+        /// Тип фиксируется явно; подтип/стихия/грейд/мастерство — SeededRandom.
+        /// Cultivation — пассивная техника (TECHNIQUE_SYSTEM.md §11.5:
+        /// capacity=null, qiCost=0, element=neutral, BaseDamage=0).
+        /// </summary>
+        public TechniqueData GenerateSpecified(TechniqueType type, int level, int cultivationLevel, long seed)
+        {
+            if (cultivationLevel < 1) cultivationLevel = 1;
+            if (cultivationLevel > GameConstants.MAX_CULTIVATION_LEVEL)
+                cultivationLevel = GameConstants.MAX_CULTIVATION_LEVEL;
+
+            // Уровень техники в границах резонанса (§8.1): 1..cultivationLevel
+            if (level < 1) level = 1;
+            if (level > cultivationLevel) level = cultivationLevel;
+
+            var rng = new SeededRandom(seed);
+
+            CombatSubtype subtype = DetermineSubtype(type, rng);
+            TechniqueGrade grade = type == TechniqueType.Cultivation
+                ? TechniqueGrade.Common
+                : DetermineGrade(rng);
+            Element element = DetermineElement(type, rng);
+            float mastery = rng.NextFloat() * 100f;
+
+            int baseCapacity = GetBaseCapacity(type);
+            int capacity = type == TechniqueType.Cultivation ? 0 : CalculateCapacity(baseCapacity, level, mastery);
+            float gradeMultiplier = GetGradeMultiplier(grade);
+            long qiCost = type == TechniqueType.Cultivation ? 0 : CalculateQiCost(baseCapacity, level);
+            float baseDamage = type == TechniqueType.Cultivation ? 0f : CalculateBaseDamage(capacity, gradeMultiplier);
+            float cooldown = GetBaseCooldown(type);
+            float range = GetBaseRange(subtype);
+            float castTime = GetBaseCastTime(subtype);
+
+            // Ultimate не применяется к пассивным техникам
+            bool isUltimate = type != TechniqueType.Cultivation
+                              && grade == TechniqueGrade.Transcendent
+                              && rng.NextBool(0.05f);
+            if (isUltimate)
+            {
+                baseDamage *= GameConstants.ULTIMATE_DAMAGE_MULTIPLIER;
+                qiCost = (long)(qiCost * GameConstants.ULTIMATE_QI_COST_MULTIPLIER);
+            }
+
+            var technique = new TechniqueData
+            {
+                TechniqueId = GenerateTechniqueId(type, element, grade, level, seed),
+                NameRu = GenerateNameRu(type, element, grade, level, isUltimate),
+                NameEn = GenerateNameEn(type, element, grade, level, isUltimate),
+                Description = GenerateDescription(type, element, grade, level, isUltimate),
+
+                Type = type,
+                Subtype = subtype,
+                Grade = grade,
+                Element = element,
+
+                Level = level,
+                CapacityCost = capacity,
+                QiCost = qiCost,
+                BaseDamage = (int)baseDamage,
+                Cooldown = cooldown,
+                Range = range,
+                CastTime = castTime,
+
+                IsUltimate = isUltimate,
+                UltimateDamageMultiplier = isUltimate ? 2.0f : 1.0f,
+                UltimateQiCostMultiplier = isUltimate ? 2.0f : 1.0f,
+
+                Mastery = mastery
+            };
+
+            _registry.Register(technique);
+            return technique;
         }
 
         // ===================================================================

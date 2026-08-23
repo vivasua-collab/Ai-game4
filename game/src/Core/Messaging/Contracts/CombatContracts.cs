@@ -82,6 +82,44 @@ public readonly struct TechniqueUsedEvent
         { UserId = userId; TechniqueId = techniqueId; QiCost = qiCost; }
 }
 
+// === Этап 2 внедрения ЦИ (2026-08-23): слоты техник игрока (TECHNIQUE_SYSTEM.md §12) ===
+
+/// <summary>
+/// Событие: игрок изучил технику (слот занят).
+/// Публикуется TechniqueService.LearnTechnique. Потребители: TechniquesPanel.
+/// </summary>
+public readonly struct TechniqueLearnedEvent
+{
+    public readonly string TechniqueId;
+    public readonly string Name;
+    public readonly Core.Data.TechniqueType Type;
+    public readonly Core.Data.TechniqueGrade Grade;
+    public TechniqueLearnedEvent(string techniqueId, string name,
+        Core.Data.TechniqueType type, Core.Data.TechniqueGrade grade)
+        { TechniqueId = techniqueId; Name = name; Type = type; Grade = grade; }
+}
+
+/// <summary>
+/// Событие: игрок забыл/потерял технику (слот освобождён).
+/// </summary>
+public readonly struct TechniqueForgottenEvent
+{
+    public readonly string TechniqueId;
+    public TechniqueForgottenEvent(string techniqueId)
+        { TechniqueId = techniqueId; }
+}
+
+/// <summary>
+/// Событие: изменился выбор активной техники игрока.
+/// Публикуется TechniqueService.SelectTechnique. Потребители: HUD/панель техник.
+/// </summary>
+public readonly struct TechniqueSelectionChangedEvent
+{
+    public readonly string TechniqueId; // null/empty — выбор сброшен
+    public TechniqueSelectionChangedEvent(string techniqueId)
+        { TechniqueId = techniqueId ?? string.Empty; }
+}
+
 public readonly struct EnemyKilledEvent
 {
     public readonly string EnemyId;

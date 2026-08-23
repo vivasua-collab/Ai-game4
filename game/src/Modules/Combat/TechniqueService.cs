@@ -4,8 +4,12 @@
 // Редактировано: 2026-05-09 — CMB-A06: QiCost изменён с float на long (Fix-01)
 // Редактировано: 2026-05-09 — EVT-01: убрана инъекция IQiService,
 //   кросс-модульное общение через QiChangedEvent + QiConsumeRequestEvent
+// Редактировано: 2026-08-23 — Этап 1-2 внедрения ЦИ:
+//   слотовая модель TECHNIQUE_SYSTEM.md §12 (Cultivation 1, Combat 3+(L-1),
+//   Curse 1, Formation 1), LearnTechnique(TechniqueData), выбор активной
+//   техники, рост мастерства при использовании (§10), публикация
+//   TechniqueLearnedEvent/TechniqueSelectionChangedEvent.
 // Сервис управления техниками — изучение, применение, отслеживание кулдаунов.
-// Перенесено из legacy Combat/TechniqueController.cs с адаптацией.
 using System;
 using System.Collections.Generic;
 using CultivationGame.Core;
@@ -21,7 +25,12 @@ namespace CultivationGame.Modules.Combat
     /// Отслеживает изученные техники, кулдауны и стоимость Ци.
     ///
     /// АРХИТЕКТУРА: TechniqueService НЕ инжектит IBodyService, IQiService.
-    /// Межмодульное общение — через MessagePipe (TechniqueUsedEvent, QiConsumeRequestEvent).
+    /// Межмодульное общение — через EventBus (TechniqueUsedEvent, QiConsumeRequestEvent).
+    ///
+    /// СЛОТЫ (TECHNIQUE_SYSTEM.md §12):
+    ///   Cultivation 1 | Combat 3+(L-1) | Curse 1 | Formation 1.
+    ///   Все активные типы (Defense/Support/Healing/Movement/Sensory/Poison)
+    ///   занимают слоты пула Combat.
     ///
     /// CMB-A06: LearnedTechnique.QiCost — long (Fix-01: все Qi-значения long).
     /// EVT-01: кэш Qi из QiChangedEvent вместо инъекции IQiService.
@@ -30,6 +39,9 @@ namespace CultivationGame.Modules.Combat
     {
         // === Зависимости ===
         private readonly IPublisher<TechniqueUsedEvent> _techniqueUsedPub;
+        private readonly IPublisher<TechniqueLearnedEvent> _techniqueLearnedPub;
+        private readonly IPublisher<TechniqueForgottenEvent> _techniqueForgottenPub;
+        private readonly IPublisher<TechniqueSelectionChangedEvent> _techniqueSelectionPub;
 
         // EVT-01: подписки на кросс-модульные события (вместо инъекции IQiService)
         private readonly ISubscriber<QiChangedEvent> _qiChangedSub;
@@ -46,15 +58,23 @@ namespace CultivationGame.Modules.Combat
         // === Состояние ===
         private readonly Dictionary<string, LearnedTechnique> _learnedTechniques = new();
         private readonly Dictionary<string, float> _cooldowns = new();
+        private readonly List<string> _orderedIds = new(); // порядок изучения (для UI/цикла выбора)
+        private string? _selectedTechniqueId;
         private int _usedCapacity;
 
         // === Конструктор ===
         public TechniqueService(
             IPublisher<TechniqueUsedEvent> techniqueUsedPub,
+            IPublisher<TechniqueLearnedEvent> techniqueLearnedPub,
+            IPublisher<TechniqueForgottenEvent> techniqueForgottenPub,
+            IPublisher<TechniqueSelectionChangedEvent> techniqueSelectionPub,
             ISubscriber<QiChangedEvent> qiChangedSub,
             IPublisher<QiConsumeRequestEvent> qiConsumeRequestPub)
         {
             _techniqueUsedPub = techniqueUsedPub;
+            _techniqueLearnedPub = techniqueLearnedPub;
+            _techniqueForgottenPub = techniqueForgottenPub;
+            _techniqueSelectionPub = techniqueSelectionPub;
             _qiChangedSub = qiChangedSub;
             _qiConsumeRequestPub = qiConsumeRequestPub;
 
@@ -66,50 +86,183 @@ namespace CultivationGame.Modules.Combat
             });
         }
 
+        // === Выбор активной техники ===
+
+        /// <summary>ID выбранной техники (null — не выбрана).</summary>
+        public string? SelectedTechniqueId => _selectedTechniqueId;
+
+        /// <summary>Выбранная техника (null — не выбрана).</summary>
+        public LearnedTechnique? SelectedTechnique
+            => _selectedTechniqueId != null && _learnedTechniques.TryGetValue(_selectedTechniqueId, out var t) ? t : null;
+
+        /// <summary>Выбрать активную технику (для каста по R/клику). null — сброс.</summary>
+        public void SelectTechnique(string? techniqueId)
+        {
+            if (techniqueId != null && !_learnedTechniques.ContainsKey(techniqueId)) return;
+            _selectedTechniqueId = techniqueId;
+            _techniqueSelectionPub.Publish(new TechniqueSelectionChangedEvent(techniqueId));
+        }
+
+        /// <summary>Циклический выбор следующей кастуемой техники (Q).</summary>
+        public void CycleSelection()
+        {
+            if (_orderedIds.Count == 0) return;
+            int idx = _selectedTechniqueId != null ? _orderedIds.IndexOf(_selectedTechniqueId) : -1;
+            string next = _orderedIds[(idx + 1) % _orderedIds.Count];
+            SelectTechnique(next);
+        }
+
+        // === Слоты (TECHNIQUE_SYSTEM.md §12) ===
+
+        /// <summary>Категория слота для типа техники.</summary>
+        public static TechniqueType SlotCategory(TechniqueType type)
+        {
+            return type switch
+            {
+                TechniqueType.Cultivation => TechniqueType.Cultivation,
+                TechniqueType.Curse => TechniqueType.Curse,
+                TechniqueType.Formation => TechniqueType.Formation,
+                // Defense/Support/Healing/Movement/Sensory/Poison/Combat → пул Combat
+                _ => TechniqueType.Combat
+            };
+        }
+
+        /// <summary>Ёмкость слотов категории для уровня культивации (§12).</summary>
+        public static int SlotCapacity(TechniqueType category, int cultivationLevel)
+        {
+            int level = Math.Max(1, cultivationLevel);
+            return category switch
+            {
+                TechniqueType.Cultivation => 1,
+                TechniqueType.Curse => 1,
+                TechniqueType.Formation => 1,
+                TechniqueType.Combat => 3 + (level - 1),
+                _ => 3 + (level - 1)
+            };
+        }
+
+        /// <summary>Сколько техник категории занято.</summary>
+        public int UsedSlots(TechniqueType type)
+        {
+            var category = SlotCategory(type);
+            int used = 0;
+            foreach (var t in _learnedTechniques.Values)
+                if (SlotCategory(t.Type) == category) used++;
+            return used;
+        }
+
+        /// <summary>Сколько свободных слотов для категории типа.</summary>
+        public int FreeSlots(TechniqueType type)
+        {
+            return SlotCapacity(SlotCategory(type), _cachedCultivationLevel) - UsedSlots(type);
+        }
+
+        // === Изучение ===
+
         /// <summary>
-        /// Изучить технику.
+        /// Изучить сгенерированную технику (TechniqueData из TechniqueGeneratorService).
+        /// Проверяет: свободный слот категории, уровень резонанса (§8.1: L_техники ≤ L_практика
+        /// и ≥ max(1, L_практика − 4)).
+        /// </summary>
+        public bool LearnTechnique(TechniqueData data)
+        {
+            if (data == null || string.IsNullOrEmpty(data.TechniqueId)) return false;
+            if (_learnedTechniques.ContainsKey(data.TechniqueId)) return false;
+
+            // Ограничение уровня (TECHNIQUE_SYSTEM.md §8.1 — Резонанс Ци)
+            int minL = Math.Max(1, _cachedCultivationLevel - 4);
+            if (data.Level > _cachedCultivationLevel || data.Level < minL) return false;
+
+            // Слот категории
+            if (FreeSlots(data.Type) <= 0) return false;
+
+            _learnedTechniques[data.TechniqueId] = new LearnedTechnique
+            {
+                TechniqueId = data.TechniqueId,
+                Name = data.NameRu,
+                Type = data.Type,
+                Grade = data.Grade,
+                Subtype = data.Subtype,
+                Level = data.Level,
+                Element = data.Element,
+                QiCost = data.QiCost,
+                Cooldown = data.Cooldown,
+                CastTime = data.CastTime,
+                Range = data.Range,
+                ArmorPenetration = data.ArmorPenetration,
+                BaseDamage = data.BaseDamage,
+                IsUltimate = data.IsUltimate,
+                Mastery = data.Mastery
+            };
+            _orderedIds.Add(data.TechniqueId);
+
+            // Авто-выбор первой изученной техники
+            if (_selectedTechniqueId == null) SelectTechnique(data.TechniqueId);
+
+            _techniqueLearnedPub.Publish(new TechniqueLearnedEvent(
+                data.TechniqueId, data.NameRu, data.Type, data.Grade));
+            return true;
+        }
+
+        /// <summary>
+        /// Забыть технику (освободить слот). Тест-режим/читы.
+        /// </summary>
+        public bool ForgetTechnique(string techniqueId)
+        {
+            if (!_learnedTechniques.Remove(techniqueId)) return false;
+            _orderedIds.Remove(techniqueId);
+            _cooldowns.Remove(techniqueId);
+            if (_selectedTechniqueId == techniqueId)
+            {
+                _selectedTechniqueId = _orderedIds.Count > 0 ? _orderedIds[0] : null;
+                _techniqueSelectionPub.Publish(new TechniqueSelectionChangedEvent(_selectedTechniqueId));
+            }
+            _techniqueForgottenPub.Publish(new TechniqueForgottenEvent(techniqueId));
+            return true;
+        }
+
+        /// <summary>Забыть все техники (тест-режим/читы).</summary>
+        public void ForgetAll()
+        {
+            foreach (var id in _orderedIds.ToArray())
+                ForgetTechnique(id);
+        }
+
+        /// <summary>
+        /// Изучить технику (legacy-сигнатура по компонентам).
         /// CMB-A06: qiCost — long (Fix-01).
-        /// FIX CS1061: добавлены castTime, armorPenetration, baseDamage, element, isUltimate.
         /// </summary>
         public bool LearnTechnique(string techniqueId, TechniqueType type, TechniqueGrade grade,
             CombatSubtype subtype, long qiCost, float cooldown,
             float castTime = 0.5f, int armorPenetration = 0, int baseDamage = 0,
             Element element = Element.Neutral, bool isUltimate = false)
         {
-            if (string.IsNullOrEmpty(techniqueId)) return false;
-            if (_learnedTechniques.ContainsKey(techniqueId)) return false;
-
-            // Проверка ёмкости
-            int cost = TechniqueCapacity.CalculateCost(type, grade, subtype);
-            int capacity = TechniqueCapacity.CalculateCapacity(type, _cachedCultivationLevel); // EVT-01: из кэша
-
-            if (!TechniqueCapacity.CanLearn(_usedCapacity, capacity, cost))
-                return false;
-
-            _learnedTechniques[techniqueId] = new LearnedTechnique
+            var data = new TechniqueData
             {
                 TechniqueId = techniqueId,
+                NameRu = techniqueId,
                 Type = type,
                 Grade = grade,
                 Subtype = subtype,
-                QiCost = qiCost, // CMB-A06: long вместо float
+                Level = _cachedCultivationLevel,
+                Element = element,
+                QiCost = qiCost,
                 Cooldown = cooldown,
-                CapacityCost = cost,
-                CastTime = castTime,               // FIX CS1061
-                ArmorPenetration = armorPenetration, // FIX CS1061
-                BaseDamage = baseDamage,             // FIX CS1061
-                Element = element,                   // FIX CS1061
-                IsUltimate = isUltimate              // FIX CS1061
+                CastTime = castTime,
+                ArmorPenetration = armorPenetration,
+                BaseDamage = baseDamage,
+                IsUltimate = isUltimate
             };
-
-            _usedCapacity += cost;
-            return true;
+            return LearnTechnique(data);
         }
+
+        // === Использование ===
 
         /// <summary>
         /// Использовать технику.
         /// CMB-A06: QiCost — long, каст не нужен.
         /// EVT-01: проверка Ци из кэша + QiConsumeRequestEvent вместо IQiService.TryConsumeQi.
+        /// Этап 1: рост мастерства при использовании (§10: mastery = min(100, +0.01)).
         /// </summary>
         public bool UseTechnique(string techniqueId)
         {
@@ -130,6 +283,9 @@ namespace CultivationGame.Modules.Combat
             // Установка кулдауна
             if (tech.Cooldown > 0)
                 _cooldowns[techniqueId] = tech.Cooldown;
+
+            // Рост мастерства (TECHNIQUE_SYSTEM.md §5.1 шаг 5)
+            tech.Mastery = MathF.Min(100f, tech.Mastery + 0.01f);
 
             // Публикация события
             // Фаза 9D: QiCost float→int (ЗАПРЕТ 3.9)
@@ -200,6 +356,12 @@ namespace CultivationGame.Modules.Combat
             return _learnedTechniques;
         }
 
+        /// <summary>Идентификаторы изученных техник в порядке изучения (для UI).</summary>
+        public IReadOnlyList<string> GetOrderedIds()
+        {
+            return _orderedIds;
+        }
+
         public void Dispose()
         {
             _qiChangedSubscription?.Dispose();
@@ -212,20 +374,25 @@ namespace CultivationGame.Modules.Combat
     /// CMB-A06: QiCost — long (Fix-01: все Qi-значения long).
     /// FIX CS1061: добавлены CastTime, ArmorPenetration, BaseDamage, Element, IsUltimate —
     /// поля из TechniqueData, необходимые CombatService.
+    /// Этап 1: +Name, +Level, +Range, +Mastery (живой рост при использовании).
     /// </summary>
     public class LearnedTechnique
     {
         public string TechniqueId;
+        public string Name = "";
         public TechniqueType Type;
         public TechniqueGrade Grade;
         public CombatSubtype Subtype;
-        public long QiCost;              // CMB-A06: long вместо float (Fix-01)
+        public int Level;                 // Уровень техники (1..9)
+        public long QiCost;               // CMB-A06: long вместо float (Fix-01)
         public float Cooldown;
         public int CapacityCost;
         public float CastTime;            // FIX CS1061: время каста (из TechniqueData)
+        public float Range;               // Дальность (метры, из TechniqueData)
         public int ArmorPenetration;      // FIX CS1061: пробитие брони (из TechniqueData, C6)
         public int BaseDamage;            // FIX CS1061: базовый урон (из TechniqueData, P1-6.1: int)
         public Element Element;           // FIX CS1061: стихия (из TechniqueData, B5)
         public bool IsUltimate;           // FIX CS1061: Ultimate-техника (из TechniqueData)
+        public float Mastery;             // Этап 1: мастерство 0..100 (растёт при использовании)
     }
 }
