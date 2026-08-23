@@ -61,6 +61,7 @@ public partial class GameWorldController : Node2D
     private Sprite2D      _playerShadow  = null!;
     private InputAdapter  _inputAdapter  = null!;
     private SceneBuilder  _sceneBuilder  = null!;
+    private TechniqueEffectRenderer _techniqueEffectRenderer = null!;
     private InventoryWindow _inventoryWindow = null!;
     private CharacterSheetWindow _characterSheetWindow = null!;
     private UI.DialogueWindow _dialogueWindow = null!;
@@ -242,6 +243,10 @@ public partial class GameWorldController : Node2D
         // Scene builder child node (creates terrain sprites + transition renderer).
         _sceneBuilder = new SceneBuilder { Name = "SceneBuilder" };
         _worldRoot.AddChild(_sceneBuilder);
+
+        // Этап 3 внедрения ЦИ: схематические эффекты техник (_Draw, без PNG).
+        _techniqueEffectRenderer = new TechniqueEffectRenderer { Name = "TechniqueEffectRenderer" };
+        _worldRoot.AddChild(_techniqueEffectRenderer);
     }
 
     private static Texture2D CreatePlayerTexture()
