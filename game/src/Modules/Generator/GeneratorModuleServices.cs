@@ -3,7 +3,9 @@
 // Делегат регистрации публичных сервисов модуля Generator.
 // Migrated from Ai-game3 (Unity+VContainer) to Ai-game4 (Godot+DI) 2026-08-15.
 using CultivationGame.Core.DI;
+
 using CultivationGame.Core.Interfaces;
+using CultivationGame.Modules.Formation;
 
 namespace CultivationGame.Modules.Generator;
 
@@ -27,6 +29,9 @@ public static class GeneratorModuleServices
 
         // === Генератор техник ===
         builder.Register<ITechniqueGeneratorService, TechniqueGeneratorService>(Lifetime.Singleton);
+
+        // === Этап 4 внедрения ЦИ: генератор формаций ===
+        builder.Register<Modules.Generator.IFormationGeneratorService, Modules.Generator.FormationGeneratorService>(Lifetime.Singleton);
 
         // === Точка входа модуля ===
         builder.Register<GeneratorModule>(Lifetime.Singleton);

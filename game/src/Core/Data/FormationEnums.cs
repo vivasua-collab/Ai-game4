@@ -65,6 +65,21 @@ namespace CultivationGame.Core.Data
         Heavy       // 300×300 м, радиус 5000 м, множитель ×10000 (только L6+)
     }
 
+    /// <summary>
+    /// Геометрическая форма контура формации (этап 4 внедрения ЦИ, 2026-08-23).
+    /// Определяет визуальный узор на поверхности (FormationVisualRenderer)
+    /// и расположение рун/точек подключения.
+    /// </summary>
+    public enum FormationShape
+    {
+        Circle,     // Круг
+        Triangle,   // Треугольник
+        Square,     // Квадрат
+        Pentagon,   // Пятиугольник
+        Star,       // Пятиконечная звезда
+        Hexagram    // Гексаграмма (два треугольника)
+    }
+
     #endregion
 
     #region Formation Lifecycle

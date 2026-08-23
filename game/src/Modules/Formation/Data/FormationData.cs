@@ -11,6 +11,8 @@ namespace CultivationGame.Modules.Formation.Data
     /// <summary>
     /// Определение формации — описывает одну конкретную формацию.
     /// В будущих фазах может загружаться из ScriptableObject.
+    /// Этап 4 внедрения ЦИ (2026-08-23): +Shape (визуальный контур),
+    /// +EffectRadiusMeters (радиус действия по размеру, FORMATION_SYSTEM §4).
     /// </summary>
     public class FormationData
     {
@@ -26,11 +28,17 @@ namespace CultivationGame.Modules.Formation.Data
         /// <summary>Размер формации</summary>
         public FormationSize Size;
 
+        /// <summary>Геометрическая форма контура (этап 4)</summary>
+        public FormationShape Shape = FormationShape.Circle;
+
         /// <summary>Требуемый уровень формации (1-10)</summary>
         public int RequiredLevel;
 
         /// <summary>Стихия формации (Neutral = универсальная)</summary>
         public Element Element = Element.Neutral;
+
+        /// <summary>Радиус действия в метрах (по размеру: 50/200/600/1000/5000)</summary>
+        public int EffectRadiusMeters = 50;
 
         /// <summary>Тип ядра (для формаций с физическим ядром)</summary>
         public FormationCoreType CoreType = FormationCoreType.Disk;

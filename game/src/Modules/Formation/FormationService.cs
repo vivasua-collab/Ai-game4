@@ -98,7 +98,8 @@ namespace CultivationGame.Modules.Formation
             ISubscriber<QiChangedEvent> qiChangedSub,
             ISubscriber<CombatEndedEvent> combatEndedSub,
             ISubscriber<FormationContributeQiRequestEvent> contributeRequestSub,
-            IQiDataProvider qiDataProvider) // Задача 4.3: per-entity Qi-данные
+            IQiDataProvider qiDataProvider, // Задача 4.3: per-entity Qi-данные
+            FormationRegistry? formationRegistry = null) // Этап 4: генерируемые формации
         {
             _activatedPub = activatedPub;
             _deactivatedPub = deactivatedPub;
@@ -111,10 +112,14 @@ namespace CultivationGame.Modules.Formation
             _contributeRequestSub = contributeRequestSub;
 
             _qiDataProvider = qiDataProvider; // Задача 4.3
+            _registry = formationRegistry;    // Этап 4 (nullable: legacy-сборки без DI)
 
             _qiPool = new FormationQiPool(poolChangedPub);
             _effects = new FormationEffects();
         }
+
+        // Этап 4 внедрения ЦИ: реестр генерируемых формаций
+        private readonly FormationRegistry? _registry;
 
         /// <summary>
         /// Инициализировать сервис конфигурацией.
@@ -480,6 +485,10 @@ namespace CultivationGame.Modules.Formation
         /// </summary>
         private FormationData FindFormationData(string formationId)
         {
+            // Этап 4 внедрения ЦИ: сначала — реестр генерируемых формаций.
+            var generated = _registry?.Get(formationId);
+            if (generated != null) return generated;
+
             // Временная реализация: известные формации
             switch (formationId)
             {
