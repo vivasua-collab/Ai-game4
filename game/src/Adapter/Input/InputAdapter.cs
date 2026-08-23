@@ -111,6 +111,10 @@ public partial class InputAdapter : Node
         if (GodotInput.IsActionJustPressed("minimap"))         _stickyKeys.Add("minimap");
         if (GodotInput.IsActionJustPressed("time_speed_up"))   _stickyKeys.Add("time_speed_up");
         if (GodotInput.IsActionJustPressed("time_speed_down")) _stickyKeys.Add("time_speed_down");
+        // Этап 1-2 внедрения ЦИ: медитация (V) и каст техники (Z).
+        if (GodotInput.IsActionJustPressed("meditate"))        _stickyKeys.Add("meditate");
+        if (!_isOverUI && GodotInput.IsActionJustPressed("cast_technique"))
+            _stickyKeys.Add("cast_technique");
         if (!_isOverUI && GodotInput.IsActionJustPressed("attack"))
             _stickyKeys.Add("attack");
 

@@ -120,6 +120,47 @@ public readonly struct TechniqueSelectionChangedEvent
         { TechniqueId = techniqueId ?? string.Empty; }
 }
 
+/// <summary>
+/// Команда: игрок запросил каст техники (этап 2 внедрения ЦИ).
+/// Публикуется Adapter (клавиша Z / клик в панели техник).
+/// PlayerTechniqueCaster подписан: проверка Ци/кулдауна → эффект по типу.
+/// </summary>
+public readonly struct TechniqueCastRequestedEvent
+{
+    public readonly string TechniqueId;
+    public readonly int TargetMouseX;      // позиция курсора (милли-пиксели) для направления
+    public readonly int TargetMouseY;
+    public TechniqueCastRequestedEvent(string techniqueId, int mouseX, int mouseY)
+        { TechniqueId = techniqueId; TargetMouseX = mouseX; TargetMouseY = mouseY; }
+}
+
+/// <summary>
+/// Событие: результат попытки каста (этап 2 внедрения ЦИ).
+/// Публикуется PlayerTechniqueCaster. Потребители: Adapter (тосты/визуал).
+/// </summary>
+public readonly struct TechniqueCastResultEvent
+{
+    public readonly string TechniqueId;
+    public readonly bool Success;
+    public readonly string Reason;      // человекочитаемая причина отказа (пусто при успехе)
+    public readonly int OriginX;        // точка каста (милли-пиксели, мировые)
+    public readonly int OriginY;
+    public readonly int TargetX;        // точка применения (милли-пиксели, мировые)
+    public readonly int TargetY;
+    public readonly Core.Data.TechniqueType Type;
+    public readonly Core.Data.Element Element;
+    public readonly int VisualKind;     // 0=directional 1=expanding 2=self 3=heal 4=shield (этап 3)
+
+    public TechniqueCastResultEvent(string techniqueId, bool success, string reason,
+        int originX, int originY, int targetX, int targetY,
+        Core.Data.TechniqueType type, Core.Data.Element element, int visualKind)
+    {
+        TechniqueId = techniqueId; Success = success; Reason = reason;
+        OriginX = originX; OriginY = originY; TargetX = targetX; TargetY = targetY;
+        Type = type; Element = element; VisualKind = visualKind;
+    }
+}
+
 public readonly struct EnemyKilledEvent
 {
     public readonly string EnemyId;

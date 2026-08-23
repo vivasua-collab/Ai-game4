@@ -49,6 +49,17 @@ namespace CultivationGame.Core.Interfaces
         /// <summary>Нажата ли медитация (M, однократное)</summary>
         bool IsMeditatePressed { get; }
 
+        // === Этап 2 внедрения ЦИ (2026-08-23): техники ===
+
+        /// <summary>Нажат ли каст техники (Z, однократное)</summary>
+        bool IsCastTechniquePressed { get; }
+
+        /// <summary>Нажат ли цикл выбора техники (X, однократное)</summary>
+        bool IsCycleTechniquePressed { get; }
+
+        /// <summary>Нажата ли панель техник (T, однократное)</summary>
+        bool IsTechniquesPressed { get; }
+
         // === Ai-game3 compatibility: sticky flags ===
 
         /// <summary>Нажат ли pause (Esc, однократное). Ai-game3 compatibility.</summary>

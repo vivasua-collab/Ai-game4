@@ -36,6 +36,7 @@ public sealed class PlayerInputService : IPlayerInputService
     private bool _meditate;
     private bool _attack;
     private bool _defend;
+    private bool _castTechnique;
     private bool _timeSpeedUp;
     private bool _timeSpeedDown;
     private int _selectedSlot;
@@ -61,6 +62,11 @@ public sealed class PlayerInputService : IPlayerInputService
     public bool IsCharacterSheetPressed => _characterSheet && !InputDisabled;
     public bool IsInventoryPressedRaw => _inventoryRaw;
     public bool IsMeditatePressed => _meditate;
+
+    // === Этап 2 внедрения ЦИ: техники ===
+    public bool IsCastTechniquePressed => _castTechnique;
+    public bool IsCycleTechniquePressed => _specialAction; // X (special_action)
+    public bool IsTechniquesPressed => _techniques;        // T
 
     // === Ai-game3 compatibility: sticky flags ===
     public bool IsPausePressed => _pause && !InputDisabled;
@@ -103,6 +109,7 @@ public sealed class PlayerInputService : IPlayerInputService
             if (data.IsSticky("world_map")) _map = true;
             if (data.IsSticky("minimap")) _minimap = true;
             if (data.IsSticky("meditate")) _meditate = true;
+            if (data.IsSticky("cast_technique")) _castTechnique = true;
             if (data.IsSticky("attack")) _attack = true;
             if (data.IsSticky("defend")) _defend = true;
             if (data.IsSticky("time_speed_up")) _timeSpeedUp = true;
@@ -117,6 +124,7 @@ public sealed class PlayerInputService : IPlayerInputService
         _pause = _quickSave = _quickLoad = _journal = _techniques = false;
         _characterSheet = _questLog = _map = _minimap = false;
         _meditate = _attack = _defend = false;
+        _castTechnique = false;
         _timeSpeedUp = _timeSpeedDown = false;
         _inventoryRaw = false;
         _selectedSlot = 0;

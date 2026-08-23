@@ -45,8 +45,12 @@ public partial class GameWorldController : Node2D
     [Inject] private Modules.Inventory.BeltService BeltService { get; set; } = null!;
     [Inject] private IBodyService BodyService { get; set; } = null!;
     [Inject] private IQiService QiService { get; set; } = null!;
+    [Inject] private Modules.Combat.TechniqueService TechniqueSvc { get; set; } = null!;
+    [Inject] private Modules.Player.PlayerTechniqueCaster TechniqueCaster { get; set; } = null!;
     [Inject] private IPublisher<Core.Messaging.Contracts.MeditationToggleRequestedEvent> MeditationTogglePub { get; set; } = null!;
+    [Inject] private IPublisher<Core.Messaging.Contracts.TechniqueCastRequestedEvent> TechniqueCastPub { get; set; } = null!;
     [Inject] private ISubscriber<Core.Messaging.Contracts.MeditationStateChangedEvent> MeditationStateSub { get; set; } = null!;
+    [Inject] private ISubscriber<Core.Messaging.Contracts.TechniqueCastResultEvent> TechniqueCastResultSub { get; set; } = null!;
     [Inject] private ISubscriber<Core.Messaging.Contracts.PlayerDeathEvent> PlayerDeathSub { get; set; } = null!;
     [Inject] private ISubscriber<Core.Messaging.Contracts.DamageAppliedEvent> DamageSub { get; set; } = null!;
     [Inject] private ISubscriber<Core.Messaging.Contracts.DialogueEndedEvent> DialogueEndedSub { get; set; } = null!;
@@ -61,12 +65,14 @@ public partial class GameWorldController : Node2D
     private CharacterSheetWindow _characterSheetWindow = null!;
     private UI.DialogueWindow _dialogueWindow = null!;
     private UI.HotbarPanel _hotbarPanel = null!;
+    private UI.TechniquesPanel _techniquesPanel = null!;
     private Godot.ProgressBar _hpBar = null!;
     private Godot.ProgressBar _qiBar = null!;
     private Label _qiLabel = null!;
     private Label _meditationLabel = null!;
     private bool _meditationActive;           // кэш из MeditationStateChangedEvent
     private System.IDisposable? _meditationStateToken;
+    private System.IDisposable? _techniqueCastResultToken;
     private System.IDisposable? _playerDeathToken;
     private System.IDisposable? _playerDamageToken;
     private CanvasLayer   _hudCanvas     = null!;
@@ -125,6 +131,8 @@ public partial class GameWorldController : Node2D
         SetupHUD();
         // Phase 6: subscribe the combat bridge (attack intent → combat module).
         CombatAdapter?.Start();
+        // Этап 2 внедрения ЦИ: кастер техник (TechniqueCastRequestedEvent → эффекты).
+        TechniqueCaster?.Start();
         // Этап 4 (2026-08-22): смерть игрока → респавн; урон игроку → тост.
         _playerDeathToken = PlayerDeathSub?.Subscribe(OnPlayerDeath);
         _playerDamageToken = DamageSub?.Subscribe(OnPlayerDamaged);
@@ -135,6 +143,8 @@ public partial class GameWorldController : Node2D
         _dialogueEndedToken = DialogueEndedSub?.Subscribe(OnDialogueEnded);
         // Этап 1 внедрения ЦИ: индикация медитации (V).
         _meditationStateToken = MeditationStateSub?.Subscribe(OnMeditationStateChanged);
+        // Этап 2 внедрения ЦИ: результат каста техники (тосты).
+        _techniqueCastResultToken = TechniqueCastResultSub?.Subscribe(OnTechniqueCastResult);
         GD.Print("[GameWorldController] Ready");
     }
 
@@ -146,6 +156,28 @@ public partial class GameWorldController : Node2D
         ShowToast(e.IsActive
             ? $"☯ Медитация начата (+{e.RatePerSecond:F1} Ци/с)"
             : "☯ Медитация завершена");
+    }
+
+    /// <summary>Этап 2 внедрения ЦИ: тост результата каста техники.</summary>
+    private void OnTechniqueCastResult(in Core.Messaging.Contracts.TechniqueCastResultEvent e)
+    {
+        if (!e.Success)
+        {
+            ShowToast($"✖ {e.Reason}");
+            return;
+        }
+        string label = e.Type switch
+        {
+            Core.Data.TechniqueType.Healing => "Лечение",
+            Core.Data.TechniqueType.Defense => "Щит",
+            Core.Data.TechniqueType.Movement => "Рывок",
+            Core.Data.TechniqueType.Sensory => "Восприятие",
+            Core.Data.TechniqueType.Support => "Поддержка",
+            Core.Data.TechniqueType.Curse => "Проклятие",
+            Core.Data.TechniqueType.Formation => "Формация",
+            _ => "Техника"
+        };
+        ShowToast($"✴ {label} применено");
     }
 
     // ---- World setup ----
@@ -335,7 +367,7 @@ public partial class GameWorldController : Node2D
             Name = "HudHint",
             Text = "WASD — движение | Shift — бег | ЛКМ — идти к точке | Колесо — зум\n" +
                    "Esc — пауза | PageUp/PageDown — скорость\n" +
-                   "E — подобрать | B — инвентарь | F — добыча | V — медитация\n" +
+                   "E — подобрать | B — инвентарь | F — добыча | V — медитация | Z — каст | X — выбор техники\n" +
                    "C — персонаж | J — журнал | T — техники | Q — квесты | M — карта | N — миникарта",
         };
         _hudLabel.AddThemeFontSizeOverride("font_size", 13);
@@ -376,6 +408,10 @@ public partial class GameWorldController : Node2D
         // appear when a belt is equipped.
         _hotbarPanel = new UI.HotbarPanel { Name = "HotbarPanel" };
         _hudCanvas.AddChild(_hotbarPanel);
+
+        // Этап 2 внедрения ЦИ: панель техник (T).
+        _techniquesPanel = new UI.TechniquesPanel { Name = "TechniquesPanel" };
+        _hudCanvas.AddChild(_techniquesPanel);
     }
 
     // ---- Per-frame logic ----
@@ -483,6 +519,33 @@ public partial class GameWorldController : Node2D
         {
             MeditationTogglePub.Publish(
                 new Core.Messaging.Contracts.MeditationToggleRequestedEvent(!_meditationActive));
+        }
+
+        // Этап 2 внедрения ЦИ: T — панель техник, X — следующая техника, Z — каст.
+        if (PlayerInput is { IsTechniquesPressed: true } && _techniquesPanel != null)
+        {
+            _techniquesPanel.Visible = !_techniquesPanel.Visible;
+            if (_techniquesPanel.Visible) _techniquesPanel.QueueRedraw();
+        }
+        if (PlayerInput is { IsCycleTechniquePressed: true })
+        {
+            TechniqueSvc?.CycleSelection();
+            var sel = TechniqueSvc?.SelectedTechnique;
+            if (sel != null) ShowToast($"▣ Выбрано: {sel.Name} L{sel.Level}");
+        }
+        if (PlayerInput is { IsCastTechniquePressed: true } && TechniqueSvc != null)
+        {
+            var sel = TechniqueSvc.SelectedTechnique;
+            if (sel != null)
+            {
+                var mouse = GetGlobalMousePosition();
+                TechniqueCastPub.Publish(new Core.Messaging.Contracts.TechniqueCastRequestedEvent(
+                    sel.TechniqueId, (int)(mouse.X * 1000), (int)(mouse.Y * 1000)));
+            }
+            else
+            {
+                ShowToast("✖ Нет выбранной техники (T — панель, X — выбор)");
+            }
         }
 
         // Phase 6: player combat bridge — Space publishes AttackIntentEvent

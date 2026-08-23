@@ -44,11 +44,14 @@ public static class InputMapInitializer
         // Harvest / Tool (F)
         AddKeyAction("harvest", Key.F);
 
-        // Special action (X)
+        // Special action (X) — Этап 2 ЦИ: цикл выбора техники.
         AddKeyAction("special_action", Key.X);
 
         // Meditate (V) — M is taken by world_map, so V is used for meditate.
         AddKeyAction("meditate", Key.V);
+
+        // Этап 2 внедрения ЦИ: каст выбранной техники (Z).
+        AddKeyAction("cast_technique", Key.Z);
 
         // Pause / Esc
         AddKeyAction("pause", Key.Escape);
