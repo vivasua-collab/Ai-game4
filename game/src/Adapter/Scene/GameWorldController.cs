@@ -51,6 +51,8 @@ public partial class GameWorldController : Node2D
     [Inject] private IPublisher<Core.Messaging.Contracts.TechniqueCastRequestedEvent> TechniqueCastPub { get; set; } = null!;
     [Inject] private ISubscriber<Core.Messaging.Contracts.MeditationStateChangedEvent> MeditationStateSub { get; set; } = null!;
     [Inject] private ISubscriber<Core.Messaging.Contracts.TechniqueCastResultEvent> TechniqueCastResultSub { get; set; } = null!;
+    [Inject] private ISubscriber<Core.Messaging.Contracts.FormationStageChangedEvent> FormationStageSub { get; set; } = null!;
+    [Inject] private ISubscriber<Core.Messaging.Contracts.FormationActivatedEvent> FormationActivatedSub2 { get; set; } = null!;
     [Inject] private ISubscriber<Core.Messaging.Contracts.PlayerDeathEvent> PlayerDeathSub { get; set; } = null!;
     [Inject] private ISubscriber<Core.Messaging.Contracts.DamageAppliedEvent> DamageSub { get; set; } = null!;
     [Inject] private ISubscriber<Core.Messaging.Contracts.DialogueEndedEvent> DialogueEndedSub { get; set; } = null!;
@@ -74,6 +76,8 @@ public partial class GameWorldController : Node2D
     private bool _meditationActive;           // кэш из MeditationStateChangedEvent
     private System.IDisposable? _meditationStateToken;
     private System.IDisposable? _techniqueCastResultToken;
+    private System.IDisposable? _formationStageToken;
+    private System.IDisposable? _formationActivatedToken2;
     private System.IDisposable? _playerDeathToken;
     private System.IDisposable? _playerDamageToken;
     private CanvasLayer   _hudCanvas     = null!;
@@ -146,6 +150,9 @@ public partial class GameWorldController : Node2D
         _meditationStateToken = MeditationStateSub?.Subscribe(OnMeditationStateChanged);
         // Этап 2 внедрения ЦИ: результат каста техники (тосты).
         _techniqueCastResultToken = TechniqueCastResultSub?.Subscribe(OnTechniqueCastResult);
+        // Этап 5 внедрения ЦИ: стадии формации (тосты).
+        _formationStageToken = FormationStageSub?.Subscribe(OnFormationStageChanged);
+        _formationActivatedToken2 = FormationActivatedSub2?.Subscribe(OnFormationActivated);
         GD.Print("[GameWorldController] Ready");
     }
 
@@ -179,6 +186,35 @@ public partial class GameWorldController : Node2D
             _ => "Техника"
         };
         ShowToast($"✴ {label} применено");
+    }
+
+    /// <summary>Этап 5: тосты стадий формации.</summary>
+    private void OnFormationStageChanged(in Core.Messaging.Contracts.FormationStageChangedEvent e)
+    {
+        string msg = e.NewStage switch
+        {
+            Core.Data.FormationStage.Drawing => "◈ Контур формации рисуется…",
+            Core.Data.FormationStage.Filling => "◈ Формация наполняется Ци…",
+            Core.Data.FormationStage.Depleted => "◈ Формация истощена",
+            _ => null
+        };
+        if (msg != null) ShowToast(msg);
+    }
+
+    /// <summary>Этап 5: тост активации формации.</summary>
+    private void OnFormationActivated(in Core.Messaging.Contracts.FormationActivatedEvent e)
+    {
+        string type = e.Type switch
+        {
+            Core.Data.FormationType.Barrier => "Барьер",
+            Core.Data.FormationType.Amplification => "Усиление",
+            Core.Data.FormationType.Suppression => "Подавление",
+            Core.Data.FormationType.Gathering => "Сбор Ци",
+            Core.Data.FormationType.Trap => "Ловушка",
+            Core.Data.FormationType.Detection => "Обнаружение",
+            _ => e.Type.ToString()
+        };
+        ShowToast($"✦ Формация активна: {type}");
     }
 
     // ---- World setup ----

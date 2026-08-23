@@ -88,6 +88,13 @@ namespace CultivationGame.Modules.Combat
 
         // === Выбор активной техники ===
 
+        /// <summary>
+        /// Этап 5: внешний бонус урона техник (пермил, ЗАПРЕТ 3.9).
+        /// Источник — активная формация Amplification в зоне игрока.
+        /// 0 = нет бонуса; 1300 = +30%. Применяется в CombatService.GetTechniqueDamage.
+        /// </summary>
+        public int ExternalDamageBonusPermil;
+
         /// <summary>ID выбранной техники (null — не выбрана).</summary>
         public string? SelectedTechniqueId => _selectedTechniqueId;
 

@@ -5,6 +5,8 @@ namespace CultivationGame.Core.Messaging.Contracts;
 
 // Created: 2026-05-08 (Ai-game3) — migrated 2026-08-15.
 // Formation contracts: activation, deactivation, Qi pool, stage changes, contribution commands.
+// Этап 5 внедрения ЦИ (2026-08-23): FormationActivatedEvent +FormationType +позиция
+// (для Gathering-бонуса медитации и визуализатора), старые конструкторы сохранены.
 
 // FormationStage is defined in CultivationGame.Core.Data (canonical).
 
@@ -16,8 +18,20 @@ public readonly struct FormationActivatedEvent
 {
     public readonly string FormationId;
     public readonly string CasterId;
+    public readonly FormationType Type;      // Этап 5: тип (Gathering → ×2 медитация и т.д.)
+    public readonly int PositionX;           // Этап 5: позиция центра (тайлы)
+    public readonly int PositionY;
+    public readonly int EffectRadiusMeters;  // Этап 5: радиус действия
+
     public FormationActivatedEvent(string formationId, string casterId)
-        { FormationId = formationId; CasterId = casterId; }
+        { FormationId = formationId; CasterId = casterId; Type = FormationType.Barrier; PositionX = 0; PositionY = 0; EffectRadiusMeters = 50; }
+
+    public FormationActivatedEvent(string formationId, string casterId,
+        FormationType type, int posX, int posY, int effectRadiusMeters)
+    {
+        FormationId = formationId; CasterId = casterId; Type = type;
+        PositionX = posX; PositionY = posY; EffectRadiusMeters = effectRadiusMeters;
+    }
 }
 
 /// <summary>
@@ -28,8 +42,12 @@ public readonly struct FormationDeactivatedEvent
 {
     public readonly string FormationId;
     public readonly FormationStage PreviousStage;
+    public readonly FormationType Type;      // Этап 5: тип (сброс Gathering-бонуса)
     public FormationDeactivatedEvent(string formationId, FormationStage previousStage)
-        { FormationId = formationId; PreviousStage = previousStage; }
+        { FormationId = formationId; PreviousStage = previousStage; Type = FormationType.Barrier; }
+
+    public FormationDeactivatedEvent(string formationId, FormationStage previousStage, FormationType type)
+        { FormationId = formationId; PreviousStage = previousStage; Type = type; }
 }
 
 /// <summary>

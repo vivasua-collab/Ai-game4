@@ -87,6 +87,20 @@ namespace CultivationGame.Modules.Formation
         public int ParticipantCount => _participants.Count;
         public string CasterId => _casterId;
 
+        // === Этап 5 внедрения ЦИ: данные текущей формации для визуализатора/кастера ===
+
+        /// <summary>Данные текущей формации (null — не создана).</summary>
+        public Data.FormationData? CurrentFormation => _currentFormation;
+
+        /// <summary>Позиция центра формации (тайлы).</summary>
+        public int PositionX => _positionX;
+        public int PositionY => _positionY;
+        private int _positionX;
+        private int _positionY;
+
+        // Автонаполнение от создателя-одиночки (этап 5): double-аккумулятор.
+        private double _autoFillAccumulator;
+
         // === Конструктор (VContainer) ===
 
         public FormationService(
@@ -148,6 +162,15 @@ namespace CultivationGame.Modules.Formation
         /// </summary>
         public bool StartDrawing(string formationId, string casterId)
         {
+            return StartDrawing(formationId, casterId, 0, 0);
+        }
+
+        /// <summary>
+        /// Этап 5 внедрения ЦИ: начать прорисовку в заданной точке (тайлы).
+        /// Формация рисуется центром в позиции создателя.
+        /// </summary>
+        public bool StartDrawing(string formationId, string casterId, int posX, int posY)
+        {
             if (_currentStage != FormationStage.None) return false;
 
             // Поиск данных формации (в будущих фазах: из реестра/ScriptableObject)
@@ -165,6 +188,8 @@ namespace CultivationGame.Modules.Formation
                 return false;
 
             _casterId = casterId;
+            _positionX = posX;
+            _positionY = posY;
 
             // FMT-A05: Проверяем, достаточно ли Ци у создателя для прорисовки контура
             long contourQi = FormationCalculator.CalculateContourQi(_currentFormation.RequiredLevel);
@@ -327,9 +352,11 @@ namespace CultivationGame.Modules.Formation
             // Активируем эффекты
             _effects.Activate();
 
-            // Публикуем событие активации
+            // Публикуем событие активации (этап 5: с типом и позицией)
             _activatedPub.Publish(new FormationActivatedEvent(
-                _currentFormation.Id, _casterId));
+                _currentFormation.Id, _casterId,
+                _currentFormation.FormationType, _positionX, _positionY,
+                _currentFormation.EffectRadiusMeters));
 
             return true;
         }
@@ -353,9 +380,10 @@ namespace CultivationGame.Modules.Formation
             // Очищаем участников
             _participants.Clear();
 
-            // Публикуем событие деактивации
+            // Публикуем событие деактивации (этап 5: с типом для сброса бонусов)
             string formationId = _currentFormation?.Id ?? "unknown";
-            _deactivatedPub.Publish(new FormationDeactivatedEvent(formationId, previousStage));
+            var formationType = _currentFormation?.FormationType ?? FormationType.Barrier;
+            _deactivatedPub.Publish(new FormationDeactivatedEvent(formationId, previousStage, formationType));
 
             // Переход: * → None
             ChangeStage(FormationStage.None);
@@ -397,6 +425,25 @@ namespace CultivationGame.Modules.Formation
         // === Обработка утечки Ци (вызывается из FormationModule.Tick) ===
 
         /// <summary>
+        /// Этап 5 внедрения ЦИ: автонаполнение формации создателем-одиночкой.
+        /// Скорость = conductivity создателя (FORMATION_SYSTEM §9.1: каждый
+        /// вносит 100% от своей способности). Вызывается FormationModule.Tick.
+        /// </summary>
+        public void AutoFillTick(float deltaTime)
+        {
+            if (_currentStage != FormationStage.Filling) return;
+            if (_cachedConductivity <= 0f || deltaTime <= 0f) return;
+
+            _autoFillAccumulator += _cachedConductivity * deltaTime;
+            if (_autoFillAccumulator >= 1.0)
+            {
+                long chunk = (long)_autoFillAccumulator;
+                _autoFillAccumulator -= chunk;
+                ContributeQi(_casterId, chunk);
+            }
+        }
+
+        /// <summary>
         /// Обработать утечку Ци в тиках.
         /// Вызывается FormationModule.ITickable.Tick().
         /// Утечка происходит ТОЛЬКО в стадии Active.
@@ -420,6 +467,13 @@ namespace CultivationGame.Modules.Formation
                 // Полная деактивация (→ None) только через явный вызов DeactivateFormation().
                 ChangeStage(FormationStage.Depleted);
                 _effects.Deactivate(); // Эффекты отключаются при истощении
+
+                // Этап 5: формация без физического ядра (вариант А, FORMATION_SYSTEM
+                // §2.1) при истощении ИСЧЕЗАЕТ навсегда → полное разрушение.
+                if (_currentFormation is { IsReusable: false })
+                {
+                    DeactivateFormation();
+                }
             }
         }
 

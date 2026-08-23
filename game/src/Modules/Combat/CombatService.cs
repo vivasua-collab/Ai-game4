@@ -635,7 +635,14 @@ namespace CultivationGame.Modules.Combat
                 // A3 FIX: BaseDamage уже содержит capacity × gradeMultiplier
                 // Старый код: TechniqueCapacity.CalculateCost() → стоимость ёмкости (50-200),
                 // что не является уроном. BaseDamage рассчитывается при генерации техники.
-                return tech.BaseDamage > 0 ? tech.BaseDamage : 10; // P1-6.1: BaseDamage уже int
+                int baseDamage = tech.BaseDamage > 0 ? tech.BaseDamage : 10; // P1-6.1: BaseDamage уже int
+                // Этап 5 внедрения ЦИ: бонус формации Amplification (пермил, ЗАПРЕТ 3.9).
+                int bonusPermil = _techniqueService.ExternalDamageBonusPermil;
+                if (bonusPermil != 0)
+                {
+                    baseDamage = baseDamage * bonusPermil / 1000;
+                }
+                return baseDamage;
             }
             // Базовый урон кулака (нет техники)
             return 10;

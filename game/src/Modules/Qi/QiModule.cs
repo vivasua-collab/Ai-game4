@@ -38,12 +38,18 @@ public class QiModule : IModule, IDisposable
     [Inject] private readonly IPublisher<MeditationStateChangedEvent> _meditationStatePub = null!;
     [Inject] private readonly ISubscriber<MeditationToggleRequestedEvent> _meditationToggleSub = null!;
     [Inject] private readonly ISubscriber<CombatStartedEvent> _combatStartedSub = null!;
+    // Этап 5: формации Gathering удваивают поглощение Ци в зоне действия.
+    [Inject] private readonly ISubscriber<FormationActivatedEvent> _formationActivatedSub = null!;
+    [Inject] private readonly ISubscriber<FormationDeactivatedEvent> _formationDeactivatedSub = null!;
 
     private IDisposable? _meditationToggleSubscription;
     private IDisposable? _combatStartedSubscription;
+    private IDisposable? _formationActivatedSubscription;
+    private IDisposable? _formationDeactivatedSubscription;
     private bool _meditationActive;
     private float _meditationRate;          // ед/сек (кэшируется при активации)
     private double _meditationAccumulator;  // точность малых скоростей
+    private float _gatheringEnvironmentMult = 1f; // Этап 5: ×2 при активной Gathering-формации
 
     public string ModuleName => "Qi";
 
@@ -53,6 +59,8 @@ public class QiModule : IModule, IDisposable
 
         _meditationToggleSubscription = _meditationToggleSub.Subscribe(OnMeditationToggle);
         _combatStartedSubscription = _combatStartedSub.Subscribe(OnCombatStarted);
+        _formationActivatedSubscription = _formationActivatedSub.Subscribe(OnFormationActivated);
+        _formationDeactivatedSubscription = _formationDeactivatedSub.Subscribe(OnFormationDeactivated);
     }
 
     public void Tick(int tickCount)
@@ -99,9 +107,34 @@ public class QiModule : IModule, IDisposable
     {
         _meditationActive = active;
         _meditationAccumulator = 0.0;
-        _meditationRate = active ? _qiService.Conductivity * GameConstants.ENVIRONMENT_MULT_NORMAL : 0f;
+        // Этап 5: формация Gathering в зоне → environmentMult ×2 (FORMATION_SYSTEM §10.2,
+        // «Богатая Ци»; эффект-запись генератора: Value=1.0 → +100%).
+        _meditationRate = active
+            ? _qiService.Conductivity * GameConstants.ENVIRONMENT_MULT_NORMAL * _gatheringEnvironmentMult
+            : 0f;
 
         _meditationStatePub.Publish(new MeditationStateChangedEvent(_meditationActive, _meditationRate));
+    }
+
+    /// <summary>Этап 5: активация Gathering-формации → ×2 к поглощению Ци при медитации.</summary>
+    private void OnFormationActivated(in FormationActivatedEvent e)
+    {
+        if (e.Type == FormationType.Gathering)
+        {
+            _gatheringEnvironmentMult = 2f;
+            // Пересчёт скорости, если медитация уже идёт.
+            if (_meditationActive) SetMeditation(true);
+        }
+    }
+
+    /// <summary>Этап 5: деактивация Gathering-формации → сброс бонуса.</summary>
+    private void OnFormationDeactivated(in FormationDeactivatedEvent e)
+    {
+        if (e.Type == FormationType.Gathering)
+        {
+            _gatheringEnvironmentMult = 1f;
+            if (_meditationActive) SetMeditation(true);
+        }
     }
 
     public void Dispose()
@@ -110,6 +143,10 @@ public class QiModule : IModule, IDisposable
         _meditationToggleSubscription = null;
         _combatStartedSubscription?.Dispose();
         _combatStartedSubscription = null;
+        _formationActivatedSubscription?.Dispose();
+        _formationActivatedSubscription = null;
+        _formationDeactivatedSubscription?.Dispose();
+        _formationDeactivatedSubscription = null;
         // Services own their subscriptions and dispose themselves.
     }
 }

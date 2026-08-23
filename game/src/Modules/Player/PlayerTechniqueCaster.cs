@@ -19,6 +19,8 @@ using CultivationGame.Core.Events;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Core.Messaging.Contracts;
 using CultivationGame.Modules.Combat;
+using CultivationGame.Modules.Formation;
+using CultivationGame.Modules.Generator;
 
 namespace CultivationGame.Modules.Player;
 
@@ -26,7 +28,8 @@ namespace CultivationGame.Modules.Player;
 /// Кастер техник игрока. Владеет логикой применения техник по типам.
 /// АРХИТЕКТУРА: кросс-модульное общение через EventBus; санкционированные
 /// прямые инъекции (как в PlayerCombatAdapter): IPlayerService, INPCService,
-/// IBodyService (модуль игрока работает с игроком).
+/// IBodyService (модуль игрока работает с игроком), IFormationService +
+/// IFormationGeneratorService (этап 5: формации).
 /// </summary>
 public sealed class PlayerTechniqueCaster : IDisposable
 {
@@ -34,10 +37,13 @@ public sealed class PlayerTechniqueCaster : IDisposable
     [Inject] private readonly INPCService _npcs = null!;
     [Inject] private readonly IBodyService _body = null!;
     [Inject] private readonly TechniqueService _techniques = null!;
+    [Inject] private readonly IFormationService _formations = null!;
+    [Inject] private readonly IFormationGeneratorService _formationGenerator = null!;
     [Inject] private readonly IPublisher<AttackIntentEvent> _attackIntentPub = null!;
     [Inject] private readonly IPublisher<QiBufferActivateRequestEvent> _qiBufferActivatePub = null!;
     [Inject] private readonly IPublisher<TechniqueCastResultEvent> _castResultPub = null!;
     [Inject] private readonly ISubscriber<TechniqueCastRequestedEvent> _castRequestSub = null!;
+    [Inject] private readonly ISubscriber<FormationActivatedEvent> _formationActivatedSub = null!;
 
     /// <summary>Дальность dash техник Movement (тайлы).</summary>
     private const int DashDistanceTiles = 3;
@@ -46,14 +52,36 @@ public sealed class PlayerTechniqueCaster : IDisposable
     /// <summary>Минимальная дальность атаки в тайлах (Range/2м, но не меньше 2).</summary>
     private const float MinAttackRangeTiles = 2f;
 
+    /// <summary>Типы формаций для случайной генерации Formation-техникой (этап 5).</summary>
+    private static readonly FormationType[] FormationTypePool =
+    {
+        FormationType.Barrier, FormationType.Amplification,
+        FormationType.Suppression, FormationType.Gathering
+    };
+
     private IDisposable? _castRequestToken;
+    private IDisposable? _formationActivatedToken;
+    private readonly Random _formationRng = new();
 
     public void Start()
     {
         _castRequestToken = _castRequestSub.Subscribe(OnCastRequested);
+        // Этап 5: Barrier-формация при активации даёт игроку Ци-щит.
+        _formationActivatedToken = _formationActivatedSub.Subscribe(OnFormationActivated);
     }
 
     public void Tick(float deltaTime) { /* нет кадровых задач */ }
+
+    /// <summary>Barrier-формация активирована → Ци-буфер игрока (схематично, этап 5).</summary>
+    private void OnFormationActivated(in FormationActivatedEvent e)
+    {
+        if (e.CasterId != _player.PlayerId) return;
+        if (e.Type != FormationType.Barrier) return;
+        // Поглощение урона за счёт Ци (FORMATION_SYSTEM §12.1: барьер поглощает урон).
+        // Схематично: буфер = 10% ёмкости формации (кап 2000).
+        long shield = Math.Min(2000, Math.Max(200, _formations.QiPoolMax / 10));
+        _qiBufferActivatePub.Publish(new QiBufferActivateRequestEvent(shield, QiBufferMode.Shield));
+    }
 
     private void OnCastRequested(in TechniqueCastRequestedEvent e)
     {
@@ -95,6 +123,9 @@ public sealed class PlayerTechniqueCaster : IDisposable
                         ? "Перезарядка" : "Недостаточно Ци");
                     return;
                 }
+                // Этап 5: формация Amplification в зоне → пермил-бонус урона
+                // (CombatService.GetTechniqueDamage применяет; ЗАПРЕТ 3.9).
+                _techniques.ExternalDamageBonusPermil = GetAmplificationBonusPermil();
                 _attackIntentPub.Publish(new AttackIntentEvent(
                     _player.PlayerId, target, e.TechniqueId, isRanged));
                 PublishSuccess(tech, playerX, playerY, target);
@@ -182,8 +213,29 @@ public sealed class PlayerTechniqueCaster : IDisposable
 
             case TechniqueType.Formation:
             {
-                // Этап 5 внедрения ЦИ: создание формации.
-                PublishFail(e.TechniqueId, "Формации: этап 5 (скоро)");
+                // Этап 5 внедрения ЦИ: создание формации (вариант А, без ядра).
+                // 1) Генерация формации (тип случайный из пула, Small, уровень техники).
+                // 2) StartDrawing в позиции игрока: расход contourQi (QiConsumeRequestEvent).
+                // 3) Автонаполнение: FormationModule.AutoFillTick (conductivity/сек) → Active.
+                if (_formations.CurrentStage != Core.Data.FormationStage.None)
+                {
+                    PublishFail(e.TechniqueId, "Формация уже создаётся");
+                    return;
+                }
+
+                var type = FormationTypePool[_formationRng.Next(FormationTypePool.Length)];
+                var data = _formationGenerator.GenerateSpecified(
+                    type, FormationSize.Small, tech.Level, _formationRng.NextInt64());
+
+                bool started = _formations.StartDrawing(data.Id, _player.PlayerId,
+                    _player.Position.X, _player.Position.Y);
+                if (!started)
+                {
+                    PublishFail(e.TechniqueId, "Не хватает Ци на контур или уровень мал");
+                    return;
+                }
+
+                PublishSuccess(tech, playerX, playerY, null, visualKind: 2);
                 return;
             }
 
@@ -193,10 +245,28 @@ public sealed class PlayerTechniqueCaster : IDisposable
         }
     }
 
+    /// <summary>
+    /// Этап 5: бонус урона от активной формации Amplification, если игрок в зоне.
+    /// Возвращает пермил (1000 = +0%, 1300 = +30%); 1000 — формации нет.
+    /// </summary>
+    private int GetAmplificationBonusPermil()
+    {
+        if (_formations is not Modules.Formation.FormationService svc) return 1000;
+        if (!svc.IsFormationActive || svc.CurrentFormation is not { } f) return 1000;
+        if (f.FormationType != FormationType.Amplification) return 1000;
+
+        // Игрок в радиусе? (Chebyshev в тайлах против EffectRadiusMeters / TILE_SIZE_M)
+        var pos = _player.Position;
+        float radiusTiles = f.EffectRadiusMeters / (float)GameConstants.TILE_SIZE_M;
+        int dist = Math.Max(Math.Abs(pos.X - svc.PositionX), Math.Abs(pos.Y - svc.PositionY));
+        if (dist > radiusTiles) return 1000;
+
+        return 1000 + svc.GetFormationBonusPermil(StatType.Damage);
+    }
+
     /// <summary>Ближайший живой NPC в радиусе техники (Chebyshev, тайлы).</summary>
     private string? FindTargetInRange(LearnedTechnique tech)
-    {
-        // Range хранится в метрах; 1 тайл = 2 м (TILE_SIZE_M), минимум 2 тайла.
+    {        // Range хранится в метрах; 1 тайл = 2 м (TILE_SIZE_M), минимум 2 тайла.
         float rangeTiles = Math.Max(MinAttackRangeTiles, tech.Range / GameConstants.TILE_SIZE_M);
         var nearby = _npcs.GetNearbyNPCIds(_player.Position, rangeTiles);
         if (nearby == null || nearby.Count == 0) return null;
@@ -276,5 +346,7 @@ public sealed class PlayerTechniqueCaster : IDisposable
     {
         _castRequestToken?.Dispose();
         _castRequestToken = null;
+        _formationActivatedToken?.Dispose();
+        _formationActivatedToken = null;
     }
 }

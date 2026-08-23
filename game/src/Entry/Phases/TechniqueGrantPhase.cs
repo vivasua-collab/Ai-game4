@@ -31,6 +31,9 @@ public sealed class TechniqueGrantPhase : AbstractSceneAssemblyPhase
     [Inject] private readonly ITechniqueGeneratorService _techniqueGenerator = null!;
     [Inject] private readonly TechniqueService _techniques = null!;
     [Inject] private readonly IQiService _qi = null!;
+    [Inject] private readonly IPlayerService _player = null!;
+    [Inject] private readonly IFormationService _formations = null!;
+    [Inject] private readonly CultivationGame.Modules.Generator.IFormationGeneratorService _formationGenerator = null!;
 
     /// <summary>Типы активных техник для случайного наполнения Combat-пула.</summary>
     private static readonly TechniqueType[] ActivePoolTypes =
@@ -88,6 +91,30 @@ public sealed class TechniqueGrantPhase : AbstractSceneAssemblyPhase
 
         Console.WriteLine($"[Phase {PhaseOrder}] {PhaseName} complete — granted {granted} techniques " +
                           $"(cultivation 1, active {grantedActive}/{combatSlots}, curse, formation) at L{level}");
+
+        // Headless smoke-тест формаций (этап 5): GODOT_FORMATION_TEST=1 — создать
+        // формацию напрямую (StartDrawing + мгновенное наполнение → Active).
+        if (Environment.GetEnvironmentVariable("GODOT_FORMATION_TEST") == "1")
+        {
+            var pool = new[] { FormationType.Barrier, FormationType.Amplification,
+                               FormationType.Suppression, FormationType.Gathering };
+            var genType = pool[Math.Abs(seed.GetHashCode()) % pool.Length];
+            var formData = _formationGenerator.GenerateSpecified(
+                genType, Core.Data.FormationSize.Small, level, seed + 999);
+            var playerPos = _player.Position;
+            bool started = _formations.StartDrawing(formData.Id, _player.PlayerId,
+                playerPos.X, playerPos.Y);
+            Console.WriteLine($"[FormationTest] id={formData.Id} name='{formData.DisplayName}' " +
+                              $"started={started} stage={_formations.CurrentStage} " +
+                              $"pool={_formations.QiPoolCurrent}/{_formations.QiPoolMax}");
+            if (started)
+            {
+                // Мгновенное наполнение (headless не ждёт conductivity-тиков).
+                _formations.ContributeQi(_player.PlayerId, _formations.QiPoolMax);
+                Console.WriteLine($"[FormationTest] after fill: stage={_formations.CurrentStage} " +
+                                  $"active={_formations.IsFormationActive} pool={_formations.QiPoolCurrent}/{_formations.QiPoolMax}");
+            }
+        }
         return Task.CompletedTask;
     }
 }

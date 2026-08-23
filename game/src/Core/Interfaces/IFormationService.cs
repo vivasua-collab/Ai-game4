@@ -42,6 +42,12 @@ namespace CultivationGame.Core.Interfaces
         bool StartDrawing(string formationId, string casterId);
 
         /// <summary>
+        /// Этап 5 внедрения ЦИ: начать прорисовку в заданной точке (тайлы).
+        /// Формация рисуется центром в позиции создателя.
+        /// </summary>
+        bool StartDrawing(string formationId, string casterId, int posX, int posY);
+
+        /// <summary>
         /// Начать наполнение формации Ци.
         /// Этап 2: Внесение Ци участниками через FormationContributeQiRequestEvent.
         /// Автоматически вызывается после завершения прорисовки.
