@@ -331,7 +331,7 @@ public partial class FormationVisualRenderer : Node2D
     {
         // Ромб + точка в центре.
         DrawDiamond(_center, glow ? 14f : 10f, color);
-        DrawCircle(_center, 3f, WithAlpha(Color Colors White, 0)); // placeholder removed below
+        DrawCircle(_center, 3f, WithAlpha(color, 0.6f));
     }
 
     /// <summary>Дуга-индикатор прогресса наполнения вокруг центра.</summary>

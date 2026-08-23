@@ -41,6 +41,9 @@ public partial class InventoryWindow : Control
     [Inject] private IEquipmentService EquipmentService { get; set; } = null!;
     [Inject] private IPlayerService PlayerService { get; set; } = null!;
     [Inject] private IEquipmentGenerator EquipmentGenerator { get; set; } = null!;
+    [Inject] private IQiService QiService { get; set; } = null!;
+    [Inject] private IBodyService BodyService { get; set; } = null!;
+    [Inject] private CultivationGame.Core.Events.IPublisher<CultivationGame.Core.Messaging.Contracts.ToastShownEvent> ToastPub { get; set; } = null!;
 
     private bool _isVisible;
     private Panel _panel = null!;
@@ -336,6 +339,20 @@ public partial class InventoryWindow : Control
             ItemDatabase.Register(item);
             InventoryService.TryAddItem(item, 5);
         }
+
+        // === Этап 7 внедрения ЦИ: камни Ци (GENERATORS_SYSTEM.md §10) ===
+        // Регистрируем все 10 канонических камней (5 размеров × calm/chaotic)
+        // в БД предметов. Игроку выдаём 3 стартовых камня (calm: dust, pebble, shard).
+        QiStoneSeeder.Seed(ItemDatabase);
+        if (ItemDatabase.TryGetItem("qistone_dust_calm", out var qDust))
+            InventoryService.TryAddItem(qDust, 3);
+        if (ItemDatabase.TryGetItem("qistone_pebble_calm", out var qPebble))
+            InventoryService.TryAddItem(qPebble, 2);
+        if (ItemDatabase.TryGetItem("qistone_shard_calm", out var qShard))
+            InventoryService.TryAddItem(qShard, 1);
+        // Один хаотичный камень — для теста риска.
+        if (ItemDatabase.TryGetItem("qistone_dust_chaotic", out var qChaotic))
+            InventoryService.TryAddItem(qChaotic, 1);
     }
 
     /// <summary>Toggle inventory visibility.</summary>
@@ -363,6 +380,102 @@ public partial class InventoryWindow : Control
 
     /// <summary>Expose doll panel for double-click equip (InventoryItemRow uses this).</summary>
     public CharacterDollPanel? GetDollPanel() => _dollPanel;
+
+    /// <summary>
+    /// Этап 7 внедрения ЦИ: использовать камень Ци (RMB в инвентаре → Use).
+    /// v1 — мгновенное поглощение всего Ци камня:
+    ///   • +QiAmount к CurrentQi игрока (IQiService.AddQi).
+    ///   • chaotic: 10% шанс −10% MaxHP (опасность хаотичной Ци, §10.2).
+    ///   • камень расходуется (1 шт. снимается с инвентаря).
+    /// </summary>
+    public bool TryUseQiStone(string itemId)
+    {
+        if (string.IsNullOrEmpty(itemId)) return false;
+        if (!ItemDatabase.TryGetItem(itemId, out var itemData)) return false;
+        if (itemData is not QiStoneData stone) return false;
+
+        int count = InventoryService.GetItemCount(itemId);
+        if (count <= 0)
+        {
+            PublishToast("Нет камня для использования");
+            return false;
+        }
+
+        long before = QiService?.CurrentQi ?? 0;
+
+        // Снять 1 шт. с инвентаря.
+        if (!InventoryService.TryRemoveItem(itemId, 1))
+        {
+            PublishToast("Не удалось использовать камень");
+            return false;
+        }
+
+        // Поглотить Ци (мгновенно для v1).
+        QiService?.AddQi(stone.QiAmount);
+
+        long after = QiService?.CurrentQi ?? 0;
+        long gained = after - before;
+
+        // Хаотичная Ци: 10% шанс −10% MaxHP (риск по канону §10.2).
+        bool tookDamage = false;
+        if (stone.IsChaotic)
+        {
+            var rng = new System.Random((int)System.DateTime.UtcNow.Ticks);
+            double roll = rng.NextDouble();
+            if (roll < 0.10) // 10% риск
+            {
+                ApplyChaoticDamage();
+                tookDamage = true;
+            }
+        }
+
+        // Формирование отзыва.
+        string stoneName = stone.NameRu;
+        if (tookDamage)
+        {
+            PublishToast($"💥 {stoneName}: +{gained} Ци, но хаотичная Ци ранила вас! (−10% HP)");
+            GD.Print($"[Inventory] Used Qi stone {itemId}: +{gained} Qi, chaotic damage applied");
+        }
+        else if (stone.IsChaotic)
+        {
+            PublishToast($"⚡ {stoneName}: +{gained} Ци (хаос сдержан — повезло)");
+            GD.Print($"[Inventory] Used chaotic Qi stone {itemId}: +{gained} Qi, no damage");
+        }
+        else
+        {
+            PublishToast($"✦ {stoneName}: +{gained} Ци");
+            GD.Print($"[Inventory] Used Qi stone {itemId}: +{gained} Qi");
+        }
+
+        RefreshExternally();
+        return true;
+    }
+
+    /// <summary>
+    /// Применить урон хаотичной Ци: −10% от максимального HP игрока.
+    /// HP = сумма MaxRedHP по частям тела (Q4). Урон наносится в торс
+    /// (витальная часть) — представляет нагрузку на культивационное ядро.
+    /// </summary>
+    private void ApplyChaoticDamage()
+    {
+        if (BodyService == null) return;
+        int maxHp = 0;
+        var parts = BodyService.GetAllParts();
+        if (parts == null) return;
+        foreach (var p in parts) maxHp += p.MaxRedHP;
+        if (maxHp <= 0) return;
+
+        int damage = (int)System.Math.Max(1, maxHp * 0.10f);
+        BodyService.ApplyDamage(BodyPartType.Torso, damage);
+        GD.Print($"[Inventory] Chaotic Qi damage: -{damage} HP (10% of {maxHp})");
+    }
+
+    /// <summary>Опубликовать toast (показывается GameWorldController).</summary>
+    private void PublishToast(string message)
+    {
+        GD.Print($"[Inventory] {message}");
+        ToastPub?.Publish(new CultivationGame.Core.Messaging.Contracts.ToastShownEvent(message, 2.5f));
+    }
 
     /// <summary>
     /// Drop an item from inventory onto the ground near the player.
@@ -618,10 +731,18 @@ public partial class InventoryItemRow : HBoxContainer
         {
             if (mb.ButtonIndex == MouseButton.Right)
             {
-                // RMB: info log
+                // RMB: Этап 7 — для камня Ци: использовать (мгновенное поглощение).
+                // Для остальных категорий: только лог-инфо.
                 if (_itemDb.TryGetItem(_slot.ItemId, out var itemData))
                 {
-                    GD.Print($"[Inventory] RMB on {itemData.NameRu} (category={itemData.Category}, rarity={itemData.Rarity})");
+                    if (itemData.Category == ItemCategory.QiStone)
+                    {
+                        _parent.TryUseQiStone(_slot.ItemId);
+                    }
+                    else
+                    {
+                        GD.Print($"[Inventory] RMB on {itemData.NameRu} (category={itemData.Category}, rarity={itemData.Rarity})");
+                    }
                 }
             }
             else if (mb.ButtonIndex == MouseButton.Left)

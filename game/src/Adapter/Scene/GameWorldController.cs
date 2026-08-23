@@ -56,6 +56,7 @@ public partial class GameWorldController : Node2D
     [Inject] private ISubscriber<Core.Messaging.Contracts.PlayerDeathEvent> PlayerDeathSub { get; set; } = null!;
     [Inject] private ISubscriber<Core.Messaging.Contracts.DamageAppliedEvent> DamageSub { get; set; } = null!;
     [Inject] private ISubscriber<Core.Messaging.Contracts.DialogueEndedEvent> DialogueEndedSub { get; set; } = null!;
+    [Inject] private ISubscriber<Core.Messaging.Contracts.ToastShownEvent> ToastShownSub { get; set; } = null!;
 
     private Node2D        _worldRoot     = null!;
     private Camera2D      _camera        = null!;
@@ -69,6 +70,9 @@ public partial class GameWorldController : Node2D
     private UI.DialogueWindow _dialogueWindow = null!;
     private UI.HotbarPanel _hotbarPanel = null!;
     private UI.TechniquesPanel _techniquesPanel = null!;
+#if DEBUG
+    private UI.CheatPanel? _cheatPanel; // Этап 7: чит-меню (F1).
+#endif
     private Godot.ProgressBar _hpBar = null!;
     private Godot.ProgressBar _qiBar = null!;
     private Label _qiLabel = null!;
@@ -80,6 +84,7 @@ public partial class GameWorldController : Node2D
     private System.IDisposable? _formationActivatedToken2;
     private System.IDisposable? _playerDeathToken;
     private System.IDisposable? _playerDamageToken;
+    private System.IDisposable? _toastShownToken;
     private CanvasLayer   _hudCanvas     = null!;
     private Label         _timeLabel     = null!;
     private Label         _hudLabel      = null!;
@@ -141,6 +146,8 @@ public partial class GameWorldController : Node2D
         // Этап 4 (2026-08-22): смерть игрока → респавн; урон игроку → тост.
         _playerDeathToken = PlayerDeathSub?.Subscribe(OnPlayerDeath);
         _playerDamageToken = DamageSub?.Subscribe(OnPlayerDamaged);
+        // Этап 7: тосты от модулей (InventoryWindow.TryUseQiStone и др.)
+        _toastShownToken = ToastShownSub?.Subscribe(OnToastShown);
         // Phase 2 fix: dialogue can end from MANY paths (E advance, Esc, choice
         // button click, digit key 1-4) — each closed the window its own way and
         // only E/Esc resumed time, leaving the game silently paused after a
@@ -409,7 +416,11 @@ public partial class GameWorldController : Node2D
             Text = "WASD — движение | Shift — бег | ЛКМ — идти к точке | Колесо — зум\n" +
                    "Esc — пауза | PageUp/PageDown — скорость\n" +
                    "E — подобрать | B — инвентарь | F — добыча | V — медитация | Z — каст | X — выбор техники\n" +
-                   "C — персонаж | J — журнал | T — техники | Q — квесты | M — карта | N — миникарта",
+                   "C — персонаж | J — журнал | T — техники | Q — квесты | M — карта | N — миникарта"
+#if DEBUG
+                   + "\nF1 — чит-меню (dev)"
+#endif
+            ,
         };
         _hudLabel.AddThemeFontSizeOverride("font_size", 13);
         _hudLabel.AddThemeColorOverride("font_color", new Color(0.1f, 0.08f, 0.05f));  // near-black
@@ -453,6 +464,13 @@ public partial class GameWorldController : Node2D
         // Этап 2 внедрения ЦИ: панель техник (T).
         _techniquesPanel = new UI.TechniquesPanel { Name = "TechniquesPanel" };
         _hudCanvas.AddChild(_techniquesPanel);
+
+#if DEBUG
+        // Этап 7 внедрения ЦИ: чит-меню разработки (F1).
+        // Видимость переключается в HandleStickyInput по PlayerInput.IsCheatMenuPressed.
+        _cheatPanel = new UI.CheatPanel { Name = "CheatPanel" };
+        _hudCanvas.AddChild(_cheatPanel);
+#endif
     }
 
     // ---- Per-frame logic ----
@@ -807,6 +825,16 @@ public partial class GameWorldController : Node2D
     {
         if (PlayerInput == null || Time == null) return;
 
+#if DEBUG
+        // Этап 7: F1 — чит-меню (только в DEBUG-сборке).
+        // Работает независимо от состояния UI (modalOpen, пауза).
+        if (PlayerInput.IsCheatMenuPressed && _cheatPanel != null)
+        {
+            _cheatPanel.Visible = !_cheatPanel.Visible;
+            GD.Print($"[GameWorld] CheatPanel: {(_cheatPanel.Visible ? "open" : "closed")}");
+        }
+#endif
+
         // Esc while a dialogue is open → close it and resume ticks (Phase 2).
         if (PlayerInput.IsPausePressed && _dialogueWindow is { IsOpen: true })
         {
@@ -958,6 +986,12 @@ public partial class GameWorldController : Node2D
     {
         if (e.TargetId is not ("player_0" or "player")) return;
         ShowToast($"💥 −{e.Damage} HP");
+    }
+
+    /// <summary>Этап 7: тост от модуля (QiStone use, чит-меню и т.д.).</summary>
+    private void OnToastShown(in Core.Messaging.Contracts.ToastShownEvent e)
+    {
+        if (!string.IsNullOrEmpty(e.Message)) ShowToast(e.Message);
     }
 
     /// <summary>

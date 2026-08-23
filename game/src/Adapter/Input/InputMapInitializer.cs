@@ -94,6 +94,11 @@ public static class InputMapInitializer
         AddKeyAction("input_log", Key.Quoteleft);
         AddKeyAction("input_log", Key.F1);
 
+        // Этап 7 внедрения ЦИ: чит-меню разработки (F1, #if DEBUG только в CheatPanel).
+        // F1 уже связан с input_log, но input_log нигде не потребляется —
+        // оба action'а получают событие, но только cheat_menu используется.
+        AddKeyAction("cheat_menu", Key.F1);
+
         // Time speed control: Page Up = faster, Page Down = slower
         AddPhysicalKeyAction("time_speed_up", Key.Pageup);
         AddPhysicalKeyAction("time_speed_down", Key.Pagedown);

@@ -39,6 +39,7 @@ public sealed class PlayerInputService : IPlayerInputService
     private bool _castTechnique;
     private bool _timeSpeedUp;
     private bool _timeSpeedDown;
+    private bool _cheatMenu;
     private int _selectedSlot;
 
     /// <summary>
@@ -74,6 +75,9 @@ public sealed class PlayerInputService : IPlayerInputService
     public bool IsQuickLoadPressed => _quickLoad && !InputDisabled;
     public bool IsTimeSpeedUpPressed => _timeSpeedUp && !InputDisabled;
     public bool IsTimeSpeedDownPressed => _timeSpeedDown && !InputDisabled;
+
+    // Этап 7: F1 — чит-меню (работает всегда, без InputDisabled-гарда).
+    public bool IsCheatMenuPressed => _cheatMenu;
 
     public int SelectedTechniqueSlot => _selectedSlot;
 
@@ -115,6 +119,9 @@ public sealed class PlayerInputService : IPlayerInputService
             if (data.IsSticky("time_speed_up")) _timeSpeedUp = true;
             if (data.IsSticky("time_speed_down")) _timeSpeedDown = true;
         }
+        // Этап 7: F1 — чит-меню работает даже когда InputDisabled (UI открыт).
+        // Политика: чит-меню — это dev-tool, доступный всегда.
+        if (data.IsSticky("cheat_menu")) _cheatMenu = true;
         if (data.HotbarSlot is int slot && slot > 0) _selectedSlot = slot;
     }
 
@@ -126,6 +133,7 @@ public sealed class PlayerInputService : IPlayerInputService
         _meditate = _attack = _defend = false;
         _castTechnique = false;
         _timeSpeedUp = _timeSpeedDown = false;
+        _cheatMenu = false;
         _inventoryRaw = false;
         _selectedSlot = 0;
     }

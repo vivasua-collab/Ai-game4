@@ -502,6 +502,7 @@ namespace CultivationGame.Core.Data
         Material,       // Материал
         Technique,      // Свиток техники
         Quest,          // Квестовый предмет
+        QiStone,        // Камень Ци (Q12 — снят 2026-08-23, этап 7 внедрения ЦИ)
         Misc            // Разное
     }
 

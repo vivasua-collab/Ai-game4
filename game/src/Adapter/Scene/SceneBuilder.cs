@@ -52,6 +52,8 @@ public partial class SceneBuilder : Node
         SetupAnimals();
         // NPC_COMBAT_PREP Phase 1: human NPCs — coloured circles per role.
         SetupNPCs();
+        // Qi Stage 6: formation visual renderer (contour + runes + progress arc).
+        SetupFormationVisuals();
     }
 
     /// <summary>
@@ -176,6 +178,15 @@ public partial class SceneBuilder : Node
     {
         _npcRenderer = new NPCSpriteRenderer();
         _worldRoot.AddChild(_npcRenderer);
+    }
+
+    /// <summary>Qi Stage 6: formation visual renderer — contour, runes, progress arc.</summary>
+    private FormationVisualRenderer? _formationRenderer;
+
+    private void SetupFormationVisuals()
+    {
+        _formationRenderer = new FormationVisualRenderer();
+        _worldRoot.AddChild(_formationRenderer);
     }
 
     /// <summary>

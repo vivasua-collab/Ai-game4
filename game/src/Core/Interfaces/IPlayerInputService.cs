@@ -77,6 +77,13 @@ namespace CultivationGame.Core.Interfaces
         /// <summary>Нажато ли уменьшение скорости времени (-/PageDown, однократное).</summary>
         bool IsTimeSpeedDownPressed { get; }
 
+        /// <summary>
+        /// Этап 7 внедрения ЦИ: нажато ли чит-меню (F1, однократное).
+        /// Работает даже поверх UI (чит-меню — это dev-tool).
+        /// #if DEBUG в потребителе (CheatPanel) — release-сборка игнорирует.
+        /// </summary>
+        bool IsCheatMenuPressed { get; }
+
         /// <summary>Текущий кадр ввода (raw). Ai-game3 compatibility — для Adapter'ов.</summary>
         InputFrameData CurrentFrame { get; }
 

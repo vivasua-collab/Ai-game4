@@ -117,6 +117,8 @@ public partial class InputAdapter : Node
             _stickyKeys.Add("cast_technique");
         if (!_isOverUI && GodotInput.IsActionJustPressed("attack"))
             _stickyKeys.Add("attack");
+        // Этап 7 внедрения ЦИ: чит-меню (F1) — работает даже поверх UI.
+        if (GodotInput.IsActionJustPressed("cheat_menu"))      _stickyKeys.Add("cheat_menu");
 
         // ---- Build the engine-agnostic InputFrameData (readonly struct) ----
         var frameData = new InputFrameData(
