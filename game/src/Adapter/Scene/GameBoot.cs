@@ -63,11 +63,19 @@ public partial class GameBoot : Node
         GD.Print("[GameBoot] Game initialized. Container built and entry point started.");
 
         // Screenshot automation: if GODOT_SCREENSHOT env is set, wait for render then capture and quit.
+        // GODOT_SCREENSHOT_DELAY (сек, default 2) — задержка кадра (например, чтобы
+        // поймать бой при GODOT_COMBAT_SIM=1: урон идёт с ~2.9с, берите 3.2+).
         var screenshotPath = System.Environment.GetEnvironmentVariable("GODOT_SCREENSHOT");
         if (!string.IsNullOrEmpty(screenshotPath))
         {
-            GD.Print($"[GameBoot] Screenshot mode: will save to {screenshotPath} in 2s...");
-            await ToSignal(GetTree().CreateTimer(2.0), SceneTreeTimer.SignalName.Timeout);
+            float shotDelay = 2.0f;
+            var delayRaw = System.Environment.GetEnvironmentVariable("GODOT_SCREENSHOT_DELAY");
+            if (float.TryParse(delayRaw, System.Globalization.CultureInfo.InvariantCulture,
+                    out float parsed) && parsed > 0f && parsed <= 60f)
+                shotDelay = parsed;
+
+            GD.Print($"[GameBoot] Screenshot mode: will save to {screenshotPath} in {shotDelay:0.#}s...");
+            await ToSignal(GetTree().CreateTimer(shotDelay), SceneTreeTimer.SignalName.Timeout);
             var img = GetViewport().GetTexture().GetImage();
             if (img != null)
             {

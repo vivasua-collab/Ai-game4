@@ -54,6 +54,8 @@ public partial class SceneBuilder : Node
         SetupNPCs();
         // Qi Stage 6: formation visual renderer (contour + runes + progress arc).
         SetupFormationVisuals();
+        // NPC_COMBAT_PREP Phase 7: floating damage numbers (DamageAppliedEvent).
+        SetupDamageNumbers();
     }
 
     /// <summary>
@@ -187,6 +189,15 @@ public partial class SceneBuilder : Node
     {
         _formationRenderer = new FormationVisualRenderer();
         _worldRoot.AddChild(_formationRenderer);
+    }
+
+    /// <summary>NPC_COMBAT_PREP Phase 7: floating damage numbers over targets.</summary>
+    private DamageNumberRenderer? _damageNumberRenderer;
+
+    private void SetupDamageNumbers()
+    {
+        _damageNumberRenderer = new DamageNumberRenderer();
+        _worldRoot.AddChild(_damageNumberRenderer);
     }
 
     /// <summary>

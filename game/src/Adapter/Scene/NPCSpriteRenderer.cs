@@ -4,6 +4,8 @@
 // spawned human NPC. Re-queries NPCService every frame so NPCs are drawn
 // at their current position (NPCMovementService updates positions per tick).
 // Источник: docs/docs_v2/09_workflow/NPC_COMBAT_PREP.md §Phase 1
+// Редактировано: 2026-08-25 — Phase 7: HP-бар над NPC при повреждении
+// (IBodyDataProvider.GetCurrentHealth/GetMaxHealth; бар скрыт, пока HP полный).
 using Godot;
 using System.Collections.Generic;
 using CultivationGame.Core.Data;
@@ -17,10 +19,12 @@ namespace CultivationGame.Adapter.Scene;
 /// Renders spawned NPCs as colored circles on the world map. Color encodes
 /// the NPC role (merchant=cold, cultivator=violet, guard=blue, passerby=grey).
 /// ZIndex = RenderLayer.Objects (3) — same as animals, below the player (4).
+/// Phase 7: рисует HP-бар над раненым NPC (текущий/полный RedHP).
 /// </summary>
 public partial class NPCSpriteRenderer : Node2D
 {
     [Inject] private INPCService? _npcService;
+    [Inject] private IBodyDataProvider? _bodyProvider;
 
     private int _tilePixels;
     private readonly List<string> _idSnapshot = new();
@@ -77,7 +81,46 @@ public partial class NPCSpriteRenderer : Node2D
             float spriteSize = tex.GetWidth();
             var pos = new Vector2(cx - spriteSize / 2f, cy - spriteSize / 2f);
             DrawTexture(tex, pos);
+
+            // Phase 7: HP-бар над NPC — только если повреждён (полный HP не рисуем,
+            // чтобы не засорять HUD в мирное время). Высота полосы — над спрайтом.
+            if (_bodyProvider != null)
+            {
+                int hp = _bodyProvider.GetCurrentHealth(id);
+                int maxHp = _bodyProvider.GetMaxHealth(id);
+                if (maxHp > 0 && hp < maxHp)
+                    DrawNpcHealthBar(cx, cy - spriteSize / 2f - 8f, hp, maxHp);
+            }
         }
+    }
+
+    /// <summary>
+    /// Phase 7: компактный HP-бар (48×5 px): тёмная подложка + заливка по ratio.
+    /// Цвет: зелёный > 50%, жёлтый > 25%, красный ниже (семантика BodyStatusPanel).
+    /// </summary>
+    private void DrawNpcHealthBar(float cx, float top, int hp, int maxHp)
+    {
+        const float barWidth = 48f;
+        const float barHeight = 5f;
+        float ratio = maxHp > 0 ? (float)hp / maxHp : 0f;
+
+        // Подложка.
+        DrawRect(new Rect2(cx - barWidth / 2f, top, barWidth, barHeight),
+            new Color(0.05f, 0.04f, 0.02f, 0.8f));
+
+        // Заливка.
+        var fillColour = ratio > 0.5f
+            ? new Color(0.30f, 0.75f, 0.30f)
+            : ratio > 0.25f
+                ? new Color(0.85f, 0.75f, 0.25f)
+                : new Color(0.85f, 0.25f, 0.20f);
+        float fillWidth = barWidth * ratio;
+        if (fillWidth > 0.5f)
+            DrawRect(new Rect2(cx - barWidth / 2f, top, fillWidth, barHeight), fillColour);
+
+        // Тонкая рамка.
+        DrawRect(new Rect2(cx - barWidth / 2f, top, barWidth, barHeight),
+            new Color(0f, 0f, 0f, 0.5f), false, 1f);
     }
 
     private static Color GetColourForRole(NPCRole role) => role switch

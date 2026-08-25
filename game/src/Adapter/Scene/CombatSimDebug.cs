@@ -34,6 +34,7 @@ public partial class CombatSimDebug : Node
     [Inject] private ITimeService? _timeService;
     [Inject] private IEquipmentService? _equipmentService;
     [Inject] private Modules.Generator.EquipmentGenerator? _equipmentGenerator;
+    [Inject] private IPlayerService? _playerService;
 
     private System.IDisposable? _damageToken;
     private System.IDisposable? _intentEchoToken;
@@ -117,6 +118,21 @@ public partial class CombatSimDebug : Node
         int playerHpBefore = _bodyProvider.GetCurrentHealth("player");
         int npcHpBefore = _bodyProvider.GetCurrentHealth(npcId);
         GD.Print($"[CombatSim] start HP: player={playerHpBefore}, npc({npcId})={npcHpBefore}");
+
+        // 2b. Телепортируем NPC рядом с игроком — бой происходит в кадре камеры
+        // (для визуальной верификации HP-баров/цифр урона на скриншотах).
+        // NPC, а не игрока: камера и спрайт игрока привязаны к _visualPosition
+        // контроллера, а PlayerService.SetPosition двигает только логику.
+        if (_playerService != null)
+        {
+            var playerPos = _playerService.Position;
+            var npcState = _npcService.GetNPCState(npcId);
+            if (npcState != null)
+            {
+                npcState.Position = new Position2D(playerPos.X + 1, playerPos.Y);
+                GD.Print($"[CombatSim] NPC {npcId} teleported to ({playerPos.X + 1}, {playerPos.Y}) near player");
+            }
+        }
 
         // 3. Серия ударов в обе стороны (как это делает NPCModule/PlayerCombatAdapter).
         for (int round = 1; round <= 4; round++)
