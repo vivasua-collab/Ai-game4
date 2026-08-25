@@ -30,6 +30,8 @@ namespace CultivationGame.Modules.Interaction
         private readonly IPublisher<DialogueStartedEvent> _dialogueStartedPub;
         private readonly IPublisher<DialogueEndedEvent> _dialogueEndedPub;
         private readonly IPublisher<DialogueChoiceSelectedEvent> _choiceSelectedPub;
+        // NPC_COMBAT_PREP Phase 4: диалог торговца запрашивает лавку.
+        private readonly IPublisher<TradeRequestedEvent> _tradeRequestedPub;
 
         // === MessagePipe: подписки ===
         private readonly ISubscriber<NPCInteractedEvent> _npcInteractedSub;
@@ -61,6 +63,7 @@ namespace CultivationGame.Modules.Interaction
             IPublisher<DialogueStartedEvent> dialogueStartedPub,
             IPublisher<DialogueEndedEvent> dialogueEndedPub,
             IPublisher<DialogueChoiceSelectedEvent> choiceSelectedPub,
+            IPublisher<TradeRequestedEvent> tradeRequestedPub,
             ISubscriber<NPCInteractedEvent> npcInteractedSub,
             ISubscriber<InteractionCompletedEvent> interactionCompletedSub,
             ISubscriber<UIAdvanceDialogueRequestEvent> uiAdvanceSub, // Q13-E02 FIX
@@ -70,6 +73,7 @@ namespace CultivationGame.Modules.Interaction
             _dialogueStartedPub = dialogueStartedPub;
             _dialogueEndedPub = dialogueEndedPub;
             _choiceSelectedPub = choiceSelectedPub;
+            _tradeRequestedPub = tradeRequestedPub;
             _npcInteractedSub = npcInteractedSub;
             _interactionCompletedSub = interactionCompletedSub;
             _uiAdvanceSub = uiAdvanceSub; // Q13-E02 FIX
@@ -163,6 +167,19 @@ namespace CultivationGame.Modules.Interaction
             // Публикуем событие выбора
             _choiceSelectedPub.Publish(new DialogueChoiceSelectedEvent(
                 _currentNpcId, _currentDialogueId, choiceIndex));
+
+            // NPC_COMBAT_PREP Phase 4: sentinel-узел "open_trade" — торговля.
+            // Порядок важен: СНАЧАЛА EndDialogue (DialogueEndedEvent резюмирует
+            // тики в GameWorldController), ПОТОМ TradeRequestedEvent (лавка
+            // ставит тики на паузу). Обратный порядок оставил бы время
+            // запущенным при открытой лавке.
+            if (choice.TargetNodeId == "open_trade")
+            {
+                string tradeNpcId = _currentNpcId;
+                EndDialogue();
+                _tradeRequestedPub.Publish(new TradeRequestedEvent(tradeNpcId));
+                return;
+            }
 
             // Переходим к узлу, указанному в выборе
             if (!string.IsNullOrEmpty(choice.TargetNodeId))
@@ -358,6 +375,9 @@ namespace CultivationGame.Modules.Interaction
             MapNpcDialogue("elder_01", "dialogue_elder");
 
             // Диалог торговца
+            // NPC_COMBAT_PREP Phase 4: выбор «Покажи товары» ведёт на sentinel-узел
+            // "open_trade" (SelectChoice публикует TradeRequestedEvent и завершает
+            // диалог; лавку открывает TradeModule). Узел show_goods удалён.
             var merchantDialogue = new Dictionary<string, DialogueNode>
             {
                 ["start"] = new DialogueNode
@@ -366,14 +386,9 @@ namespace CultivationGame.Modules.Interaction
                     Text = "Добро пожаловать в мою лавку! У меня есть всё, что нужно путнику.",
                     Choices =
                     {
-                        new DialogueChoice { Index = 0, Text = "Покажи товары", TargetNodeId = "show_goods" },
+                        new DialogueChoice { Index = 0, Text = "Покажи товары", TargetNodeId = "open_trade" },
                         new DialogueChoice { Index = 1, Text = "До свидания", TargetNodeId = null }
                     }
-                },
-                ["show_goods"] = new DialogueNode
-                {
-                    NodeId = "show_goods",
-                    Text = "Вот, смотри: зелья, свитки, снаряжение. Выбирай, что по карману!"
                 }
             };
             RegisterDialogue("dialogue_merchant", merchantDialogue);

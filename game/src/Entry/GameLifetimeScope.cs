@@ -17,6 +17,7 @@ using CultivationGame.Modules.Qi;
 using CultivationGame.Modules.Quest;
 using CultivationGame.Modules.Save;
 using CultivationGame.Modules.Tile;
+using CultivationGame.Modules.Trade;
 using CultivationGame.Modules.UI;
 using CultivationGame.Modules.World;
 
@@ -39,7 +40,7 @@ namespace CultivationGame.Entry;
 /// <c>[Inject] IResolver</c> fields that are filled post-build.</para>
 /// <para><b>Module registration order</b> follows DI_AND_EVENTBUS §1.2
 /// (canonical order): World, Tile, Body, Qi, Buff, Inventory, Combat,
-/// Formation, NPC, Player, Quest, Interaction, UI, Charger, Save,
+/// Formation, NPC, Player, Quest, Interaction, Trade, UI, Charger, Save,
 /// Generator. Order matters where module constructors depend on
 /// interfaces registered by earlier modules (resolved lazily by the
 /// container, but registration order can affect startable iteration).</para>
@@ -68,7 +69,9 @@ public static class GameLifetimeScope
         var eventBus = new EventBus();
         builder.RegisterInstance(eventBus);
 
-        // 2. 16 module services — registration order per DI_AND_EVENTBUS §1.2.
+        // 2. 17 module services — registration order per DI_AND_EVENTBUS §1.2.
+        // Trade (NPC_COMBAT_PREP Phase 4-5) идёт после Interaction (диалог
+        // публикует TradeRequestedEvent) и до UI.
         WorldModuleServices.Register(builder);
         TileModuleServices.Register(builder);
         BodyModuleServices.Register(builder);
@@ -81,6 +84,7 @@ public static class GameLifetimeScope
         PlayerModuleServices.Register(builder);
         QuestModuleServices.Register(builder);
         InteractionModuleServices.Register(builder);
+        TradeModuleServices.Register(builder);
         UIModuleServices.Register(builder);
         ChargerModuleServices.Register(builder);
         SaveModuleServices.Register(builder);

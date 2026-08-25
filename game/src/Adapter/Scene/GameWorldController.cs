@@ -56,6 +56,8 @@ public partial class GameWorldController : Node2D
     [Inject] private ISubscriber<Core.Messaging.Contracts.PlayerDeathEvent> PlayerDeathSub { get; set; } = null!;
     [Inject] private ISubscriber<Core.Messaging.Contracts.DamageAppliedEvent> DamageSub { get; set; } = null!;
     [Inject] private ISubscriber<Core.Messaging.Contracts.DialogueEndedEvent> DialogueEndedSub { get; set; } = null!;
+    [Inject] private ISubscriber<Core.Messaging.Contracts.TradeOpenedEvent> TradeOpenedSub { get; set; } = null!;
+    [Inject] private ISubscriber<Core.Messaging.Contracts.TradeClosedEvent> TradeClosedSub { get; set; } = null!;
     [Inject] private ISubscriber<Core.Messaging.Contracts.ToastShownEvent> ToastShownSub { get; set; } = null!;
 
     private Node2D        _worldRoot     = null!;
@@ -68,6 +70,7 @@ public partial class GameWorldController : Node2D
     private InventoryWindow _inventoryWindow = null!;
     private CharacterSheetWindow _characterSheetWindow = null!;
     private UI.DialogueWindow _dialogueWindow = null!;
+    private UI.TradeWindow _tradeWindow = null!;
     private UI.HotbarPanel _hotbarPanel = null!;
     private UI.TechniquesPanel _techniquesPanel = null!;
 #if DEBUG
@@ -112,6 +115,8 @@ public partial class GameWorldController : Node2D
     private bool _positionInitialized;
     private bool _wasPausedBeforeInventory; // track if game was paused before opening inventory
     private System.IDisposable? _dialogueEndedToken;
+    private System.IDisposable? _tradeOpenedToken;
+    private System.IDisposable? _tradeClosedToken;
     private bool _overweightNotified; // debounce overweight toast
 
     // Speed change debounce — prevents rapid cycling when key held.
@@ -153,6 +158,10 @@ public partial class GameWorldController : Node2D
         // only E/Esc resumed time, leaving the game silently paused after a
         // choice-click finish. Single authoritative resume point: the bus event.
         _dialogueEndedToken = DialogueEndedSub?.Subscribe(OnDialogueEnded);
+        // NPC_COMBAT_PREP Phase 4-5: торговля — пауза/резюм тиков по шине
+        // (TradeOpened/TradeClosedEvent; единая точка резюма, как у диалогов).
+        _tradeOpenedToken = TradeOpenedSub?.Subscribe(OnTradeOpened);
+        _tradeClosedToken = TradeClosedSub?.Subscribe(OnTradeClosed);
         // Этап 1 внедрения ЦИ: индикация медитации (V).
         _meditationStateToken = MeditationStateSub?.Subscribe(OnMeditationStateChanged);
         // Этап 2 внедрения ЦИ: результат каста техники (тосты).
@@ -463,6 +472,12 @@ public partial class GameWorldController : Node2D
         _dialogueWindow = new UI.DialogueWindow { Name = "DialogueWindow" };
         _hudCanvas.AddChild(_dialogueWindow);
 
+        // Trade window (merchant shop) — NPC_COMBAT_PREP Phase 5. Открывается
+        // по TradeOpenedEvent (выбор «Покажи товары» в диалоге торговца),
+        // закрывается по TradeClosedEvent / Esc. Пауза — OnTradeOpened ниже.
+        _tradeWindow = new UI.TradeWindow { Name = "TradeWindow" };
+        _hudCanvas.AddChild(_tradeWindow);
+
         // Hotbar (2026-08-22): 9 quick slots bottom-center; belt slots 3-9
         // appear when a belt is equipped.
         _hotbarPanel = new UI.HotbarPanel { Name = "HotbarPanel" };
@@ -653,7 +668,8 @@ public partial class GameWorldController : Node2D
         // change the camera zoom (user report 2026-08-22).
         bool modalOpen = (_inventoryWindow is { Visible: true })
                       || (_characterSheetWindow is { Visible: true })
-                      || (_dialogueWindow is { IsOpen: true });
+                      || (_dialogueWindow is { IsOpen: true })
+                      || (_tradeWindow is { IsOpen: true });
 
         if (@event is InputEventMouseButton mb && mb.Pressed)
         {
@@ -842,8 +858,14 @@ public partial class GameWorldController : Node2D
         }
 #endif
 
+        // Esc while trading → close the shop (Phase 5). Authoritative resume
+        // happens in OnTradeClosed (bus event), like dialogues.
+        if (PlayerInput.IsPausePressed && _tradeWindow is { IsOpen: true })
+        {
+            _tradeWindow.Close();
+        }
         // Esc while a dialogue is open → close it and resume ticks (Phase 2).
-        if (PlayerInput.IsPausePressed && _dialogueWindow is { IsOpen: true })
+        else if (PlayerInput.IsPausePressed && _dialogueWindow is { IsOpen: true })
         {
             _dialogueWindow.Close();
             if (!_wasPausedBeforeInventory && Time is { IsPaused: true })
@@ -917,9 +939,14 @@ public partial class GameWorldController : Node2D
         // E key: dialogue takes priority when open or an NPC is in range;
         // otherwise pick up the nearest ground item.
         // NPC_COMBAT_PREP Phase 2: E near NPC → open role dialogue (pause ticks).
+        // Phase 5: при открытой лавке E не действует (торговля — модальность).
         if (PlayerInput.IsInteractPressed)
         {
-            if (_dialogueWindow != null && _dialogueWindow.IsOpen)
+            if (_tradeWindow is { IsOpen: true })
+            {
+                // Лавка открыта — E съедается модальностью торговли.
+            }
+            else if (_dialogueWindow != null && _dialogueWindow.IsOpen)
             {
                 _dialogueWindow.Advance();
                 if (_dialogueWindow is { IsOpen: false } && !_wasPausedBeforeInventory && Time is { IsPaused: true })
@@ -931,10 +958,10 @@ public partial class GameWorldController : Node2D
             }
         }
 
-        // Suppress game input when inventory is open.
+        // Suppress game input when inventory OR trade window is open (Phase 5).
         if (_inputAdapter != null && _inventoryWindow != null)
         {
-            _inputAdapter.SetOverUI(_inventoryWindow.Visible);
+            _inputAdapter.SetOverUI(_inventoryWindow.Visible || _tradeWindow is { IsOpen: true });
         }
 
         // Save/load DISABLED (Q8: user decision — saves invalid after each fix).
@@ -1054,6 +1081,31 @@ public partial class GameWorldController : Node2D
             _dialogueWindow.Close();
         if (!_wasPausedBeforeInventory && Time is { IsPaused: true })
             Time.Resume();
+    }
+
+    /// <summary>
+    /// NPC_COMBAT_PREP Phase 4-5: лавка открыта — пауза тиков (торговля —
+    /// планирующая активность, как инвентарь/диалог). Окно показывает себя
+    /// по тому же событию (TradeWindow.OnTradeOpened).
+    /// </summary>
+    private void OnTradeOpened(in Core.Messaging.Contracts.TradeOpenedEvent e)
+    {
+        _wasPausedBeforeInventory = Time is { IsPaused: true };
+        if (Time is { IsPaused: false })
+            Time.Pause();
+        GD.Print($"[GameWorld] Trade opened: {e.NpcId} — ticks paused");
+    }
+
+    /// <summary>
+    /// Лавка закрыта — авторитетная точка резюма (как OnDialogueEnded):
+    /// TradeClosedEvent стреляет из любого пути закрытия (Esc, конец
+    /// отладочного сценария и т.д.).
+    /// </summary>
+    private void OnTradeClosed(in Core.Messaging.Contracts.TradeClosedEvent e)
+    {
+        if (!_wasPausedBeforeInventory && Time is { IsPaused: true })
+            Time.Resume();
+        GD.Print("[GameWorld] Trade closed — ticks resumed");
     }
 
     /// <summary>
@@ -1260,6 +1312,18 @@ public partial class GameWorldController : Node2D
     }
 
     // ---- Public accessors for child nodes / tests ----
+
+    /// <summary>
+    /// NPC_COMBAT_PREP Phase 5: dispose trade-подписок при уходе сцены
+    /// (правило «токены подписок диспозятся» — BeltSlotRow._ExitTree паттерн).
+    /// </summary>
+    public override void _ExitTree()
+    {
+        _tradeOpenedToken?.Dispose();
+        _tradeClosedToken?.Dispose();
+        _tradeOpenedToken = null;
+        _tradeClosedToken = null;
+    }
 
     public Node2D WorldRoot => _worldRoot;
     public Camera2D Camera => _camera;
