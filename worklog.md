@@ -620,3 +620,41 @@ Database: 11 items registered
 - E key: подобрать ближайший предмет (1.5 тайла)
 - Процедурные спрайты по категориям (8 типов)
 - Полный цикл: harvest → overflow → drop → pickup → inventory
+
+---
+
+## 2026-08-25 — Облачная сессия: Phase 7+8+4-5, P0-фиксы боя (3 коммита)
+
+**Агент:** cloud (Z.ai Code sandbox) | **Коммиты:** 679f19e, f02d61d, 8a5001b
+
+### P0-баги (найдены через GODOT_COMBAT_SIM, исправлены)
+1. **Урон NPC→игрок не применялся**: BodyService фильтровал `TargetId=="player"`,
+   а NPC AI атакует "player_0". Тост был, HP не падал. → IsPlayerEntityId()
+2. **Таймеры в 60× медленнее**: DeltaTime 1/60 → 1.0/тик (TIME_SYSTEM.md);
+   QiRegen SECONDS_PER_DAY 86400→1440 (регенерация = 10%/сутки по доке)
+
+### Phase 8 (5 TODO закрыты)
+- EquipmentDataProvider: ID→EquipmentData через IItemDatabaseService + прямой
+  кэш игрока; агрегаты dodge/block/parry/crit/penetration (промилле)
+- CombatService: броня→уклонение, щит/оружие→блок/парирование, крит,
+  пробитие оружия; базовая атака с оружием = урон оружия (не кулак 10)
+
+### Phase 7
+- DamageNumberRenderer (пул, _Draw): −N / КРИТ −N / уклонение / парирование /
+  блок; HP-бар над раненым NPC. Визуально верифицировано (Xvfb+VLM).
+- Урок: подписки EventBus в Godot-нодах — в _Ready ПОСЛЕ DI, не в _EnterTree
+
+### Phase 4-5 (модуль Trade, 17-й)
+- CurrencyService (ICurrencyService, 50 камней), TradeService (сток от
+  FNV-1a(npcId), Permil-цены 1200/500), TradeWindow «Лавка торговца»,
+  диалог-хук "open_trade". GODOT_TRADE_DEBUG/HOLD хуки.
+
+### Инфраструктура
+- Холодный старт: `--import --path <абсолютный>` генерирует .ctex — биом-
+  текстуры рендерятся в облаке; GODOT_SCREENSHOT_DELAY для кадров боя
+- CombatSimDebug (GODOT_COMBAT_SIM=1): VERDICT PASS
+
+### Осталось (приоритет)
+- Живая проверка в редакторе (страж, пояс, лут) — P0
+- Phase 3 Faction port; Phase 8 ч.2 ammo/луки; Phase 9
+- Per-attacker pending technique; Tooltip/ContextMenu
