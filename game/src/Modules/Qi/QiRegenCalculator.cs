@@ -17,9 +17,12 @@ namespace CultivationGame.Modules.Qi
     public static class QiRegenCalculator
     {
         /// <summary>
-        /// Секунд в сутках для расчёта регенерации.
+        /// Тиков в игровых сутках для расчёта регенерации (TIME SYSTEM FIX 2026-08-25:
+        /// DeltaTime теперь 1.0/тик = «игросекунда»; сутки = 1440 тиков, а не 86400 —
+        /// иначе пассивная регенерация была в 60 раз медленнее документированных
+        /// 10%/сутки из QI_SYSTEM.md §4).
         /// </summary>
-        private const double SECONDS_PER_DAY = 86400.0;
+        private const double SECONDS_PER_DAY = 1440.0;
 
         /// <summary>
         /// Безопасный максимум для Qi-значений.

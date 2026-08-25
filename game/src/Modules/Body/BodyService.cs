@@ -444,8 +444,15 @@ namespace CultivationGame.Modules.Body
 
         private void OnDamageApplied(in DamageAppliedEvent e)
         {
-            // 1. Игрок: урон по нашим собственным BodyParts
-            if (e.TargetId == _entityId)
+            // 1. Игрок: урон по нашим собственным BodyParts.
+            // P0 FIX (2026-08-25, NPC_COMBAT_PREP Phase 8 wiring): NPC AI атакует
+            // игрока как "player_0" (NPCAIService.PlayerId), а тело игрока
+            // инициализировано под "player" (BodyConfig default) — из-за строгого
+            // сравнения урон NPC никогда не применялся к игроку (тост показывался,
+            // HP не падал, смерть была недостижима). Принимаем оба исторических ID
+            // (прецедент двойной проверки: PlayerService, GameWorldController,
+            // NPCAIService.Friendly-ветка).
+            if (e.TargetId == _entityId || (IsPlayerEntityId(e.TargetId) && IsPlayerEntityId(_entityId)))
             {
                 ApplyDamage(e.HitPart, e.Damage);
                 return;
@@ -458,6 +465,13 @@ namespace CultivationGame.Modules.Body
                 ApplyDamageToEntityParts(e.TargetId, npcParts, e.HitPart, e.Damage);
             }
         }
+
+        /// <summary>
+        /// Исторические ID игрока в кодовой базе: "player" (InventoryModule,
+        /// BodyConfig) и "player_0" (PlayerService, Combat, NPC AI).
+        /// P0 FIX: единая точка нормализации для сравнения.
+        /// </summary>
+        private static bool IsPlayerEntityId(string? id) => id == "player" || id == "player_0";
 
         /// <summary>
         /// Применить урон к частям тела NPC (per-entity).

@@ -2,6 +2,9 @@
 // Создано: 2026-05-09 00:00:00 UTC
 // Редактировано: 2026-05-09 — INV-04: заменена прямая инъекция IBodyService на событийную модель.
 // Редактировано: 2026-05-09 — EVT-02: EquipmentChangedEvent публикуется с TotalArmor.
+// Редактировано: 2026-08-25 — NPC_COMBAT_PREP Phase 8: синхронизация экипировки игрока
+//   в IEquipmentDataProvider (SetEquipmentData) — боевые статы оружия/брони теперь
+//   видны CombatService (dodge/block/parry/crit/penetration/weapon damage).
 // АРХИТЕКТУРА: VContainer sibling scopes НЕ видят регистрации друг друга.
 // Межмодульное общение — ТОЛЬКО через MessagePipe (Hub-and-Spoke).
 // EquipmentService подписывается на BodyPartSeveredEvent и кэширует заблокированные слоты.
@@ -38,6 +41,7 @@ namespace CultivationGame.Modules.Inventory
         private readonly IPublisher<EquipmentChangedEvent> _equipChangedPub;
         private readonly IPublisher<EquipmentBlockedEvent> _equipBlockedPub;
         private readonly ISubscriber<BodyPartSeveredEvent> _severedSub;
+        private readonly IEquipmentDataProvider? _equipmentDataProvider;
 
         // === Состояние ===
         private readonly Dictionary<EquipmentSlot, EquipmentData> _equipment = new();
@@ -54,15 +58,20 @@ namespace CultivationGame.Modules.Inventory
         public string EntityId => _entityId;
         public bool IsTwoHandEquipped => EquipmentStatAggregator.IsTwoHandEquipped(_equipment);
 
-        // === Конструктор (VContainer) ===
+        /// <summary>
+        /// Конструктор (VContainer). Phase 8: +IEquipmentDataProvider — пуш экипировки
+        /// игрока в per-entity провайдер (CombatService читает боевые статы оттуда).
+        /// </summary>
         public EquipmentService(
             IPublisher<EquipmentChangedEvent> equipChangedPub,
             IPublisher<EquipmentBlockedEvent> equipBlockedPub,
-            ISubscriber<BodyPartSeveredEvent> severedSub)
+            ISubscriber<BodyPartSeveredEvent> severedSub,
+            IEquipmentDataProvider? equipmentDataProvider = null)
         {
             _equipChangedPub = equipChangedPub;
             _equipBlockedPub = equipBlockedPub;
             _severedSub = severedSub;
+            _equipmentDataProvider = equipmentDataProvider;
         }
 
         /// <summary>
@@ -125,6 +134,7 @@ namespace CultivationGame.Modules.Inventory
 
             // Надеваем предмет
             _equipment[slot] = item;
+            SyncToProvider();
             _equipChangedPub.Publish(new EquipmentChangedEvent(_entityId ?? "unknown", slot, item.ItemId, oldItemId, GetTotalArmor()));
             return true;
         }
@@ -138,6 +148,7 @@ namespace CultivationGame.Modules.Inventory
             }
 
             _equipment.Remove(slot);
+            SyncToProvider();
             _equipChangedPub.Publish(new EquipmentChangedEvent(_entityId ?? "unknown", slot, null, item.ItemId, GetTotalArmor()));
             return true;
         }
@@ -170,6 +181,33 @@ namespace CultivationGame.Modules.Inventory
         public WeaponHandType GetWeaponHandType()
         {
             return EquipmentStatAggregator.GetWeaponHandType(_equipment);
+        }
+
+        /// <summary>
+        /// Снапшот всей экипировки (для UI и провайдера).
+        /// Phase 8: используется при синхронизации в IEquipmentDataProvider.
+        /// </summary>
+        public IReadOnlyDictionary<EquipmentSlot, EquipmentData> GetAllEquipped()
+        {
+            return _equipment;
+        }
+
+        // === Phase 8: синхронизация в IEquipmentDataProvider ===
+
+        /// <summary>
+        /// Запушить текущую экипировку игрока в IEquipmentDataProvider.
+        /// Вызывается после каждого изменения (equip/unequip) — CombatService
+        /// читает оттуда weapon damage/penetration/dodge/block/parry/crit.
+        /// Пушим под обоими историческими ID игрока ("player" — InventoryModule,
+        /// "player_0" — PlayerService/Combat), чтобы не зависеть от строкового
+        /// соглашения (прецедент двойной проверки — PlayerService:178).
+        /// </summary>
+        private void SyncToProvider()
+        {
+            if (_equipmentDataProvider == null) return;
+
+            _equipmentDataProvider.SetEquipmentData(_entityId ?? "player", _equipment);
+            _equipmentDataProvider.SetEquipmentData("player_0", _equipment);
         }
 
         // === Обработчики событий ===

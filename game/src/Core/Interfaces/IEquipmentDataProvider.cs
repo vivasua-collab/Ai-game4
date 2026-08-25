@@ -63,5 +63,52 @@ namespace CultivationGame.Core.Interfaces
         /// Спринт 6 C5: для coverage roll в DamageService.
         /// </summary>
         void SetArmorCoverage(string entityId, int coverage);
+
+        // === NPC_COMBAT_PREP Phase 8: wiring боевых статов экипировки ===
+        // Все агрегаты в промилле (ЗАПРЕТ 3.9): 1% = 10 промилле.
+        // Источники: EquipmentData.DodgeBonus (%) + StatBonuses §7.1 (EQUIPMENT_SYSTEM.md).
+        // Резолв ID → EquipmentData идёт через IItemDatabaseService (кэш данных
+        // для игрока имеет приоритет — EquipmentService пушит полные объекты).
+
+        /// <summary>
+        /// Суммарный модификатор уклонения от экипировки (промилле, может быть
+        /// отрицательным — штраф тяжёлой брони). COMBAT_SYSTEM.md §7.1:
+        /// dodgeChance = 5% + (AGI-10)×0.5% - armorDodgePenalty.
+        /// </summary>
+        int GetDodgeBonusPermil(string entityId);
+
+        /// <summary>
+        /// Плоский бонус блока от экипировки (промилле). COMBAT_SYSTEM.md §7.3:
+        /// blockChance = shieldBlock + (STR-10)×0.2%. Источник — StatBonus
+        /// "blockChance" (EQUIPMENT_SYSTEM.md §7.1 Defense).
+        /// </summary>
+        int GetBlockBonusPermil(string entityId);
+
+        /// <summary>
+        /// Плоский бонус парирования от экипировки (промилле). COMBAT_SYSTEM.md §7.2:
+        /// parryChance = weaponParryBonus + (AGI-10)×0.3%. Источник — StatBonus
+        /// "parryChance" (дата-driven: 0, пока контент не выдаёт такие бонусы).
+        /// </summary>
+        int GetParryBonusPermil(string entityId);
+
+        /// <summary>
+        /// Плоский бонус крит-шанса от экипировки атакующего (промилле).
+        /// COMBAT_SYSTEM.md §9.1: critChance = базовый + luck×0.01 + techniqueBonus.
+        /// Источник — StatBonus "critChance" (EQUIPMENT_SYSTEM.md §7.1 Combat).
+        /// </summary>
+        int GetCritBonusPermil(string entityId);
+
+        /// <summary>
+        /// Пробитие оружия основной руки (ед. брони). COMBAT_SYSTEM.md §11.5:
+        /// penetration = weapon.penetration + attackerSTR×0.5 + techniquePenetration.
+        /// </summary>
+        int GetWeaponPenetration(string entityId);
+
+        /// <summary>
+        /// Установить экипировку сущности напрямую (полные EquipmentData).
+        /// Путь игрока: EquipmentService пушит свой словарь после каждого
+        /// equip/unequip — резолв через базу предметов не нужен.
+        /// </summary>
+        void SetEquipmentData(string entityId, Dictionary<EquipmentSlot, EquipmentData> equipment);
     }
 }

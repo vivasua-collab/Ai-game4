@@ -160,6 +160,13 @@ public partial class GameWorldController : Node2D
         // Этап 5 внедрения ЦИ: стадии формации (тосты).
         _formationStageToken = FormationStageSub?.Subscribe(OnFormationStageChanged);
         _formationActivatedToken2 = FormationActivatedSub2?.Subscribe(OnFormationActivated);
+        // NPC_COMBAT_PREP P0/Phase 8: headless-верификация боевого пайплайна
+        // (GODOT_COMBAT_SIM=1) — урон NPC→игрок и игрок→NPC + wiring статов.
+        if (System.Environment.GetEnvironmentVariable("GODOT_COMBAT_SIM") == "1")
+        {
+            var combatSim = new CombatSimDebug { Name = "CombatSimDebug" };
+            AddChild(combatSim);
+        }
         GD.Print("[GameWorldController] Ready");
     }
 

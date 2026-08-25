@@ -421,30 +421,42 @@ namespace CultivationGame.Modules.Combat
 
             // Спринт 5 C1/C2/C3: статы для шансов попадания
             int attackerLuck = _statProvider.GetStat(attackerId, StatType.Luck);
-            int techniqueCritBonus = 0; // TODO: из TechniqueData после расширения
 
-            // Спринт 5 C1: штраф уклонения от брони
-            int armorDodgePenalty = 0;
-            // TODO: получить из EquipmentData.DodgeBonus (после IItemDatabaseService)
+            // NPC_COMBAT_PREP Phase 8: wiring боевых статов экипировки (5 TODO закрыты).
+            // techniqueCritBonus — плоский крит-бонус экипировки атакующего
+            // (EQUIPMENT_SYSTEM.md §7.1 "critChance"); вклад самой TechniqueData
+            // добавится после расширения модели техник.
+            int techniqueCritBonus = _equipmentDataProvider.GetCritBonusPermil(attackerId);
 
-            // Спринт 5 C3: блок и парирование
-            int shieldBlock = 0;
-            int weaponParryBonus = 0;
-            // TODO: получить из EquipmentData после IItemDatabaseService
+            // Спринт 5 C1: штраф уклонения от брони — DodgeBonus брони защитника
+            // (тяжёлая броня даёт отрицательный DodgeBonus → положительный штраф).
+            // COMBAT_SYSTEM.md §7.1: dodgeChance = 5% + (AGI-10)×0.5% - armorDodgePenalty.
+            int armorDodgePenalty = -_equipmentDataProvider.GetDodgeBonusPermil(defenderId);
+
+            // Спринт 5 C3: блок и парирование — StatBonus "blockChance"/"parryChance"
+            // экипировки защитника (EQUIPMENT_SYSTEM.md §7.1 Defense).
+            int shieldBlock = _equipmentDataProvider.GetBlockBonusPermil(defenderId);
+            int weaponParryBonus = _equipmentDataProvider.GetParryBonusPermil(defenderId);
 
             // Получаем данные техники для penetration и weapon damage
             var tech = _techniqueService.GetTechnique(techniqueId);
 
             // Спринт 6 C6: пробитие брони
-            // penetration = weapon.Penetration + attackerSTR × 0.5 + techniquePenetration
+            // penetration = weapon.Penetration + attackerSTR × 0.5 + techniquePenetration (§11.5)
             int penetration = attackerSTR / 2; // attackerSTR × 0.5
             // P2-6.1 FIX: подключаем ArmorPenetration из TechniqueData
             if (tech != null)
                 penetration += tech.ArmorPenetration;
-            // TODO: + weapon.Penetration (после IItemDatabaseService)
+            // Phase 8: + weapon.Penetration — пробитие оружия основной руки атакующего
+            penetration += _equipmentDataProvider.GetWeaponPenetration(attackerId);
 
-            // Спринт 6 C4: Урон оружия для melee_weapon
-            if (tech != null && tech.Subtype == CombatSubtype.MeleeWeapon)
+            // Спринт 6 C4 + Phase 8: урон оружия для melee_weapon-техник И базовой
+            // атаки с оружием (раньше удар игрока всегда давал 10 — кулак,
+            // экипированное оружие не влияло на урон).
+            bool hasWeapon = _equipmentDataProvider.GetEquipped(attackerId, EquipmentSlot.WeaponMain) != null;
+            bool useWeaponDamage = (tech != null && tech.Subtype == CombatSubtype.MeleeWeapon)
+                                   || (tech == null && hasWeapon);
+            if (useWeaponDamage)
             {
                 int weaponDamage = _equipmentDataProvider.HasEntity(attackerId)
                     ? (int)_equipmentDataProvider.GetTotalDamage(attackerId)
@@ -458,9 +470,13 @@ namespace CultivationGame.Modules.Combat
                 }
             }
 
-            // Спринт 3 B7: NPC BaseDamage как аддитивный бонус
+            // Спринт 3 B7: NPC BaseDamage как аддитивный бонус — только для безоружных
+            // атак NPC (Phase 8: с оружием урон уже учтён выше через WeaponDamageCalculator).
+            // P2-4.1-STYLE FIX: строковая проверка "player" заменена на isPlayerAttacker —
+            // боевой ID игрока "player_0" раньше попадал в NPC-ветку и после
+            // синхронизации экипировки игрока в провайдер дал бы двойной учёт урона.
             // BaseDamage уже зарегистрирован в EquipmentDataProvider.SetTotalDamage()
-            if (_equipmentDataProvider.HasEntity(attackerId) && attackerId != "player")
+            if (_equipmentDataProvider.HasEntity(attackerId) && !isPlayerAttacker && !hasWeapon)
             {
                 int npcBaseDamage = (int)_equipmentDataProvider.GetTotalDamage(attackerId);
                 if (npcBaseDamage > 0 && (tech == null || tech.Subtype != CombatSubtype.MeleeWeapon))

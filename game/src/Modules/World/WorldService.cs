@@ -77,7 +77,15 @@ public sealed class TimeService : ITimeService
     {
         if (IsPaused) return;
         TickCount++;
-        DeltaTime = 1f / 60f; // V1 placeholder: 1 minute per real-time tick.
+        // TIME SYSTEM FIX (2026-08-25, NPC_COMBAT_PREP P0-verification): DeltaTime = 1.0
+        // game-second per tick. TIME_SYSTEM.md §5-6: 1 тик = 1 игровая минута =
+        // 1 реальная секунда на Normal; все потребители (каст-таймеры CombatService,
+        // кулдауны техник, каденции атак NPCModule/TotalTime, регенерация тела,
+        // длительности баффов, медитация QiModule «Ци/с») трактуют DeltaTime как
+        // «секунды при Normal-скорости». Старый V1-плейсхолдер 1/60 делал ВСЕ
+        // таймеры в 60 раз медленнее (каст 0.5с разрешался ~30 реальных секунд,
+        // урон не проходил, NPC почти не двигались).
+        DeltaTime = 1f;
         TotalTime += DeltaTime;
         CurrentTime = CurrentTime.AddMinutes(GameConstants.TICKS_PER_MINUTE);
         OnTick?.Invoke(TickCount);
