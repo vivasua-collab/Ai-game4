@@ -91,6 +91,10 @@ namespace CultivationGame.Modules.Combat
         private PendingTechnique _pendingTechnique;
         private bool _isCasting;
 
+        // Stage 0 (2026-08-25, GLM-5.3): potency последней атаки (от зарядки игрока).
+        // 1000 = базовая (NPC/без зарядки); >1000 = заряженная игроком (множитель урона).
+        private int _lastAttackPotencyPermil = GameConstants.POTENCY_BASE_PERMIL;
+
         // IDisposable для подписок
         private IDisposable _qiDepletedSubscription;
         private IDisposable _qiChangedSubscription;
@@ -274,8 +278,12 @@ namespace CultivationGame.Modules.Combat
         /// A3-2 FIX: Авто-начало боя при наличии TargetId.
         /// A3-3 FIX: Переключение цели при указанном TargetId.
         /// A3-4 FIX: IsRanged доступен для будущих расширений пайплайна.
+        ///
+        /// Stage 0 (2026-08-25, GLM-5.3): + potencyPermil (по умолчанию 1000).
+        /// Если potencyPermil > 1000 — атака игрока после зарядки, пропуск pending-таймера
+        /// (зарядка УЖЕ была временем каста). BuildAndExecuteDamageRequest применяет potency.
         /// </summary>
-        public void ExecuteAttack(string attackerId, string techniqueId, string targetId, bool isRanged)
+        public void ExecuteAttack(string attackerId, string techniqueId, string targetId, bool isRanged, int potencyPermil = 1000, bool isCharged = false)
         {
             // A3-2 FIX: Авто-начало боя при наличии цели
             if (!_isInCombat)
@@ -302,6 +310,15 @@ namespace CultivationGame.Modules.Combat
             // Спринт 8 C11: Уже кастует — нельзя начать новый
             if (_isCasting) return;
 
+            // Stage 0: если атака уже заряжена (isCharged или potency > 1000) —
+            // пропустить pending-таймер (зарядка TechniqueChargeService была временем каста).
+            if (isCharged || potencyPermil > GameConstants.POTENCY_BASE_PERMIL)
+            {
+                _lastAttackPotencyPermil = potencyPermil;
+                ApplyTechniqueImmediately(attackerId, techniqueId);
+                return;
+            }
+
             // C11: Проверка времени каста техники
             var techForCastTime = _techniqueService.GetTechnique(techniqueId);
             // P2-8.1 FIX: используем CastTime вместо Cooldown
@@ -320,6 +337,9 @@ namespace CultivationGame.Modules.Combat
             int castSpeedPermil = 1000 + conductivityPermil / 100;
             // effectiveCastTime = castTime × 1000 / castSpeedPermil (float для Unity Time API)
             float effectiveCastTime = Math.Max(0.1f, castTime * 1000f / castSpeedPermil);
+
+            // Запоминаем potency для BuildAndExecuteDamageRequest (после pending-таймера)
+            _lastAttackPotencyPermil = potencyPermil;
 
             if (effectiveCastTime > 0.15f)
             {
@@ -373,7 +393,7 @@ namespace CultivationGame.Modules.Combat
             Element element = GetTechniqueElement(techniqueId);
             AttackType attackType = GetTechniqueAttackType(techniqueId);
             TechniqueGrade grade = GetTechniqueGrade(techniqueId);
-            int potencyPermil = GetTechniquePotencyPermil(techniqueId); // CRIT-1: integer math (промилле)
+            int potencyPermil = _lastAttackPotencyPermil; // Stage 0: potency из зарядки игрока (не dormant lookup)
 
             // Определяем уровни культивации атакующего и защитника
             // Фаза 3 (3.I): пер-entity уровни через IQiDataProvider

@@ -1,6 +1,11 @@
 # Система техник (Technique System)
 
 > **Назначение:** Документ описывает все способности практика: боевые, защитные, лечебные, вспомогательные. Включает классификацию, систему Grade, структурную ёмкость (capacity), генерацию «Матрёшка», использование техник, мастерство, Ultimate-техники, дестабилизацию. Документ engine-agnostic: концепции, формулы, данные — без привязки к движку.
+>
+> **Статус (обновлено 2026-08-25, GLM-5.3):** §5 унифицирован под модель заполнения
+> (charge-by-conductivity) — реализовано в `TechniqueChargeService` (Stage 0).
+> Добавлена §5.4 «Аура-задержка» (вариант В) — реализовано в `AuraHoldService` (Stage 1).
+> Код: HEAD соответствует этому разделу; прецедент — `checkpoints/08_25_technique_hold_analysis.md`.
 
 **Связанные документы:** `02_systems/COMBAT_SYSTEM.md`, `02_systems/QI_SYSTEM.md`, `02_systems/ELEMENTS_SYSTEM.md`, `02_systems/TECHNIQUE_EFFECTS.md`, `09_workflow/ALGORITHMS.md`.
 
@@ -213,6 +218,85 @@ effectiveSpeed = conductivity × (1 + cultivationBonus) × (1 + masteryBonus)
 - `qiCost = 50`, `conductivity = 2.0`, `cultivationLevel = 3` (+10%), `mastery = 50%` (+50%).
 - `effectiveSpeed = 2.0 × 1.10 × 1.50 = 3.3`
 - `castTime = 50 / 3.3 = 15.15` секунд.
+
+> **⚠️ Примечание (GLM-5.3, 2026-08-25):** Литеральный пример даёт 15 с — это
+> **медитативный масштаб** (проводимость = coreCapacity/360 — полный цикл
+> поглощения). Для боевого канала введён множитель `K = COMBAT_CHANNEL_MULT = 12`
+> («боевой прогон меридиан» против медитативного поглощения):
+>
+> ```
+> chargeRate = finalConductivity × K × (1 + mastery × 0.005)   [Ци/тик]
+> fillTicks  = qiCost / chargeRate
+> ```
+>
+> | K | L1 (64 qi, cond 2.8) | L3 (256, 18.7) | L5 (1024, 125.7) | L9 (16384, 5690) |
+> |---|---|---|---|---|
+> | ×12 (выбран) | 2.0 тика | 1.1 | 0.68 | 0.24 |
+>
+> Реализация: `Constants.COMBAT_CHANNEL_MULT`, `TechniqueChargeService.ComputeChargeRate`.
+> Лёгкие реакции (Dodge/Block, малый qiCost) заполняются <0.3 тика — мгновенно.
+
+---
+
+## 5.4. Аура-задержка (вариант В, Stage 1 — реализовано 2026-08-25, GLM-5.3)
+
+> **Источник:** `checkpoints/08_25_technique_hold_analysis.md` §4 (вариант В рекомендован).
+> Реализация: `Modules/Player/AuraHoldService.cs`, `PlayerTechniqueCaster.OnChargeCompleted`.
+
+### Принцип
+
+ВСЕ техники (кроме Cultivation) могут «зависать» в ауре игрока после зарядки,
+но **аура держит только ОДНУ**. Остальные срабатывают сразу по завершении зарядки.
+
+### Поток (с Stage 0)
+
+```
+1. Z (TechniqueCastRequestedEvent):
+   ├── если аура удерживает технику → Release + FireTechnique (второе нажатие)
+   └── иначе → TechniqueChargeService.StartCharge (первое нажатие)
+
+2. CombatModule.Tick → TechniqueChargeService.UpdateCharges
+   └── drain chargeRate Ци/тик через QiConsumeRequestEvent
+
+3. ChargedQi ≥ QiCost → TechniqueChargeCompletedEvent (potency=1000 на Stage 0)
+   └── PlayerTechniqueCaster.OnChargeCompleted:
+       ├── аура свободна → AuraHoldService.Hold (park, ждёт второго нажатия)
+       └── аура занята → FireTechnique немедленно («остальные срабатывают сразу»)
+
+4. Z повторно (аура удерживает) → Release → FireTechnique
+   └── AttackIntentEvent(isCharged=true) → CombatService: пропуск pending-таймера
+```
+
+### Декей удержания
+
+- `AURA_HOLD_DECAY_PERMIL = 10` (1% QiCost/тик) — удержание требует концентрации.
+- При `ChargedQi < QiCost/2` → авто-рассеивание (возврат 50% остаточного Ци).
+- Принудительное рассеивание: стюн/смерть/медитация (через `AuraHoldService.Dissipate`).
+
+### Потency (окно перезарядки)
+
+На Stage 1 potency всегда 1000‰ (базовая мощность). Окно перезарядки
+[qiCost..capacity] → potency 1000→2000‰ + дестабилизация §7 — **Stage 2**
+(опциональный план, см. `checkpoints/08_25_technique_hold_analysis.md` §8).
+
+### NPC-паритет
+
+NPC используют псевдо-технику `"npc_strike"` (NPCModule:132) без данных техники →
+зарядка не применяется; NPC атакует через `CombatService.ExecuteAttack` с
+pending-таймером (castTime по умолчанию 0.5 с). **Осознанная временная
+асимметрия** — паритет NPC = Stage 2 (отдельный план).
+
+### Связанные константы (`Constants.cs`)
+
+- `COMBAT_CHANNEL_MULT = 12` — K-множитель боевого прогона
+- `MIN_CHARGE_RATE = 1.0` — минимальная проводимость для зарядки
+- `AURA_HOLD_DECAY_PERMIL = 10` — декей удержания (1%/тик)
+- `POTENCY_BASE_PERMIL = 1000`, `POTENCY_MAX_PERMIL = 2000` — окно мощности
+
+### Верификация
+
+`GODOT_CHARGE_SIM=1` (headless): зарядка → hold → release → урон по NPC.
+Ожидаемый вывод: `[ChargeSim] VERDICT: PASS — fill model + aura hold + release all wired`.
 
 ---
 

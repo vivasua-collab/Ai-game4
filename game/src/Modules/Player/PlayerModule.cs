@@ -23,6 +23,9 @@ public sealed class PlayerModule : IModule
     [Inject] private readonly IStatService _statService = null!;
     [Inject] private readonly ITileService _tileService = null!;
     [Inject] private readonly IPublisher<PlayerMovedEvent> _positionPublisher = null!;
+    [Inject] private readonly ITimeService _timeService = null!;
+    // Stage 1 (2026-08-25, GLM-5.3): декей удержания техники в ауре
+    [Inject] private readonly AuraHoldService _auraHold = null!;
 
     private int _tickCount;
     private Position2D? _mouseDestination;  // null = keyboard movement, non-null = mouse-click movement
@@ -54,6 +57,10 @@ public sealed class PlayerModule : IModule
     public void Tick(int tickCount)
     {
         _tickCount = tickCount;
+
+        // Stage 1 (2026-08-25, GLM-5.3): декей удержания техники в ауре
+        // (1% QiCost/тик; рассеяние при < QiCost/2 с возвратом 50%).
+        _auraHold?.Tick(_timeService.DeltaTime);
 
         // Movement is now handled by GameWorldController.HandleFreeMovement()
         // (pixel-based, continuous). PlayerModule.Tick() no longer moves the player.
@@ -212,6 +219,9 @@ public static class PlayerModuleServices
         // Этап 2 внедрения ЦИ (2026-08-23): каст техник игрока
         // (TechniqueCastRequestedEvent → эффекты по типам).
         builder.Register<PlayerTechniqueCaster>(Lifetime.Singleton);
+        // Stage 1 (2026-08-25, GLM-5.3): удержание заряженной техники в ауре
+        // (вариант В — аура держит одну). Декей из PlayerModule.Tick.
+        builder.Register<AuraHoldService>(Lifetime.Singleton);
         builder.Register<IStatService, StatService>(Lifetime.Singleton);
         builder.Register<PlayerModule>(Lifetime.Singleton);
     }

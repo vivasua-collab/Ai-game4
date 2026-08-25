@@ -29,8 +29,12 @@ namespace CultivationGame.Core.Interfaces
         /// A3-5 FIX: Полная сигнатура ExecuteAttack с TargetId и IsRanged.
         /// Позволяет передать цель и тип дальности из AttackIntentEvent.
         /// Обратная совместимость: старый 2-параметровый вызов делегирует сюда с defaults.
+        ///
+        /// Stage 0 (2026-08-25, GLM-5.3): + potencyPermil + isCharged.
+        /// isCharged=true → пропуск pending-таймера (зарядка была временем каста).
+        /// potencyPermil>1000 → то же (Stage 2 overcharge); умножитель урона.
         /// </summary>
-        void ExecuteAttack(string attackerId, string techniqueId, string targetId = null, bool isRanged = false);
+        void ExecuteAttack(string attackerId, string techniqueId, string targetId = null, bool isRanged = false, int potencyPermil = 1000, bool isCharged = false);
         void ExecuteDefense(string defenderId, DefenseSubtype defenseType);
     }
 

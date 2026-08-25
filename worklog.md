@@ -702,3 +702,67 @@ Database: 11 items registered
 - Чекпоинт сессии 08_25 приведён к полному формату истории разработки
 - Анализ задержки техник готов к обсуждению; код не менялся
 - Следующий шаг: решения по §10 анализа → стадия 0 «Модель заполнения»
+
+---
+
+## 2026-08-25 (вечер 2) — Stage 0+1 реализация: модель заполнения + аура-задержка (вариант В)
+
+**Агент:** cloud (Z.ai Code sandbox) | **Подтверждение плана:** 19:58 MSK
+
+### Что сделано
+
+**Stage 0 — модель заполнения (charge-by-conductivity):**
+- `TechniqueChargeContracts.cs` (новый) — 5 событий (Started/Progress/Completed/
+  Cancelled/HeldChanged)
+- `TechniqueChargeService` — полная переработка: per-entity зарядки, chargeRate
+  = conductivity × COMBAT_CHANNEL_MULT(12) × (1+mastery×0.005), расход Ци
+  тиками через QiConsumeRequestEvent, отмена с возвратом 50%; P0-DUAL-PLAYER-ID
+  нормализация ("player"/"player_0" в кэше QiChangedEvent)
+- `TechniqueService.CompleteUse` (новый) — кулдаун+мастерство ПОСЛЕ зарядки
+  (без расхода Ци, уже слито тиками)
+- `Constants` — +6 констант (K=12, MIN_CHARGE_RATE=1.0, AURA_HOLD_DECAY=10‰,
+  POTENCY_BASE=1000, POTENCY_MAX=2000, CHARGE_CANCEL_REFUND=500‰)
+- `AttackIntentEvent` — + PotencyPermil + IsCharged
+- `CombatService.ExecuteAttack` — + potency/isCharged; skip pending если
+  isCharged или potency>1000; `_lastAttackPotencyPermil` вместо спящего lookup
+- `CombatModule.Tick` — + UpdateCharges; forward e.PotencyPermil/IsCharged
+
+**Stage 1 — аура-задержка (вариант В):**
+- `AuraHoldService.cs` (новый) — единый слот HeldTechnique; Hold/Release/Dissipate;
+  декей 1%/тик; авто-рассеивание при ChargedQi < QiCost/2 (возврат 50%)
+- `PlayerTechniqueCaster` переписан: OnCastRequested (hold→release / else→
+  StartCharge); OnChargeCompleted (aura free→Hold / occupied→Fire немедленно);
+  FireTechnique (CompleteUse + switch по типам, isCharged=true для Combat)
+- `PlayerModule.Tick` — + AuraHoldService decay
+- `PlayerModuleServices` — + регистрация AuraHoldService
+
+**UI / Верификация:**
+- `ChargeSimDebug.cs` (новый, GODOT_CHARGE_SIM=1) — headless сценарий
+  StartCharge→COMPLETED→HELD→PRESS 2→RELEASE INTENT→damage
+- `TechniquesPanel._Process` — «⚡X%» для зарядки, «⏸В ауре» для удержания
+- `GameWorldController._Ready` — инстанцирование ChargeSimDebug
+
+**Доки (5.2 → 5.3, эволюция с кодом):**
+- TECHNIQUE_SYSTEM — статус-баннер + §5.3 K-множитель + новая §5.4 «Аура-задержка»
+- QI_SYSTEM §4.2 — боевой прогон меридиан (K=12) + напоминание про ConductivityBoost
+
+### Локальные тесты (все PASS)
+- `dotnet build`: 0 errors
+- GODOT_NEWGAME=1: 19 startables, 6 техник, без исключений
+- GODOT_CHARGE_SIM=1: **PASS** — fill model + aura hold + release all wired
+  (qiCost=64, chargeRate=538‰, 110 dmg немедленно)
+- GODOT_COMBAT_SIM=1: PASS (без регрессии)
+- GODOT_TRADE_DEBUG=1: PASS (без регрессии)
+
+### Решения
+- K=12 (по умолчанию из анализа; пользователь не указал явно)
+- IsCharged bool (дополнительно к PotencyPermil — на Stage 0 potency всегда 1000)
+- NPC-паритет = Stage 2 (осознанная временная асимметрия)
+- Save/Load зарядок не реализован (минимальный scope)
+
+### Stage Summary
+- Полная реализация Stage 0+1 варианта В (план из анализа подтверждён)
+- 3 новых файла кода + 1 sim-debug + 8 изменённых + 2 док-правки
+- Все 4 headless-теста PASS, включая новый GODOT_CHARGE_SIM
+- Техдолг: DualPlayerId централизация; NPC-паритет Stage 2; перезарядка Stage 2;
+  Save зарядок; архивный баннер docs/ v1; ALGORITHMS §15 обновление

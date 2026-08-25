@@ -102,6 +102,10 @@ public class CombatModule : IModule
         // Обновление кулдаунов техник
         _techniqueService.UpdateCooldowns(delta);
 
+        // Stage 0 (2026-08-25, GLM-5.3): обновление активных зарядок техник
+        // (модель заполнения TECHNIQUE_SYSTEM §5.3). Зарядка тиками по проводимости.
+        _techniqueChargeService.UpdateCharges(delta);
+
         // AI-ход (только в EnemyTurn)
         if (_combatService.IsInCombat && _combatService.CurrentStage == CombatStage.EnemyTurn)
         {
@@ -207,7 +211,7 @@ public class CombatModule : IModule
             _combatService.StartCombat(e.AttackerId, e.TargetId);
         }
 
-        _combatService.ExecuteAttack(e.AttackerId, e.TechniqueId, e.TargetId, e.IsRanged);
+        _combatService.ExecuteAttack(e.AttackerId, e.TechniqueId, e.TargetId, e.IsRanged, e.PotencyPermil, e.IsCharged);
     }
 
     public void Dispose()

@@ -176,6 +176,13 @@ public partial class GameWorldController : Node2D
             var combatSim = new CombatSimDebug { Name = "CombatSimDebug" };
             AddChild(combatSim);
         }
+        // Stage 0+1 (2026-08-25, GLM-5.3): верификация модели заполнения +
+        // ауры-задержки (вариант В): зарядка → hold → release → урон.
+        if (System.Environment.GetEnvironmentVariable("GODOT_CHARGE_SIM") == "1")
+        {
+            var chargeSim = new ChargeSimDebug { Name = "ChargeSimDebug" };
+            AddChild(chargeSim);
+        }
         GD.Print("[GameWorldController] Ready");
     }
 

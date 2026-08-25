@@ -187,12 +187,31 @@ public readonly struct AttackIntentEvent
     /// <summary>Дальняя атака? (attackRange > 2)</summary>
     public readonly bool IsRanged;
 
+    /// <summary>
+    /// Stage 0 (2026-08-25, GLM-5.3): мощность техники в промилле.
+    /// 1000 = ×1.0 (базовая, NPC/uncharged); >1000 = заряженная игроком техника.
+    /// CombatService: если PotencyPermil > 1000 → пропуск pending-таймера
+    /// (зарядка УЖЕ была временем каста), немедленное применение с potency.
+    /// По умолчанию 1000 (NPC и PlayerCombatAdapter без техники).
+    /// </summary>
+    public readonly int PotencyPermil;
+
+    /// <summary>
+    /// Stage 0: true = атака уже заряжена (игрок после зарядки/удержания в ауре);
+    /// CombatService пропускает pending-таймер (зарядка была временем каста).
+    /// false = NPC/базовая атака — используется pending (castTime техники).
+    /// На Stage 0 potency всегда 1000 (нет overcharge), поэтому нужен явный флаг.
+    /// </summary>
+    public readonly bool IsCharged;
+
     public AttackIntentEvent(string attackerId, string targetId,
-        string techniqueId, bool isRanged)
+        string techniqueId, bool isRanged, int potencyPermil = 1000, bool isCharged = false)
     {
         AttackerId = attackerId;
         TargetId = targetId;
         TechniqueId = techniqueId;
         IsRanged = isRanged;
+        PotencyPermil = potencyPermil;
+        IsCharged = isCharged;
     }
 }

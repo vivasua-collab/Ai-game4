@@ -266,7 +266,7 @@ namespace CultivationGame.Modules.Combat
         // === Использование ===
 
         /// <summary>
-        /// Использовать технику.
+        /// Использовать технику (legacy — мгновенный расход Ци).
         /// CMB-A06: QiCost — long, каст не нужен.
         /// EVT-01: проверка Ци из кэша + QiConsumeRequestEvent вместо IQiService.TryConsumeQi.
         /// Этап 1: рост мастерства при использовании (§10: mastery = min(100, +0.01)).
@@ -296,6 +296,36 @@ namespace CultivationGame.Modules.Combat
 
             // Публикация события
             // Фаза 9D: QiCost float→int (ЗАПРЕТ 3.9)
+            _techniqueUsedPub.Publish(new TechniqueUsedEvent(
+                _cachedEntityId, techniqueId, (int)tech.QiCost));
+
+            return true;
+        }
+
+        /// <summary>
+        /// Stage 0 (2026-08-25, GLM-5.3): завершение использования техники ПОСЛЕ зарядки.
+        /// Вызывается PlayerTechniqueCaster.OnChargeCompleted после того, как
+        /// TechniqueChargeService дренировал Ци тиками (расход уже учтён).
+        /// Делает ТОЛЬКО: установку кулдауна, рост мастерства, публикацию TechniqueUsedEvent.
+        /// НЕ списывает Ци (уже сделано сервисом зарядки).
+        /// </summary>
+        public bool CompleteUse(string techniqueId)
+        {
+            if (!_learnedTechniques.TryGetValue(techniqueId, out var tech))
+                return false;
+
+            // Кулдаун (на случай повторного вызова — но PlayerTechniqueCaster гарантирует путь)
+            if (_cooldowns.TryGetValue(techniqueId, out var remaining) && remaining > 0)
+                return false;
+
+            // Установка кулдауна
+            if (tech.Cooldown > 0)
+                _cooldowns[techniqueId] = tech.Cooldown;
+
+            // Рост мастерства (TECHNIQUE_SYSTEM.md §5.1 шаг 5)
+            tech.Mastery = MathF.Min(100f, tech.Mastery + 0.01f);
+
+            // Публикация события
             _techniqueUsedPub.Publish(new TechniqueUsedEvent(
                 _cachedEntityId, techniqueId, (int)tech.QiCost));
 

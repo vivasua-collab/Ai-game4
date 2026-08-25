@@ -23,6 +23,8 @@ namespace CultivationGame.Adapter.UI;
 public partial class TechniquesPanel : Panel
 {
     [Inject] private TechniqueService Techniques = null!;
+    [Inject] private CultivationGame.Modules.Combat.TechniqueChargeService ChargeSvc = null!;
+    [Inject] private CultivationGame.Modules.Player.AuraHoldService AuraSvc = null!;
     [Inject] private IPublisher<TechniqueCastRequestedEvent> CastPub = null!;
     [Inject] private ISubscriber<TechniqueLearnedEvent> LearnedSub = null!;
     [Inject] private ISubscriber<TechniqueForgottenEvent> ForgottenSub = null!;
@@ -66,7 +68,12 @@ public partial class TechniquesPanel : Panel
     {
         if (!_initialized || !Visible) return;
 
-        // Обновление кулдаунов/доступности Ци (дёшево: ≤ ~10 строк).
+        // Stage 0+1: зарядка (progress) и удержание в ауре (held marker)
+        string? chargingId = ChargeSvc?.GetActiveTechniqueId("player")
+                          ?? ChargeSvc?.GetActiveTechniqueId("player_0");
+        var held = AuraSvc?.Current;
+        string? heldId = held?.TechniqueId;
+
         foreach (var kvp in _rowById)
         {
             var tech = Techniques.GetTechnique(kvp.Key);
@@ -78,6 +85,20 @@ public partial class TechniquesPanel : Panel
             {
                 btn.Disabled = true;
                 btn.Text = RowTitle(tech) + $"  ⏳{cd:F0}с";
+            }
+            else if (kvp.Key == chargingId && ChargeSvc != null)
+            {
+                // Stage 0: техника заряжается
+                float prog = ChargeSvc.GetProgress("player");
+                if (prog <= 0f) prog = ChargeSvc.GetProgress("player_0");
+                btn.Disabled = true; // нельзя выбрать другую во время зарядки
+                btn.Text = RowTitle(tech) + $"  ⚡{prog * 100:F0}%";
+            }
+            else if (kvp.Key == heldId)
+            {
+                // Stage 1: техника удерживается в ауре
+                btn.Disabled = false;
+                btn.Text = RowTitle(tech) + "  ⏸В ауре (Z — выпуск)";
             }
             else
             {
@@ -124,7 +145,7 @@ public partial class TechniquesPanel : Panel
 
         var hint = new Label
         {
-            Text = "ЛКМ — выбрать | 2×ЛКМ — применить | X — след. | Z — каст выбранной",
+            Text = "ЛКМ — выбрать | 2×ЛКМ — применить | X — след. | Z — каст → заряд → аура → Z=выпуск",
         };
         hint.AddThemeFontSizeOverride("font_size", 11);
         hint.AddThemeColorOverride("font_color", new Color(0.6f, 0.55f, 0.45f));

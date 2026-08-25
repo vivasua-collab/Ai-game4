@@ -242,6 +242,49 @@ namespace CultivationGame.Core.Data
 
         #endregion
 
+        #region Combat - Technique Charging (Stage 0, GLM-5.3)
+
+        /// <summary>
+        /// Боевой множитель канала меридиан (Stage 0 — модель заполнения техник).
+        /// Лор: «боевой прогон» меридиан против медитативного поглощения.
+        /// Проводимость (= coreCapacity/360, QI_SYSTEM §4.2) — медитативный масштаб;
+        /// для зарядки техник в бою умножается на K, чтобы дать боевой темп.
+        /// chargeRate = finalConductivity × K × (1 + mastery × 0.005)  [Ци/тик]
+        /// K=12: L1 (cond 2.8, qiCost 64) ≈ 2 тика; L3 ≈ 1.1; L5 ≈ 0.7; L9 ≈ 0.24.
+        /// См. checkpoints/08_25_technique_hold_analysis.md §2.3 — балансовая таблица.
+        /// </summary>
+        public const int COMBAT_CHANNEL_MULT = 12;
+
+        /// <summary>
+        /// Минимальная проводимость для начала зарядки (Ци/тик).
+        /// Если finalConductivity × K ниже порога — зарядка невозможна (L1 без перков всё ещё может).
+        /// </summary>
+        public const float MIN_CHARGE_RATE = 1.0f;
+
+        /// <summary>
+        /// Доля возврата Ци при отмене зарядки (CancelCharge): 50%.
+        /// </summary>
+        public const int CHARGE_CANCEL_REFUND_PERMIL = 500;
+
+        /// <summary>
+        /// Декей удерживаемой в ауре техники (Stage 1 — вариант В): 1% chargedQi/тик.
+        /// Лор: удержание в ауре требует концентрации, часть Ци рассеивается.
+        /// 1000=10%/тик, 100=1%/тик. При chargedQi < qiCost техника рассеивается (возврат 50%).
+        /// </summary>
+        public const int AURA_HOLD_DECAY_PERMIL = 10;
+
+        /// <summary>
+        /// Минимальный потенциал техники (промилле). 1000 = ×1.0 (базовая мощность).
+        /// </summary>
+        public const int POTENCY_BASE_PERMIL = 1000;
+
+        /// <summary>
+        /// Максимальный потенциал перезарядки (промилле). 2000 = ×2.0 (окно [qiCost..capacity]).
+        /// </summary>
+        public const int POTENCY_MAX_PERMIL = 2000;
+
+        #endregion
+
         #region Combat - Qi Buffer
 
         /// <summary>
