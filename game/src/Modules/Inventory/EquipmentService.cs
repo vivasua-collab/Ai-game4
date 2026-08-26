@@ -128,7 +128,10 @@ namespace CultivationGame.Modules.Inventory
                 if (_equipment.TryGetValue(EquipmentSlot.WeaponOff, out var offHand))
                 {
                     _equipment.Remove(EquipmentSlot.WeaponOff);
-                    _equipChangedPub.Publish(new EquipmentChangedEvent(_entityId ?? "unknown", EquipmentSlot.WeaponOff, null, GetTotalArmor()));
+                    // AUDIT-4 EQ-A1 FIX: 5-arg ctor с OldItemId — иначе InventoryModule
+                    // не возвращает предмет в инвентарь (4-arg ctor даёт OldItemId=null,
+                    // оружие из левой руки уничтожалось при смене на двуручник).
+                    _equipChangedPub.Publish(new EquipmentChangedEvent(_entityId ?? "unknown", EquipmentSlot.WeaponOff, null, offHand.ItemId, GetTotalArmor()));
                 }
             }
 
@@ -236,6 +239,9 @@ namespace CultivationGame.Modules.Inventory
                 {
                     var unequippedItemId = item.ItemId;
                     _equipment.Remove(slot);
+                    // AUDIT-4 EQ-A2 FIX: синхронизация провайдера после ампутации —
+                    // иначе CombatService видел устаревшие статы до следующей смены.
+                    SyncToProvider();
                     _equipBlockedPub.Publish(new EquipmentBlockedEvent(
                         _entityId, slot, $"Ампутация части тела {e.Part}"));
                     _equipChangedPub.Publish(new EquipmentChangedEvent(_entityId, slot, null, unequippedItemId, GetTotalArmor()));
