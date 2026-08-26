@@ -945,3 +945,48 @@ Stage Summary:
 - Кандидаты аудита-4+: Inventory/UI/Save, Interaction/Trade глубже,
   Body/Enhancement, NPC AI/Movement; мелочь C-5 (_isCasting событие) и C-6
   (удалить CombatConfig.PlayerEntityId).
+
+---
+Task ID: session-2026-08-26-env-restore-audit4
+Agent: main thread (Z.ai Code)
+Task: Восстановление окружения (глубокий сброс) + Аудит-4 всех подсистем ядра
+
+Work Log:
+- Дата/время: 2026-08-26 14:08 UTC. Глубокий сброс песочницы: /home/z/godot и
+  /home/z/.dotnet удалены ЦЕЛИКОМ → симлинк my-project/godot сломан → в предпросмотре
+  пользователя "godot: No such file or directory (os error 2)".
+- cold_start.sh восстановил dotnet; Godot «исчезал» после unzip-распаковки.
+- РАСКРЫТА КОРНЕВАЯ ПРИЧИНА №1: в официальном zip имена с UNDERSCORE
+  (Godot_v4.7.1-stable_mono_linux_x86_64), все скрипты проекта используют DOT
+  (linux.x86_64) — визуально неразличимо, байтово разные пути → все ENOENT
+  «мерцания» при chmod/exec по точечному пути.
+- РАСКРЫТА КОРНЕВАЯ ПРИЧИНА №2: файлы, созданные unzip, нестабильны в этой
+  песочнице (lookup ENOENT после «успешной» распаковки); python-zipfile-файлы
+  стабильны (проверено: blob1.bin 145МБ жив, unzip-бинарь исчезал).
+- Решение: Godot установлен python-извлечением в ПЕРСИСТЕНТНЫЙ my-project/godot
+  (реальная директория, dot-нормализация имён); /home/z/godot — симлинк-легаси.
+  cold_start.sh переписан (python-extract, без unzip). core.fileMode=false
+  (ФС флапает exec-биты). Коммит 1fd576a. Прогон cold_start — PASS, игра
+  грузится, бинарь стабилен между вызовами.
+- АУДИТ-4 (каждая подсистема, монтируемая в ядро GameLifetimeScope — 17 модулей
+  + фазы): чекпоинт 2026-08-26_audit_pass4_kernel_modules.md.
+  - A0 сквозная матрица: чисто (dual-id, подписки, изоляция Core).
+  - EQ-A1 MAJOR FIX: при надевании двуручника оружие из левой руки
+    УНИЧТОЖАЛОСЬ (4-arg ctor без OldItemId → обработчик не возвращал в
+    инвентарь). Фикс: 5-arg ctor.
+  - EQ-A2 MINOR FIX: SyncToProvider после ампутации.
+  - Задокументированы: INV-A1, BUFF-A1 (латентная реентерабельность TickBuffs),
+    BUFF-A3, NPC-A2 (живая коллекция — безопасна, пока RemoveNPC не вызывается),
+    SAVE-A1 (RegisterSaveable без вызывающих — известный долг).
+  - Остальные модули чисты: Player/Quest/Interaction/Charger/UI/Generator.
+- Верификация: build 0 errors; NEWGAME PASS (14 фаз, PreGen 100/100);
+  COMBAT_SIM VERDICT PASS; TRADE_DEBUG PASS. Коммит 06668c4, push.
+
+Stage Summary:
+- Окружение полностью восстановлено и hardened: предпросмотр больше не должен
+  показывать сломанный godot (my-project/godot — реальная директория с файлами).
+- Серия аудитов 1–4: ядро + ВСЕ 17 модулей покрыты (19+8=27 находок, 12 фиксов
+  за два дня серии).
+- HEAD 06668c4, synced с origin/main.
+- Для следующей сессии: cold_start.sh теперь самодостаточен (python-extract);
+  кандидаты аудита-5+: Adapter-слой (Scene/UI/Input), глубокий NPC (Soul).
