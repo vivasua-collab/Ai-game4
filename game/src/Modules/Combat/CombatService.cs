@@ -763,16 +763,6 @@ namespace CultivationGame.Modules.Combat
         }
 
         /// <summary>
-        /// Получить мощность техники в промилле (CRIT-1: ЗАПРЕТ 3.9).
-        /// 1000 = ×1.0, 2000 = ×2.0.
-        /// Этап 2.2: float GetTechniquePotency() удалён — заменён на GetTechniquePotencyPermil.
-        /// </summary>
-        private int GetTechniquePotencyPermil(string techniqueId)
-        {
-            return _techniqueChargeService.GetPotencyPermil(techniqueId);
-        }
-
-        /// <summary>
         /// Получить стоимость Ци техники.
         /// C7-E01 FIX: используем стоимость Ци из данных техники вместо baseDamage.
         /// </summary>

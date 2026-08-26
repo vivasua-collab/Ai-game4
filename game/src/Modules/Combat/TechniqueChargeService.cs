@@ -22,6 +22,7 @@ using System.Collections.Generic;
 using CultivationGame.Core;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.Events;
+using CultivationGame.Core.Helpers;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Core.Messaging.Contracts;
 
@@ -48,12 +49,15 @@ namespace CultivationGame.Modules.Combat
         private readonly IPublisher<TechniqueChargeCompletedEvent> _completedPub;
         private readonly IPublisher<TechniqueChargeCancelledEvent> _cancelledPub;
         private readonly TechniqueService _techniqueService;
+        // B5 (2026-08-26): подписка на SaveStartedEvent для отмены зарядок при сейве
+        private readonly ISubscriber<SaveStartedEvent> _saveStartedSub;
 
         // EVT-01: кэш состояния из событий (per-entity)
         private readonly Dictionary<string, QiCache> _qiCache = new();
 
         // IDisposable для подписок
         private IDisposable _qiChangedSubscription;
+        private IDisposable _saveStartedSubscription;
 
         // === Состояние ===
         // per-entity: одна активная зарядка на сущность (игрок/каждый NPC, если бы NPC юзал)
@@ -94,7 +98,8 @@ namespace CultivationGame.Modules.Combat
             IPublisher<TechniqueChargeProgressEvent> progressPub,
             IPublisher<TechniqueChargeCompletedEvent> completedPub,
             IPublisher<TechniqueChargeCancelledEvent> cancelledPub,
-            TechniqueService techniqueService)
+            TechniqueService techniqueService,
+            ISubscriber<SaveStartedEvent> saveStartedSub)
         {
             _qiChangedSub = qiChangedSub;
             _qiConsumeRequestPub = qiConsumeRequestPub;
@@ -104,10 +109,15 @@ namespace CultivationGame.Modules.Combat
             _completedPub = completedPub;
             _cancelledPub = cancelledPub;
             _techniqueService = techniqueService;
+            _saveStartedSub = saveStartedSub;
 
             // EVT-01: подписка на кэш состояния Ци (per-entity)
+            // B1 (2026-08-26): нормализация ID игрока через PlayerIdResolver —
+            // QiChangedEvent публикуется под "player", а StartCharge передаёт
+            // _player.PlayerId = "player_0". Normalize приводит оба к "player_0".
             _qiChangedSubscription = _qiChangedSub.Subscribe((in QiChangedEvent e) => {
-                _qiCache[e.EntityId] = new QiCache
+                string key = PlayerIdResolver.Normalize(e.EntityId);
+                _qiCache[key] = new QiCache
                 {
                     CurrentQi = e.Current,
                     Conductivity = e.Conductivity,
@@ -115,6 +125,26 @@ namespace CultivationGame.Modules.Combat
                     Valid = true
                 };
             });
+
+            // B5 (2026-08-26): отмена всех зарядок при начале сейва —
+            // иначе активные зарядки теряются при сериализации (без возврата Ци).
+            _saveStartedSubscription = _saveStartedSub.Subscribe((in SaveStartedEvent e) => {
+                CancelAllCharges("save");
+            });
+        }
+
+        /// <summary>
+        /// B5 (2026-08-26): отменить ВСЕ активные зарядки с возвратом 50% ChargedQi.
+        /// Вызывается по SaveStartedEvent перед сериализацией (минимальный scope edge-case).
+        /// </summary>
+        public void CancelAllCharges(string reason)
+        {
+            if (_activeCharges.Count == 0) return;
+            List<string>? cancelledIds = null;
+            foreach (var state in _activeCharges.Values)
+                CancelChargeInternal(state, reason, ref cancelledIds);
+            if (cancelledIds != null)
+                foreach (var id in cancelledIds) _activeCharges.Remove(id);
         }
 
         /// <summary>
@@ -137,8 +167,7 @@ namespace CultivationGame.Modules.Combat
             // Кулдаун (TechniqueService.GetCooldown)
             if (_techniqueService.GetCooldown(techniqueId) > 0) return false;
 
-            // Кэш Ци сущности (P0-DUAL-PLAYER-ID: QiChangedEvent публикуется под "player",
-            // а PlayerService.PlayerId = "player_0"; нормализуем как в BodyService:455).
+            // Кэш Ци сущности (B1: нормализация через PlayerIdResolver)
             if (!TryGetQiCache(entityId, out var cache)) return false;
             if (cache.CurrentQi < GameConstants.MIN_QI_FOR_BUFFER) return false;
 
@@ -197,7 +226,7 @@ namespace CultivationGame.Modules.Combat
                 string techId = state.TechniqueId;
 
                 // Кэш Ци мог устареть — проверяем актуальный остаток
-                // P0-DUAL-PLAYER-ID: QiChangedEvent публикуется под "player", charge keyed "player_0"
+                // (B1: нормализация ID через PlayerIdResolver внутри TryGetQiCache)
                 if (!TryGetQiCache(entityId, out var cache))
                 {
                     // Нет данных о Ци — прервать с возвратом
@@ -322,8 +351,9 @@ namespace CultivationGame.Modules.Combat
         }
 
         /// <summary>
-        /// Получить мощность зарядки сущности (для CombatService.GetTechniquePotencyPermil).
-        /// Возвращает 1000, если зарядка не активна/не завершена (базовая мощность).
+        /// Получить мощность зарядки сущности (для CombatService._lastAttackPotencyPermil
+        /// при отложенных атаках — если атака инициирована НЕ через зарядку).
+        /// Возвращает 1000 (POTENCY_BASE_PERMIL), если зарядка не активна/не завершена (базовая мощность).
         /// </summary>
         public int GetPotencyPermil(string entityId)
         {
@@ -358,34 +388,30 @@ namespace CultivationGame.Modules.Combat
         }
 
         /// <summary>
-        /// P0-DUAL-PLAYER-ID: QiChangedEvent публикуется под "player" (QiConfig.EntityId),
-        /// а PlayerService.PlayerId = "player_0" (P0-баг 08_25: BodyService:455 — та же пара).
-        /// Нормализуем lookup: ищем по entityId, иначе по альтернативному player-id.
+        /// Получить кэш Ци сущности (B1: централизованная нормализация через PlayerIdResolver).
+        /// "player" и "player_0" — один и тот же игрок; оба нормализуются к каноническому ID.
         /// </summary>
         private bool TryGetQiCache(string entityId, out QiCache cache)
         {
-            if (!string.IsNullOrEmpty(entityId) && _qiCache.TryGetValue(entityId, out var c) && c.Valid)
+            if (!string.IsNullOrEmpty(entityId))
             {
-                cache = c;
-                return true;
-            }
-            // Альтернативный player-id
-            string alt = IsPlayerId(entityId) ? (entityId == "player" ? "player_0" : "player") : entityId;
-            if (_qiCache.TryGetValue(alt, out var altCache) && altCache.Valid)
-            {
-                cache = altCache;
-                return true;
+                string normalized = PlayerIdResolver.Normalize(entityId);
+                if (_qiCache.TryGetValue(normalized, out var c) && c.Valid)
+                {
+                    cache = c;
+                    return true;
+                }
             }
             cache = default;
             return false;
         }
 
-        private static bool IsPlayerId(string? id) => id == "player" || id == "player_0";
-
         public void Dispose()
         {
             _qiChangedSubscription?.Dispose();
             _qiChangedSubscription = null;
+            _saveStartedSubscription?.Dispose();
+            _saveStartedSubscription = null;
         }
     }
 }

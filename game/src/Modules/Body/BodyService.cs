@@ -21,6 +21,7 @@ using System;
 using System.Collections.Generic;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.Events;
+using CultivationGame.Core.Helpers;
 using CultivationGame.Core.Messaging.Contracts;
 using CultivationGame.Core.Interfaces;
 
@@ -445,14 +446,14 @@ namespace CultivationGame.Modules.Body
         private void OnDamageApplied(in DamageAppliedEvent e)
         {
             // 1. Игрок: урон по нашим собственным BodyParts.
-            // P0 FIX (2026-08-25, NPC_COMBAT_PREP Phase 8 wiring): NPC AI атакует
-            // игрока как "player_0" (NPCAIService.PlayerId), а тело игрока
-            // инициализировано под "player" (BodyConfig default) — из-за строгого
-            // сравнения урон NPC никогда не применялся к игроку (тост показывался,
-            // HP не падал, смерть была недостижима). Принимаем оба исторических ID
-            // (прецедент двойной проверки: PlayerService, GameWorldController,
-            // NPCAIService.Friendly-ветка).
-            if (e.TargetId == _entityId || (IsPlayerEntityId(e.TargetId) && IsPlayerEntityId(_entityId)))
+            // B1 (2026-08-26): нормализация ID через PlayerIdResolver.
+            // Раньше: локальный IsPlayerEntityId() + двойная проверка (TargetId и _entityId
+            // оба могут быть "player" или "player_0" — исторические алиасы). Теперь —
+            // единая точка AreSameEntity, покрывающая оба алиаса.
+            // Контекст P0-фикса: NPC AI атакует игрока как "player_0" (NPCAIService.PlayerId),
+            // а тело игрока инициализировано под "player" (BodyConfig default) — строгое
+            // сравнение приводило к бессмертию игрока (NPC урон не применялся).
+            if (PlayerIdResolver.AreSameEntity(e.TargetId, _entityId))
             {
                 ApplyDamage(e.HitPart, e.Damage);
                 return;
@@ -465,13 +466,6 @@ namespace CultivationGame.Modules.Body
                 ApplyDamageToEntityParts(e.TargetId, npcParts, e.HitPart, e.Damage);
             }
         }
-
-        /// <summary>
-        /// Исторические ID игрока в кодовой базе: "player" (InventoryModule,
-        /// BodyConfig) и "player_0" (PlayerService, Combat, NPC AI).
-        /// P0 FIX: единая точка нормализации для сравнения.
-        /// </summary>
-        private static bool IsPlayerEntityId(string? id) => id == "player" || id == "player_0";
 
         /// <summary>
         /// Применить урон к частям тела NPC (per-entity).

@@ -32,6 +32,9 @@ namespace CultivationGame.Modules.Player
         private readonly IPublisher<HeldTechniqueChangedEvent> _heldPub;
         private readonly IPublisher<QiAddRequestEvent> _qiAddPub;
         private readonly IPlayerService _player;
+        // B5 (2026-08-26): подписка на SaveStartedEvent для рассеивания удержания при сейве
+        private readonly ISubscriber<SaveStartedEvent> _saveStartedSub;
+        private IDisposable? _saveStartedSubscription;
 
         /// <summary>Текущее удержание (null = аура пуста).</summary>
         private HeldTechnique? _held;
@@ -40,11 +43,18 @@ namespace CultivationGame.Modules.Player
         public AuraHoldService(
             IPublisher<HeldTechniqueChangedEvent> heldPub,
             IPublisher<QiAddRequestEvent> qiAddPub,
-            IPlayerService player)
+            IPlayerService player,
+            ISubscriber<SaveStartedEvent> saveStartedSub)
         {
             _heldPub = heldPub;
             _qiAddPub = qiAddPub;
             _player = player;
+            _saveStartedSub = saveStartedSub;
+
+            // B5: рассеять удержание при начале сейва (возврат 50% ChargedQi).
+            _saveStartedSubscription = _saveStartedSub.Subscribe((in SaveStartedEvent e) => {
+                Dissipate("save");
+            });
         }
 
         /// <summary>Аура пуста?</summary>
@@ -111,8 +121,12 @@ namespace CultivationGame.Modules.Player
 
         /// <summary>
         /// Тик декея (вызывается из PlayerModule.Tick).
-        /// ChargedQi -= max(1, QiCost × AURA_HOLD_DECAY_PERMIL / 1000).
+        /// ChargedQi -= max(1, QiCost × AURA_HOLD_DECAY_PERMIL / 1000 × deltaTime).
         /// При ChargedQi &lt; QiCost/2 → Dissipate("decay").
+        ///
+        /// B3 (2026-08-26): фикс — декей масштабируется с deltaTime. Раньше был
+        /// фиксированный per-tick, что на ускоренной игре (Fast speed = ×2)
+        /// приводило к слишком долгому удержанию. Теперь на Fast декей вдвое больше.
         /// </summary>
         public void Tick(float deltaTime)
         {
@@ -120,7 +134,12 @@ namespace CultivationGame.Modules.Player
             if (deltaTime <= 0f) return;
 
             var h = _held;
-            long decayPerTick = Math.Max(1, h.QiCost * GameConstants.AURA_HOLD_DECAY_PERMIL / 1000);
+            // B3: double для точности + Math.Ceiling (ЗАПРЕТ 3.9 — integer division).
+            // Минимум 1 Ци/тик — иначе на малых QiCost декей может быть 0 (вечное удержание).
+            double decayPerTickRaw = (double)h.QiCost
+                * GameConstants.AURA_HOLD_DECAY_PERMIL / 1000.0
+                * (double)deltaTime;
+            long decayPerTick = Math.Max(1L, (long)Math.Ceiling(decayPerTickRaw));
             long newCharged = h.ChargedQi - decayPerTick;
 
             if (newCharged <= h.QiCost / 2)
@@ -143,6 +162,8 @@ namespace CultivationGame.Modules.Player
         {
             _disposed = true;
             _held = null;
+            _saveStartedSubscription?.Dispose();
+            _saveStartedSubscription = null;
         }
     }
 

@@ -193,6 +193,11 @@ namespace CultivationGame.Modules.Combat
                 Level = data.Level,
                 Element = data.Element,
                 QiCost = data.QiCost,
+                // B2 (2026-08-26): фикс бага — CapacityCost не копировался из TechniqueData,
+                // из-за чего TechniqueChargeService брал fallback (qiCost как capacity),
+                // и окно перезарядки [qiCost..capacity] схлопывалось → potency 1001-2000
+                // (overcharge, Stage 2) был недостижим.
+                CapacityCost = data.CapacityCost,
                 Cooldown = data.Cooldown,
                 CastTime = data.CastTime,
                 Range = data.Range,

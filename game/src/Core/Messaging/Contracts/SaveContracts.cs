@@ -41,6 +41,20 @@ public readonly struct SaveRequestedEvent
         { SlotName = slotName; SlotType = slotType; }
 }
 
+/// <summary>
+/// Событие: сейв НАЧАЛСЯ (B5, 2026-08-26).
+/// Публикуется SaveService.Save ПЕРЕД сборкой состояния ISaveable.
+/// Подписчики с transient-состоянием (активные зарядки, удержания в ауре)
+/// должны отменить их с возвратом 50% Ци — иначе состояние теряется при сериализации.
+/// </summary>
+public readonly struct SaveStartedEvent
+{
+    public readonly string SlotName;
+    public readonly SaveSlotType SlotType;
+    public SaveStartedEvent(string slotName, SaveSlotType slotType = SaveSlotType.Manual)
+        { SlotName = slotName; SlotType = slotType; }
+}
+
 public readonly struct LoadRequestedEvent
 {
     public readonly string SlotName;

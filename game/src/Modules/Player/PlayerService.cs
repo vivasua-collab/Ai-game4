@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Events;
+using CultivationGame.Core.Helpers;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Core.Messaging.Contracts;
 
@@ -174,8 +175,10 @@ public sealed class PlayerService : IPlayerService, IDisposable
     /// </summary>
     private void OnBodyCritical(in BodyCriticalEvent e)
     {
-        // Only react to player's body events.
-        if (e.EntityId != _data.Id && e.EntityId != "player") return;
+        // B1: нормализация ID игрока через PlayerIdResolver.
+        // Раньше: hardcoded проверка e.EntityId != _data.Id && e.EntityId != "player"
+        // (исторические алиасы "player_0" и "player" — см. PlayerIdResolver).
+        if (!PlayerIdResolver.AreSameEntity(e.EntityId, _data.Id)) return;
 
         // Heart disabled/severed = death.
         if (e.Part == BodyPartType.Heart && e.State == BodyPartState.Disabled)

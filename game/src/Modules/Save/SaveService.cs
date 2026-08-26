@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.DI;
+using CultivationGame.Core.Events;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Core.Messaging.Contracts;
 
@@ -16,6 +17,10 @@ namespace CultivationGame.Modules.Save;
 public sealed class SaveService : ISaveService, ISaveable
 {
     [Inject] private readonly SaveDataAggregator _aggregator = null!;
+    // B5 (2026-08-26): публикуем SaveStartedEvent перед сборкой состояния,
+    // чтобы transient-системы (TechniqueChargeService, AuraHoldService) могли
+    // отменить активные зарядки/удержания с возвратом 50% Ци.
+    [Inject] private readonly IPublisher<SaveStartedEvent> _saveStartedPub = null!;
     private SaveConfig _config = new();
 
     // ISaveable
@@ -37,6 +42,10 @@ public sealed class SaveService : ISaveService, ISaveable
 
     public bool Save(SaveSlot slot)
     {
+        // B5: уведомить transient-системы о начале сейва — они отменят активные
+        // зарядки/удержания с возвратом 50% Ци. Иначе состояние теряется при сериализации.
+        _saveStartedPub?.Publish(new SaveStartedEvent(slot.Name, slot.Type));
+
         bool ok = _aggregator.Save(slot.Name);
         OnSaveCompleted?.Invoke(ok, slot.Name);
         Console.WriteLine($"[SaveService] Save('{slot}') → {(ok ? "OK" : "FAILED")}");
