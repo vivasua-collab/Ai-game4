@@ -172,12 +172,15 @@ public static class LevelBoundaries
     /// <summary>
     /// Применить политику легендарного оверсама: расширить max на +1 уровень.
     /// Возвращает расширенные границы (оригинал не меняется).
+    /// 2026-08-26: next-границы считаются для ТОГО ЖЕ грейда (не Common) —
+    /// семантика «+1 уровень при том же грейде». Иначе Transcendent-предмет
+    /// с формулами L+1 (eff 2.0) выйдет за окно Common L+1 (eff 1.0).
     /// </summary>
-    public static TechniqueBounds WithOvershootApplied(TechniqueBounds original, int level, TechniqueType type)
+    public static TechniqueBounds WithOvershootApplied(TechniqueBounds original, int level, TechniqueType type, TechniqueGrade grade)
     {
         if (original.Overshoot == OvershootPolicy.None) return original;
-        // Bound(L+1) для расширения
-        var next = TechniqueBoundsFor(Math.Min(level + 1, GameConstants.MAX_CULTIVATION_LEVEL), type, TechniqueGrade.Common);
+        // Bound(L+1) для расширения — тот же грейд, что у проверяемой техники.
+        var next = TechniqueBoundsFor(Math.Min(level + 1, GameConstants.MAX_CULTIVATION_LEVEL), type, grade);
         var result = new TechniqueBounds
         {
             MinCapacity = original.MinCapacity,
@@ -232,13 +235,16 @@ public static class LevelBoundaries
 
         // damage = (base + perLevel×(L-1)) × speedScale × eff × (1 + matBonus/100)
         // matBonus: из Materials тира = clamp((L+1)/2,1,5). Диапазон по тиру.
+        // 2026-08-26: +Void категория — согласовано с EquipmentGenerator.PickMaterial
+        // (иначе tier 5 без оружейных материалов → границы без учёта void_matter).
         int tier = Math.Clamp((level + 1) / 2, 1, 5);
         float minMat = float.MaxValue, maxMat = float.MinValue;
         foreach (var m in EquipmentGenerationTables.Materials)
         {
             if (m.Tier != tier) continue;
             if (m.Category is MaterialCategory.Metal or MaterialCategory.Bone
-                                    or MaterialCategory.Crystal or MaterialCategory.Wood)
+                                    or MaterialCategory.Crystal or MaterialCategory.Wood
+                                    or MaterialCategory.Void)
             {
                 if (m.DamageBonus < minMat) minMat = m.DamageBonus;
                 if (m.DamageBonus > maxMat) maxMat = m.DamageBonus;
@@ -262,7 +268,8 @@ public static class LevelBoundaries
         {
             if (m.Tier != tier) continue;
             if (m.Category is MaterialCategory.Metal or MaterialCategory.Bone
-                                    or MaterialCategory.Crystal or MaterialCategory.Wood)
+                                    or MaterialCategory.Crystal or MaterialCategory.Wood
+                                    or MaterialCategory.Void)
             {
                 if (m.WeightMult < minW) minW = m.WeightMult;
                 if (m.WeightMult > maxW) maxW = m.WeightMult;
@@ -351,15 +358,19 @@ public static class LevelBoundaries
     /// <summary>
     /// Применить политику легендарного оверсама к границам экипировки.
     /// Возвращает расширенные границы.
+    /// 2026-08-26: next-границы считаются для ТОГО ЖЕ грейда (не Common) —
+    /// оверкапнутая легендарка (Transcendent) считает статы по формулам
+    /// L+1 с eff грейда 2.0, а не 1.0. Rarity=Common → Overshoot=None,
+    /// рекурсии нет.
     /// </summary>
     public static EquipmentBounds WithOvershootApplied(EquipmentBounds original, int level,
-        WeaponBaseClass? wclass = null, ArmorBaseClass? aclass = null)
+        EquipmentGrade grade, WeaponBaseClass? wclass = null, ArmorBaseClass? aclass = null)
     {
         if (original.Overshoot == OvershootPolicy.None) return original;
         var next = wclass != null
-            ? WeaponBoundsFor(Math.Min(level + 1, GameConstants.MAX_CULTIVATION_LEVEL), wclass, EquipmentGrade.Common, ItemRarity.Common)
+            ? WeaponBoundsFor(Math.Min(level + 1, GameConstants.MAX_CULTIVATION_LEVEL), wclass, grade, ItemRarity.Common)
             : aclass != null
-                ? ArmorBoundsFor(Math.Min(level + 1, GameConstants.MAX_CULTIVATION_LEVEL), aclass, EquipmentGrade.Common, ItemRarity.Common)
+                ? ArmorBoundsFor(Math.Min(level + 1, GameConstants.MAX_CULTIVATION_LEVEL), aclass, grade, ItemRarity.Common)
                 : original;
         var result = new EquipmentBounds
         {

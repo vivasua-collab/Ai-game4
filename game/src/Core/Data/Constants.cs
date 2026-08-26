@@ -494,6 +494,30 @@ namespace CultivationGame.Core.Data
         /// </summary>
         public const float ULTIMATE_QI_COST_MULTIPLIER = 2.0f;
 
+        // =====================================================================
+        // Epic→Legendary промоушен и оверкап (2026-08-26)
+        // =====================================================================
+
+        /// <summary>
+        /// Шанс промоушена Epic→Legendary при ролле грейда Transcendent
+        /// (0.20 = 20% эпиков становятся легендарками).
+        /// Итоговые доли легендарок: L7-8 → 5%×20% = 1.0%; L9+ → 20%×20% = 4.0%.
+        /// </summary>
+        public const float EPIC_TO_LEGENDARY_PROMOTE_CHANCE = 0.20f;
+
+        /// <summary>
+        /// Шанс оверкапа легендарной вещи: часть характеристик (Damage/Defense
+        /// + Durability — политика OvershootPolicy.DamageAndQi) считается по
+        /// формулам уровня L+1 («заход на +1 уровень по некоторым статам»).
+        /// 0.18 = 18% — середина диапазона 10–25% из ТЗ: НЕ каждая легендарка
+        /// улетает на новый ранг. Остальные 82% — статы в границах L + перки
+        /// (гарант. зачарование, макс. бонусы, value ×3).
+        /// </summary>
+        public const float LEGENDARY_OVERCAP_CHANCE = 0.18f;
+
+        /// <summary>Множитель цены легендарной вещи (поверх базовой Value).</summary>
+        public const float LEGENDARY_VALUE_MULTIPLIER = 3.0f;
+
         #endregion
 
         #region Combat - Defense Pipeline

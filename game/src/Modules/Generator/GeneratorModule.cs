@@ -20,6 +20,7 @@ public class GeneratorModule : IModule
     [Inject] private readonly IItemGeneratorService _itemGenerator = null!;
     [Inject] private readonly IEquipmentGenerator _equipmentGenerator = null!;
     [Inject] private readonly ITechniqueGeneratorService _techniqueGenerator = null!;
+    [Inject] private readonly IVerificationService? _verifier = null;
 
     public string ModuleName => "Generator";
 
@@ -123,6 +124,73 @@ public class GeneratorModule : IModule
         catch (Exception ex)
         {
             Console.WriteLine($"  ❌ EquipmentGenerator FAILED: {ex.GetType().Name}: {ex.Message}");
+        }
+
+        // === 2026-08-26: Epic→Legendary промоушен + оверкап ===
+        Console.WriteLine("");
+        Console.WriteLine("── Epic→Legendary промоушен + оверкап (промо 20% / оверкап 18%) ──");
+        try
+        {
+            // Батч 1: встроенный промоушен — распределение rarity по 400 генерациям L9
+            // (L9+ даёт вес Transcendent=20% → ожидание: Epic≈16% (80% от 20%),
+            //  Legendary≈4% (20% от 20%)).
+            const int batch = 200;
+            int total = batch * 2, epic = 0, legendary = 0, overcapped = 0;
+            for (int i = 0; i < batch; i++)
+            {
+                var w = _equipmentGenerator.GenerateWeapon(9, null, seed: 50000 + i);
+                if (w.Rarity == ItemRarity.Epic) epic++;
+                if (w.Rarity == ItemRarity.Legendary)
+                {
+                    legendary++;
+                    if (w.Description.Contains("ОВЕРКАП")) overcapped++;
+                }
+            }
+            for (int i = 0; i < batch; i++)
+            {
+                var a = _equipmentGenerator.GenerateArmor(9, null, seed: 60000 + i);
+                if (a.Rarity == ItemRarity.Epic) epic++;
+                if (a.Rarity == ItemRarity.Legendary)
+                {
+                    legendary++;
+                    if (a.Description.Contains("ОВЕРКАП")) overcapped++;
+                }
+            }
+            Console.WriteLine($"  [Promote]  {total} генераций L9: Epic={epic} ({100f * epic / total:F1}%, ожид. ~16%) | " +
+                              $"Legendary={legendary} ({100f * legendary / total:F1}%, ожид. ~4%)");
+            Console.WriteLine($"  [Overcap]  оверкапнутых легендарок: {overcapped}/{legendary} " +
+                              $"({(legendary > 0 ? 100f * overcapped / legendary : 0):F1}%, ожид. ~18%) — " +
+                              $"не каждая легендарка уходит на ранг L+1");
+
+            // Батч 2: принудительные легендарки — сравнение оверкап/без + верификация.
+            int valid = 0, count = 0;
+            for (int i = 0; i < 20; i++)
+            {
+                var w = _equipmentGenerator.GenerateLegendaryWeapon(9, null, seed: 70000 + i);
+                var r = _verifier?.Validate(w, 9);
+                count++;
+                if (r == null || r.IsValid) valid++;
+                else Console.WriteLine($"    ❌ {w.ItemId}: {r.Message}");
+            }
+            for (int i = 0; i < 20; i++)
+            {
+                var a = _equipmentGenerator.GenerateLegendaryArmor(9, null, seed: 80000 + i);
+                var r = _verifier?.Validate(a, 9);
+                count++;
+                if (r == null || r.IsValid) valid++;
+                else Console.WriteLine($"    ❌ {a.ItemId}: {r.Message}");
+            }
+            Console.WriteLine($"  [Verify]   принудительных легендарок L9 валидно: {valid}/{count}");
+
+            // Примеры: одна с оверкапом, одна без (один сид — разница только в статах L+1).
+            var withOc = _equipmentGenerator.GenerateLegendaryWeapon(9, "sword", seed: 91001, forceOvercap: true);
+            var noOc = _equipmentGenerator.GenerateLegendaryWeapon(9, "sword", seed: 91001, forceOvercap: false);
+            Console.WriteLine($"  [Sample]   с оверкапом : {withOc.NameRu} | dmg={withOc.Damage} | dur={withOc.MaxDurability} | бонусы={withOc.StatBonuses.Count} | энчант={withOc.SpecialEffects.Count > 0}");
+            Console.WriteLine($"  [Sample]   без оверкапа: {noOc.NameRu} | dmg={noOc.Damage} | dur={noOc.MaxDurability} | бонусы={noOc.StatBonuses.Count} | энчант={noOc.SpecialEffects.Count > 0}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  ❌ Legendary generation FAILED: {ex.GetType().Name}: {ex.Message}");
         }
 
         // === Techniques: 3 samples for different roles ===

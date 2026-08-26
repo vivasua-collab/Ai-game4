@@ -39,7 +39,7 @@ namespace CultivationGame.Modules.Generator
 
             // 2. Границы по статам.
             var bounds = LevelBoundaries.TechniqueBoundsFor(tech.Level, tech.Type, tech.Grade);
-            var effective = LevelBoundaries.WithOvershootApplied(bounds, tech.Level, tech.Type);
+            var effective = LevelBoundaries.WithOvershootApplied(bounds, tech.Level, tech.Type, tech.Grade);
 
             // 3. CapacityCost ∈ [min..max] (легендарный оверсам расширяет max).
             if (tech.CapacityCost < effective.MinCapacity || tech.CapacityCost > effective.MaxCapacity)
@@ -112,20 +112,23 @@ namespace CultivationGame.Modules.Generator
             }
 
             // 2. Найти базовый класс для сравнения.
+            // 2026-08-26: точное матчинг "_id_" вместо подстроки — иначе
+            // "sword" ложно матчится внутри "greatsword" (NameEn =
+            // materialId_classId_level, id класса всегда окружён '_').
             WeaponBaseClass? wclass = null;
             ArmorBaseClass? aclass = null;
             foreach (var w in EquipmentGenerationTables.Weapons)
-                if (w.Id == item.ItemType || item.NameEn.Contains(w.Id)) { wclass = w; break; }
+                if (w.Id == item.ItemType || item.NameEn.Contains("_" + w.Id + "_")) { wclass = w; break; }
             if (wclass == null)
             {
                 foreach (var a in EquipmentGenerationTables.Armors)
-                    if (a.Id == item.ItemType || item.NameEn.Contains(a.Id)) { aclass = a; break; }
+                    if (a.Id == item.ItemType || item.NameEn.Contains("_" + a.Id + "_")) { aclass = a; break; }
             }
 
             if (wclass != null)
             {
                 var bounds = LevelBoundaries.WeaponBoundsFor(item.ItemLevel, wclass, item.Grade, item.Rarity);
-                var effective = LevelBoundaries.WithOvershootApplied(bounds, item.ItemLevel, wclass, null);
+                var effective = LevelBoundaries.WithOvershootApplied(bounds, item.ItemLevel, item.Grade, wclass, null);
                 CheckInt(result, "Damage", item.Damage, effective.MinDamage, effective.MaxDamage);
                 CheckInt(result, "MaxDurability", item.MaxDurability, effective.MinDurability, effective.MaxDurability);
                 CheckFloat(result, "Weight", item.Weight, effective.MinWeight, effective.MaxWeight);
@@ -133,7 +136,7 @@ namespace CultivationGame.Modules.Generator
             else if (aclass != null)
             {
                 var bounds = LevelBoundaries.ArmorBoundsFor(item.ItemLevel, aclass, item.Grade, item.Rarity);
-                var effective = LevelBoundaries.WithOvershootApplied(bounds, item.ItemLevel, null, aclass);
+                var effective = LevelBoundaries.WithOvershootApplied(bounds, item.ItemLevel, item.Grade, null, aclass);
                 CheckInt(result, "Defense", item.Defense, effective.MinDefense, effective.MaxDefense);
                 CheckInt(result, "MaxDurability", item.MaxDurability, effective.MinDurability, effective.MaxDurability);
                 CheckFloat(result, "Coverage", item.Coverage, effective.MinCoverage, effective.MaxCoverage);

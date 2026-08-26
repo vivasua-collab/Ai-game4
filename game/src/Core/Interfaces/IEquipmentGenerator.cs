@@ -24,6 +24,22 @@ public interface IEquipmentGenerator
     /// </summary>
     EquipmentData GenerateArmor(int level, string? subtype = null, long seed = 0);
 
+    /// <summary>
+    /// 2026-08-26 — ЛЕГЕНДАРНОЕ оружие (принудительный путь Epic→Legendary:
+    /// grade=Transcendent, Rarity=Legendary, гарант. зачарование + макс.
+    /// бонусы грейда + value ×3).
+    /// forceOvercap: null → ролл LEGENDARY_OVERCAP_CHANCE (18%); true/false —
+    /// детерминированный оверкап (урон и прочность по формулам L+1).
+    /// </summary>
+    EquipmentData GenerateLegendaryWeapon(int level, string? subtype = null, long seed = 0, bool? forceOvercap = null);
+
+    /// <summary>
+    /// 2026-08-26 — ЛЕГЕНДАРНАЯ броня (принудительный путь Epic→Legendary).
+    /// forceOvercap: null → ролл LEGENDARY_OVERCAP_CHANCE (18%); true/false —
+    /// детерминированный оверкап (защита и прочность по формулам L+1).
+    /// </summary>
+    EquipmentData GenerateLegendaryArmor(int level, string? subtype = null, long seed = 0, bool? forceOvercap = null);
+
     /// <summary>Случайная экипировка (оружие или броня, 50/50).</summary>
     EquipmentData GenerateRandom(int level, long seed = 0);
 

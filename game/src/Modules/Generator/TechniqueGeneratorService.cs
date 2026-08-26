@@ -284,7 +284,10 @@ namespace CultivationGame.Modules.Generator
                 Level = level,
                 CapacityCost = capacity,
                 QiCost = qiCost,
-                BaseDamage = (int)baseDamage, // FIX CS0266: cast float→int (ЗАПРЕТ 3.9)
+                // 2026-08-26: MathF.Round вместо trunc — согласовано с
+                // LevelBoundaries.Min/MaxDamage (round): trunc давал
+                // отбои «BaseDamage 72 out of [73..109]» на дробных гранях.
+                BaseDamage = (int)MathF.Round(baseDamage),
                 Cooldown = cooldown,
                 Range = range,
                 CastTime = castTime,
@@ -383,7 +386,8 @@ namespace CultivationGame.Modules.Generator
                 Level = level,
                 CapacityCost = capacity,
                 QiCost = qiCost,
-                BaseDamage = (int)baseDamage,
+                // 2026-08-26: MathF.Round — согласовано с LevelBoundaries (см. Generate).
+                BaseDamage = (int)MathF.Round(baseDamage),
                 Cooldown = cooldown,
                 Range = range,
                 CastTime = castTime,

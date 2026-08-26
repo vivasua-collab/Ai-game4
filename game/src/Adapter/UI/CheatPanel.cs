@@ -184,6 +184,16 @@ namespace CultivationGame.Adapter.UI
             vbox.AddChild(equipRow);
             vbox.AddChild(MakeButton("Оружие + зачарование", 264, OnGenerateEnchantedWeapon));
 
+            // === 2026-08-26: Легендарки (Epic→Legendary промоушен + оверкап) ===
+            vbox.AddChild(MakeSeparator());
+            vbox.AddChild(MakeLabel("▸ Легендарки (промо 20% / оверкап 18%):", 12, new Color(0.94f, 0.83f, 0.66f)));
+            var legRow = new HBoxContainer();
+            legRow.AddThemeConstantOverride("separation", 4);
+            legRow.AddChild(MakeButton("Легендарка оружие", 128, OnGenerateLegendaryWeapon));
+            legRow.AddChild(MakeButton("Легендарка броня", 130, OnGenerateLegendaryArmor));
+            vbox.AddChild(legRow);
+            vbox.AddChild(MakeButton("×20 легендарок: статистика оверкапа", 264, OnLegendaryStats));
+
             // === Phase F: Расходники + зарядники ===
             vbox.AddChild(MakeSeparator());
             vbox.AddChild(MakeLabel("▸ Расходники:", 12, new Color(0.94f, 0.83f, 0.66f)));
@@ -380,6 +390,62 @@ namespace CultivationGame.Adapter.UI
             bool enchanted = EquipmentGenerator.TryApplyEnchant(weapon, null, _seedCounter++);
             bool added = Inventory.TryAddItem(weapon, 1);
             SetStatus($"Оружие+зачар: {weapon.NameRu} | enchant={enchanted} | effects={weapon.SpecialEffects.Count} | в инвентарь: {added}");
+        }
+
+        // === 2026-08-26: Легендарки (Epic→Legendary + оверкап) ===
+
+        private void OnGenerateLegendaryWeapon()
+        {
+            if (EquipmentGenerator == null || Inventory == null) return;
+            int level = Qi == null ? 1 : Math.Max(1, (int)Qi.CultivationLevel);
+            string subtype = WeaponIds[_weaponCycleIdx % WeaponIds.Length];
+            _weaponCycleIdx++;
+            var weapon = EquipmentGenerator.GenerateLegendaryWeapon(level, subtype, _seedCounter++);
+            if (weapon == null) { SetStatus("Легендарка не сгенерирована"); return; }
+            bool added = Inventory.TryAddItem(weapon, 1);
+            bool overcap = weapon.Description.Contains("ОВЕРКАП");
+            SetStatus($"Легендарка: {weapon.NameRu} | dmg={weapon.Damage} dur={weapon.MaxDurability} | оверкап={overcap} | бонусы={weapon.StatBonuses.Count} | в инвентарь: {added}");
+        }
+
+        private void OnGenerateLegendaryArmor()
+        {
+            if (EquipmentGenerator == null || Inventory == null) return;
+            int level = Qi == null ? 1 : Math.Max(1, (int)Qi.CultivationLevel);
+            string subtype = ArmorIds[_armorCycleIdx % ArmorIds.Length];
+            _armorCycleIdx++;
+            var armor = EquipmentGenerator.GenerateLegendaryArmor(level, subtype, _seedCounter++);
+            if (armor == null) { SetStatus("Легендарка не сгенерирована"); return; }
+            bool added = Inventory.TryAddItem(armor, 1);
+            bool overcap = armor.Description.Contains("ОВЕРКАП");
+            SetStatus($"Легендарка: {armor.NameRu} | def={armor.Defense} dur={armor.MaxDurability} | оверкап={overcap} | бонусы={armor.StatBonuses.Count} | в инвентарь: {added}");
+        }
+
+        /// <summary>
+        /// ×20 легендарок: фактический % оверкапа + верификация каждой
+        /// (быстрая проверка шанса 18% без ручного пересчёта).
+        /// </summary>
+        private void OnLegendaryStats()
+        {
+            if (EquipmentGenerator == null || Verifier == null) return;
+            int level = Qi == null ? 9 : Math.Max(1, (int)Qi.CultivationLevel);
+            const int n = 20;
+            int overcapped = 0, valid = 0, weapons = 0, armors = 0;
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < n; i++)
+            {
+                var item = i % 2 == 0
+                    ? EquipmentGenerator.GenerateLegendaryWeapon(level, null, _seedCounter++)
+                    : EquipmentGenerator.GenerateLegendaryArmor(level, null, _seedCounter++);
+                if (item == null) continue;
+                if (item.Category == ItemCategory.Weapon) weapons++; else armors++;
+                bool oc = item.Description.Contains("ОВЕРКАП");
+                if (oc) overcapped++;
+                var vr = Verifier.Validate(item, level);
+                if (vr.IsValid) valid++;
+                else sb.AppendLine($"  ❌ {item.ItemId}: {vr.Message}");
+            }
+            GD.Print($"[CheatPanel] ×{n} легендарок L{level}: оружие={weapons} броня={armors} | оверкап={overcapped}/{n} ({100 * overcapped / n}%) | валидных={valid}/{n}\n{sb}");
+            SetStatus($"×{n} легендарок: оверкап {overcapped}/{n} ({100 * overcapped / n}%), валидных {valid}/{n} — детали в логе");
         }
 
         // === Phase F: Расходники + зарядники ===
