@@ -38,7 +38,10 @@ docs_v2/
 │   ├── STAT_THRESHOLD_SYSTEM.md
 │   ├── PERK_SYSTEM.md
 │   ├── CHARGER_SYSTEM.md
-│   └── TECHNIQUE_EFFECTS.md
+│   ├── TECHNIQUE_EFFECTS.md
+│   ├── LEVEL_BOUNDARIES.md            — (2026-08-27) границы min/max по уровню/типу/грейду
+│   ├── VERIFICATION_SYSTEM.md        — (2026-08-27) VerificationService — отбраковка невалидных
+│   └── PRE_GENERATION.md              — (2026-08-27) пред-генерация техник при создании мира
 ├── 03_world/                          ← мир, карта, тайлы, время
 │   ├── WORLD_SYSTEM.md
 │   ├── WORLD_MAP_SYSTEM.md
@@ -67,7 +70,8 @@ docs_v2/
 │   ├── UI_DESIGN.md
 │   ├── RENDER_LAYERS.md
 │   ├── SPRITE_CATALOG.md
-│   └── HOTKEYS.md
+│   ├── HOTKEYS.md
+│   └── CHEAT_PANEL.md                 — (2026-08-27) чит-меню разработки (F1)
 ├── 08_content/                        ← лор, имена, контент
 │   ├── LORE_SYSTEM.md
 │   ├── START_LORE.md

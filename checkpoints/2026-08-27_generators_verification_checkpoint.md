@@ -244,11 +244,11 @@
 | Время MSK | Этап | Статус | Commit |
 |-----------|------|--------|--------|
 | 09:30 | A | ✅ завершён (аудит чтения) | — |
-| 09:55 | B | ✅ завершён (LevelBoundaries.cs, 415 строк) | pending |
-| — | C | pending | — |
-| — | D | pending | — |
-| — | E | pending | — |
-| — | F | pending | — |
+| 09:55 | B | ✅ завершён (LevelBoundaries.cs, 415 строк) | 29f8d50 |
+| 10:20 | C | ✅ завершён (VerificationService + IVerificationService) | 29f8d50 |
+| 10:30 | D | ✅ завершён (DeduplicationService + TechniqueRegistry.Remove) | 29f8d50 |
+| 10:50 | E | ✅ завершён (PreGenTechniquePhase) | 4cc5235 |
+| 11:10 | F | ✅ завершён (CheatPanel: 6 новых кнопок) | 4cc5235 |
 | — | G | pending | — |
 | — | H | pending | — |
 
