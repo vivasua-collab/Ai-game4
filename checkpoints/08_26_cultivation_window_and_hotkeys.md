@@ -190,8 +190,10 @@
 - [ ] F2. Обновить `docs_v2/02_systems/QI_SYSTEM.md` — ссылка на CultivationWindow
 - [ ] F3. Создать `docs_v2/03_ui/CULTIVATION_WINDOW.md` — UI-спецификация (вкладки, слоты, хоткеи)
 - [ ] F4. Создать `docs_v2/03_ui/HOTKEY_SYSTEM.md` — таблица хоткеев (1-9, Shift+1-9, Z X C V T I E Space)
-- [ ] F5. Обновить `SESSION_SUMMARY.md` и `worklog.md`
-- [ ] F6. Git commit + push в origin/main (с токеном)
+- [x] F5. Обновить `worklog.md` — запись сессии 08_26 (Task ID 08_26-cultivation) добавлена
+- [x] F6. Git commit + push в origin/main ✅ `f54ebd7..44609f7` — все 4 коммита запушены
+
+**Точка восстановления F:** ✅ Push в origin/main завершён. F1-F4 (docs_v2 спецификации) — pending, могут быть сделаны в следующей сессии.
 
 ---
 
