@@ -57,6 +57,12 @@ public sealed class GroupSpawnPhase : AbstractSceneAssemblyPhase
 
     public override Task ExecuteAsync()
     {
+        // 2026-08-26 (аудит-2 B-6): сброс перед каждым прогоном сборки — фаза
+        // синглтон, а RunAssembly вызывается и на NewGame, и на Load
+        // (GameSession:91/131): без сброса spacing-чек гонялся по устаревшим
+        // центрам прошлой сборки.
+        _placedGroupCentres.Clear();
+
         var locId = _session.Data?.WorldId ?? LocationCatalog.TestPolygon.Id;
         var loc = LocationCatalog.Find(locId) ?? LocationCatalog.TestPolygon;
         var rng = new SeededRandom(loc.Seed + GroupSeedOffset);

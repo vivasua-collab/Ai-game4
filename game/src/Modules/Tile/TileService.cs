@@ -85,8 +85,10 @@ public sealed class TileService : ITileService
         }
         _grid[x, y] = updated;
 
+        // 2026-08-26 (аудит-2 B-2): в событии — ИСХОДНЫЙ ResourceId (updated уже
+        // очищен при истощении → подписчики получали пустой id ресурса).
         _harvestedPub.Publish(new ResourceHarvestedEvent(
-            x, y, updated.ResourceId, result.ItemId, result.Amount, result.ResourceRemaining));
+            x, y, tile.ResourceId, result.ItemId, result.Amount, result.ResourceRemaining));
         if (result.Depleted)
         {
             _depletedPub.Publish(new ResourceDepletedEvent(x, y, tile.ResourceId));
@@ -237,10 +239,13 @@ public sealed class TileService : ITileService
                     }
                 }
                 // Herbs: very rare on Grass in any land biome.
+                // 2026-08-26 (аудит-2 B-1): chance = 100 — ролл УЖЕ сделан выше
+                // (< 1); старое chance = 1 давало ВТОРОЙ ролл 1% → фактическая
+                // вероятность 1%×1% = 0.01% (травы практически не спавнились).
                 if (objType == null && terrain == TerrainType.Grass && rng.Next(0, 100) < 1)
                 {
                     objType = ObjectType.Herb;
-                    chance = 1;
+                    chance = 100; // уже прошло ролл (паттерн ore vein)
                 }
 
                 if (objType.HasValue && rng.Next(0, 100) < chance)

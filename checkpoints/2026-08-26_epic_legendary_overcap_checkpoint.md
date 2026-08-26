@@ -177,15 +177,19 @@
 
 ---
 
-## Phase E — Аудит проход 1: Архитектура
+## Phase E — Аудит проход 1: Архитектура ✅
 
 (отдельный файл `2026-08-26_audit_pass1_architecture.md`)
-- [ ] E1. Прочитать/аудит Core: DI-контейнер, interfaces (все), messaging,
-  events, module system.
-- [ ] E2. Прочитать/аудит Entry: фазы (порядок, зависимости), boot.
-- [ ] E3. Прочитать/аудит Adapter-границу: Scene, UI, Input.
-- [ ] E4. Фиксация проблем + критичные фиксы.
-- [ ] E5. Коммит.
+- [x] E1. Прочитать/аудит Core: DI-контейнер (292 стр, OK), EventBus (239,
+  OK + минор ThreadStatic), interfaces (нарушение A-2 найдено), messaging.
+- [x] E2. Прочитать/аудит Entry: 16 фаз (порядки — баг A-1), boot
+  (GameEntryPoint OK), SceneOrchestrator (нестабильный Sort),
+  GameLifetimeScope (OK), SceneAssemblyRegistrar.
+- [x] E3. Adapter-граница: Core без Godot-ссылок ✓ (grep).
+- [x] E4. Фиксы: перенумерация фаз 1–14 (Finalize последняя), дубль
+  SceneReadyEvent удалён, стабильный OrderBy, FormationData → Core.Data
+  (рецидив Core→Modules устранён, 10 файлов using).
+- [x] E5. Коммит + push: `b8ddda1`.
 
 ## Phase F — Аудит проход 2: + Модуль мира (WorldGen/NPC)
 
@@ -226,6 +230,7 @@
 | 13:58 | C8 | Headless PASS: промо Epic 16.8%/Legendary 4.0% (расчёт 16/4), оверкап 12.5% (n=16, шум), верификация 40/40. |
 | 14:05 | D | BUGFIX-3: BaseDamage trunc→MathF.Round в обоих местах генератора техник (Generate + GenerateSpecified) — устранены отбои на дробных гранях (valid 98→100). |
 | 14:10 | D | Коммит f0d11a6 (12 файлов, +791/−56), push в origin/main. |
+| 14:55 | E | Аудит-1 (архитектура) завершён: 6 находок, 4 фикса (порядок фаз — Finalize стала последней; FormationData → Core.Data; стабильная сортировка; дубль SceneReadyEvent удалён). Коммит b8ddda1. |
 
 ---
 
@@ -238,7 +243,8 @@
 | 12:57 | B | ✅ завершён (дизайн зафиксирован) | — |
 | 13:58 | C | ✅ завершён (фича + 2 баг-фикса, build 0 err, headless PASS) | — |
 | 14:10 | D | ✅ завершён (доки + BUGFIX-3 + NEWGAME 100/100 + push) | f0d11a6 |
-| 14:15 | E | 🔄 аудит-1 архитектура в работе | — |
+| 14:55 | E | ✅ аудит-1 архитектура (6 находок, 4 фикса, headless PASS) | b8ddda1 |
+| 15:00 | F | 🔄 аудит-2 мир+NPC в работе | — |
 
 ---
 
