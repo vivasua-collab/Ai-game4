@@ -766,3 +766,142 @@ Database: 11 items registered
 - Все 4 headless-теста PASS, включая новый GODOT_CHARGE_SIM
 - Техдолг: DualPlayerId централизация; NPC-паритет Stage 2; перезарядка Stage 2;
   Save зарядок; архивный баннер docs/ v1; ALGORITHMS §15 обновление
+
+---
+
+## 2026-08-26
+
+### 09:04 — Аудит + Техдолг + Окно Культивации + Хоткеи (основная сессия)
+
+**Task ID:** 08_26-cultivation-window-and-hotkeys
+**Agent:** main (Z.ai Code, основная сессия без субагентов)
+**HEAD start:** f54ebd7 (Stage 0+1)
+**HEAD end:** 49f0e9c + pending push
+
+**Запрос пользователя:**
+1. Получить системную дату/время (MSK+3)
+2. Восстановить окружение
+3. Аудит кода вчерашних сессий (Stage 0+1) на баги/архитектурные нарушения
+4. Закрыть техдолг
+5. Окно Культивации Ци (как инвентарь, на отдельную клавишу):
+   - вкладки: Изученные техники / Меридианы (проводимость) / Ядро (заполнение, ёмкость, уровень, этап)
+   - панель слотов техник (установка техник в слоты 3-9)
+6. Система горячих клавиш:
+   - 1 = ближнее оружие, 2 = дальнее, 3-9 = техники, Shift+цифра = пояс
+7. План внедрения → аудит затронутого кода → проверка архитектуры → внедрение
+
+**Режим работы (новая схема):** без субагентов, в основном потоке; детальный чекпоинт-план
+в checkpoints/08_26_cultivation_window_and_hotkeys.md с отметками [x] после каждого этапа.
+
+**Системное время (вывод в чат, на русском):**
+- UTC: 2026-08-26 06:04:54
+- Москва (MSK, +3): 2026-08-26 09:04:54 (среда, 26 августа 2026 г.)
+
+**Work Log:**
+- Прочитан START_PROMPT.md (архитектура, запреты, формат чекпоинтов)
+- Прочитаны ключевые файлы Stage 0+1: TechniqueChargeService, AuraHoldService,
+  TechniqueService, Constants, TechniqueChargeContracts, PlayerTechniqueCaster,
+  CombatContracts, CombatService, CombatModule, ICombatService
+- Прочитаны UI/Input паттерны: InputAdapter, InputMapInitializer, InventoryWindow,
+  HotbarPanel, TechniquesPanel, IPlayerInputService, PlayerInputService, InputFrameData
+- Создан чекпоинт-план checkpoints/08_26_cultivation_window_and_hotkeys.md
+
+**Аудит Stage 0+1 — найденные проблемы:**
+- P1-ARCH: TechniqueService.LearnTechnique НЕ копирует CapacityCost → Stage 2 overcharge
+  (potency 1001-2000) недостижим. Фикс B2.
+- P1-ARCH: AuraHoldService.Tick декей НЕ масштабируется с deltaTime → на Fast speed ×2
+  декей остаётся per-tick. Фикс B3.
+- P2-DEAD: CombatService.GetTechniquePotencyPermil — мёртвый код (заменён на
+  _lastAttackPotencyPermil). Удалён в B4.
+- P3-DUAL-PLAYER-ID: 3 копии нормализации "player"/"player_0" в PlayerService,
+  BodyService, TechniqueChargeService. Централизован в B1 через PlayerIdResolver.
+- P4-SAVE-LOAD: зарядки и удержание не сейвятся. B5 — Cancel-on-save (минимальный scope).
+- P5-CONSISTENCY: HeldTechniqueChangedEvent под "player_0", QiChangedEvent под "player".
+  Закрыто через B1 (PlayerIdResolver.AreSameEntity).
+
+**Stage B (техдолг) — ВСЕ 6 ПУНКТОВ ВЫПОЛНЕНЫ:**
+- B1: Core/Helpers/PlayerIdResolver.cs (новый). Normalize/IsPlayer/AreSameEntity.
+  Обновлены: PlayerService.OnBodyCritical, BodyService.OnDamageApplied,
+  TechniqueChargeService.TryGetQiCache.
+- B2: TechniqueService.LearnTechnique + CapacityCost = data.CapacityCost
+- B3: AuraHoldService.Tick декей × deltaTime (double + Math.Ceiling)
+- B4: Удалён CombatService.GetTechniquePotencyPermil (мёртвый код)
+- B5: SaveStartedEvent контракт + SaveService публикует перед Save();
+  TechniqueChargeService.CancelAllCharges("save") и AuraHoldService.Dissipate("save")
+  отписывают transient-состояние с возвратом 50% Ци.
+- B6: docs/README.md архивный баннер — предупреждение про docs/docs/ (Unity v1).
+
+**Stage C (CultivationWindow) — ВСЕ 10 ШАГОВ ВЫПОЛНЕНЫ:**
+- C1: UIContracts.cs + 3 контракта (CultivationWindowToggleRequestedEvent,
+  TechniqueSlotAssignedEvent, TechniqueSlotClearedEvent)
+- C2: Modules/Player/TechniqueSlotService.cs (новый) — единый источник правды для
+  слотов 3-9. ISaveable. Auto-clear по TechniqueForgottenEvent. Public API:
+  AssignSlot/ClearSlot/GetTechniqueAtSlot/FindSlotForTechnique.
+- C3: Adapter/UI/CultivationWindow.cs (новый) — Control + TabContainer.
+  Open()/Close()/Toggle() методы + CultivationWindowToggleRequestedEvent.
+- C4: Вкладка «Техники» — ItemList + Label (детали) + OptionButton + Assign кнопка.
+- C5: Вкладка «Меридианы» — conductivity, K=12, chargeRate, cultivationLevel.
+- C6: Вкладка «Ядро» — currentQi/maxQi (заполнение %%), coreCapacity, cultivationLevel,
+  breakthroughStage (1-3 Закалка / 4-6 Формирование / 7-9 Золотое / 10+ Сокровенное).
+- C7: Панель слотов техник (нижняя) — 7 ячеек (3-9), 108×56 px, ЛКМ = очистить.
+- C8: Регистрация в PlayerModuleServices как ISaveable (forwarding в ContainerBuilder).
+  GameWorldController инстанцирует CultivationWindow в HUD.
+- C9: ISaveable impl готов. ⚠️ Известный gap: SaveDataAggregator не собирает ISaveable
+  автоматически (нужен wiring в SaveModule/GameBoot — вне scope этой сессии).
+- C10: Тосты при установке/очистке слота, при открытии окна.
+
+**Stage D (Хоткеи) — ВСЕ 6 ШАГОВ ВЫПОЛНЕНЫ:**
+- D2: InputMapInitializer + cultivation_window (Key.K) — выбрана K, чтобы не
+  конфликтовать с C=character_sheet, I=inventory, T=techniques.
+- D3: InputAdapter._PhysicsProcess — Shift-routing:
+  • Shift+1..9 → belt slot (InputFrameData.HotbarSlot → BeltService.Use, как раньше)
+  • 1 (no Shift) → sticky "weapon_melee"
+  • 2 (no Shift) → sticky "weapon_ranged"
+  • 3..9 (no Shift) → sticky "technique_slot_{i}"
+  • K → sticky "cultivation_window"
+  Цикл перенесён ПОСЛЕ _stickyKeys.Clear() (исправлен баг — ранее добавлял stickies
+  перед Clear, что их стирали).
+- D4: IPlayerInputService + PlayerInputService — 4 новых свойства:
+  IsCultivationWindowPressed, IsWeaponMeleePressed, IsWeaponRangedPressed,
+  TechniqueSlotIndex (int 3-9, 0=not pressed). ResetFrameFlags обновлён.
+- D5: GameWorldController.HandleStickyInput — новые ветки:
+  • IsCultivationWindowPressed → _cultivationWindow.Toggle() (не паузит)
+  • IsWeaponMeleePressed → тост «зарезервировано»
+  • IsWeaponRangedPressed → тост «зарезервировано»
+  • TechniqueSlotIndex N → TechniqueSlots.GetTechniqueAtSlot(N) → если техника
+    назначена: TechniqueCastPub.Publish(TechniqueCastRequestedEvent) (тот же path,
+    что Z-каст → PlayerTechniqueCaster → зарядка → аура → выпуск);
+    если слот пуст: тост «назначьте в окне Культивации (K)».
+- D6: Архитектура проверена — Hub-and-Spoke: Adapter → PlayerInputService →
+  GameWorldController → EventBus → PlayerTechniqueCaster. Без прямых вызовов сервисов.
+
+**Stage E (Верификация) — 4/7 PASS, 2 pending (визуальные):**
+- E1: dotnet build — 0 errors, 271 warnings (все pre-existing CS0649/CS0414)
+- E2: GODOT_NEWGAME=1 — PASS: 19/18, 6 техник, CultivationWindow Ready
+- E3: GODOT_CHARGE_SIM=1 — PASS: STARTED→PROGRESS 64/64→COMPLETED→HELD→PRESS 2→
+  RELEASE INTENT→damage player→npc=80 (Hit). VERDICT: PASS — fill model + aura hold
+  + release all wired.
+- E4: GODOT_COMBAT_SIM=1 — PASS: damage npc→player=21, player→npc=10×2,
+  npc→npc=21. VERDICT: PASS — обе стороны боя получают урон.
+- E5: GODOT_TRADE_DEBUG=1 — PASS: buy/sell material_iron_ore за 6/2 камней,
+  лавка закрыта, smoke-тест завершён.
+- E6: pending (Xvfb+opengl3 скриншот CultivationWindow)
+- E7: pending (Agent Browser интерактивный тест)
+
+**Stage Summary:**
+- 8 коммитов: 635535e (Stage B), 20c336b (Stage C), 49f0e9c (Stage D)
+- 6 новых/изменённых файлов кода (B) + 4 новых/изменённых (C) + 4 изменённых (D)
+- 2 новых Core файла: PlayerIdResolver.cs, TechniqueSlotService.cs
+- 1 новый Adapter UI файл: CultivationWindow.cs
+- 1 новый Core contract: SaveStartedEvent + 3 Cultivation contracts (в UIContracts.cs)
+- Все 4 headless sim-теста PASS (NEWGAME/CHARGE/COMBAT/TRADE)
+- CultivationWindow инициализируется без runtime-ошибок
+- Визуальная верификация (E6/E7) — pending, требует интерактивной эмуляции клавиш
+
+**Техдолг открытый:**
+- ISaveable wiring в SaveDataAggregator (SaveModule не собирает ISaveable из DI)
+- Weapon switching system (slots 1-2 сейчас просто тосты)
+- NPC-паритет для зарядок (Stage 2 — "npc_strike" заглушка)
+- Перезарядка/overcharge (Stage 2 — capacity window [qiCost..capacity] готов в коде,
+  но активация pending)
+- ALGORITHMS §15 / TECHNIQUE_USAGE_REPORT.md (доки v1 устарели — баннер B6)
