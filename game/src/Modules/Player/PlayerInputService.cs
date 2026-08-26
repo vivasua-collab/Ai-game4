@@ -41,6 +41,11 @@ public sealed class PlayerInputService : IPlayerInputService
     private bool _timeSpeedDown;
     private bool _cheatMenu;
     private int _selectedSlot;
+    // D (2026-08-26): cultivation window + weapon/technique slot hotkeys
+    private bool _cultivationWindow;
+    private bool _weaponMelee;
+    private bool _weaponRanged;
+    private int _techniqueSlotIndex;
 
     /// <summary>
     /// Internal — the raw underlying frame. Not part of the interface;
@@ -68,6 +73,12 @@ public sealed class PlayerInputService : IPlayerInputService
     public bool IsCastTechniquePressed => _castTechnique;
     public bool IsCycleTechniquePressed => _specialAction; // X (special_action)
     public bool IsTechniquesPressed => _techniques;        // T
+
+    // === D (2026-08-26): Окно Культивации + хоткеи оружие/техник ===
+    public bool IsCultivationWindowPressed => _cultivationWindow;
+    public bool IsWeaponMeleePressed => _weaponMelee;
+    public bool IsWeaponRangedPressed => _weaponRanged;
+    public int TechniqueSlotIndex => _techniqueSlotIndex;
 
     // === Ai-game3 compatibility: sticky flags ===
     public bool IsPausePressed => _pause && !InputDisabled;
@@ -118,6 +129,18 @@ public sealed class PlayerInputService : IPlayerInputService
             if (data.IsSticky("defend")) _defend = true;
             if (data.IsSticky("time_speed_up")) _timeSpeedUp = true;
             if (data.IsSticky("time_speed_down")) _timeSpeedDown = true;
+            // D (2026-08-26): cultivation window (K) + weapon/technique slots
+            if (data.IsSticky("cultivation_window")) _cultivationWindow = true;
+            if (data.IsSticky("weapon_melee")) _weaponMelee = true;
+            if (data.IsSticky("weapon_ranged")) _weaponRanged = true;
+            for (int i = 3; i <= 9; i++)
+            {
+                if (data.IsSticky($"technique_slot_{i}"))
+                {
+                    _techniqueSlotIndex = i;
+                    break;
+                }
+            }
         }
         // Этап 7: F1 — чит-меню работает даже когда InputDisabled (UI открыт).
         // Политика: чит-меню — это dev-tool, доступный всегда.
@@ -136,5 +159,10 @@ public sealed class PlayerInputService : IPlayerInputService
         _cheatMenu = false;
         _inventoryRaw = false;
         _selectedSlot = 0;
+        // D: сброс cultivation window + weapon/technique slot flags
+        _cultivationWindow = false;
+        _weaponMelee = false;
+        _weaponRanged = false;
+        _techniqueSlotIndex = 0;
     }
 }

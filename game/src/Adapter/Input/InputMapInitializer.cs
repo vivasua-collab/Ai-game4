@@ -69,6 +69,11 @@ public static class InputMapInitializer
         // Character sheet (C)
         AddKeyAction("character_sheet", Key.C);
 
+        // D2 (2026-08-26): Окно Культивации Ци (K). Открывает CultivationWindow:
+        // вкладки Техники / Меридианы / Ядро + панель слотов техник 3-9.
+        // K выбрано, чтобы не конфликтовать с C (CharacterSheet) и I (Inventory).
+        AddKeyAction("cultivation_window", Key.K);
+
         // Quest log (Q)
         AddKeyAction("quest_log", Key.Q);
 

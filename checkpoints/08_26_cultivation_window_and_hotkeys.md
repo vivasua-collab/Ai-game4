@@ -152,27 +152,21 @@
 
 ### Шаги внедрения
 
-- [ ] D1. **Аудит InputAdapter + InputMapInitializer:** прочитать, как сейчас обрабатываются 1-9, где регистрируются действия (action names). Зафиксировать конфликт.
-- [ ] D2. **InputMapInitializer:** добавить новые действия:
-  - `weapon_melee` (key 1), `weapon_ranged` (key 2)
-  - `technique_slot_3`..`technique_slot_9` (keys 3-9)
-  - `cultivation_window` (key C)
-  - `belt_slot_1`..`belt_slot_9` (Shift+1..Shift+9) — Shift как модификатор
-  - Сохранить существующие: `cast_technique` (Z), `cycle_technique` (X/Q), `meditation` (V), `inventory` (I), `techniques_panel` (T), `dialogue` (E)
-- [ ] D3. **PlayerInputService routing:**
-  - `weapon_melee` → `PlayerCombatAdapter.SelectWeapon(Melee)` + `AttackIntentEvent(basic_melee)`
-  - `weapon_ranged` → `PlayerCombatAdapter.SelectWeapon(Ranged)` + `AttackIntentEvent(basic_ranged)`
-  - `technique_slot_N` → `TechniqueCastRequestedEvent(TechniqueSlotService.GetTechniqueAtSlot(N))`
-  - `belt_slot_N` → `BeltService.UseSlot(N)` (существующий путь)
-  - `cultivation_window` → `CultivationWindowToggleRequestedEvent(open=true)`
-- [ ] D4. **HotbarPanel переработка:** визуальное разделение:
-  - Слоты 1-2 — оружие (с equipped иконкой)
-  - Слоты 3-9 — техники (с иконкой стихии + хоткеем)
-  - Под основой — строка пояса (Shift+1..9) с расходниками
-- [ ] D5. **UI подсказки:** на каждой ячейке хотбара отображать хоткей (1, 2, ..., 9, Shift+1, ...).
-- [ ] D6. **Проверка архитектуры:** `InputAdapter` (Adapter слой) → `PlayerInputService` (Module) → `EventBus` → `PlayerTechniqueCaster` / `BeltService` / `CultivationWindow`. Hub-and-Spoke соблюдён. НЕ прямой вызов сервисов из Adapter.
+- [x] D1. **Аудит InputAdapter + InputMapInitializer:** ✅ (см. A11). Найдено: `hotbar_1..9` без Shift; `C` = character_sheet (конфликт с CultivationWindow, выбрана клавиша **K**).
+- [x] D2. **InputMapInitializer:** добавлено `cultivation_window` (Key.K). Существующие `hotbar_1..9` оставлены — теперь они обрабатываются с учётом Shift state в InputAdapter.
+- [x] D3. **InputAdapter routing:** в `_PhysicsProcess` добавлена логика:
+  - `bool shiftHeld = IsKeyPressed(Key.Shift)`
+  - Цикл `hotbar_1..9` → если Shift → `hotbarSlot = i` (попадает в `InputFrameData.HotbarSlot` → BeltService как раньше); иначе `1` → sticky `weapon_melee`, `2` → sticky `weapon_ranged`, `3..9` → sticky `technique_slot_{i}`
+  - `cultivation_window` → sticky `cultivation_window`
+- [x] D4. **IPlayerInputService + PlayerInputService:** добавлены свойства `IsCultivationWindowPressed`, `IsWeaponMeleePressed`, `IsWeaponRangedPressed`, `TechniqueSlotIndex` (int 3-9, 0 = не нажато). `ResetFrameFlags` сбрасывает все новые флаги.
+- [x] D5. **GameWorldController.HandleStickyInput:** добавлены ветки:
+  - `IsCultivationWindowPressed` → `_cultivationWindow.Toggle()` (НЕ паузит игру — окно справочное)
+  - `IsWeaponMeleePressed` → тост «Слот 1: оружие ближнего боя (зарезервировано)» (weapon switching system pending)
+  - `IsWeaponRangedPressed` → тост «Слот 2: оружие дальнего боя (зарезервировано)»
+  - `TechniqueSlotIndex is int N (3-9)` → `TechniqueSlots.GetTechniqueAtSlot(N)` → если есть техника → `TechniqueCastPub.Publish(TechniqueCastRequestedEvent(techId, mouseX, mouseY))`; иначе тост «Слот N: пусто»
+- [x] D6. **Проверка архитектуры:** Hub-and-Spoke соблюдён — Adapter (InputAdapter) → PlayerInputService (Module) → GameWorldController (Adapter scene) → EventBus → PlayerTechniqueCaster. Нет прямых вызовов сервисов из InputAdapter.
 
-**Точка восстановления D:** после D1-D6 — `dotnet build` + git commit.
+**Точка восстановления D:** ✅ `dotnet build` — 0 errors, 271 warnings (без изменений от Stage C). git commit pending.
 
 ---
 

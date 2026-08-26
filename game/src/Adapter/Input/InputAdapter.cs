@@ -83,15 +83,15 @@ public partial class InputAdapter : Node
         var mousePos = GetViewport().GetMousePosition();
 
         // Hotbar slot selection (1..9). null when no digit pressed this frame.
-        int? hotbarSlot = null;
-        for (int i = 1; i <= 9; i++)
-        {
-            if (GodotInput.IsActionJustPressed($"hotbar_{i}"))
-            {
-                hotbarSlot = i;
-                break;
-            }
-        }
+        // D3 (2026-08-26): routing по Shift state:
+        //   • Shift+1..9 → belt slot (пояс, расходники) — передаётся в HotbarSlot
+        //     (существующий путь PlayerInputService.SelectedTechniqueSlot → BeltService.Use)
+        //   • 1 (без Shift) → weapon_melee sticky (ближнее оружие)
+        //   • 2 (без Shift) → weapon_ranged sticky (дальнее оружие)
+        //   • 3..9 (без Shift) → technique_slot_N sticky (техника из слота N)
+        //   • cultivation_window (K) → cultivation_window sticky (ниже, в sticky-блоке)
+        bool shiftHeld = GodotInput.IsKeyPressed(Key.Shift);
+        int? hotbarSlot = null;  // только belt slot (Shift+N) попадает сюда
 
         // ---- One-shot sticky keys (cleared and rebuilt each frame) ----
         _stickyKeys.Clear();
@@ -119,6 +119,37 @@ public partial class InputAdapter : Node
             _stickyKeys.Add("attack");
         // Этап 7 внедрения ЦИ: чит-меню (F1) — работает даже поверх UI.
         if (GodotInput.IsActionJustPressed("cheat_menu"))      _stickyKeys.Add("cheat_menu");
+
+        // D3 (2026-08-26): Окно Культивации (K) — открывает CultivationWindow.
+        if (GodotInput.IsActionJustPressed("cultivation_window")) _stickyKeys.Add("cultivation_window");
+
+        // D3 (2026-08-26): Hotbar routing — определяется Shift state (см. комментарий выше).
+        // Цикл ищет нажатую цифру 1..9 и маршрутизирует:
+        //   Shift+N → belt slot (попадает в hotbarSlot для BeltService);
+        //   1 → weapon_melee; 2 → weapon_ranged; 3..9 → technique_slot_N.
+        for (int i = 1; i <= 9; i++)
+        {
+            if (GodotInput.IsActionJustPressed($"hotbar_{i}"))
+            {
+                if (shiftHeld)
+                {
+                    hotbarSlot = i;  // belt slot — пойдёт в InputFrameData.HotbarSlot
+                }
+                else if (i == 1)
+                {
+                    _stickyKeys.Add("weapon_melee");
+                }
+                else if (i == 2)
+                {
+                    _stickyKeys.Add("weapon_ranged");
+                }
+                else
+                {
+                    _stickyKeys.Add($"technique_slot_{i}");
+                }
+                break;
+            }
+        }
 
         // ---- Build the engine-agnostic InputFrameData (readonly struct) ----
         var frameData = new InputFrameData(

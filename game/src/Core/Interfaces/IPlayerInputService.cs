@@ -60,6 +60,26 @@ namespace CultivationGame.Core.Interfaces
         /// <summary>Нажата ли панель техник (T, однократное)</summary>
         bool IsTechniquesPressed { get; }
 
+        // === D (2026-08-26): Окно Культивации + хоткеи武器/техник ===
+
+        /// <summary>
+        /// D: Нажата ли клавиша окна Культивации (K, однократное).
+        /// Открывает CultivationWindow (вкладки Техники/Меридианы/Ядро + слоты 3-9).
+        /// </summary>
+        bool IsCultivationWindowPressed { get; }
+
+        /// <summary>D: Нажата ли клавиша ближнего оружия (1, без Shift).</summary>
+        bool IsWeaponMeleePressed { get; }
+
+        /// <summary>D: Нажата ли клавиша дальнего оружия (2, без Shift).</summary>
+        bool IsWeaponRangedPressed { get; }
+
+        /// <summary>
+        /// D: Индекс слота техники (3-9) при нажатии соответствующей клавиши.
+        /// 0 = не нажато в этом кадре. Consumer обнуляет в ResetFrameFlags.
+        /// </summary>
+        int TechniqueSlotIndex { get; }
+
         // === Ai-game3 compatibility: sticky flags ===
 
         /// <summary>Нажат ли pause (Esc, однократное). Ai-game3 compatibility.</summary>

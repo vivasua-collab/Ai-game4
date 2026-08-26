@@ -46,6 +46,9 @@ public partial class GameWorldController : Node2D
     [Inject] private IBodyService BodyService { get; set; } = null!;
     [Inject] private IQiService QiService { get; set; } = null!;
     [Inject] private Modules.Combat.TechniqueService TechniqueSvc { get; set; } = null!;
+    // D (2026-08-26): слоты техник 3-9 (для каста по клавише N) + тосты.
+    [Inject] private Modules.Player.TechniqueSlotService TechniqueSlots { get; set; } = null!;
+    [Inject] private IPublisher<Core.Messaging.Contracts.ToastShownEvent> ToastPub { get; set; } = null!;
     [Inject] private Modules.Player.PlayerTechniqueCaster TechniqueCaster { get; set; } = null!;
     [Inject] private IPublisher<Core.Messaging.Contracts.MeditationToggleRequestedEvent> MeditationTogglePub { get; set; } = null!;
     [Inject] private IPublisher<Core.Messaging.Contracts.TechniqueCastRequestedEvent> TechniqueCastPub { get; set; } = null!;
@@ -948,6 +951,48 @@ public partial class GameWorldController : Node2D
                     if (!_wasPausedBeforeInventory && Time.IsPaused)
                         Time.Resume();
                 }
+            }
+        }
+
+        // D (2026-08-26): K — окно Культивации Ци (3 вкладки + слоты техник 3-9).
+        // Не паузит игру (окно справочное — можно смотреть в реальном времени).
+        if (PlayerInput.IsCultivationWindowPressed)
+        {
+            _cultivationWindow?.Toggle();
+        }
+
+        // D: 1 — выбор ближнего оружия (зарезервировано, weapon switching system pending).
+        if (PlayerInput.IsWeaponMeleePressed)
+        {
+            ToastPub?.Publish(new Core.Messaging.Contracts.ToastShownEvent(
+                "Слот 1: оружие ближнего боя (зарезервировано)", 1.5f));
+        }
+
+        // D: 2 — выбор дальнего оружия (зарезервировано).
+        if (PlayerInput.IsWeaponRangedPressed)
+        {
+            ToastPub?.Publish(new Core.Messaging.Contracts.ToastShownEvent(
+                "Слот 2: оружие дальнего боя (зарезервировано)", 1.5f));
+        }
+
+        // D: 3..9 — каст техники из назначенного слота (CultivationWindow → slot → technique).
+        if (PlayerInput.TechniqueSlotIndex is int slotIdx and >= 3 and <= 9)
+        {
+            string? techId = TechniqueSlots?.GetTechniqueAtSlot(slotIdx);
+            if (string.IsNullOrEmpty(techId))
+            {
+                ToastPub?.Publish(new Core.Messaging.Contracts.ToastShownEvent(
+                    $"Слот {slotIdx}: пусто — назначьте технику в окне Культивации (K)", 2.0f));
+            }
+            else
+            {
+                // Публикуем TechniqueCastRequestedEvent — PlayerTechniqueCaster обработает
+                // (валидация, зарядка, эффект). Position курсора — как в Z-касте.
+                var mousePos = GetViewport().GetMousePosition();
+                int mx = (int)(mousePos.X * 1000);
+                int my = (int)(mousePos.Y * 1000);
+                TechniqueCastPub?.Publish(new Core.Messaging.Contracts.TechniqueCastRequestedEvent(
+                    techId, mx, my));
             }
         }
 
