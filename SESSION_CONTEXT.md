@@ -1,21 +1,59 @@
 # SESSION_CONTEXT — Передача контекста агенту
 
 **Дата создания:** 2026-08-22
-**Обновлено:** 2026-08-25 15:15 UTC (облачная сессия: Phase 7+8+4-5, P0-фиксы)
+**Обновлено:** 2026-08-26 14:50 UTC (облачная сессия: Epic→Legendary оверкап + 3 прохода аудита)
 **Назначение:** Полный контекст для продолжения разработки
 **Инструкция:** Прочитай этот файл ПЕРВЫМ при старте новой сессии
 
 ---
 
-## 0. ЧТО СДЕЛАЛОСЬ ЗА ОБЛАЧНУЮ СЕССИЮ 2026-08-25 (3 коммита: 679f19e, f02d61d, 8a5001b)
+## 0. ЧТО СДЕЛАЛОСЬ ЗА ОБЛАЧНЫЕ СЕССИИ 2026-08-25…26 (коммиты 679f19e…1c3e041)
 
-### P0-баги найдены и исправлены — бой теперь РЕАЛЬНО работает
-1. **Урон NPC→игрок не применялся ВООБЩЕ**: BodyService сравнивал
-   `e.TargetId == _entityId` ("player"), а NPC AI атакует "player_0".
-   Тост показывался, HP не падал. Фикс: `IsPlayerEntityId()` (BodyService).
-2. **Все таймеры в 60× медленнее**: WorldService.DeltaTime был 1/60 на тик
-   (V1 placeholder). Каст 0.5с = ~30 реальных секунд. Фикс: DeltaTime=1.0/тик
-   по TIME_SYSTEM.md; QiRegenCalculator SECONDS_PER_DAY 86400→1440.
+### Сессия 2026-08-26 №1: генераторы + верификация (коммиты 29f8d50…31d679b)
+1. **LevelBoundaries.cs** — границы уровней для техник/экипировки/формаций
+   (L1-10 × грейды × подтипы), OvershootPolicy (None/DamageAndQi/All).
+2. **VerificationService** — валидация генерируемых объектов по границам
+   (+WithOvershootApplied для легендарных +1lvl).
+3. **DeduplicationService** — fingerprints, очистка дублей по статам.
+4. **PreGenTechniquePhase** — предгенерация техник при создании мира
+   (100 техник, дедуп, верификация, регистрация в реестре).
+5. **CheatPanel** — секции генерации: экипировка/расходники/техника+формация/
+   cycle-формация/верификация (F1 в игре).
+6. docs_v2: CHEAT_PANEL, LEVEL_BOUNDARIES, VERIFICATION_SYSTEM,
+   PRE_GENERATION.
+
+### Сессия 2026-08-26 №2: Epic→Legendary оверкап + 3 аудита (f0d11a6, b8ddda1, e7f2008, 1c3e041)
+1. **Epic→Legendary промоушен:** при ролле Transcendent — 20% шанс
+   промо в Legendary (итог: L9+ ≈4% легендарок). **Оверкап** 18%
+   (диапазон ТЗ 10-25%): только Damage/Defense + Durability по формулам
+   L+1, RequiredCultivationLevel остаётся L. Легендарка ВСЕГДА получает:
+   энчант, макс стат-бонусы (5), value×3. API:
+   GenerateLegendaryWeapon/Armor(level, subtype?, seed, forceOvercap?).
+   Константы в GameConstants: EPIC_TO_LEGENDARY_PROMOTE_CHANCE,
+   LEGENDARY_OVERCAP_CHANCE, LEGENDARY_VALUE_MULTIPLIER.
+2. **3 баг-фикса генераторов:** VerificationService матчинг «_id_» (sword⊂
+   greatsword ложные out-of-bounds); оружие категории Void на T5 (иначе всё
+   L9-оружие — ЖЕЛЕЗО T1); BaseDamage MathF.Round (отбои на дробных гранях).
+3. **Аудит-1 (архитектура):** 6 находок, 4 фикса — порядок фаз
+   перенумерован 1-14 (Finalize последняя), FormationData перенесён в
+   Core.Data (Core→Modules нарушение), стабильная сортировка фаз, дубль
+   SceneReadyEvent удалён.
+4. **Аудит-2 (мир+NPC):** 7 находок, 4 фикса — травы chance 1→100
+   (двойной ролл давал 0.01%!), ResourceHarvestedEvent с исходным
+   ResourceId, сброс _placedGroupCentres между сборками, dead
+   NPCSpawnPhase удалён.
+5. **Аудит-3 (боевой контур):** 6 находок, 1 CRITICAL-фикс — инверсия
+   ролей игрока при NPC-инстагаторе (5 мест в CombatService через
+   PlayerIdResolver: qi-щит игрока, защита, fatal-ветка — лут/квесты
+   дропались НА игрока при ЕГО гибели, EndCombat winner, ExecuteDefense).
+6. **Итог регресса (Phase H):** все 4 headless-теста PASS — NEWGAME,
+   COMBAT_SIM (обе стороны получают урон; qi-щит отражает), TRADE_DEBUG
+   (buy/sell), GEN_DEBUG (промо 16.8%/4.0%, оверкап 2/16, верификация
+   40/40 легендарок).
+
+### Сессия 2026-08-25: P0-фиксы боя + торговля + визуал (679f19e, f02d61d, 8a5001b)
+- **P0-баги:** урон NPC→игрок не применялся ("player" vs "player_0"); все
+  таймеры в 60× медленнее (DeltaTime 1/60→1.0). Исправлены.
 
 ### Phase 8: wiring экипировки (5 TODO CombatService закрыты)
 - IEquipmentDataProvider: +GetDodgeBonusPermil/GetBlockBonusPermil/
@@ -96,7 +134,7 @@ GODOT_NEWGAME=1 timeout 25 "$GODOT" --headless --path "$PWD" scenes/MainMenu.tsc
 
 ---
 
-## 2. ТЕКУЩЕЕ СОСТОЯНИЕ (коммит 8a5001b)
+## 2. ТЕКУЩЕЕ СОСТОЯНИЕ (коммит 1c3e041 — synced с origin/main)
 
 ### Что работает
 - ✅ Main Menu → New Game (50×50) / Large World (500×500)
@@ -118,6 +156,11 @@ GODOT_NEWGAME=1 timeout 25 "$GODOT" --headless --path "$PWD" scenes/MainMenu.tsc
       lifecycle + визуал), камни Ци (RMB), медитация (V), чит-меню (F1)
 - ✅ Генераторы: «Матрёшка» экипировка (7 оружий × 6 бронь × 14 материалов ×
       грейды × зачарования), техники, формации, предметы
+- ✅ **Legendary-предметы:** промо Epic→Legendary 20%, оверкап 18%
+      (статы L+1 в Damage/Defense/Durability), верификация по границам
+      (все 40/40 принудительных легендарок L9 валидны)
+- ✅ **Верификация/дедуп генераторов:** LevelBoundaries + VerificationService
+      + DeduplicationService + PreGenTechniquePhase (100 техник при старте)
 - ✅ Скорость PageUp/Down; EventBus re-entrancy; детерминированный combat RNG
 
 ### НЕ проверено живьём (в редакторе на ПК)
@@ -175,18 +218,25 @@ game/src/
 
 ## 5. СЛЕДУЮЩИЕ ШАГИ (приоритет)
 
-### P0 — живая проверка в редакторе (ПК)
-1. Бандит бьёт игрока: HP падает, тосты, смерть→респавн (пайплайн исправлен
-   и headless-верифицирован, но живая проверка не помешает)
-2. Страж вступается; лут-подбор; пояс end-to-end
-3. Цифры урона/HP-бары/лавка — глазами
+### P0 — живая проверка в редакторе (ПК, после 19:00)
+1. **Чит-кнопки легендарок (F1):** «Легендарки (промо 20% / оверкап 18%)» —
+   оружие/броня/батч ×20 со статистикой + верификацией. Сравнить семплы
+   с/без оверкапа (dmg 115 vs 104 на L9 — эталон из дампа).
+2. Бандит бьёт игрока: HP падает, тосты, смерть→респавн; qi-щит отражает
+   урон атакующему (новое после фикса C-1)
+3. Страж вступается; лут-подбор; пояс end-to-end
+4. Цифры урона/HP-бары/лавка — глазами
 
-### P1 — по плану NPC_COMBAT_PREP
-4. Phase 3: Faction Port (Ai-game3-ref/Modules/World/FactionService.cs —
+### P1 — по плану NPC_COMBAT_PREP / кандидаты аудита-4+
+4. **Аудит-4+ (по схеме этой сессии — по модулю за проход):** Inventory/UI/
+   Save, Interaction/Trade (глубже), Body/Enhancement, NPC AI/Movement.
+   Мелочь от аудита-3: событие отклонения атаки при _isCasting (C-5),
+   удалить CombatConfig.PlayerEntityId (C-6).
+5. Phase 3: Faction Port (Ai-game3-ref/Modules/World/FactionService.cs —
    227 LOC portable; FactionData 34 LOC; wire в NPCRelationshipService)
-5. Phase 8 ч.2: Weapon Variety + Ammo (WeaponSubtype в атаках, IAmmoService,
-   ProjectileRenderer ~300 LOC; генератор уже выдаёт bow/ spear/axe/dagger)
-6. Phase 9: Thrown + Dual Wield
+6. Phase 8 ч.2: Weapon Variety + Ammo (WeaponSubtype в атаках, IAmmoService,
+   ProjectileRenderer ~300 LOC; генератор уже выдаёт bow/spear/axe/dagger)
+7. Phase 9: Thrown + Dual Wield
 
 ### P2 — долг
 7. Per-attacker pending technique (CombatService)
@@ -235,12 +285,16 @@ DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 GODOT_NEWGAME=1 GODOT_COMBAT_SIM=1 \
 |------|------------|
 | `SESSION_CONTEXT.md` | ЭТОТ ФАЙЛ |
 | `SESSION_SUMMARY.md` | Сводка сессий + состояние |
-| `checkpoints/08_25_phase7_8_trade.md` | Чекпоинт последней сессии |
-| `docs/docs_v2/09_workflow/NPC_COMBAT_PREP.md` | План (Phase 3/8ч.2/9 остались) |
+| `checkpoints/plans/2026-08-26_epic_legendary_overcap_and_audit_plan.md` | План сессии 08-26 №2 |
+| `checkpoints/2026-08-26_epic_legendary_overcap_checkpoint.md` | Чекпоинт сессии 08-26 №2 (фазы A-H) |
+| `checkpoints/2026-08-26_audit_pass1_architecture.md` | Аудит-1: архитектура (6 находок) |
+| `checkpoints/2026-08-26_audit_pass2_worldgen.md` | Аудит-2: мир+NPC (7 находок) |
+| `checkpoints/2026-08-26_audit_pass3_combat_qi.md` | Аудит-3: боевой контур (6 находок) |
+| `checkpoints/2026-08-27_generators_verification_checkpoint.md` | Чекпоинт сессии 08-26 №1 (генераторы) |
+| `docs/docs_v2/02_systems/LEVEL_BOUNDARIES.md` | Границы уровней + промо/оверкап |
+| `docs/docs_v2/07_ui/CHEAT_PANEL.md` | Чит-меню (вкл. секция «Легендарки») |
 | `game/src/Adapter/Scene/CombatSimDebug.cs` | Headless-верификация боя |
-| `game/src/Adapter/Scene/DamageNumberRenderer.cs` | Цифры урона (Phase 7) |
-| `game/src/Adapter/UI/TradeWindow.cs` | Окно лавки (Phase 5) |
-| `game/src/Modules/Trade/*` | Торговля + валюта (Phase 4) |
+| `game/src/Modules/Combat/CombatService.cs` | Боевой контур (фикс C-1 аудита-3) |
 
 ---
 
@@ -252,5 +306,10 @@ DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 GODOT_NEWGAME=1 GODOT_COMBAT_SIM=1 \
 4. BiomeTiles/спрайты логируют каждый кадр — спам в лог
 5. Токен GitHub не коммитить; после push сбрасывать remote URL на публичный
 6. Документация НЕ редактируется без прямого указания пользователя
+7. **Сброс песочницы между сессиями:** если Godot/dotnet пропали — запускать
+   `bash /home/z/my-project/Ai-game4/cold_start.sh` (idempotent, ~15 сек).
+   Аномалия ФС 08-26: бинарь Godot виден через readdir, но ENOENT при
+   прямом lookup — обход: python os.walk + shutil.copyfile в /tmp/godot471,
+   запускать оттуда.
 
 *Конец файла. Прочитай START_PROMPT.md следующим.*

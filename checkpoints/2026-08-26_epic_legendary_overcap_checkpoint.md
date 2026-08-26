@@ -201,19 +201,39 @@
   _placedGroupCentres между сборками, удалён dead NPCSpawnPhase.
 - [x] F3. Коммит + push: `e7f2008`.
 
-## Phase G — Аудит проход 3: + Боевой контур (Combat/Qi/Formation/Body/Trade)
+## Phase G — Аудит проход 3: + Боевой контур (Combat/Qi/Formation/Body/Trade) ✅
 
 (отдельный файл `2026-08-26_audit_pass3_combat_qi.md`)
-- [ ] G1. Аудит Combat, Qi, TechniqueService, Formation, Body, Trade.
-- [ ] G2. Фиксация проблем + критичные фиксы.
-- [ ] G3. Коммит.
+- [x] G1. Аудит Combat (CombatService 805 строк полностью), Qi, Formation,
+  Body, Trade (целевые проверки), PlayerIdResolver-миграция Combat.
+  6 находок, вкл. CRITICAL-баг инверсии ролей игрока при NPC-инстагаторе.
+- [x] G2. Фикс C-1: 5 связанных мест в CombatService (isPlayerAttacker/
+  isPlayerTarget → PlayerIdResolver; виктим-центричная fatal-ветка — лут/
+  квесты больше не дропаются НА игрока при его гибели; игроко-центричный
+  EndCombat; ExecuteDefense → PlayerIdResolver).
+- [x] G3. Коммит + push: `1c3e041`.
 
-## Phase H — Финализация
+## Phase H — Финализация ✅
 
-- [ ] H1. Прогон всех headless-тестов (NEWGAME, COMBAT_SIM, TRADE_DEBUG,
-  GEN_DEBUG) — регрессий нет.
-- [ ] H2. SESSION_CONTEXT.md — обновить сводку сессии.
-- [ ] H3. Финальный push.
+- [x] H1. Прогон всех headless-тестов — регрессий НЕТ (окружение
+  восстанавливалось через cold_start.sh после сброса песочницы; Godot-бинарь
+  скопирован в /tmp/godot471 из-за интермиттентной ФС):
+  - NEWGAME: PASS — 14 фаз в правильном порядке (Finalize последняя —
+    фикс аудита-1 работает), PreGen 100/100, granted 6 техник,
+    state=Playing.
+  - COMBAT_SIM: PASS — «VERDICT: PASS — обе стороны боя получают урон»;
+    NPC-инстагатор бьёт игрока (21 dmg), qi-щит игрока отражает урон
+    (npc→npc: 21 — механика щита после фикса C-1), weapon end-to-end
+    (Посох dmg=7 pen=1, armed swing 14 RedHP).
+  - TRADE_DEBUG: PASS — лавка 7 позиций, buy (50→44), sell (44→46),
+    ticks resumed.
+  - GEN_DEBUG: PASS — промо Epic 16.8% (ожид ~16%) / Legendary 4.0%
+    (ожид ~4%), оверкап 2/16, верификация 40/40, семплы dmg 115
+    (оверкап) vs 104 (без); все 6 секций дампа на месте (Items,
+    Матрёшка, Legendary, Techniques, Loot, DB stats).
+- [x] H2. SESSION_CONTEXT.md — обновлена сводка сессии (раздел 0, состояние,
+  чекпоинты, следующие шаги).
+- [x] H3. Финальный push (коммит обновления SESSION_CONTEXT + чекпоинтов).
 
 ---
 
@@ -235,6 +255,9 @@
 | 14:10 | D | Коммит f0d11a6 (12 файлов, +791/−56), push в origin/main. |
 | 14:55 | E | Аудит-1 (архитектура) завершён: 6 находок, 4 фикса (порядок фаз — Finalize стала последней; FormationData → Core.Data; стабильная сортировка; дубль SceneReadyEvent удалён). Коммит b8ddda1. |
 | 15:45 | F | Аудит-2 (мир+NPC) завершён: 7 находок, 4 фикса (травы 0.01%→1%; событие с пустым ResourceId; stale-центры групп; dead NPCSpawnPhase). Коммит e7f2008. |
+| 16:30 | G | Аудит-3 (боевой контур) завершён: CRITICAL — инверсия ролей игрока при NPC-инстагаторе (лут/квесты дропались НА игрока при его гибели, Victory доставалась NPC). Фикс в 5 местах через PlayerIdResolver. Коммит 1c3e041. |
+| 16:40 | H0 | Песочница сброшена между сессиями: Godot/dotnet исчезли из PATH. Восстановлено cold_start.sh (14 сек, всё idempotent). Аномалия ФС: Godot-бинарь виден через readdir, но ENOENT при lookup — скопирован в /tmp/godot471 через python os.walk, работает оттуда. |
+| 16:45 | H1 | Регресс: все 4 headless-теста PASS (NEWGAME/COMBAT_SIM/TRADE_DEBUG/GEN_DEBUG) — детали в Phase H выше. |
 
 ---
 
@@ -249,7 +272,8 @@
 | 14:10 | D | ✅ завершён (доки + BUGFIX-3 + NEWGAME 100/100 + push) | f0d11a6 |
 | 14:55 | E | ✅ аудит-1 архитектура (6 находок, 4 фикса, headless PASS) | b8ddda1 |
 | 15:45 | F | ✅ аудит-2 мир+NPC (7 находок, 4 фикса, headless PASS) | e7f2008 |
-| 15:50 | G | 🔄 аудит-3 боевой контур в работе | — |
+| 16:30 | G | ✅ аудит-3 боевой контур (6 находок, 1 крит-фикс в 5 местах, COMBAT_SIM PASS) | 1c3e041 |
+| 16:45 | H | ✅ финализация: все 4 headless-теста PASS, SESSION_CONTEXT обновлён | (этот) |
 
 ---
 
