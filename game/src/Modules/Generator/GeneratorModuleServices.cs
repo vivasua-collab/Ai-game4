@@ -33,6 +33,12 @@ public static class GeneratorModuleServices
         // === Этап 4 внедрения ЦИ: генератор формаций ===
         builder.Register<Modules.Generator.IFormationGeneratorService, Modules.Generator.FormationGeneratorService>(Lifetime.Singleton);
 
+        // === Phase C (2026-08-27): VerificationService — границы уровней ===
+        builder.Register<Core.Interfaces.IVerificationService, Modules.Generator.VerificationService>(Lifetime.Singleton);
+
+        // === Phase D (2026-08-27): DeduplicationService — детектор дублей ===
+        builder.Register<Modules.Generator.DeduplicationService>(Lifetime.Singleton);
+
         // === Точка входа модуля ===
         builder.Register<GeneratorModule>(Lifetime.Singleton);
     }

@@ -3,6 +3,7 @@
 // Реестр сгенерированных техник — хранилище для боевого поиска.
 // Источник: docs/NPC_ASSEMBLY_PIPELINE.md §6
 using System.Collections.Generic;
+using System.Linq;
 using CultivationGame.Core.Data;
 
 namespace CultivationGame.Modules.Generator
@@ -60,5 +61,25 @@ namespace CultivationGame.Modules.Generator
         {
             _techniques.Clear();
         }
+
+        /// <summary>
+        /// Получить все зарегистрированные техники (для дедупликации).
+        /// </summary>
+        public IReadOnlyCollection<TechniqueData> GetAll()
+        {
+            return _techniques.Values.ToList();
+        }
+
+        /// <summary>
+        /// Удалить технику по идентификатору (для очистки дублей).
+        /// </summary>
+        public bool Remove(string techniqueId)
+        {
+            if (string.IsNullOrEmpty(techniqueId)) return false;
+            return _techniques.Remove(techniqueId);
+        }
+
+        /// <summary>Количество зарегистрированных техник.</summary>
+        public int Count => _techniques.Count;
     }
 }
