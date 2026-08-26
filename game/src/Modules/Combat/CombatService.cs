@@ -25,6 +25,7 @@
 // CombatManager → CombatService + DamageService + CombatAIService + TechniqueService + CombatLootService.
 using System;
 using CultivationGame.Core;
+using CultivationGame.Core.Helpers;
 using CultivationGame.Core.Messaging.Contracts;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.Events;
@@ -217,26 +218,52 @@ namespace CultivationGame.Modules.Combat
             if (!_isInCombat) return;
 
             // CMB-C06: исправлена логика определения победителя
-            // Victory → instigator победил, Defeat → instigator проиграл
-            // Flee → ничья/побег, победитель не определён
+            // 2026-08-26 (аудит-3 C-1): Victory/Defeat теперь ИГРОКО-ЦЕНТРИЧНЫ
+            // (Victory = победил игрок; было «instigator победил», что давало
+            // winner=NPC в бою, который инициировал NPC и проиграл его же).
+            // Для NPC-vs-NPC (игрока в бою нет) — прежняя инстагаторская схема.
             string winnerId;
             string loserId;
             bool victory;
 
+            bool instigatorIsPlayer = PlayerIdResolver.IsPlayer(_instigatorId);
+            bool targetIsPlayer = PlayerIdResolver.IsPlayer(_currentTargetId);
+
             switch (_currentStage)
             {
                 case CombatStage.Victory:
-                    winnerId = _instigatorId;
-                    loserId = _currentTargetId;
-                    victory = true;
+                    if (instigatorIsPlayer || targetIsPlayer)
+                    {
+                        // В бою есть игрок: Victory = игрок победил.
+                        winnerId = instigatorIsPlayer ? _instigatorId : _currentTargetId;
+                        loserId = instigatorIsPlayer ? _currentTargetId : _instigatorId;
+                        victory = true;
+                    }
+                    else
+                    {
+                        // NPC vs NPC: победил инициатор (прежняя семантика).
+                        winnerId = _instigatorId;
+                        loserId = _currentTargetId;
+                        victory = true;
+                    }
                     break;
                 case CombatStage.Defeat:
-                    winnerId = _currentTargetId;
-                    loserId = _instigatorId;
-                    victory = false;
+                    if (instigatorIsPlayer || targetIsPlayer)
+                    {
+                        // Игрок проиграл: победитель — не-игрок.
+                        winnerId = instigatorIsPlayer ? _currentTargetId : _instigatorId;
+                        loserId = instigatorIsPlayer ? _instigatorId : _currentTargetId;
+                        victory = false;
+                    }
+                    else
+                    {
+                        winnerId = _currentTargetId;
+                        loserId = _instigatorId;
+                        victory = false;
+                    }
                     break;
                 case CombatStage.Flee:
-                    // При побеге — никто не победил, но формально «проигравший» — инициатор
+                    // При побеге — никто не победил
                     winnerId = null;
                     loserId = null;
                     victory = false;
@@ -422,7 +449,13 @@ namespace CultivationGame.Modules.Combat
                 defenderLevel = _cachedCultivationLevel; // Игрок — из кэша
             }
 
-            bool isPlayerAttacker = attackerId == _instigatorId;
+            // 2026-08-26 (аудит-3 C-1): игрок определяется по PlayerIdResolver
+            // ("player"/"player_0"), а НЕ по инстагатору. Раньше при инициировании
+            // боя NPC (волк/бандит атакует первым: instigator=NPC) флаги
+            // ИНВЕРТИРОВАЛИСЬ: isPlayerTarget=false для игрока → qi-щит читался
+            // из per-entity провайдера вместо кэша; isPlayerAttacker=true для NPC
+            // → защита игрока игнорировалась.
+            bool isPlayerAttacker = PlayerIdResolver.IsPlayer(attackerId);
 
             // CMB-A05/A07/A08: передаём данные через DamageRequest
             // Спринт 3 B1: статы атакующего/защищающегося
@@ -507,8 +540,9 @@ namespace CultivationGame.Modules.Combat
                 }
             }
 
-            // P2-4.1 FIX: определяем, является ли цель игроком (вместо магической строки "player")
-            bool isPlayerTarget = defenderId == _instigatorId; // instigator = игрок
+            // P2-4.1 FIX + аудит-3 C-1: цель-игрок — по PlayerIdResolver,
+            // не по инстагатору (инстагатором может быть NPC).
+            bool isPlayerTarget = PlayerIdResolver.IsPlayer(defenderId);
 
             // P2-7.3 FIX: передаём подтип атаки для различения slashing/piercing от blunt
             CombatSubtype attackSubtype = tech?.Subtype ?? CombatSubtype.MeleeStrike; // без техники = безоружная атака
@@ -543,19 +577,23 @@ namespace CultivationGame.Modules.Combat
             // Проверяем результат боя
             if (result.IsFatal)
             {
-                if (attackerId == _instigatorId)
+                // 2026-08-26 (аудит-3 C-1): ВИКТИМ-ЦЕНТРИЧНАЯ логика (была
+                // «attackerId == _instigatorId» = игрок): при гибели игрока от
+                // руки NPC-инстагатора старый код публиковал EnemyKilledEvent(игрок)
+                // (лут/квесты дропались НА игрока) и ставил Victory.
+                if (isPlayerTarget)
                 {
-                    // Игрок убил врага
-                    _enemyKilledPub.Publish(new EnemyKilledEvent(_currentTargetId));
-                    _currentStage = CombatStage.Victory;
-                    EndCombat();
+                    // Игрок погиб — поражение, EnemyKilledEvent НЕ публикуется.
+                    _currentStage = CombatStage.Defeat;
                 }
                 else
                 {
-                    // Враг убил игрока
-                    _currentStage = CombatStage.Defeat;
-                    EndCombat();
+                    // Жертва — NPC: если убил игрок — EnemyKilledEvent (лут/квесты).
+                    if (isPlayerAttacker)
+                        _enemyKilledPub.Publish(new EnemyKilledEvent(defenderId));
+                    _currentStage = CombatStage.Victory;
                 }
+                EndCombat();
                 return;
             }
 
@@ -575,7 +613,11 @@ namespace CultivationGame.Modules.Combat
             if (!_isInCombat) return;
 
             // Запоминаем выбранную защиту для использования в пайплайне урона
-            if (defenderId == _instigatorId || defenderId == _config?.PlayerEntityId)
+            // 2026-08-26 (аудит-3 C-1): PlayerIdResolver вместо
+            // «defenderId == _instigatorId || == _config?.PlayerEntityId»
+            // (config-алиас "player" не покрывал канонический "player_0",
+            // которым атакует NPC AI).
+            if (PlayerIdResolver.IsPlayer(defenderId))
             {
                 _lastPlayerDefense = defenseType;
             }

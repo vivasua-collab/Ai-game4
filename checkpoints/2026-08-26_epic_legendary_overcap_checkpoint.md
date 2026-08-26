@@ -191,12 +191,15 @@
   (рецидив Core→Modules устранён, 10 файлов using).
 - [x] E5. Коммит + push: `b8ddda1`.
 
-## Phase F — Аудит проход 2: + Модуль мира (WorldGen/NPC)
+## Phase F — Аудит проход 2: + Модуль мира (WorldGen/NPC) ✅
 
 (отдельный файл `2026-08-26_audit_pass2_worldgen.md`)
-- [ ] F1. Аудит WorldGen (карта, тайлы, биомы) + NPC-модуль (спавн, души).
-- [ ] F2. Фиксация проблем + критичные фиксы.
-- [ ] F3. Коммит.
+- [x] F1. Аудит World/Tile (полностью, 988 строк) + NPC-спавн-контур
+  (3 фазы + AnimalService/NPCSpawnerService структура).
+- [x] F2. Фиксы: травы chance 1→100 (двойной ролл 0.01%!),
+  ResourceHarvestedEvent с исходным ResourceId, сброс
+  _placedGroupCentres между сборками, удалён dead NPCSpawnPhase.
+- [x] F3. Коммит + push: `e7f2008`.
 
 ## Phase G — Аудит проход 3: + Боевой контур (Combat/Qi/Formation/Body/Trade)
 
@@ -231,6 +234,7 @@
 | 14:05 | D | BUGFIX-3: BaseDamage trunc→MathF.Round в обоих местах генератора техник (Generate + GenerateSpecified) — устранены отбои на дробных гранях (valid 98→100). |
 | 14:10 | D | Коммит f0d11a6 (12 файлов, +791/−56), push в origin/main. |
 | 14:55 | E | Аудит-1 (архитектура) завершён: 6 находок, 4 фикса (порядок фаз — Finalize стала последней; FormationData → Core.Data; стабильная сортировка; дубль SceneReadyEvent удалён). Коммит b8ddda1. |
+| 15:45 | F | Аудит-2 (мир+NPC) завершён: 7 находок, 4 фикса (травы 0.01%→1%; событие с пустым ResourceId; stale-центры групп; dead NPCSpawnPhase). Коммит e7f2008. |
 
 ---
 
@@ -244,7 +248,8 @@
 | 13:58 | C | ✅ завершён (фича + 2 баг-фикса, build 0 err, headless PASS) | — |
 | 14:10 | D | ✅ завершён (доки + BUGFIX-3 + NEWGAME 100/100 + push) | f0d11a6 |
 | 14:55 | E | ✅ аудит-1 архитектура (6 находок, 4 фикса, headless PASS) | b8ddda1 |
-| 15:00 | F | 🔄 аудит-2 мир+NPC в работе | — |
+| 15:45 | F | ✅ аудит-2 мир+NPC (7 находок, 4 фикса, headless PASS) | e7f2008 |
+| 15:50 | G | 🔄 аудит-3 боевой контур в работе | — |
 
 ---
 
