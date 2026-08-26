@@ -905,3 +905,43 @@ Database: 11 items registered
 - Перезарядка/overcharge (Stage 2 — capacity window [qiCost..capacity] готов в коде,
   но активация pending)
 - ALGORITHMS §15 / TECHNIQUE_USAGE_REPORT.md (доки v1 устарели — баннер B6)
+
+---
+Task ID: session-2026-08-26-final
+Agent: main thread (Z.ai Code)
+Task: Phase H финализация сессии 08-26 №2 — регресс-тесты + закрытие чекпоинтов
+
+Work Log:
+- Обнаружен сброс песочницы: Godot/dotnet пропали из ФС. Восстановлено cold_start.sh (14 сек, idempotent).
+- Аномалия ФС: Godot-бинарь виден через readdir, но ENOENT при прямом lookup —
+  обход через python os.walk + shutil.copyfile → /tmp/godot471 (запуск оттуда работает).
+- dotnet build: 0 errors (271 warnings — прежний уровень).
+- Регресс H1, все 4 теста PASS:
+  1. GODOT_NEWGAME: 14 фаз в правильном порядке (Finalize=14 — фикс аудита-1 работает),
+     PreGenTechnique 100/100 (duplicates=100 — норма для детерминированного генератора),
+     TechniqueGrant 6 техник, state=Playing.
+  2. GODOT_COMBAT_SIM: VERDICT: PASS — обе стороны боя получают урон;
+     NPC-инстагатор → player 21 dmg (фикс C-1 аудита-3 в работе), qi-щит игрока
+     отражает урон (npc→npc: 21), weapon end-to-end (Посох dmg=7/pen=1, 14 RedHP).
+  3. GODOT_TRADE_DEBUG: лавка 7 позиций, buy (50→44), sell (44→46), ticks resumed.
+  4. GODOT_GEN_DEBUG: промо Epic 16.8% (ожид ~16%) / Legendary 4.0% (ожид ~4%),
+     оверкап 2/16 (12.5%, биномиальный шум n=16), верификация легендарок 40/40,
+     семплы dmg 115 (оверкап) vs 104 (без); все 6 секций дампа присутствуют.
+- Чекпоинт сессии: Phase G (G1-G3, коммит 1c3e041) и Phase H (H1-H3) закрыты,
+  добавлены записи в журналы решений и прогресса.
+- SESSION_CONTEXT.md: раздел 0 переписан (две сессии 08-26 + сводка 08-25),
+  состояние → 1c3e041, P0-шаги для вечернего теста (чит-кнопки легендарок),
+  предупреждение №7 (процедура восстановления песочницы).
+- Финальный коммит cb9574d + push в origin/main (токен выставлен на push,
+  сброшен после — не хранится в конфиге).
+
+Stage Summary:
+- Сессия 08-26 №2 ПОЛНОСТЬЮ завершена: оверкап Epic→Legendary (20%/18%) +
+  3 прохода аудита (19 находок, 9 фиксов, 3 критических бага) + финализация.
+- Все 4 headless-регресса PASS — регрессий нет.
+- HEAD cb9574d, synced с origin/main.
+- Для пользователя (после 19:00): F1 → секция «Легендарки» (оружие/броня/×20),
+  эталон семплов dmg 115 vs 104 на L9.
+- Кандидаты аудита-4+: Inventory/UI/Save, Interaction/Trade глубже,
+  Body/Enhancement, NPC AI/Movement; мелочь C-5 (_isCasting событие) и C-6
+  (удалить CombatConfig.PlayerEntityId).
