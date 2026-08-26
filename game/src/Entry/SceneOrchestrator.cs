@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CultivationGame.Core.DI;
@@ -39,18 +40,23 @@ public sealed class SceneOrchestrator
     [Inject] private readonly IPublisher<SceneAssemblyFailedEvent> _failedPub = null!;
     [Inject] private readonly IPublisher<SceneReadyEvent> _readyPub = null!;
 
-    private readonly List<ISceneAssemblyPhase> _phases = new();
+    // 2026-08-26 (аудит-1 A-1): не readonly — переназначается при стабильной
+    // пересортировке OrderBy при регистрации фаз.
+    private List<ISceneAssemblyPhase> _phases = new();
     private bool _autoLoaded;
 
     /// <summary>
     /// Explicitly register a phase. Phases added this way supplement (and
     /// are merged with) any phases auto-discovered from the container.
+    /// 2026-08-26 (аудит-1 A-1): сортировка OrderBy — СТАБИЛЬНАЯ (List.Sort
+    /// нестабилен: при равных Order порядок фаз не определён). При равных
+    /// Order сохраняется порядок регистрации.
     /// </summary>
     public void RegisterPhase(ISceneAssemblyPhase phase)
     {
         if (phase is null) throw new ArgumentNullException(nameof(phase));
         _phases.Add(phase);
-        _phases.Sort(ComparePhaseOrder);
+        _phases = _phases.OrderBy(p => p.Order).ToList();
     }
 
     /// <summary>
@@ -107,7 +113,8 @@ public sealed class SceneOrchestrator
                 _phases.Add(phase);
             }
         }
-        _phases.Sort(ComparePhaseOrder);
+        // Стабильная сортировка (аудит-1 A-1): равные Order → порядок регистрации.
+        _phases = _phases.OrderBy(p => p.Order).ToList();
     }
 
     private static int ComparePhaseOrder(ISceneAssemblyPhase a, ISceneAssemblyPhase b)

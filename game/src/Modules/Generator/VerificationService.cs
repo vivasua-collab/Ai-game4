@@ -13,7 +13,6 @@ using System.Collections.Generic;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Core;
-using CultivationGame.Modules.Formation.Data;
 
 namespace CultivationGame.Modules.Generator
 {

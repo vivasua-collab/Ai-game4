@@ -40,7 +40,9 @@ namespace CultivationGame.Entry.Phases;
 public sealed class PreGenTechniquePhase : AbstractSceneAssemblyPhase
 {
     public override string PhaseName => "PreGenTechnique";
-    public override int PhaseOrder => 44; // Перед TechniqueGrantPhase (45)
+    // 2026-08-26 (аудит-1 A-1): 44 → 12 — уникальные порядки; перед TechniqueGrant (13),
+    // после UIInit (11), до финализации (14).
+    public override int PhaseOrder => 12;
 
     [Inject] private readonly ITechniqueGeneratorService _techniqueGenerator = null!;
     [Inject] private readonly IVerificationService _verifier = null!;

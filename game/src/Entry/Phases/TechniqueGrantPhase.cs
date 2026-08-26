@@ -26,7 +26,9 @@ namespace CultivationGame.Entry.Phases;
 public sealed class TechniqueGrantPhase : AbstractSceneAssemblyPhase
 {
     public override string PhaseName => "TechniqueGrant";
-    public override int PhaseOrder => 45; // После PlayerSpawn (4), до NPC-фаз (50+)
+    // 2026-08-26 (аудит-1 A-1): 45 → 13 — уникальные порядки, финализация (14)
+    // теперь ПОСЛЕ выдачи техник. Требует PlayerSpawn (4); до NPC-фаз не критично.
+    public override int PhaseOrder => 13;
 
     [Inject] private readonly ITechniqueGeneratorService _techniqueGenerator = null!;
     [Inject] private readonly TechniqueService _techniques = null!;

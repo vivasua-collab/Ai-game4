@@ -4,7 +4,6 @@
 // Каждый экземпляр FormationEffects привязан к конкретной формации.
 using System.Collections.Generic;
 using CultivationGame.Core;
-using CultivationGame.Modules.Formation.Data;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Core.Messaging.Contracts;

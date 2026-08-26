@@ -3,7 +3,7 @@
 // формаций (аналог TechniqueRegistry). FormationService.FindFormationData
 // смотрит сюда ПЕРЕД legacy-хардкодом. Генератор регистрирует свои формации.
 using System.Collections.Generic;
-using CultivationGame.Modules.Formation.Data;
+using CultivationGame.Core.Data; // FormationData (аудит-1 A-2: перенесён в Core.Data)
 
 namespace CultivationGame.Modules.Formation
 {

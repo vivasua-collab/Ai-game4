@@ -13,7 +13,8 @@ namespace CultivationGame.Entry.Phases;
 public sealed class UIInitPhase : AbstractSceneAssemblyPhase
 {
     public override string PhaseName => "UIInit";
-    public override int PhaseOrder => 9;
+    // 2026-08-26 (аудит-1 A-1): 9 → 11 — уникальные порядки после перенумерации.
+    public override int PhaseOrder => 11;
 
     [Inject] private readonly IUIService _ui = null!;
 

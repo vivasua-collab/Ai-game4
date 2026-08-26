@@ -163,12 +163,17 @@
 
 ---
 
-## Phase D — Документация + git
+## Phase D — Документация + git ✅
 
-- [ ] D1. docs_v2/02_systems/LEVEL_BOUNDARIES.md: раздел «Epic→Legendary
-  промоушен и оверкап» (шансы, перки, формулы L+1, edge cases).
-- [ ] D2. docs_v2/07_ui/CHEAT_PANEL.md: новые кнопки (3 шт).
-- [ ] D3. Коммит + push.
+- [x] D1. docs_v2/02_systems/LEVEL_BOUNDARIES.md: раздел «Epic→Legendary
+  промоушен и оверкап» (схема, константы, доли, перки, формулы L+1,
+  верификация, API, детерминизм, замер шансов).
+- [x] D2. docs_v2/07_ui/CHEAT_PANEL.md: секция «Легендарки» (3 кнопки).
+- [x] D3. Коммит + push: `f0d11a6`.
+- [x] D4 (доп.). BUGFIX-3: TechniqueGeneratorService.BaseDamage — MathF.Round
+  вместо trunc (были отбои верификатора «BaseDamage 72 out of [73..109]»
+  на дробных гранях при некоторых сидах;_capacity/qiCost уже были
+  консистентны). После фикса: valid=100/100.
 
 ---
 
@@ -219,6 +224,8 @@
 | 13:55 | C-BUG1 | VerificationService матчинг класса по «_id_» (было Contains: «sword»⊂«greatsword» — greatsword-предметы проверялись по границам sword, ложные out of bounds). |
 | 13:55 | C-BUG2 | Оружию разрешена категория Void: tier 5 для оружия был ПУСТ (void_matter — единственный T5) → fallback iron T1: всё оружие L9 было ЖЕЛЕЗНЫМ. Синхронно: PickMaterial + оба фильтка в WeaponBoundsFor. |
 | 13:58 | C8 | Headless PASS: промо Epic 16.8%/Legendary 4.0% (расчёт 16/4), оверкап 12.5% (n=16, шум), верификация 40/40. |
+| 14:05 | D | BUGFIX-3: BaseDamage trunc→MathF.Round в обоих местах генератора техник (Generate + GenerateSpecified) — устранены отбои на дробных гранях (valid 98→100). |
+| 14:10 | D | Коммит f0d11a6 (12 файлов, +791/−56), push в origin/main. |
 
 ---
 
@@ -230,7 +237,8 @@
 | 12:57 | A | ✅ завершён (аудит чтения) | — |
 | 12:57 | B | ✅ завершён (дизайн зафиксирован) | — |
 | 13:58 | C | ✅ завершён (фича + 2 баг-фикса, build 0 err, headless PASS) | — |
-| 14:00 | D | 🔄 в работе | — |
+| 14:10 | D | ✅ завершён (доки + BUGFIX-3 + NEWGAME 100/100 + push) | f0d11a6 |
+| 14:15 | E | 🔄 аудит-1 архитектура в работе | — |
 
 ---
 

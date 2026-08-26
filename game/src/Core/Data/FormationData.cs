@@ -2,11 +2,15 @@
 // Создано: 2026-05-09
 // Данные определений формаций.
 // Описывает конкретные формации: тип, размер, уровень, эффекты.
+//
+// 2026-08-26 (аудит-1 A-2): перенесён из Modules/Formation/Data в Core/Data —
+// чистый DTO (зависимости только Core), на который ссылается Core-интерфейс
+// IVerificationService. Нарушение «Core не зависит от Modules» устранено
+// (прецедент: NPCState перенесён аудитом 08-21). FormationRegistry остался
+// в Modules/Formation/Data (это сервисная инфраструктура модуля).
 using System.Collections.Generic;
-using CultivationGame.Core;
-using CultivationGame.Core.Data;
 
-namespace CultivationGame.Modules.Formation.Data
+namespace CultivationGame.Core.Data
 {
     /// <summary>
     /// Определение формации — описывает одну конкретную формацию.

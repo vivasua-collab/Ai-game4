@@ -11,7 +11,8 @@ namespace CultivationGame.Entry.Phases;
 public sealed class QuestInitPhase : AbstractSceneAssemblyPhase
 {
     public override string PhaseName => "QuestInit";
-    public override int PhaseOrder => 8;
+    // 2026-08-26 (аудит-1 A-1): 8 → 10 — уникальные порядки после перенумерации.
+    public override int PhaseOrder => 10;
 
     public override Task ExecuteAsync()
     {

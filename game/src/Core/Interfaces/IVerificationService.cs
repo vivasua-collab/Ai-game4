@@ -4,7 +4,6 @@
 // ValidationResult — статус + список out-of-bounds полей.
 using System.Collections.Generic;
 using CultivationGame.Core.Data;
-using CultivationGame.Modules.Formation.Data;
 
 namespace CultivationGame.Core.Interfaces
 {

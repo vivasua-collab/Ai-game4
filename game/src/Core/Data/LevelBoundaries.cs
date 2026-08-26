@@ -19,7 +19,6 @@
 
 using System;
 using System.Collections.Generic;
-using CultivationGame.Modules.Formation.Data;
 
 namespace CultivationGame.Core.Data;
 

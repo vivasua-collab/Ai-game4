@@ -14,7 +14,6 @@ using System;
 using System.Collections.Generic;
 using CultivationGame.Core;
 using CultivationGame.Core.Messaging.Contracts;
-using CultivationGame.Modules.Formation.Data;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.Events;
 using CultivationGame.Core.Interfaces;
@@ -90,7 +89,7 @@ namespace CultivationGame.Modules.Formation
         // === Этап 5 внедрения ЦИ: данные текущей формации для визуализатора/кастера ===
 
         /// <summary>Данные текущей формации (null — не создана).</summary>
-        public Data.FormationData? CurrentFormation => _currentFormation;
+        public FormationData? CurrentFormation => _currentFormation; // аудит-1 A-2: Core.Data
 
         /// <summary>Позиция центра формации (тайлы).</summary>
         public int PositionX => _positionX;

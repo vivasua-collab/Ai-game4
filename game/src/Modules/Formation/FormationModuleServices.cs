@@ -5,7 +5,7 @@
 // Migrated from Ai-game3 (Unity+VContainer+MessagePipe) to Ai-game4 (Godot+DI+EventBus) 2026-08-15.
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Interfaces;
-using CultivationGame.Modules.Formation.Data;
+using CultivationGame.Core.Data; // FormationData (аудит-1 A-2: перенесён в Core.Data)
 
 namespace CultivationGame.Modules.Formation;
 

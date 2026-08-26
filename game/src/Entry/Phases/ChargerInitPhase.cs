@@ -11,7 +11,8 @@ namespace CultivationGame.Entry.Phases;
 public sealed class ChargerInitPhase : AbstractSceneAssemblyPhase
 {
     public override string PhaseName => "ChargerInit";
-    public override int PhaseOrder => 7;
+    // 2026-08-26 (аудит-1 A-1): 7 → 9 — уникальный порядок (был дубль с GroupSpawn).
+    public override int PhaseOrder => 9;
 
     public override Task ExecuteAsync()
     {

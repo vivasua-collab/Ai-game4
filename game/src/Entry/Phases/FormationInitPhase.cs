@@ -11,7 +11,8 @@ namespace CultivationGame.Entry.Phases;
 public sealed class FormationInitPhase : AbstractSceneAssemblyPhase
 {
     public override string PhaseName => "FormationInit";
-    public override int PhaseOrder => 6;
+    // 2026-08-26 (аудит-1 A-1): 6 → 8 — уникальный порядок (был дубль с HumanNPCSpawn).
+    public override int PhaseOrder => 8;
 
     public override Task ExecuteAsync()
     {

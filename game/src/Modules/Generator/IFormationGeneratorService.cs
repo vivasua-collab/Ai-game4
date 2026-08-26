@@ -4,7 +4,6 @@
 // Core не может ссылаться на типы модулей (layering).
 // Детерминированная генерация (GENERATORS_SYSTEM.md §9, FORMATION_SYSTEM.md §3-8).
 using CultivationGame.Core.Data;
-using CultivationGame.Modules.Formation.Data;
 
 namespace CultivationGame.Modules.Generator
 {
