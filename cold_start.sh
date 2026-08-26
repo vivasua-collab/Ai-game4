@@ -2,12 +2,18 @@
 # =============================================================================
 # COLD START — Чистая процедура холодного старта sandbox
 # =============================================================================
-# Заменяет recover_sandbox.sh (минимальная структура, 2 симлинка)
 # Дизайн: docs/docs_v2/09_workflow/COLD_START.md
 #
+# ОБНОВЛЕНО 2026-08-26 (аудит среды):
+#   - unzip в песочнице НЕНАДЁЖЕН (созданные им файлы "мерцают"/исчезают):
+#     извлечение Godot — ТОЛЬКО python-zipfile.
+#   - В официальном zip имена с UNDERSCORE (linux_x86_64), все скрипты
+#     проекта используют DOT (linux.x86_64) → нормализация при извлечении.
+#   - Godot ставится в ПЕРСИСТЕНТНЫЙ my-project/godot (реальная директория,
+#     переживает сбои песочницы); /home/z/godot — симлинк (легаси-пути).
+#
 # Запуск:
-#   bash /home/z/my-project/aigame4/cold_start.sh
-#   bash /home/z/my-project/Ai-game4/cold_start.sh  (если симлинка ещё нет)
+#   bash /home/z/my-project/Ai-game4/cold_start.sh
 #
 # Idempotent: безопасно запускать многократно.
 # =============================================================================
@@ -22,7 +28,7 @@ DOTNET_INSTALL="/tmp/dotnet-install.sh"
 
 SANDBOX="/home/z/my-project"
 REPO_DIR="$SANDBOX/Ai-game4"
-GODOT_DIR="/home/z/godot"
+GODOT_DIR="$SANDBOX/godot"
 DOTNET_DIR="/home/z/.dotnet"
 
 echo "═══════════════════════════════════════════════════════════════"
@@ -47,20 +53,51 @@ export PATH="$DOTNET_ROOT:$PATH"
 echo "  SDK: $(dotnet --list-sdks | tr '\n' ' ')"
 echo ""
 
-# ─── Шаг 2: Godot 4.7.1 .NET ─────────────────────────────────────
+# ─── Шаг 2: Godot 4.7.1 .NET (python-извлечение!) ────────────────
 echo "── Шаг 2/6: Godot 4.7.1 ──"
-GODOT_BIN="$GODOT_DIR/Godot_v4.7.1-stable_mono_linux_x86_64/Godot_v4.7.1-stable_mono_linux.x86_64"
-if [ -x "$GODOT_BIN" ]; then
-    echo "  ✅ Уже установлен: $(basename "$GODOT_DIR")"
+GODOT_BIN="$GODOT_DIR/Godot_v4.7.1-stable_mono_linux.x86_64/Godot_v4.7.1-stable_mono_linux.x86_64"
+if python3 -c "import os,sys; sys.exit(0 if os.path.exists('$GODOT_BIN') and os.path.getsize('$GODOT_BIN')==145073296 else 1)" 2>/dev/null; then
+    echo "  ✅ Уже установлен: $GODOT_DIR"
 else
-    echo "  Скачиваю Godot 4.7.1 .NET..."
-    curl -sSL "$GODOT_URL" -o /tmp/godot471.zip
-    mkdir -p "$GODOT_DIR"
-    cd "$GODOT_DIR"
-    unzip -o /tmp/godot471.zip > /dev/null 2>&1
-    chmod +x "$GODOT_BIN"
-    rm -f /tmp/godot471.zip
+    ZIP=/tmp/godot471.zip
+    if ! python3 -c "import zipfile; zipfile.ZipFile('$ZIP')" 2>/dev/null; then
+        echo "  Скачиваю Godot 4.7.1 .NET..."
+        curl -sSL "$GODOT_URL" -o "$ZIP"
+    fi
+    echo "  Извлекаю python-zipfile (dot-нормализация имён)..."
+    python3 - "$ZIP" <<'PYEXTRACT'
+import os, sys, zipfile, shutil
+zp = sys.argv[1]
+base = '/home/z/my-project/godot'
+bin_size = 145073296
+dotdir = os.path.join(base, 'Godot_v4.7.1-stable_mono_linux.x86_64')
+binpath = os.path.join(dotdir, 'Godot_v4.7.1-stable_mono_linux.x86_64')
+if os.path.exists(binpath) and os.path.getsize(binpath) == bin_size:
+    raise SystemExit(0)
+if os.path.exists(base):
+    shutil.rmtree(base)
+os.makedirs(dotdir, exist_ok=True)
+with zipfile.ZipFile(zp) as zf:
+    for info in zf.infolist():
+        if info.filename.endswith('/'):
+            continue
+        norm = info.filename.replace('linux_x86_64', 'linux.x86_64')
+        tgt = os.path.join(base, norm)
+        os.makedirs(os.path.dirname(tgt), exist_ok=True)
+        with zf.open(info) as f, open(tgt, 'wb') as o:
+            while True:
+                c = f.read(4 << 20)
+                if not c:
+                    break
+                o.write(c)
+        perm = info.external_attr >> 16 & 0o777
+        os.chmod(tgt, perm if perm & 0o400 else 0o644)
+sz = os.path.getsize(binpath)
+assert sz == bin_size, f'binary {sz} != {bin_size}'
+print(f'  OK: binary {sz} + GodotSharp извлечены')
+PYEXTRACT
 fi
+echo "  Версия: $(timeout 20 "$GODOT_BIN" --version 2>/dev/null || echo 'check failed')"
 echo ""
 
 # ─── Шаг 3: Ai-game4 репозиторий ─────────────────────────────────
@@ -81,20 +118,15 @@ fi
 echo "  HEAD: $(git -C "$REPO_DIR" rev-parse --short HEAD)"
 echo ""
 
-# ─── Шаг 4: Симлинки (минимум — только 2) ────────────────────────
-echo "── Шаг 4/6: Симлинки (aigame4 + godot) ──"
-# Удаляем ВСЕ старые симлинки (включая устаревшие из Variant D)
-for link in aigame4 checkpoints game game-docs godot; do
-    rm -rf "$SANDBOX/$link" 2>/dev/null || true
-done
+# ─── Шаг 4: Симлинки ─────────────────────────────────────────────
+echo "── Шаг 4/6: Симлинки (aigame4 + legacy /home/z/godot) ──"
+# my-project/godot — РЕАЛЬНАЯ директория (не симлинк, переживает сбои).
+ln -sf "$REPO_DIR"   "$SANDBOX/aigame4"
+ln -sfn "$GODOT_DIR" "/home/z/godot"
 
-# Создаём только 2 симлинка (минимальная структура)
-ln -sf "$REPO_DIR"       "$SANDBOX/aigame4"
-ln -sf "$GODOT_DIR"      "$SANDBOX/godot"
-
-echo "  aigame4 → $(readlink "$SANDBOX/aigame4")"
-echo "  godot   → $(readlink "$SANDBOX/godot")"
-echo "  (устаревшие checkpoints, game, game-docs — удалены)"
+echo "  aigame4       → $(readlink "$SANDBOX/aigame4")"
+echo "  /home/z/godot → $(readlink /home/z/godot) (legacy)"
+echo "  my-project/godot — реальная директория"
 echo ""
 
 # ─── Шаг 5: NuGet.config (локальный, gitignored) ─────────────────
@@ -122,7 +154,6 @@ echo "$BUILD_OUTPUT" | tail -3
 # Headless проверка
 echo ""
 echo "  Godot headless:"
-GODOT_BIN="$GODOT_DIR/Godot_v4.7.1-stable_mono_linux_x86_64/Godot_v4.7.1-stable_mono_linux.x86_64"
 # Godot .NET needs DOTNET_ROOT to find hostfxr (set above in step 1).
 export DOTNET_ROOT="$DOTNET_DIR"
 export PATH="$DOTNET_ROOT:$PATH"
@@ -134,10 +165,10 @@ echo "  COLD START ЗАВЕРШЁН"
 echo "  Время: $(date)"
 echo "═══════════════════════════════════════════════════════════════"
 echo ""
-echo "Симлинки (2):"
-for link in aigame4 godot; do
-    if test -e "$SANDBOX/$link"; then
-        echo "  ✅ $link → $(readlink "$SANDBOX/$link")"
+echo "Симлинки:"
+for link in "$SANDBOX/aigame4" "/home/z/godot"; do
+    if test -e "$link"; then
+        echo "  ✅ $link → $(readlink "$link")"
     else
         echo "  ❌ $link (BROKEN)"
     fi
@@ -157,3 +188,4 @@ echo "  cd /home/z/my-project/aigame4          # весь репозиторий
 echo "  cd /home/z/my-project/aigame4/game      # Godot проект"
 echo "  cd /home/z/my-project/aigame4/checkpoints  # чекпоинты"
 echo "  cd /home/z/my-project/aigame4/docs      # документация"
+echo "  cd /home/z/my-project/godot             # движок Godot (реальная директория)"
