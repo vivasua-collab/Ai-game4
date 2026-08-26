@@ -116,21 +116,21 @@
 
 ### Шаги внедрения
 
-- [ ] C1. **Контракты:** добавить в `Core/Messaging/Contracts/UIContracts.cs` (или новый `CultivationContracts.cs`) события:
-  - `CultivationWindowToggleRequestedEvent` (bool open) — публикует InputAdapter по клавише C
+- [x] C1. **Контракты:** добавить в `Core/Messaging/Contracts/UIContracts.cs` события:
+  - `CultivationWindowToggleRequestedEvent` (bool open) — публикует InputAdapter по клавише K
   - `TechniqueSlotAssignedEvent` (slotIndex 3-9, techniqueId) — публикует CultivationWindow при установке
   - `TechniqueSlotClearedEvent` (slotIndex) — при очистке слота
-- [ ] C2. **Сервис слотов техник:** новый `Modules/Player/TechniqueSlotService.cs` — хранит маппинг slotIndex(3-9) → techniqueId, перезагружаемый из save. Подписан на TechniqueForgottenEvent (очищает слот, если техника удалена). ISaveable.
-- [ ] C3. **CultivationWindow.cs** — Godot Control (аналог InventoryWindow). Вкладки через `TabContainer`. Открытие/закрытие по событию. Pause game при открытии (как InventoryWindow).
-- [ ] C4. **Вкладка «Техники»:** список + детали. Подписка на `TechniqueLearnedEvent` / `TechniqueForgottenEvent` для обновления списка.
-- [ ] C5. **Вкладка «Меридианы»:** подписка на `QiChangedEvent` (finalConductivity, cultivationLevel). Отображение проводимости, K, chargeRate.
-- [ ] C6. **Вкладка «Ядро»:** currentQi / coreCapacity / cultivationLevel / breakthroughStage. Подписка на QiChangedEvent.
-- [ ] C7. **Панель слотов техник (нижняя панель):** 7 ячеек (3-9). Drag&drop техники из списка ИЛИ кнопка «Установить в слот N». Подписка на TechniqueSlotAssignedEvent/ClearedEvent.
-- [ ] C8. **Регистрация в DI:** `PlayerModuleServices` регистрирует TechniqueSlotService; `UIFactory` / `GameWorldController` инстанцирует CultivationWindow.
-- [ ] C9. **Save/Load слотов:** TechniqueSlotService реализует ISaveable, сериализует словарь slot→techId.
-- [ ] C10. **UI подсказки:** тосты при установке/очистке слота, при открытии окна.
+- [x] C2. **Сервис слотов техник:** новый `Modules/Player/TechniqueSlotService.cs` — хранит маппинг slotIndex(3-9) → techniqueId, перезагружаемый из save. Подписан на TechniqueForgottenEvent (очищает слот, если техника удалена). ISaveable.
+- [x] C3. **CultivationWindow.cs** — Godot Control (аналог InventoryWindow). Вкладки через `TabContainer`. Открытие/закрытие через метод Toggle() (из GameWorldController.HandleStickyInput) + через CultivationWindowToggleRequestedEvent (для программного открытия).
+- [x] C4. **Вкладка «Техники»:** список (ItemList) + детали (Label). Подписка на `TechniqueLearnedEvent` / `TechniqueForgottenEvent` для обновления списка.
+- [x] C5. **Вкладка «Меридианы»:** подписка на `QiChangedEvent` (finalConductivity, cultivationLevel). Отображение проводимости, K, chargeRate.
+- [x] C6. **Вкладка «Ядро»:** currentQi / coreCapacity / cultivationLevel / breakthroughStage. Подписка на QiChangedEvent.
+- [x] C7. **Панель слотов техник (нижняя панель):** 7 ячеек (3-9). Drag&drop техники из списка ИЛИ кнопка «Установить в слот N». Подписка на TechniqueSlotAssignedEvent/ClearedEvent. ЛКМ по занятому слоту = очистка.
+- [x] C8. **Регистрация в DI:** `PlayerModuleServices` регистрирует TechniqueSlotService как `ISaveable` (forwarding в ContainerBuilder даёт тот же singleton для concrete типа); `GameWorldController` инстанцирует CultivationWindow в HUD.
+- [ ] C9. **Save/Load слотов:** TechniqueSlotService реализует ISaveable, сериализует словарь slot→techId. ⚠️ **Известный gap:** SaveDataAggregator не вызывает ISaveable автоматически (нужен IEnumerable<ISaveable> wiring в SaveModule или GameBoot). Сейв заработает когда wiring будет починен (вне scope этой сессии).
+- [x] C10. **UI подсказки:** тосты при установке/очистке слота, при открытии окна.
 
-**Точка восстановления C:** после C1-C10 — `dotnet build` + git commit.
+**Точка восстановления C:** ✅ `dotnet build` — 0 errors, 271 warnings (+5 от новых файлов, все CS0649/CS0414 [Inject] property-injection). git commit pending.
 
 ---
 

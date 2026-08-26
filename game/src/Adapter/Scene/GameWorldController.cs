@@ -73,6 +73,8 @@ public partial class GameWorldController : Node2D
     private UI.TradeWindow _tradeWindow = null!;
     private UI.HotbarPanel _hotbarPanel = null!;
     private UI.TechniquesPanel _techniquesPanel = null!;
+    // C3 (2026-08-26): окно Культивации Ци (K) — 3 вкладки + панель слотов техник 3-9.
+    private UI.CultivationWindow _cultivationWindow = null!;
 #if DEBUG
     private UI.CheatPanel? _cheatPanel; // Этап 7: чит-меню (F1).
 #endif
@@ -493,6 +495,12 @@ public partial class GameWorldController : Node2D
         // Этап 2 внедрения ЦИ: панель техник (T).
         _techniquesPanel = new UI.TechniquesPanel { Name = "TechniquesPanel" };
         _hudCanvas.AddChild(_techniquesPanel);
+
+        // C3 (2026-08-26): окно Культивации Ци (K) — 3 вкладки (Техники / Меридианы / Ядро)
+        // + нижняя панель слотов техник (3-9). Открывается клавишей K через
+        // CultivationWindowToggleRequestedEvent из InputAdapter (этап D).
+        _cultivationWindow = new UI.CultivationWindow { Name = "CultivationWindow" };
+        _hudCanvas.AddChild(_cultivationWindow);
 
 #if DEBUG
         // Этап 7 внедрения ЦИ: чит-меню разработки (F1).

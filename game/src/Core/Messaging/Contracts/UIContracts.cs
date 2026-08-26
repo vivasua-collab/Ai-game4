@@ -91,3 +91,41 @@ public readonly struct ModalShownEvent
     public ModalShownEvent(string title, string message)
         { Title = title; Message = message; }
 }
+
+// === CULTIVATION WINDOW (этап C, 2026-08-26) ===
+// Окно Культивации Ци — отдельное окно (как инвентарь), открывается клавишей K.
+// Содержит вкладки: Техники / Меридианы / Ядро + панель слотов техник (3-9).
+
+/// <summary>
+/// Запрос: переключить окно Культивации (открыть/закрыть).
+/// Публикуется Adapter (клавиша K). Подписан CultivationWindow.
+/// Open=true → показать окно; Open=false → скрыть.
+/// </summary>
+public readonly struct CultivationWindowToggleRequestedEvent
+{
+    public readonly bool Open;
+    public CultivationWindowToggleRequestedEvent(bool open) { Open = open; }
+}
+
+/// <summary>
+/// Событие: техника установлена в слот быстрого доступа (3-9).
+/// Публикуется CultivationWindow при установке/переназначении.
+/// Подписаны: TechniqueSlotService (обновление состояния), HotbarPanel (UI).
+/// </summary>
+public readonly struct TechniqueSlotAssignedEvent
+{
+    public readonly int SlotIndex;       // 3..9
+    public readonly string TechniqueId;  // пусто = слот очищен
+    public TechniqueSlotAssignedEvent(int slotIndex, string techniqueId)
+        { SlotIndex = slotIndex; TechniqueId = techniqueId ?? string.Empty; }
+}
+
+/// <summary>
+/// Событие: слот быстрого доступа техник очищен.
+/// Публикуется CultivationWindow при снятии техники со слота.
+/// </summary>
+public readonly struct TechniqueSlotClearedEvent
+{
+    public readonly int SlotIndex;
+    public TechniqueSlotClearedEvent(int slotIndex) { SlotIndex = slotIndex; }
+}

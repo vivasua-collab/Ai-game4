@@ -26,6 +26,8 @@ public sealed class PlayerModule : IModule
     [Inject] private readonly ITimeService _timeService = null!;
     // Stage 1 (2026-08-25, GLM-5.3): декей удержания техники в ауре
     [Inject] private readonly AuraHoldService _auraHold = null!;
+    // C2 (2026-08-26): слоты быстрого доступа техник (3-9)
+    [Inject] private readonly TechniqueSlotService _techniqueSlots = null!;
 
     private int _tickCount;
     private Position2D? _mouseDestination;  // null = keyboard movement, non-null = mouse-click movement
@@ -37,6 +39,8 @@ public sealed class PlayerModule : IModule
         {
             ps.Spawn(new Position2D(25, 25));
         }
+        // C2: запуск подписок TechniqueSlotService (TechniqueForgottenEvent для авто-очистки слотов)
+        _techniqueSlots?.Start();
         Console.WriteLine($"[PlayerModule] Started — stat svc wired={_statService != null}");
     }
 
@@ -222,6 +226,11 @@ public static class PlayerModuleServices
         // Stage 1 (2026-08-25, GLM-5.3): удержание заряженной техники в ауре
         // (вариант В — аура держит одну). Декей из PlayerModule.Tick.
         builder.Register<AuraHoldService>(Lifetime.Singleton);
+        // C2 (2026-08-26): слоты быстрого доступа техник (3-9) — назначение через
+        // CultivationWindow, каст по клавишам 3-9 (через InputAdapter → событие каста).
+        // Регистрируем как ISaveable → singleton автоматически резолвится и как
+        // TechniqueSlotService (forwarding в ContainerBuilder.Register<TI,TImpl>).
+        builder.Register<ISaveable, TechniqueSlotService>(Lifetime.Singleton);
         builder.Register<IStatService, StatService>(Lifetime.Singleton);
         builder.Register<PlayerModule>(Lifetime.Singleton);
     }
