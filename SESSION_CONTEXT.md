@@ -1,13 +1,31 @@
 # SESSION_CONTEXT — Передача контекста агенту
 
 **Дата создания:** 2026-08-22
-**Обновлено:** 2026-08-26 14:50 UTC (облачная сессия: Epic→Legendary оверкап + 3 прохода аудита)
+**Обновлено:** 2026-08-28 08:40 UTC (фикс-сессия аудита-4: все находки закрыты + восстановление окружения)
 **Назначение:** Полный контекст для продолжения разработки
 **Инструкция:** Прочитай этот файл ПЕРВЫМ при старте новой сессии
 
 ---
 
-## 0. ЧТО СДЕЛАЛОСЬ ЗА ОБЛАЧНЫЕ СЕССИИ 2026-08-25…26 (коммиты 679f19e…1c3e041)
+## 0. ЧТО СДЕЛАЛОСЬ ЗА ОБЛАЧНЫЕ СЕССИИ 2026-08-25…28 (коммиты 679f19e…fd39377)
+
+### Сессия 2026-08-28: фикс-сессия аудита-4 + восстановление окружения (1fd576a, 06668c4, 6204593, fd39377)
+1. **Аудит-4** (сессия 08-26 №3, сверено в коде): все 17 модулей ядра;
+   EQ-A1 MAJOR (потеря off-hand при двуручнике) + EQ-A2 фиксы на месте.
+2. **Закрыты ВСЕ задокументированные находки аудита-4:** BUFF-A1
+   (TickBuffs: двойной снапшот + отложенное удаление + пересчёт статов
+   ПОСЛЕ удаления), BUFF-A3 (StatModifierChanged в RemoveAllBuffs),
+   NPC-A2 (GetAllStates → снапшот List), INV-A1 (аккумуляция addedCount
+   в рекурсиях TryAddItem), SAVE-A1 (SaveModule собирает ISaveable через
+   IResolver.ResolveAll — в логе «6 ISaveable registered»; save_meta
+   больше не мёртвый код).
+3. **Хвост аудита-3:** C-5 — AttackRejectedEvent при атаке во время
+   каста (вместо тихого return); C-6 — CombatConfig.PlayerEntityId удалён.
+4. **cold_start.sh hardened:** чистит битый симлинк godot, работает без
+   GITHUB_TOKEN (публичный pull), ln -sfn + чистка симлинк-петель.
+   Прогон с чистого сброса — PASS end-to-end.
+5. Верификация: build 0 err / 271 warn (базовый уровень); NEWGAME,
+   COMBAT_SIM, TRADE_DEBUG, GEN_DEBUG — все PASS с эталонами.
 
 ### Сессия 2026-08-26 №1: генераторы + верификация (коммиты 29f8d50…31d679b)
 1. **LevelBoundaries.cs** — границы уровней для техник/экипировки/формаций
@@ -134,7 +152,7 @@ GODOT_NEWGAME=1 timeout 25 "$GODOT" --headless --path "$PWD" scenes/MainMenu.tsc
 
 ---
 
-## 2. ТЕКУЩЕЕ СОСТОЯНИЕ (коммит 1c3e041 — synced с origin/main)
+## 2. ТЕКУЩЕЕ СОСТОЯНИЕ (коммит fd39377 — synced с origin/main)
 
 ### Что работает
 - ✅ Main Menu → New Game (50×50) / Large World (500×500)
@@ -227,11 +245,11 @@ game/src/
 3. Страж вступается; лут-подбор; пояс end-to-end
 4. Цифры урона/HP-бары/лавка — глазами
 
-### P1 — по плану NPC_COMBAT_PREP / кандидаты аудита-4+
-4. **Аудит-4+ (по схеме этой сессии — по модулю за проход):** Inventory/UI/
-   Save, Interaction/Trade (глубже), Body/Enhancement, NPC AI/Movement.
-   Мелочь от аудита-3: событие отклонения атаки при _isCasting (C-5),
-   удалить CombatConfig.PlayerEntityId (C-6).
+### P1 — по плану NPC_COMBAT_PREP / кандидаты аудита-5+
+4. ~~Аудит-4 + C-5/C-6~~ — ЗАКРЫТО 2026-08-28 (все 17 модулей ядра +
+   все находки серии 1–4 закрыты фиксами; см. чекпоинт аудита-4).
+   Кандидаты аудита-5+: Adapter-слой (Scene/UI/Input),
+   Body/Enhancement глубже, NPC Soul, Trade-экономика.
 5. Phase 3: Faction Port (Ai-game3-ref/Modules/World/FactionService.cs —
    227 LOC portable; FactionData 34 LOC; wire в NPCRelationshipService)
 6. Phase 8 ч.2: Weapon Variety + Ammo (WeaponSubtype в атаках, IAmmoService,
@@ -307,9 +325,11 @@ DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 GODOT_NEWGAME=1 GODOT_COMBAT_SIM=1 \
 5. Токен GitHub не коммитить; после push сбрасывать remote URL на публичный
 6. Документация НЕ редактируется без прямого указания пользователя
 7. **Сброс песочницы между сессиями:** если Godot/dotnet пропали — запускать
-   `bash /home/z/my-project/Ai-game4/cold_start.sh` (idempotent, ~15 сек).
-   Аномалия ФС 08-26: бинарь Godot виден через readdir, но ENOENT при
-   прямом lookup — обход: python os.walk + shutil.copyfile в /tmp/godot471,
-   запускать оттуда.
+   `bash /home/z/my-project/Ai-game4/cold_start.sh` (idempotent, ~1 мин с
+   нуля; переживает битые симлинки, отсутствие GITHUB_TOKEN, петли).
+   08-28: «аномалия ФС» 08-26 объяснена и закрыта в cold_start
+   (подчёркивание/точка в имени бинаря, ненадёжный unzip, ln -sf сквозь
+   симлинк). Локальный git может ОТСТАВАТЬ от GitHub после сброса:
+   сверять `git ls-remote origin` → fetch + reset --hard origin/main.
 
 *Конец файла. Прочитай START_PROMPT.md следующим.*

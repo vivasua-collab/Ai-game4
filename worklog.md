@@ -990,3 +990,38 @@ Stage Summary:
 - HEAD 06668c4, synced с origin/main.
 - Для следующей сессии: cold_start.sh теперь самодостаточен (python-extract);
   кандидаты аудита-5+: Adapter-слой (Scene/UI/Input), глубокий NPC (Soul).
+
+---
+Task ID: session-2026-08-28
+Agent: main-thread (Z.ai Code, основной поток — без субагентов)
+Task: Восстановление окружения после сброса песочницы + закрытие
+задокументированных находок аудита-4 («проверь результаты аудита,
+найденные ошибки и выполни исправления»)
+
+Work Log:
+- Сброс песочницы 2026-08-28: Godot/dotnet//tmp стёрты, my-project/godot
+  битый симлинк («os error 2» в предпросмотре), локальный git отстал от
+  GitHub на 3 коммита (284eecc vs 6204593) → fetch + reset --hard.
+- Проверка скриптов автовосстановления: cold_start.sh — 3 фикса
+  (битый симлинк в python-извлечении; pull без токена через публичный
+  URL; ln -sfn + чистка симлинк-петли Ai-game4/Ai-game4). Прогон с
+  чистого состояния — PASS end-to-end.
+- Сверка фиксов прошлой сессии: EQ-A1/EQ-A2 в EquipmentService.cs на
+  месте и корректны.
+- 7 фиксов: BUFF-A1 (двойной снапшот TickBuffs + отложенное удаление +
+  пересчёт статов после удаления), BUFF-A3 (StatModifierChanged в
+  RemoveAllBuffs), NPC-A2 (GetAllStates → снапшот), INV-A1 (аккумуляция
+  addedCount в рекурсиях), SAVE-A1 (ResolveAll<ISaveable> в
+  SaveModule.Start + save_meta-регистрация), C-5 (AttackRejectedEvent),
+  C-6 (удалён CombatConfig.PlayerEntityId).
+- Верификация: build 0 errors / 271 warnings (базовый уровень); NEWGAME
+  PASS (+ «6 ISaveable registered» — SAVE-A1 работает), COMBAT_SIM
+  VERDICT PASS, TRADE_DEBUG PASS, GEN_DEBUG PASS (эталоны: 16.8%/4.0%,
+  2/16, 40/40, 115 vs 104).
+
+Stage Summary:
+- Все 7 находок аудита-4 закрыты фиксами (+ C-5/C-6 аудита-3). Серия
+  аудитов 1–4 полностью закрыта: отложенных пунктов нет.
+- cold_start.sh переживает: битые симлинки, отсутствие GITHUB_TOKEN,
+  симлинк-петли — восстановление окружения теперь однострочное.
+- Коммит фиксов: fd39377. Все запушено в origin/main.

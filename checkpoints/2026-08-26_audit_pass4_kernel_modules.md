@@ -208,3 +208,75 @@ PASS; TRADE_DEBUG PASS (buy/sell Пилюля Ци).
 | 18:40 | A6 NPC: NPC-A2 INFO; SourceId консистентен |
 | 18:50 | A7 Charger / A8 Save / A9 UI / A10 Generator: чисто (SAVE-A1 известный долг) |
 | 19:00 | build 0 errors; NEWGAME+COMBAT_SIM+TRADE_DEBUG PASS |
+
+---
+
+# ФИКС-СЕССИЯ 2026-08-28: закрытие задокументированных находок
+
+**Дата:** 2026-08-28, 09:27–11:40 MSK
+**Запрос:** «проверь результаты аудита, найденные ошибки и выполни
+исправления» (+ восстановление окружения после сброса песочницы).
+**HEAD на старте:** 6204593 (GitHub; локальный диск — устаревший снапшот
+284eecc, fetch+reset). **Фикс-коммит:** fd39377.
+
+## Окружение (сброс 2026-08-28)
+
+- Godot/dotnet//tmp стёрты; my-project/godot — битый симлинк (источник
+  «os error 2» в предпросмотре); репо на диске отстало на 3 коммита.
+- cold_start.sh — 3 фикса: (1) python-извлечение убирает битый симлинк
+  (иначе os.makedirs → FileExistsError); (2) pull/clone без валидного
+  GITHUB_TOKEN использует публичный URL (placeholder-токен валился даже
+  на публичном репо); (3) ln -sf → ln -sfn + чистка самоссылающихся
+  симлинк-петель в репо (Ai-game4/Ai-game4 ломал rg/glob/предпросмотр).
+- Прогон cold_start с нуля — PASS (SDK 8.0.424+9.0.317, Godot 4.7.1,
+  build 0 errors, headless старт модулей).
+- Сверка фиксов прошлой сессии: EQ-A1 (EquipmentService.cs:131-134,
+  5-arg ctor с offHand.ItemId) и EQ-A2 (:242-244, SyncToProvider) —
+  на месте, корректны.
+
+## Фиксы (7)
+
+| ID | Файл | Суть |
+|----|------|------|
+| BUFF-A1 | BuffService.TickBuffs | Двойной снапшот (сущности + список баффов), отложенное удаление истёкших ПОСЛЕ итерации; бонус: пересчёт StatModifierChanged ПОСЛЕ удаления (раньше newMod включал истёкший бафф) |
+| BUFF-A3 | BuffService.RemoveAllBuffs | StatModifierChangedEvent по всем затронутым статам после Clear() — подписчики видят сброс к 0 |
+| NPC-A2 | NPCService.GetAllStates | Снапшот List<NPCState> вместо живой ValueCollection — 5 мест итерации с публикацией событий безопасны при будущем деспавне |
+| INV-A1 | InventoryService.TryAddItem | Обе рекурсии → 3-arg перегрузка с аккумуляцией addedCount (2-arg отбрасывала уточнение → завышение при сплите стака + лимите объёма) |
+| SAVE-A1 | SaveModule.Start / SaveModuleServices | Сбор ISaveable через IResolver.ResolveAll (контейнер дедуплицирует форварды, кэш по impl-типу = те же синглтоны) + Register<ISaveable, SaveService> (save_meta). Лог: «6 ISaveable registered» |
+| C-5 (аудит-3) | CombatContracts / CombatService | AttackRejectedEvent (паттерн EquipmentBlockedEvent) публикуется вместо тихого return при _isCasting |
+| C-6 (аудит-3) | CombatConfig / CombatModuleServices | PlayerEntityId удалён (мёртвое поле после миграции на PlayerIdResolver) |
+
+## Верификация
+
+- build: 0 errors / 271 warnings (базовый уровень; 3 добавленных
+  nullable-предупреждения отполированы аннотациями).
+- NEWGAME PASS: 14 фаз, PreGen 100/100, 6 техник, state=Playing,
+  [SaveModule] Started — 6 ISaveable service(s) registered.
+- COMBAT_SIM VERDICT PASS: NPC→игрок 21 (Torso), игрок→NPC 10/14,
+  qi-щит npc→npc 21.
+- TRADE_DEBUG PASS: лавка 8 позиций, buy/sell True.
+- GEN_DEBUG PASS: Epic 16.8% / Legendary 4.0%, оверкап 2/16 (12.5%),
+  верификация 40/40, dmg 115 (оверкап) vs 104 (без) — эталоны Phase H.
+
+## Итог по находкам аудита-4
+
+| Находка | Статус |
+|---------|--------|
+| EQ-A1 MAJOR | ✅ фиксен 08-26, сверен 08-28 |
+| EQ-A2 MINOR | ✅ фиксен 08-26, сверен 08-28 |
+| INV-A1 MINOR | ✅ фиксен 08-28 |
+| BUFF-A1 MINOR | ✅ фиксен 08-28 |
+| BUFF-A3 MINOR | ✅ фиксен 08-28 |
+| NPC-A2 INFO | ✅ фиксен 08-28 (снапшот) |
+| SAVE-A1 MINOR/долг | ✅ фиксен 08-28 (ResolveAll) |
+
+Все 7 находок аудита-4 закрыты; отложенных пунктов серии аудитов 1–4
+(вкл. C-5/C-6 аудита-3) не осталось.
+
+| Время MSK | Действие |
+|-----------|----------|
+| 09:27 | Диагностика сброса песочницы; дата 2026-08-28 |
+| 09:33 | cold_start hardened (3 фикса); прогон с нуля PASS |
+| 10:05 | Чтение Buff/Inventory/NPC/Save/Combat; сверка EQ-A1/A2 |
+| 10:45 | 7 фиксов применены; build 0 errors / 271 warnings |
+| 11:20 | 4 регресса PASS; коммит fd39377 + push |
