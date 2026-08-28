@@ -357,6 +357,9 @@ public partial class TechniqueBookWindow : Control
 
         // 4. «Свитки».
         BuildScrollsTab();
+
+        // Подсветка выбранной техники после перестройки чипов.
+        RefreshChipHighlight();
     }
 
     /// <summary>Вкладка с матрицей тип→стихия.</summary>
