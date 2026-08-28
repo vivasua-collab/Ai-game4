@@ -137,10 +137,12 @@ fi
 
 # Восстановление git credential store: ~/.git-credentials живёт в /home/z
 # и УМИРАЕТ при сбросе песочницы. Пока он цел — push работает прозрачно.
-if [ -n "$TOKEN" ] && ! grep -q "github.com" "$HOME/.git-credentials" 2>/dev/null; then
+# Безусловно (не только при отсутствии файла): git-credential-store
+# перезаписывает запись host+username → самоисцеление при протухшем токене.
+if [ -n "$TOKEN" ]; then
     git config --global credential.helper store
     printf 'protocol=https\nhost=github.com\nusername=vivasua-collab\npassword=%s\n' "$TOKEN" | git credential approve
-    echo "  ✅ GitHub credentials восстановлены из персистентного .auth"
+    echo "  ✅ GitHub credential store актуализирован из персистентного .auth"
 fi
 
 if [[ "$TOKEN" == ghp_* || "$TOKEN" == github_pat_* ]]; then
