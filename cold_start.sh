@@ -20,6 +20,14 @@
 #     чтение, AUTH-URL используется только при валидном токене.
 #   - Шаг симлинков чистит легаси-узлы перед ln -sfn.
 #
+# ОБНОВЛЕНО 2026-08-28 №2 (персистентный токен):
+#   - Диагноз: контекст чата сбрасывается между сообщениями → токен из
+#     чата умирает; ~/.git-credentials умирает при сбросе песочницы.
+#   - Решение: токен хранится в my-project/.auth/github.token (вне
+#     git-репо, но внутри зоны снапшота платформы → переживает сбросы)
+#     + зеркало в /home/sync/.auth/. Шаг 3 восстанавливает credential
+#     store автоматически.
+#
 # Запуск:
 #   bash /home/z/my-project/Ai-game4/cold_start.sh
 #
@@ -28,7 +36,7 @@
 
 set -e
 
-TOKEN="${GITHUB_TOKEN:-[REDACTED:github_token]}"
+TOKEN="${GITHUB_TOKEN:-}"   # приоритет: env → my-project/.auth → /home/sync/.auth (резолв в шаге 3)
 REPO_URL_PUBLIC="https://github.com/vivasua-collab/Ai-game4.git"
 REPO_URL_AUTH="https://x-access-token:${TOKEN}@github.com/vivasua-collab/Ai-game4.git"
 GODOT_URL="https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_mono_linux_x86_64.zip"
@@ -118,6 +126,23 @@ echo "── Шаг 3/6: Ai-game4 (git clone/pull) ──"
 # Репо публичное на чтение: токен нужен только для push. Невалидный
 # placeholder в URL ломает авторизацию даже на публичном репо →
 # AUTH-URL используем только когда токен выглядит валидным.
+# Резолв токена из персистентного хранилища (если не задан через env).
+# my-project/.auth — в зоне снапшота платформы (переживает сбросы);
+# /home/sync/.auth — прямое облачное зеркало (fallback).
+if [ -z "$TOKEN" ]; then
+    for f in "$SANDBOX/.auth/github.token" "/home/sync/.auth/github.token"; do
+        [ -f "$f" ] && TOKEN="$(<"$f")" && break
+    done
+fi
+
+# Восстановление git credential store: ~/.git-credentials живёт в /home/z
+# и УМИРАЕТ при сбросе песочницы. Пока он цел — push работает прозрачно.
+if [ -n "$TOKEN" ] && ! grep -q "github.com" "$HOME/.git-credentials" 2>/dev/null; then
+    git config --global credential.helper store
+    printf 'protocol=https\nhost=github.com\nusername=vivasua-collab\npassword=%s\n' "$TOKEN" | git credential approve
+    echo "  ✅ GitHub credentials восстановлены из персистентного .auth"
+fi
+
 if [[ "$TOKEN" == ghp_* || "$TOKEN" == github_pat_* ]]; then
     CLONE_URL="$REPO_URL_AUTH"
 else

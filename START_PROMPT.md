@@ -2,7 +2,7 @@
 
 > **Назначение:** Этот файл читается ПЕРВЫМ при старте любой сессии AI-агента.
 > Содержит правила работы, структуру проекта, запреты, точку входа в память.
-> **Дата обновления:** 2026-08-15
+> **Дата обновления:** 2026-08-28
 
 ---
 
@@ -155,9 +155,10 @@ bash /home/z/my-project/Ai-game4/recover_sandbox.sh
 **Где РЕАЛЬНО хранятся данные:**
 - ✅ **GitHub** `vivasua-collab/Ai-game4` — код, документация, checkpoints (вечно)
 - ✅ **GitHub** `vivasua-collab/Ai-game3` — reference (вечно)
-- ⚠️ **Песочница** `/home/z/my-project/Ai-game4/` — клон (исчезает при reset)
-- ⚠️ **Песочница** `/home/z/.dotnet/`, `/home/z/godot/` — инструменты (исчезают при reset)
-- ⚠️ **Песочница** `/home/z/my-project/worklog.md` — хроника (исчезает при reset)
+- ✅ **Песочница** `/home/z/my-project/.auth/github.token` — GitHub PAT для push (вне git-репо; в зоне снапшота платформы → переживает сбросы)
+- ✅ **Облако** `/home/sync/.auth/` — зеркало токена (OSS-маунт)
+- ⚠️ **Песочница** `/home/z/my-project/` — переживает сбросы: платформа снапшотит в `/home/sync/repo.tar` и восстанавливает. Свежесть = время последнего снапшота → сверять `git ls-remote origin` (см. SESSION_CONTEXT.md §8-7)
+- ❌ **Песочница** `/home/z/.dotnet/`, `/home/z/godot`, `~/.git-credentials` — умирают при reset → восстанавливаются `cold_start.sh`
 
 **Правило:** ключевые решения дублировать в `checkpoints/` (в git, не теряются).
 
@@ -296,7 +297,7 @@ Cultivation World Simulator, Godot 4.7.1 .NET, C#
 | 3 | **НЕ возвращаться к MonoGame/Phaser.** | Решение принято: Godot 4.7.1 primary. |
 | 4 | **НЕ запускать Next.js DEV сервер.** | Песочница не используется для игры. |
 | 5 | **НЕ коммитить `.godot/`, `*.uid`, `*.import`, `bin/`, `obj/`.** | Локальный cache. |
-| 6 | **НЕ коммитить токены/ключи в git.** | Безопасность. Токен хранить в памяти сессии. |
+| 6 | **НЕ коммитить токены/ключи в git.** | Безопасность. Токен хранить в `/home/z/my-project/.auth/github.token` (персистентно, вне git; зеркало `/home/sync/.auth/`). Контекст чата сбрасывается между сообщениями — «память сессии» токен НЕ сохраняет. Если файла нет — запросить у пользователя ОДИН раз, сохранить и больше не спрашивать. |
 | 7 | **НЕ использовать `SetStyleBox`** (старый API). | Использовать `SetStylebox` (Godot 4.7 canonical). |
 | 8 | **НЕ использовать `TileMap`** (deprecated). | Использовать `TileMapLayer` (4.5+ canonical). |
 | 9 | **НЕ использовать `SetAnchorsPreset` без offsets.** | Использовать `SetAnchorsAndOffsetsPreset` или явные Anchor*+Offset*. |
@@ -361,6 +362,21 @@ Cultivation World Simulator, Godot 4.7.1 .NET, C#
    - NPC AI (3-tier nervous system)
 
 3. **Далее:** UI Views, Save system, контент
+
+---
+
+## 13. Режимы коммуникации (Caveman.md)
+
+Файл: `Caveman.md` (портирован из Ai-game3 2026-08-28 без изменений).
+
+| Уровень | Описание |
+|---------|----------|
+| lite | Без filler, предложения полные |
+| full | Без артиклей, фрагменты OK |
+| ultra | Аббревиатуры, стрелки, минимум слов |
+
+**Проект по умолчанию: `lite`.** Переключение: «caveman mode full/ultra», «less tokens», «be brief».
+Опасные операции и предупреждения безопасности — полным языком (правило авто-ясности в Caveman.md).
 
 ---
 
