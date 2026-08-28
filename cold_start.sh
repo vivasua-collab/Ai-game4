@@ -12,6 +12,14 @@
 #   - Godot ставится в ПЕРСИСТЕНТНЫЙ my-project/godot (реальная директория,
 #     переживает сбои песочницы); /home/z/godot — симлинк (легаси-пути).
 #
+# ОБНОВЛЕНО 2026-08-28 (проверка скриптов автовосстановления):
+#   - Извлечение Godot корректно убирает БИТЫЙ симлинк my-project/godot
+#     → /home/z/godot (остаток старого layout после сброса песочницы;
+#     раньше os.makedirs падал с FileExistsError на висячем симлинке).
+#   - git pull/clone не ломается без GITHUB_TOKEN: репо публичное на
+#     чтение, AUTH-URL используется только при валидном токене.
+#   - Шаг симлинков чистит легаси-узлы перед ln -sfn.
+#
 # Запуск:
 #   bash /home/z/my-project/Ai-game4/cold_start.sh
 #
@@ -74,7 +82,12 @@ dotdir = os.path.join(base, 'Godot_v4.7.1-stable_mono_linux.x86_64')
 binpath = os.path.join(dotdir, 'Godot_v4.7.1-stable_mono_linux.x86_64')
 if os.path.exists(binpath) and os.path.getsize(binpath) == bin_size:
     raise SystemExit(0)
-if os.path.exists(base):
+# base может быть БИТЫМ симлинком (легаси godot -> /home/z/godot после
+# сброса песочницы): os.path.exists()=False, но os.makedirs сквозь него
+# падает с FileExistsError — сначала убираем симлинк.
+if os.path.islink(base):
+    os.unlink(base)
+elif os.path.exists(base):
     shutil.rmtree(base)
 os.makedirs(dotdir, exist_ok=True)
 with zipfile.ZipFile(zp) as zf:
@@ -102,16 +115,24 @@ echo ""
 
 # ─── Шаг 3: Ai-game4 репозиторий ─────────────────────────────────
 echo "── Шаг 3/6: Ai-game4 (git clone/pull) ──"
+# Репо публичное на чтение: токен нужен только для push. Невалидный
+# placeholder в URL ломает авторизацию даже на публичном репо →
+# AUTH-URL используем только когда токен выглядит валидным.
+if [[ "$TOKEN" == ghp_* || "$TOKEN" == github_pat_* ]]; then
+    CLONE_URL="$REPO_URL_AUTH"
+else
+    CLONE_URL="$REPO_URL_PUBLIC"
+fi
 if [ -d "$REPO_DIR/.git" ]; then
     echo "  Репо существует, обновляю..."
     cd "$REPO_DIR"
-    git remote set-url origin "$REPO_URL_AUTH"
+    git remote set-url origin "$CLONE_URL"
     git pull --ff-only 2>&1 | tail -2
     git remote set-url origin "$REPO_URL_PUBLIC"
 else
     echo "  Клонирую с GitHub..."
     cd "$SANDBOX"
-    git clone "$REPO_URL_AUTH" 2>&1 | tail -2
+    git clone "$CLONE_URL" 2>&1 | tail -2
     cd "$REPO_DIR"
     git remote set-url origin "$REPO_URL_PUBLIC"
 fi
@@ -121,7 +142,16 @@ echo ""
 # ─── Шаг 4: Симлинки ─────────────────────────────────────────────
 echo "── Шаг 4/6: Симлинки (aigame4 + legacy /home/z/godot) ──"
 # my-project/godot — РЕАЛЬНАЯ директория (не симлинк, переживает сбои).
-ln -sf "$REPO_DIR"   "$SANDBOX/aigame4"
+# ln -sfn (НЕ ln -sf!): без -n ln проходит по существующему симлинку
+# и создаёт звено ВНУТРИ цели → самоссылающийся мусор в репо.
+ln -sfn "$REPO_DIR"  "$SANDBOX/aigame4"
+# Чистим самоссылающиеся симлинк-петли внутри репо (остаток старых
+# запусков с ln -sf): ломают rg/glob/дерево предпросмотра.
+if [ -L "$REPO_DIR/Ai-game4" ]; then rm -f "$REPO_DIR/Ai-game4"; fi
+if [ -L "$REPO_DIR/aigame4" ]; then rm -f "$REPO_DIR/aigame4"; fi
+# /home/z/godot может быть битым симлинком или легаси-каталогом — чистим.
+if [ -L /home/z/godot ]; then rm -f /home/z/godot; fi
+if [ -d /home/z/godot ] && [ ! -L /home/z/godot ]; then rm -rf /home/z/godot; fi
 ln -sfn "$GODOT_DIR" "/home/z/godot"
 
 echo "  aigame4       → $(readlink "$SANDBOX/aigame4")"

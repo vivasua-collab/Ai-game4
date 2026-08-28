@@ -175,6 +175,20 @@ namespace CultivationGame.Modules.Buff
             var buffs = GetBuffList(entityId);
             if (buffs == null) return;
 
+            // BUFF-A3 FIX (аудит-4): собираем затронутые статы ДО очистки —
+            // после Clear() публикуем StatModifierChangedEvent для каждой
+            // (как в RemoveBuff), иначе подписчики статов не видели сброс к 0.
+            HashSet<StatType>? affectedStats = null;
+            for (int i = 0; i < buffs.Count; i++)
+            {
+                var st = buffs[i].AffectedStat;
+                if (st != null)
+                {
+                    affectedStats ??= new HashSet<StatType>();
+                    affectedStats.Add(st.Value);
+                }
+            }
+
             for (int i = buffs.Count - 1; i >= 0; i--)
             {
                 var buff = buffs[i];
@@ -183,6 +197,15 @@ namespace CultivationGame.Modules.Buff
 
             buffs.Clear();
             _entityBuffs.Remove(entityId);
+
+            // BUFF-A3 FIX: модификаторы после очистки = 0 — уведомляем подписчиков.
+            if (affectedStats != null)
+            {
+                foreach (var stat in affectedStats)
+                {
+                    _statModifierChangedPub.Publish(new StatModifierChangedEvent(entityId, stat, GetStatModifier(entityId, stat)));
+                }
+            }
         }
 
         public bool HasBuff(string entityId, string buffId)
@@ -276,14 +299,27 @@ namespace CultivationGame.Modules.Buff
 
             List<string> expiredEntities = null;
 
-            foreach (var kvp in _entityBuffs)
+            // BUFF-A1 FIX (аудит-4): снапшот сущностей ДО итерации. Подписчики
+            // публикуемых внутри цикла событий (DoT-тик → урон → смерть →
+            // RemoveAllBuffs / ApplyBuff новой сущности) мутируют _entityBuffs
+            // во время foreach → InvalidOperationException. Снапшот ссылок:
+            // свежеприменённые баффы не тикают в этом кадре (корректно).
+            var entitySnapshot = new List<KeyValuePair<string, List<ActiveBuff>>>(_entityBuffs);
+
+            foreach (var kvp in entitySnapshot)
             {
                 string entityId = kvp.Key;
                 var buffs = kvp.Value;
 
-                for (int i = buffs.Count - 1; i >= 0; i--)
+                // BUFF-A1 FIX: итерируем КОПИЮ списка баффов — подписчик может
+                // вызвать Clear()/Remove (RemoveAllBuffs при смерти от DoT), и
+                // индексация живого списка вышла бы за границы.
+                var buffSnapshot = new List<ActiveBuff>(buffs);
+                List<ActiveBuff>? expired = null;
+
+                for (int i = buffSnapshot.Count - 1; i >= 0; i--)
                 {
-                    var buff = buffs[i];
+                    var buff = buffSnapshot[i];
 
                     // Обновляем таймер
                     if (buff.Application != BuffApplication.Permanent && buff.Application != BuffApplication.Instant)
@@ -301,13 +337,27 @@ namespace CultivationGame.Modules.Buff
                     if (buff.IsExpired)
                     {
                         _expiredPub.Publish(new BuffExpiredEvent(entityId, buff.BuffId, buff.Type));
-                        // BF-A10: Публикуем событие изменения модификатора при истечении
-                        if (buff.AffectedStat != null)
+                        expired ??= new List<ActiveBuff>();
+                        expired.Add(buff);
+                    }
+                }
+
+                if (expired != null)
+                {
+                    // Отложенная мутация: удаляем из ЖИВОГО списка ПОСЛЕ итерации
+                    // (Remove по ссылке безвреден, если подписчик уже удалил сам).
+                    foreach (var b in expired) buffs.Remove(b);
+
+                    // BF-A10 + BUFF-A1: событие изменения модификатора при истечении.
+                    // Пересчёт ПОСЛЕ фактического удаления — иначе newMod включал
+                    // уже истёкший бафф (семантика та же, что в RemoveBuff).
+                    foreach (var b in expired)
+                    {
+                        if (b.AffectedStat != null)
                         {
-                            float newMod = GetStatModifier(entityId, buff.AffectedStat.Value);
-                            _statModifierChangedPub.Publish(new StatModifierChangedEvent(entityId, buff.AffectedStat.Value, newMod));
+                            float newMod = GetStatModifier(entityId, b.AffectedStat.Value);
+                            _statModifierChangedPub.Publish(new StatModifierChangedEvent(entityId, b.AffectedStat.Value, newMod));
                         }
-                        buffs.RemoveAt(i);
                     }
                 }
 

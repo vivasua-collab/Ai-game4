@@ -215,3 +215,25 @@ public readonly struct AttackIntentEvent
         IsCharged = isCharged;
     }
 }
+
+/// <summary>
+/// C-5 (аудит-3): атака/техника ОТКЛОНЕНА боевой системой.
+/// Публикуется CombatService.ExecuteAttack, когда новая атака приходит
+/// во время незавершённого каста (раньше — тихий return, игрок не
+/// понимал, почему атака не прошла). Потребители: Adapter/UI (тост),
+/// паттерн EquipmentBlockedEvent.
+/// </summary>
+public readonly struct AttackRejectedEvent
+{
+    /// <summary>ID атакующего, чья атака отклонена</summary>
+    public readonly string AttackerId;
+
+    /// <summary>ID техники, которую пытались применить</summary>
+    public readonly string TechniqueId;
+
+    /// <summary>Человекочитаемая причина отклонения</summary>
+    public readonly string Reason;
+
+    public AttackRejectedEvent(string attackerId, string techniqueId, string reason)
+        { AttackerId = attackerId; TechniqueId = techniqueId; Reason = reason; }
+}

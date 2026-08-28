@@ -52,7 +52,7 @@ public static class CombatModuleServices
         // === Конфигурация по умолчанию ===
         var defaultConfig = new CombatConfig
         {
-            PlayerEntityId = "player",
+            // C-6 (аудит-3): PlayerEntityId удалён (мёртвое поле — PlayerIdResolver)
             EnableAI = true,
             AITurnDelay = 1.0f,
             MaxCombatDuration = 0f,

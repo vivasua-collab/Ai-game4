@@ -63,6 +63,7 @@ namespace CultivationGame.Modules.Combat
         private readonly IPublisher<CombatEndedEvent> _combatEndedPub;
         private readonly IPublisher<TechniqueUsedEvent> _techniqueUsedPub;
         private readonly IPublisher<EnemyKilledEvent> _enemyKilledPub;
+        private readonly IPublisher<AttackRejectedEvent> _attackRejectedPub; // C-5 (аудит-3): событие отклонения атаки
         private readonly ISubscriber<QiDepletedEvent> _qiDepletedSub;
         private readonly IQiDataProvider _qiDataProvider; // Фаза 3 (3.I): уровни NPC
 
@@ -120,6 +121,7 @@ namespace CultivationGame.Modules.Combat
             IPublisher<CombatEndedEvent> combatEndedPub,
             IPublisher<TechniqueUsedEvent> techniqueUsedPub,
             IPublisher<EnemyKilledEvent> enemyKilledPub,
+            IPublisher<AttackRejectedEvent> attackRejectedPub, // C-5 (аудит-3): отклонение при _isCasting
             ISubscriber<QiDepletedEvent> qiDepletedSub,
             ISubscriber<QiChangedEvent> qiChangedSub,
             ISubscriber<QiBufferStateChangedEvent> qiBufferStateChangedSub,
@@ -137,6 +139,7 @@ namespace CultivationGame.Modules.Combat
             _combatEndedPub = combatEndedPub;
             _techniqueUsedPub = techniqueUsedPub;
             _enemyKilledPub = enemyKilledPub;
+            _attackRejectedPub = attackRejectedPub; // C-5 (аудит-3)
             _qiDepletedSub = qiDepletedSub;
             _qiChangedSub = qiChangedSub;
             _qiBufferStateChangedSub = qiBufferStateChangedSub;
@@ -335,7 +338,17 @@ namespace CultivationGame.Modules.Combat
             // TODO: Использовать isRanged для выбора CombatSubtype в BuildAndExecuteDamageRequest
 
             // Спринт 8 C11: Уже кастует — нельзя начать новый
-            if (_isCasting) return;
+            // C-5 FIX (аудит-3): раньше тихий return — игрок не понимал, почему
+            // атака не прошла. Публикуем событие отклонения (для UI-тоста,
+            // паттерн EquipmentBlockedEvent).
+            if (_isCasting)
+            {
+                _attackRejectedPub.Publish(new AttackRejectedEvent(
+                    attackerId,
+                    techniqueId,
+                    $"Каст уже идёт: {_pendingTechnique.TechniqueId}"));
+                return;
+            }
 
             // Stage 0: если атака уже заряжена (isCharged или potency > 1000) —
             // пропустить pending-таймер (зарядка TechniqueChargeService была временем каста).

@@ -27,6 +27,9 @@ public sealed class SaveModule : IModule
     [Inject] private readonly ISubscriber<LoadRequestedEvent> _loadSub = null!;
     [Inject] private readonly IPublisher<SaveCompletedEvent> _saveCompletedPublisher = null!;
     [Inject] private readonly IPublisher<LoadCompletedEvent> _loadCompletedPublisher = null!;
+    // SAVE-A1 FIX (аудит-4): сбор ISaveable из DI-контейнера.
+    [Inject] private readonly SaveDataAggregator _aggregator = null!;
+    [Inject] private readonly IResolver _resolver = null!;
 
     private IDisposable? _saveSubToken;
     private IDisposable? _loadSubToken;
@@ -36,7 +39,21 @@ public sealed class SaveModule : IModule
     {
         _saveSubToken = _saveSub.Subscribe(OnSaveRequested);
         _loadSubToken = _loadSub.Subscribe(OnLoadRequested);
-        Console.WriteLine("[SaveModule] Started");
+
+        // SAVE-A1 FIX (аудит-4): агрегатор оставался ПУСТЫМ — RegisterSaveable()
+        // никто не вызывал, при сохранении уходили только метаданные SaveService.
+        // Собираем все ISaveable из DI-контейнера: ResolveAll дедуплицирует
+        // форвард-регистрации, а кэш синглтонов по типу реализации
+        // (Container.Resolve: service-type + impl-type) гарантирует те же
+        // экземпляры, что живут в игре — Body/Charger/Inventory/NPC/
+        // TechniqueSlot (+ save_meta самого SaveService).
+        int registered = 0;
+        foreach (var saveable in _resolver.ResolveAll<ISaveable>())
+        {
+            _aggregator.Register(saveable);
+            registered++;
+        }
+        Console.WriteLine($"[SaveModule] Started — {registered} ISaveable service(s) registered");
     }
 
     public void Tick(int tickCount)
@@ -81,6 +98,11 @@ public static class SaveModuleServices
         builder.Register<SaveDataAggregator>(Lifetime.Singleton);
         builder.Register<SaveService>(Lifetime.Singleton);
         builder.Register<ISaveService, SaveService>(Lifetime.Singleton);
+        // SAVE-A1 (аудит-4): save_meta самого SaveService попадает в агрегатор
+        // через ResolveAll<ISaveable> (версия формата + время сейва). Без этой
+        // регистрации self-bound ключ перетирается форвардом ISaveService, и
+        // ISaveable-реализация SaveService оставалась мёртвым кодом.
+        builder.Register<ISaveable, SaveService>(Lifetime.Singleton);
         builder.Register<SaveModule>(Lifetime.Singleton);
     }
 }

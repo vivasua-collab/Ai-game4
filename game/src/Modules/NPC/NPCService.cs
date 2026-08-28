@@ -251,10 +251,19 @@ namespace CultivationGame.Modules.NPC
 
         /// <summary>
         /// Получить все зарегистрированные NPCState (для AI-тика).
+        /// NPC-A2 FIX (аудит-4): возвращает СНАПШОТ (копию ссылок), а не живую
+        /// ValueCollection словаря. Пять мест итерируют коллекцию с публикацией
+        /// событий внутри (AI-тик NPCAIService, attack-loop и OnYearChanged →
+        /// NPCDeathEvent в NPCModule, movement-тик): при появлении RemoveNPC/
+        /// деспавна подписчики мутировали бы словарь во время итерации →
+        /// InvalidOperationException. Прецедент: threat-decay уже использует
+        /// снапшот-буфер (NPC-A07). Копируются ССЫЛКИ — мутации полей NPCState
+        /// (Age, HP, AIState) видны сразу; свежезаспавненные NPC попадут в
+        /// тик со следующего кадра.
         /// </summary>
-        internal Dictionary<string, NPCState>.ValueCollection GetAllStates()
+        internal List<NPCState> GetAllStates()
         {
-            return _npcStates.Values;
+            return new List<NPCState>(_npcStates.Values);
         }
 
         // === Обработчики событий ===

@@ -146,10 +146,21 @@ namespace CultivationGame.Modules.Inventory
                                 ? cached + canAdd : canAdd;
                             _itemAddedPub.Publish(new ItemAddedEvent(item.ItemId, canAdd));
 
-                            // Рекурсивно добавляем остаток
+                            // Рекурсивно добавляем остаток.
+                            // INV-A1 FIX (аудит-4): раньше вызывалась 2-arg перегрузка —
+                            // уточнённый addedCount рекурсии отбрасывался, и при сплите
+                            // стака + лимите объёма out-addedCount завышал фактическое
+                            // число (влияет на дроп-на-землю). Аккумулируем.
                             int remaining = count - canAdd;
                             if (remaining > 0)
-                                return TryAddItem(item, remaining);
+                            {
+                                TryAddItem(item, remaining, out int recAdded);
+                                addedCount = canAdd + recAdded;
+                            }
+                            else
+                            {
+                                addedCount = canAdd;
+                            }
                             return true;
                         }
 
@@ -171,10 +182,15 @@ namespace CultivationGame.Modules.Inventory
 
                 _itemAddedPub.Publish(new ItemAddedEvent(item.ItemId, toAdd));
 
-                // Если не всё влезло — рекурсивно добавляем остаток
+                // Если не всё влезло — рекурсивно добавляем остаток.
+                // INV-A1 FIX (аудит-4): аккумулируем уточнённый addedCount
+                // рекурсии (раньше отбрасывался 2-arg перегрузкой).
                 int remainder = count - toAdd;
                 if (remainder > 0)
-                    return TryAddItem(item, remainder);
+                {
+                    TryAddItem(item, remainder, out int recAdded);
+                    addedCount = toAdd + recAdded;
+                }
                 return true;
             }
 

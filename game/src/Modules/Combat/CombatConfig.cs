@@ -10,8 +10,9 @@ namespace CultivationGame.Modules.Combat
     /// </summary>
     public class CombatConfig
     {
-        /// <summary>Идентификатор сущности игрока</summary>
-        public string PlayerEntityId = "player";
+        // C-6 FIX (аудит-3): PlayerEntityId удалён — поле не использовалось
+        // после миграции на PlayerIdResolver (канонический ID игрока
+        // определяется там; config-алиас "player" дрейфовал от "player_0").
 
         /// <summary>Включить AI противников</summary>
         public bool EnableAI = true;
