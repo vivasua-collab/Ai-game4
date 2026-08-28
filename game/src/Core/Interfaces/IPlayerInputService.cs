@@ -104,6 +104,13 @@ namespace CultivationGame.Core.Interfaces
         /// </summary>
         bool IsCheatMenuPressed { get; }
 
+        /// <summary>
+        /// 2026-08-28: F1 — окно-справка горячих клавиш нажато (sticky, one-shot).
+        /// Работает даже поверх UI (как cheat_menu — справка нужна и при
+        /// открытом инвентаре).
+        /// </summary>
+        bool IsHelpHotkeysPressed { get; }
+
         /// <summary>Текущий кадр ввода (raw). Ai-game3 compatibility — для Adapter'ов.</summary>
         InputFrameData CurrentFrame { get; }
 

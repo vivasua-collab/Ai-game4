@@ -95,14 +95,18 @@ public static class InputMapInitializer
             AddKeyAction($"hotbar_{i}", Key.Key0 + i);
         }
 
-        // Input log toggle (backtick / F1)
+        // Input log toggle (backquote).
+        // 2026-08-28: F1 освобождён под окно-справку горячих клавиш
+        // (help_hotkeys) — input_log оставлен только на backquote.
         AddKeyAction("input_log", Key.Quoteleft);
-        AddKeyAction("input_log", Key.F1);
 
-        // Этап 7 внедрения ЦИ: чит-меню разработки (F1, #if DEBUG только в CheatPanel).
-        // F1 уже связан с input_log, но input_log нигде не потребляется —
-        // оба action'а получают событие, но только cheat_menu используется.
-        AddKeyAction("cheat_menu", Key.F1);
+        // 2026-08-28: F1 — окно-справка «Горячие клавиши» (решение пользователя:
+        // все подсказки клавиш выносятся из панелей в отдельное меню с фоном).
+        AddKeyAction("help_hotkeys", Key.F1);
+
+        // Этап 7 внедрения ЦИ: чит-меню разработки (F2, #if DEBUG только в CheatPanel).
+        // 2026-08-28: переехало с F1 на F2 — F1 теперь занят окном-справкой.
+        AddKeyAction("cheat_menu", Key.F2);
 
         // Time speed control: Page Up = faster, Page Down = slower
         AddPhysicalKeyAction("time_speed_up", Key.Pageup);

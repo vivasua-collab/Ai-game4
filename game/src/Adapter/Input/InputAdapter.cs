@@ -117,8 +117,13 @@ public partial class InputAdapter : Node
             _stickyKeys.Add("cast_technique");
         if (!_isOverUI && GodotInput.IsActionJustPressed("attack"))
             _stickyKeys.Add("attack");
-        // Этап 7 внедрения ЦИ: чит-меню (F1) — работает даже поверх UI.
+        // Этап 7 внедрения ЦИ: чит-меню (F2, работает даже поверх UI) —
+        // 2026-08-28: переехало с F1 на F2 (F1 — окно-справка).
         if (GodotInput.IsActionJustPressed("cheat_menu"))      _stickyKeys.Add("cheat_menu");
+
+        // 2026-08-28: F1 — окно-справка горячих клавиш (работает даже поверх UI,
+        // как cheat_menu — справка нужна и при открытом инвентаре).
+        if (GodotInput.IsActionJustPressed("help_hotkeys"))    _stickyKeys.Add("help_hotkeys");
 
         // D3 (2026-08-26): Окно Культивации (K) — открывает CultivationWindow.
         if (GodotInput.IsActionJustPressed("cultivation_window")) _stickyKeys.Add("cultivation_window");

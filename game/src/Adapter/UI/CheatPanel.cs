@@ -1,6 +1,9 @@
 #if DEBUG
 #nullable enable
 // Создано: 2026-08-23 — Этап 7 внедрения ЦИ: чит-меню разработки (F1).
+// Редактировано: 2026-08-28 — модальное окно с однородным фоном (как
+// инвентарь) вместо плавающей панели в углу (решение пользователя);
+// клавиша F2 (F1 освобождён под окно-справку горячих клавиш).
 // DEBUG-ONLY: вся панель исключается из release-сборки директивой #if DEBUG.
 //
 // Содержит кнопки для тестирования системы ЦИ:
@@ -12,8 +15,8 @@
 //   • Создание тест-формации (Gathering) в позиции игрока
 //   • Тоггл быстрой утечки формации (×10)
 //
-// Управление: F1 — открыть/закрыть панель (вне зависимости от состояния UI).
-// Панель находится в верхнем-левом углу, MouseFilter.Stop (ловит клики).
+// Управление: F2 — открыть/закрыть окно (вне зависимости от состояния UI).
+// Окно центрировано, фон-оверлей затемняет мир, скролл для длинного перечня.
 using System;
 using Godot;
 using System.Collections.Generic;
@@ -27,10 +30,10 @@ using CultivationGame.Adapter.Di;
 namespace CultivationGame.Adapter.UI
 {
     /// <summary>
-    /// Чит-панель разработки (F1). Открывается в любой момент игры.
+    /// Чит-окно разработки (F2). Открывается в любой момент игры.
     /// #if DEBUG: в release-сборке класс не компилируется.
     /// </summary>
-    public partial class CheatPanel : Panel
+    public partial class CheatPanel : Control
     {
         [Inject] private IQiService Qi = null!;
         [Inject] private IPlayerService Player = null!;
@@ -86,38 +89,72 @@ namespace CultivationGame.Adapter.UI
 
             BuildUI();
             Visible = false;
-            GD.Print("[CheatPanel] Ready (F1 to toggle)");
+            GD.Print("[CheatPanel] Ready (F2 to toggle)");
         }
 
         private void BuildUI()
         {
-            // Top-left corner, dark panel, small font.
-            SetAnchorsPreset(Control.LayoutPreset.TopLeft);
-            OffsetLeft = 12;
-            OffsetTop = 130;  // под Qi-баром (60) + label (78) + запас
-            CustomMinimumSize = new Vector2(280, 0);
+            // 2026-08-28: модальное окно с однородным фоном — полноэкранный
+            // оверлей + центрированная панель со скроллом (как инвентарь).
+            SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
             MouseFilter = MouseFilterEnum.Stop;
             Visible = false;
             ZIndex = 50;
 
+            var bg = new ColorRect
+            {
+                Name = "Background",
+                Color = new Color(0.05f, 0.03f, 0.02f, 0.72f),
+            };
+            bg.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+            bg.MouseFilter = MouseFilterEnum.Stop;
+            AddChild(bg);
+
+            var panel = new Panel { Name = "CheatWindowPanel" };
+            panel.SetAnchorsAndOffsetsPreset(LayoutPreset.Center);
+            panel.OffsetLeft = -190; panel.OffsetRight = 190;
+            panel.OffsetTop = -320; panel.OffsetBottom = 320;
+            panel.MouseFilter = MouseFilterEnum.Stop;
+            AddChild(panel);
+
             var style = new StyleBoxFlat
             {
-                BgColor = new Color(0.06f, 0.04f, 0.03f, 0.96f),
+                BgColor = new Color(0.06f, 0.04f, 0.03f, 0.97f),
             };
             style.SetBorderWidthAll(1);
             style.SetBorderColor(new Color(0.85f, 0.55f, 0.15f, 0.9f));
-            style.SetCornerRadiusAll(4);
-            AddThemeStyleboxOverride("panel", style);
+            style.SetCornerRadiusAll(6);
+            panel.AddThemeStyleboxOverride("panel", style);
 
-            var vbox = new VBoxContainer();
-            vbox.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-            vbox.OffsetLeft = 8; vbox.OffsetRight = -8;
-            vbox.OffsetTop = 6; vbox.OffsetBottom = -6;
+            var scroll = new ScrollContainer
+            {
+                Name = "CheatScroll",
+                SizeFlagsHorizontal = SizeFlags.ExpandFill,
+                SizeFlagsVertical = SizeFlags.ExpandFill,
+            };
+            scroll.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+            scroll.OffsetLeft = 8; scroll.OffsetRight = -8;
+            scroll.OffsetTop = 6; scroll.OffsetBottom = -6;
+            panel.AddChild(scroll);
+
+            var vbox = new VBoxContainer
+            {
+                SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            };
             vbox.AddThemeConstantOverride("separation", 3);
-            AddChild(vbox);
+            scroll.AddChild(vbox);
 
-            // === Заголовок ===
-            var header = MakeLabel("⚡ ЧИТ-МЕНЮ (F1)", 14, new Color(0.98f, 0.7f, 0.25f));
+            // === Заголовок + закрыть ===
+            var header = new HBoxContainer();
+            var headerLabel = MakeLabel("⚡ ЧИТ-МЕНЮ", 14, new Color(0.98f, 0.7f, 0.25f));
+            header.AddChild(headerLabel);
+
+            var spacer = new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+            header.AddChild(spacer);
+
+            var closeBtn = new Button { Text = "×" };
+            closeBtn.Pressed += () => Visible = false;
+            header.AddChild(closeBtn);
             vbox.AddChild(header);
 
             var hint = MakeLabel("dev-only, #if DEBUG", 10, new Color(0.6f, 0.5f, 0.4f));

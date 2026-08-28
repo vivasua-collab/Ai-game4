@@ -32,6 +32,10 @@ public static class CombatModuleServices
 
         // Техники
         builder.Register<TechniqueService>(Lifetime.Singleton);
+        // 2026-08-28: библиотека техник в сейве (изученные + эхо + свитки).
+        // Паттерн как у TechniqueSlotService (PlayerModule) — SaveModule
+        // собирает ISaveable через ResolveAll.
+        builder.Register<ISaveable, TechniqueService>(Lifetime.Singleton);
         builder.Register<TechniqueChargeService>(Lifetime.Singleton);
 
         // AI

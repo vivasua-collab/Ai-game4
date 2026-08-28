@@ -86,7 +86,7 @@ public readonly struct TechniqueUsedEvent
 
 /// <summary>
 /// Событие: игрок изучил технику (слот занят).
-/// Публикуется TechniqueService.LearnTechnique. Потребители: TechniquesPanel.
+/// Публикуется TechniqueService.LearnTechnique. Потребители: TechniqueBookWindow.
 /// </summary>
 public readonly struct TechniqueLearnedEvent
 {

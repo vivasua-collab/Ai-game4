@@ -153,9 +153,10 @@ public partial class CharacterSheetWindow : Control
         rightWrap.AddChild(_cultivationLabel);
 
         // Footer.
+        // 2026-08-28: подсказки клавиш — в окне-справке (F1).
         var footer = new Label
         {
-            Text = "C или Esc — закрыть",
+            Text = "◆ Лист персонажа ◆",
             HorizontalAlignment = HorizontalAlignment.Center,
         };
         footer.AddThemeFontSizeOverride("font_size", 12);

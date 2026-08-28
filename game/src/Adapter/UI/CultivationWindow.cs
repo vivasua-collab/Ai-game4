@@ -122,7 +122,7 @@ public partial class CultivationWindow : Control
     public override void _Process(double delta)
     {
         if (!Visible) return;
-        // Обновляем кулдауны на лету (как TechniquesPanel).
+        // Обновляем кулдауны на лету (как Книга Техник).
         RefreshSelectedTechniqueDetails();
     }
 
@@ -165,7 +165,7 @@ public partial class CultivationWindow : Control
         spacer.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         header.AddChild(spacer);
 
-        var closeBtn = new Button { Text = "× Закрыть (K)" };
+        var closeBtn = new Button { Text = "× Закрыть" };
         closeBtn.Pressed += Close;
         header.AddChild(closeBtn);
         root.AddChild(header);
@@ -180,7 +180,7 @@ public partial class CultivationWindow : Control
         BuildCoreTab();
 
         // Bottom: slot bar (3-9)
-        var slotLabel = new Label { Text = "Слоты быстрого доступа техник (клавиши 3–9):" };
+        var slotLabel = new Label { Text = "Слоты быстрого доступа техник:" };
         slotLabel.AddThemeFontSizeOverride("font_size", 14);
         slotLabel.AddThemeColorOverride("font_color", new Color(0.85f, 0.75f, 0.55f));
         root.AddChild(slotLabel);

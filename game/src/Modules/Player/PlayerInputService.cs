@@ -40,6 +40,7 @@ public sealed class PlayerInputService : IPlayerInputService
     private bool _timeSpeedUp;
     private bool _timeSpeedDown;
     private bool _cheatMenu;
+    private bool _helpHotkeys;
     private int _selectedSlot;
     // D (2026-08-26): cultivation window + weapon/technique slot hotkeys
     private bool _cultivationWindow;
@@ -87,8 +88,11 @@ public sealed class PlayerInputService : IPlayerInputService
     public bool IsTimeSpeedUpPressed => _timeSpeedUp && !InputDisabled;
     public bool IsTimeSpeedDownPressed => _timeSpeedDown && !InputDisabled;
 
-    // Этап 7: F1 — чит-меню (работает всегда, без InputDisabled-гарда).
+    // Этап 7: F2 — чит-меню (работает всегда, без InputDisabled-гарда).
+    // 2026-08-28: F1 — окно-справка горячих клавиш (тоже без гарда —
+    // справка нужна и при открытом UI).
     public bool IsCheatMenuPressed => _cheatMenu;
+    public bool IsHelpHotkeysPressed => _helpHotkeys;
 
     public int SelectedTechniqueSlot => _selectedSlot;
 
@@ -142,9 +146,11 @@ public sealed class PlayerInputService : IPlayerInputService
                 }
             }
         }
-        // Этап 7: F1 — чит-меню работает даже когда InputDisabled (UI открыт).
+        // Этап 7: чит-меню (F2) работает даже когда InputDisabled (UI открыт).
         // Политика: чит-меню — это dev-tool, доступный всегда.
         if (data.IsSticky("cheat_menu")) _cheatMenu = true;
+        // 2026-08-28: F1 — окно-справка тоже доступно всегда (поверх UI).
+        if (data.IsSticky("help_hotkeys")) _helpHotkeys = true;
         if (data.HotbarSlot is int slot && slot > 0) _selectedSlot = slot;
     }
 
@@ -157,6 +163,7 @@ public sealed class PlayerInputService : IPlayerInputService
         _castTechnique = false;
         _timeSpeedUp = _timeSpeedDown = false;
         _cheatMenu = false;
+        _helpHotkeys = false;
         _inventoryRaw = false;
         _selectedSlot = 0;
         // D: сброс cultivation window + weapon/technique slot flags

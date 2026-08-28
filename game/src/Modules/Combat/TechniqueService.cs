@@ -9,6 +9,22 @@
 //   Curse 1, Formation 1), LearnTechnique(TechniqueData), выбор активной
 //   техники, рост мастерства при использовании (§10), публикация
 //   TechniqueLearnedEvent/TechniqueSelectionChangedEvent.
+// Редактировано: 2026-08-28 — двухслойная модель «Библиотека + Лодаут»:
+//   • БИБЛИОТЕКА (сколько техник ЗНАЕМ): единый cap, растёт с уровнем
+//     культивации (LibraryCapacityBase = 8 + 2×(L−1)), расширяемый
+//     (ExtraLibraryCapacity — задел под перки/предметы). Категории
+//     Cultivation/Curse/Formation сохраняют персональные лимиты ×1;
+//     Combat-пул §12 (3+(L−1)) больше НЕ ограничивает изучение — его роль
+//     играет библиотечный cap (решение пользователя 2026-08-28).
+//   • ЭХО МАСТЕРСТВА («осмысление», решение пользователя): при забвении
+//     15% мастерства уходит в эхо профиля (тип+стихия); при изучении новой
+//     техники того же профиля — стартовое мастерство из эха (поглощается,
+//     потолок 50).
+//   • СВИТКИ ТЕХНИК: запись базовой (без мастерства) техники на свиток
+//     (стоимость 2×QiCost), изучение со свитка обходит окно резонанса §8.1
+//     (нишевые цели: вернуть старую технику), свиток расходуется.
+//   • ISaveable: изученные техники + выбранная + эхо + свитки (раньше в сейв
+//     уходили только слоты — рассинхрон при загрузке).
 // Сервис управления техниками — изучение, применение, отслеживание кулдаунов.
 using System;
 using System.Collections.Generic;
@@ -35,8 +51,30 @@ namespace CultivationGame.Modules.Combat
     /// CMB-A06: LearnedTechnique.QiCost — long (Fix-01: все Qi-значения long).
     /// EVT-01: кэш Qi из QiChangedEvent вместо инъекции IQiService.
     /// </summary>
-    public class TechniqueService : IDisposable
+    public class TechniqueService : IDisposable, ISaveable
     {
+        // === Библиотека (2026-08-28) ===
+
+        /// <summary>Базовый размер библиотеки на L1. L1=8 … L9=24.</summary>
+        public const int LibraryBaseSize = 8;
+
+        /// <summary>Прирост библиотеки за уровень культивации.</summary>
+        public const int LibraryPerLevel = 2;
+
+        /// <summary>Доля мастерства, уходящая в эхо при забвении («осмысление»).</summary>
+        public const float EchoTransferRatio = 0.15f;
+
+        /// <summary>Потолок стартового мастерства из эха (и самого эха).</summary>
+        public const float EchoMasteryCap = 50f;
+
+        /// <summary>Множитель стоимости Ци записи техники на свиток.</summary>
+        public const long ScrollQiCostMultiplier = 2;
+
+        /// <summary>
+        /// Внешний прирост ёмкости библиотеки (перки/предметы в будущем).
+        /// </summary>
+        public int ExtraLibraryCapacity;
+
         // === Зависимости ===
         private readonly IPublisher<TechniqueUsedEvent> _techniqueUsedPub;
         private readonly IPublisher<TechniqueLearnedEvent> _techniqueLearnedPub;
@@ -60,7 +98,12 @@ namespace CultivationGame.Modules.Combat
         private readonly Dictionary<string, float> _cooldowns = new();
         private readonly List<string> _orderedIds = new(); // порядок изучения (для UI/цикла выбора)
         private string? _selectedTechniqueId;
-        private int _usedCapacity;
+
+        // Эхо мастерства: ключ "{(int)Type}:{(int)Element}" → накопленное осмысление.
+        private readonly Dictionary<string, float> _masteryEcho = new();
+
+        // Реестр свитков: ScrollId → базовый снимок TechniqueData (Mastery=0).
+        private readonly Dictionary<string, TechniqueData> _scrolls = new();
 
         // === Конструктор ===
         public TechniqueService(
@@ -164,26 +207,71 @@ namespace CultivationGame.Modules.Combat
             return SlotCapacity(SlotCategory(type), _cachedCultivationLevel) - UsedSlots(type);
         }
 
+        // === Библиотека (2026-08-28: единый cap вместо Combat-пула §12) ===
+
+        /// <summary>Базовая ёмкость библиотеки техник для уровня культивации.</summary>
+        public static int LibraryCapacityBase(int cultivationLevel)
+        {
+            int level = Math.Max(1, cultivationLevel);
+            return LibraryBaseSize + (level - 1) * LibraryPerLevel;
+        }
+
+        /// <summary>Текущая полная ёмкость библиотеки (база + расширения).</summary>
+        public int LibraryCapacity => LibraryCapacityBase(_cachedCultivationLevel) + ExtraLibraryCapacity;
+
+        /// <summary>Сколько техник изучено (вся библиотека, включая культ/проклятия/формации).</summary>
+        public int LibraryUsed => _learnedTechniques.Count;
+
+        /// <summary>Сколько свободных мест в библиотеке.</summary>
+        public int LibraryFree => LibraryCapacity - LibraryUsed;
+
+        /// <summary>Окно резонанса §8.1: минимальный изучаемый уровень для текущего L.</summary>
+        public int ResonanceMinLevel => Math.Max(1, _cachedCultivationLevel - 4);
+
         // === Изучение ===
 
         /// <summary>
         /// Изучить сгенерированную технику (TechniqueData из TechniqueGeneratorService).
-        /// Проверяет: свободный слот категории, уровень резонанса (§8.1: L_техники ≤ L_практика
-        /// и ≥ max(1, L_практика − 4)).
+        /// Проверяет: ёмкость библиотеки (единый cap), уровень резонанса
+        /// (§8.1: L_техники ≤ L_практика и ≥ max(1, L_практика − 4)),
+        /// персональные лимиты категорий Cultivation/Curse/Formation (×1).
+        /// При наличии эха мастерства того же профиля (тип+стихия) — стартовое
+        /// мастерство из эха (поглощается).
         /// </summary>
         public bool LearnTechnique(TechniqueData data)
+        {
+            return LearnCore(data, fromScroll: false);
+        }
+
+        /// <summary>Общий путь изучения (обычный и со свитка).</summary>
+        private bool LearnCore(TechniqueData data, bool fromScroll)
         {
             if (data == null || string.IsNullOrEmpty(data.TechniqueId)) return false;
             if (_learnedTechniques.ContainsKey(data.TechniqueId)) return false;
 
-            // Ограничение уровня (TECHNIQUE_SYSTEM.md §8.1 — Резонанс Ци)
-            int minL = Math.Max(1, _cachedCultivationLevel - 4);
-            if (data.Level > _cachedCultivationLevel || data.Level < minL) return false;
+            // Ограничение уровня (TECHNIQUE_SYSTEM.md §8.1 — Резонанс Ци).
+            // Свиток — доказательство постижения: обход окна резонанса
+            // (нишевая цель свитков — вернуть старую технику выше окна).
+            if (!fromScroll)
+            {
+                int minL = ResonanceMinLevel;
+                if (data.Level > _cachedCultivationLevel || data.Level < minL) return false;
+            }
 
-            // Слот категории
-            if (FreeSlots(data.Type) <= 0) return false;
+            // Персональные лимиты категорий (§12): одна техника культивации,
+            // одно проклятие, одна формация. Combat-пул больше не ограничивает
+            // изучение — его роль играет ёмкость библиотеки.
+            if (data.Type == TechniqueType.Cultivation
+                || data.Type == TechniqueType.Curse
+                || data.Type == TechniqueType.Formation)
+            {
+                if (UsedSlots(data.Type) >= 1) return false;
+            }
 
-            _learnedTechniques[data.TechniqueId] = new LearnedTechnique
+            // Ёмкость библиотеки — «разум культиватора не безграничен».
+            if (LibraryUsed + 1 > LibraryCapacity) return false;
+
+            var learned = new LearnedTechnique
             {
                 TechniqueId = data.TechniqueId,
                 Name = data.NameRu,
@@ -206,6 +294,17 @@ namespace CultivationGame.Modules.Combat
                 IsUltimate = data.IsUltimate,
                 Mastery = data.Mastery
             };
+
+            // Эхо мастерства: «осмысление» профиля (тип+стихия) даёт новой
+            // технике того же профиля стартовое мастерство (поглощается).
+            string echoKey = EchoKey(data.Type, data.Element);
+            if (_masteryEcho.TryGetValue(echoKey, out float echoBonus) && echoBonus > 0f)
+            {
+                learned.Mastery = MathF.Min(EchoMasteryCap, MathF.Max(learned.Mastery, echoBonus));
+                _masteryEcho.Remove(echoKey);
+            }
+
+            _learnedTechniques[data.TechniqueId] = learned;
             _orderedIds.Add(data.TechniqueId);
 
             // Авто-выбор первой изученной техники
@@ -217,11 +316,24 @@ namespace CultivationGame.Modules.Combat
         }
 
         /// <summary>
-        /// Забыть технику (освободить слот). Тест-режим/читы.
+        /// Забыть технику (освободить место в библиотеке).
+        /// Мастерство не пропадает полностью: 15% уходит в «эхо осмысления»
+        /// профиля (тип+стихия) и станет стартовым мастерством следующей
+        /// техники того же профиля (решение пользователя 2026-08-28).
         /// </summary>
         public bool ForgetTechnique(string techniqueId)
         {
-            if (!_learnedTechniques.Remove(techniqueId)) return false;
+            if (!_learnedTechniques.TryGetValue(techniqueId, out var tech)) return false;
+
+            // Эхо мастерства (до удаления — нужны Type/Element/Mastery).
+            if (tech.Mastery > 0f)
+            {
+                string key = EchoKey(tech.Type, tech.Element);
+                float acc = _masteryEcho.TryGetValue(key, out var cur) ? cur : 0f;
+                _masteryEcho[key] = MathF.Min(EchoMasteryCap, acc + tech.Mastery * EchoTransferRatio);
+            }
+
+            _learnedTechniques.Remove(techniqueId);
             _orderedIds.Remove(techniqueId);
             _cooldowns.Remove(techniqueId);
             if (_selectedTechniqueId == techniqueId)
@@ -233,12 +345,104 @@ namespace CultivationGame.Modules.Combat
             return true;
         }
 
-        /// <summary>Забыть все техники (тест-режим/читы).</summary>
+        /// <summary>Забыть все техники (тест-режим/читы). Свитки и эхо сохраняются.</summary>
         public void ForgetAll()
         {
             foreach (var id in _orderedIds.ToArray())
                 ForgetTechnique(id);
         }
+
+        /// <summary>Полный сброс библиотеки: техники + свитки + эхо (читы/тесты).</summary>
+        public void ForgetAllWithLibrary()
+        {
+            ForgetAll();
+            _scrolls.Clear();
+            _masteryEcho.Clear();
+        }
+
+        // === Эхо мастерства (осмысление) ===
+
+        /// <summary>Ключ эха для профиля (тип+стихия).</summary>
+        public static string EchoKey(TechniqueType type, Element element)
+            => $"{(int)type}:{(int)element}";
+
+        /// <summary>Накопленное эхо осмысления для профиля (0 — нет).</summary>
+        public float GetMasteryEcho(TechniqueType type, Element element)
+            => _masteryEcho.TryGetValue(EchoKey(type, element), out var v) ? v : 0f;
+
+        // === Свитки техник (2026-08-28) ===
+
+        /// <summary>Все записанные свитки.</summary>
+        public IReadOnlyCollection<TechniqueData> GetAllScrolls() => _scrolls.Values;
+
+        /// <summary>Стоимость Ци записи техники на свиток (2×QiCost).</summary>
+        public static long ScrollQiCost(LearnedTechnique tech) => tech.QiCost * ScrollQiCostMultiplier;
+
+        /// <summary>Есть ли уже свиток этой техники.</summary>
+        public bool HasScrollFor(string techniqueId) => _scrolls.ContainsKey(ScrollIdFor(techniqueId));
+
+        /// <summary>ID свитка для техники.</summary>
+        public static string ScrollIdFor(string techniqueId) => "scroll_" + techniqueId;
+
+        /// <summary>
+        /// Записать базовую (не улучшенную) версию изученной техники на свиток.
+        /// Мастерство на свиток НЕ пишется (наработанное — только в памяти практика).
+        /// Стоимость Ци = 2×QiCost (списание через QiConsumeRequestEvent, EVT-01).
+        /// Вызывающий UI обязан заранее проверить достаточность Ци.
+        /// </summary>
+        public bool InscribeScroll(string techniqueId)
+        {
+            if (!_learnedTechniques.TryGetValue(techniqueId, out var tech)) return false;
+            string scrollId = ScrollIdFor(techniqueId);
+            if (_scrolls.ContainsKey(scrollId)) return false; // уже записана
+
+            // Списание Ци (EVT-01: событие, не инъекция IQiService).
+            long cost = ScrollQiCost(tech);
+            if (cost > 0)
+                _qiConsumeRequestPub.Publish(new QiConsumeRequestEvent(cost, "InscribeScroll"));
+
+            // Базовый снимок: всё, кроме мастерства (и грейд остаётся — он
+            // внутреннее свойство сгенерированной техники, не «улучшение»).
+            _scrolls[scrollId] = new TechniqueData
+            {
+                TechniqueId = tech.TechniqueId,
+                NameRu = tech.Name,
+                NameEn = tech.Name,
+                Description = "Свиток техники: базовая форма без наработанного мастерства.",
+                Type = tech.Type,
+                Subtype = tech.Subtype,
+                Grade = tech.Grade,
+                Element = tech.Element,
+                Level = tech.Level,
+                CapacityCost = tech.CapacityCost,
+                QiCost = tech.QiCost,
+                BaseDamage = tech.BaseDamage,
+                Cooldown = tech.Cooldown,
+                Range = tech.Range,
+                CastTime = tech.CastTime,
+                IsUltimate = tech.IsUltimate,
+                Mastery = 0f,
+                ArmorPenetration = tech.ArmorPenetration,
+            };
+            return true;
+        }
+
+        /// <summary>
+        /// Изучить технику со свитка. Обходит окно резонанса (свиток —
+        /// доказательство постижения), но уважает ёмкость библиотеки,
+        /// лимиты категорий и дубликаты. Свиток РАСХОДУЕТСЯ при изучении.
+        /// </summary>
+        public bool LearnFromScroll(string scrollId)
+        {
+            if (!_scrolls.TryGetValue(scrollId, out var data)) return false;
+            if (!LearnCore(data, fromScroll: true)) return false;
+            _scrolls.Remove(scrollId);
+            return true;
+        }
+
+        /// <summary>Свиток по ID (null — нет).</summary>
+        public TechniqueData? GetScroll(string scrollId)
+            => _scrolls.TryGetValue(scrollId, out var d) ? d : null;
 
         /// <summary>
         /// Изучить технику (legacy-сигнатура по компонентам).
@@ -404,11 +608,202 @@ namespace CultivationGame.Modules.Combat
             return _orderedIds;
         }
 
+        // === ISaveable (2026-08-28) ===
+        // Раньше в сейв уходили только слоты (TechniqueSlotService), а сами
+        // техники — нет: загрузка оставляла бы слоты, указывающие в пустоту.
+        // Теперь библиотека персистентна: изученные техники + выбранная +
+        // эхо мастерства + свитки + расширение ёмкости.
+
+        public string SaveKey => "techniques";
+
+        public object CaptureState()
+        {
+            var state = new TechniqueServiceState
+            {
+                SelectedId = _selectedTechniqueId,
+                Echo = new Dictionary<string, float>(_masteryEcho),
+                ExtraLibraryCapacity = ExtraLibraryCapacity,
+            };
+            foreach (var id in _orderedIds)
+            {
+                if (!_learnedTechniques.TryGetValue(id, out var t)) continue;
+                state.Learned.Add(TechniqueSnapshotDto.FromLearned(t));
+            }
+            foreach (var kvp in _scrolls)
+                state.Scrolls.Add(TechniqueSnapshotDto.FromData(kvp.Key, kvp.Value));
+            return state;
+        }
+
+        public void RestoreState(object state)
+        {
+            if (state is not TechniqueServiceState s) return;
+
+            _learnedTechniques.Clear();
+            _orderedIds.Clear();
+            _cooldowns.Clear();
+            _masteryEcho.Clear();
+            _scrolls.Clear();
+
+            if (s.Learned != null)
+            {
+                foreach (var dto in s.Learned)
+                {
+                    if (string.IsNullOrEmpty(dto?.TechniqueId)) continue;
+                    if (_learnedTechniques.ContainsKey(dto.TechniqueId)) continue;
+                    _learnedTechniques[dto.TechniqueId] = dto.ToLearned();
+                    _orderedIds.Add(dto.TechniqueId);
+                }
+            }
+            if (s.Scrolls != null)
+            {
+                foreach (var dto in s.Scrolls)
+                {
+                    if (string.IsNullOrEmpty(dto?.ScrollId) || string.IsNullOrEmpty(dto.TechniqueId)) continue;
+                    _scrolls[dto.ScrollId] = dto.ToData();
+                }
+            }
+            if (s.Echo != null)
+            {
+                foreach (var kvp in s.Echo)
+                    _masteryEcho[kvp.Key] = kvp.Value;
+            }
+            ExtraLibraryCapacity = s.ExtraLibraryCapacity;
+
+            _selectedTechniqueId =
+                s.SelectedId != null && _learnedTechniques.ContainsKey(s.SelectedId)
+                    ? s.SelectedId
+                    : null;
+        }
+
         public void Dispose()
         {
             _qiChangedSubscription?.Dispose();
             _qiChangedSubscription = null;
         }
+    }
+
+    // === Сериализационные DTO (2026-08-28) ===
+    // Свойства (не поля): System.Text.Json без IncludeFields не сериализует
+    // public-поля — см. находку в checkpoints/08_28_technique_book_and_ui_cleanup.md.
+
+    /// <summary>Снимок сейва TechniqueService.</summary>
+    public sealed class TechniqueServiceState
+    {
+        public List<TechniqueSnapshotDto> Learned { get; set; } = new();
+        public List<TechniqueSnapshotDto> Scrolls { get; set; } = new();
+        public Dictionary<string, float> Echo { get; set; } = new();
+        public string? SelectedId { get; set; }
+        public int ExtraLibraryCapacity { get; set; }
+    }
+
+    /// <summary>
+    /// Снимок техники: для изученных (Mastery — наработанное) и для свитков
+    /// (Mastery всегда 0 — базовая форма).
+    /// </summary>
+    public sealed class TechniqueSnapshotDto
+    {
+        public string? ScrollId { get; set; }
+        public string TechniqueId { get; set; } = "";
+        public string NameRu { get; set; } = "";
+        public string Description { get; set; } = "";
+        public int Type { get; set; }
+        public int Subtype { get; set; }
+        public int Grade { get; set; }
+        public int Element { get; set; }
+        public int Level { get; set; }
+        public long QiCost { get; set; }
+        public int CapacityCost { get; set; }
+        public int BaseDamage { get; set; }
+        public float Cooldown { get; set; }
+        public float Range { get; set; }
+        public float CastTime { get; set; }
+        public int ArmorPenetration { get; set; }
+        public bool IsUltimate { get; set; }
+        public float Mastery { get; set; }
+
+        public static TechniqueSnapshotDto FromLearned(LearnedTechnique t) => new()
+        {
+            TechniqueId = t.TechniqueId,
+            NameRu = t.Name,
+            Type = (int)t.Type,
+            Subtype = (int)t.Subtype,
+            Grade = (int)t.Grade,
+            Element = (int)t.Element,
+            Level = t.Level,
+            QiCost = t.QiCost,
+            CapacityCost = t.CapacityCost,
+            BaseDamage = t.BaseDamage,
+            Cooldown = t.Cooldown,
+            Range = t.Range,
+            CastTime = t.CastTime,
+            ArmorPenetration = t.ArmorPenetration,
+            IsUltimate = t.IsUltimate,
+            Mastery = t.Mastery,
+        };
+
+        public static TechniqueSnapshotDto FromData(string scrollId, TechniqueData d) => new()
+        {
+            ScrollId = scrollId,
+            TechniqueId = d.TechniqueId,
+            NameRu = d.NameRu,
+            Description = d.Description,
+            Type = (int)d.Type,
+            Subtype = (int)d.Subtype,
+            Grade = (int)d.Grade,
+            Element = (int)d.Element,
+            Level = d.Level,
+            QiCost = d.QiCost,
+            CapacityCost = d.CapacityCost,
+            BaseDamage = d.BaseDamage,
+            Cooldown = d.Cooldown,
+            Range = d.Range,
+            CastTime = d.CastTime,
+            ArmorPenetration = d.ArmorPenetration,
+            IsUltimate = d.IsUltimate,
+            Mastery = d.Mastery,
+        };
+
+        public LearnedTechnique ToLearned() => new()
+        {
+            TechniqueId = TechniqueId,
+            Name = NameRu,
+            Type = (TechniqueType)Type,
+            Subtype = (CombatSubtype)Subtype,
+            Grade = (TechniqueGrade)Grade,
+            Element = (Element)Element,
+            Level = Level,
+            QiCost = QiCost,
+            CapacityCost = CapacityCost,
+            BaseDamage = BaseDamage,
+            Cooldown = Cooldown,
+            Range = Range,
+            CastTime = CastTime,
+            ArmorPenetration = ArmorPenetration,
+            IsUltimate = IsUltimate,
+            Mastery = Mastery,
+        };
+
+        public TechniqueData ToData() => new()
+        {
+            TechniqueId = TechniqueId,
+            NameRu = NameRu,
+            NameEn = NameRu,
+            Description = Description,
+            Type = (TechniqueType)Type,
+            Subtype = (CombatSubtype)Subtype,
+            Grade = (TechniqueGrade)Grade,
+            Element = (Element)Element,
+            Level = Level,
+            QiCost = QiCost,
+            CapacityCost = CapacityCost,
+            BaseDamage = BaseDamage,
+            Cooldown = Cooldown,
+            Range = Range,
+            CastTime = CastTime,
+            ArmorPenetration = ArmorPenetration,
+            IsUltimate = IsUltimate,
+            Mastery = Mastery,
+        };
     }
 
     /// <summary>

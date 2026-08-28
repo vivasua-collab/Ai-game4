@@ -213,9 +213,11 @@ public partial class InventoryWindow : Control
         outer.AddChild(beltRow);
 
         // Footer hint.
+        // 2026-08-28: подсказки клавиш вынесены в окно-справку (F1);
+        // в футере остаётся только небытовая механика без клавиш.
         var footer = new Label
         {
-            Text = "B/Esc — закрыть | Dbl-click — надеть | Перетащи на 🗑 — выбросить",
+            Text = "Двойной клик — надеть | Перетащи на 🗑 — выбросить",
             HorizontalAlignment = HorizontalAlignment.Center,
         };
         footer.AddThemeFontSizeOverride("font_size", 12);

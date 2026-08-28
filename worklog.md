@@ -1025,3 +1025,61 @@ Stage Summary:
 - cold_start.sh переживает: битые симлинки, отсутствие GITHUB_TOKEN,
   симлинк-петли — восстановление окружения теперь однострочное.
 - Коммит фиксов: fd39377. Все запушено в origin/main.
+
+---
+Task ID: 2026-08-28-book
+Agent: основная сессия (Z.ai Code)
+Task: Книга Техник + библиотека (cap/эхо/свитки) + F1-справка + чит-окно (по итогам теоретических изысканий утром 2026-08-28)
+
+Work Log:
+- Теоретические изыскания: аудит текущей системы техник (TechniqueService,
+  TechniquesPanel, CultivationWindow, TechniqueSlotService, хотбар, грант-фаза,
+  TechniqueCapacity — мёртвый код), синтез двухслойной модели «Библиотека +
+  Лодаут»; пользователь зафиксировал решения (мастерство-перенос, свитки,
+  расширяемый cap по уровню, книга Old School, архив-вкладка, культ-техники
+  в CultivationWindow, F1-справка, чит → F2 модальное окно).
+- TechniqueService: LibraryCapacityBase = 8+2(L−1) + ExtraLibraryCapacity;
+  LearnTechnique → LearnCore(fromScroll): резонанс (обход со свитка) +
+  категории Cultivation/Curse/Formation ×1 + cap библиотеки (Combat-пул §12
+  больше не лимитирует изучение); эхо мастерства 15% (cap 50, поглощается
+  при изучении того же профиля тип+стихия); InscribeScroll (2×QiCost,
+  Mastery=0, QiConsumeRequestEvent) / LearnFromScroll (свиток расходуется);
+  ISaveable "techniques" (DTO на свойствах) + регистрация в CombatModuleServices.
+- TechniqueBookWindow (T, пауза как инвентарь): вкладки [Все][L..L−4][Архив
+  (только непустой)][Свитки]; блоки типов с бордюром-выделением; строки
+  стихий (HFlowContainer чипов, сортировка Grade→Mastery→урон); панель
+  деталей: слоты 3–9, запись свитка, забвение через ConfirmationDialog с
+  предпросмотром эха; нижний бар слотов с цветами стихий; подписки на
+  события; QiChanged фильтруется по сущности (B1-паттерн).
+- ElementStyle: единая палитра стихий/типов/грейдов для всего UI.
+- HotkeysWindow (F1, пауза): модальное окно с фоном 0.78, 7 групп,
+  полный перечень клавиш (канон — InputMapInitializer).
+- CheatPanel → модальное окно (оверлей 0.72 + центрированная панель 380×640
+  + ScrollContainer), F2; вся логика кнопок без изменений.
+- Инпут: cheat_menu F1→F2, новый help_hotkeys F1, input_log освобождён от
+  F1; InputAdapter/PlayerInputService/IPlayerInputService + IsHelpHotkeysPressed.
+- GameWorldController: _techniqueBook (T+пауза), _hotkeysWindow (F1+пауза),
+  Esc-цепочка hotkeys→book→cheat→trade→dialogue→pause/inventory; modalOpen
+  и SetOverUI расширены (книга/справка/чит/культивация); TechniquesPanel
+  удалён (git rm).
+- Зачистка хинтов клавиш: InventoryWindow (B/Esc), CharacterSheetWindow (C/Esc),
+  TradeWindow (Esc), DialogueWindow (E/Esc/1-4), CultivationWindow ((K),
+  клавиши 3–9), CheatPanel ((F1) в заголовке).
+- Окружение: dotnet SDK 8.0 переустановлен (сброс песочницы), Godot
+  персистентный на месте; build — 0 errors / 271 warnings (базовый уровень).
+
+Stage Summary:
+- Двухслойная модель внедрена: библиотека с cap 8+2(L−1) (расширяемая),
+  эхо мастерства 15% при забвении, свитки базовых форм (обход резонанса).
+- Книга Техник — главный новый UI (матрица уровни/типы/стихии, архив,
+  свитки, слоты); TechniquesPanel (HUD-список) удалён.
+- F1 = справка клавиш (фон, Old School), F2 = чит-окно (модальное),
+  инлайн-хинты убраны из всех окон.
+- TechniqueService теперь ISaveable: техники+эхо+свитки в сейве (раньше —
+  только слоты; рассинхрон устранён).
+- НАХОДКА (латентный баг, не фиксировался): System.Text.Json без
+  IncludeFields=true не сериализует public-поля DTO (SlotState и др.), а
+  Load отдаёт JsonElement — типизированные касты state is X молча падают.
+  Отдельная сессия по сейвам.
+- Рантайм-смоук (NEWGAME: 6 техник при cap 8; T/пауза; эхо; свиток;
+  F1/F2/Esc) — отложен до >19:00 МСК (правило сессии).

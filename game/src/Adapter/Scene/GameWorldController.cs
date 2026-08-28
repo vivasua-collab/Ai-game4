@@ -75,11 +75,15 @@ public partial class GameWorldController : Node2D
     private UI.DialogueWindow _dialogueWindow = null!;
     private UI.TradeWindow _tradeWindow = null!;
     private UI.HotbarPanel _hotbarPanel = null!;
-    private UI.TechniquesPanel _techniquesPanel = null!;
+    // 2026-08-28: Книга Техник (T) — матричный браузер библиотеки
+    // (вкладки-уровни / блоки-типы / строки-стихии) вместо HUD-панели.
+    private UI.TechniqueBookWindow _techniqueBook = null!;
+    // 2026-08-28: окно-справка горячих клавиш (F1).
+    private UI.HotkeysWindow _hotkeysWindow = null!;
     // C3 (2026-08-26): окно Культивации Ци (K) — 3 вкладки + панель слотов техник 3-9.
     private UI.CultivationWindow _cultivationWindow = null!;
 #if DEBUG
-    private UI.CheatPanel? _cheatPanel; // Этап 7: чит-меню (F1).
+    private UI.CheatPanel? _cheatPanel; // Этап 7: чит-меню (F2, с 2026-08-28).
 #endif
     private Godot.ProgressBar _hpBar = null!;
     private Godot.ProgressBar _qiBar = null!;
@@ -495,9 +499,14 @@ public partial class GameWorldController : Node2D
         _hotbarPanel = new UI.HotbarPanel { Name = "HotbarPanel" };
         _hudCanvas.AddChild(_hotbarPanel);
 
-        // Этап 2 внедрения ЦИ: панель техник (T).
-        _techniquesPanel = new UI.TechniquesPanel { Name = "TechniquesPanel" };
-        _hudCanvas.AddChild(_techniquesPanel);
+        // 2026-08-28: Книга Техник (T) — матрица вкладки-уровни / блоки-типы /
+        // строки-стихии + свитки + архив. Заменяет HUD-панель техник.
+        _techniqueBook = new UI.TechniqueBookWindow { Name = "TechniqueBookWindow" };
+        _hudCanvas.AddChild(_techniqueBook);
+
+        // 2026-08-28: окно-справка горячих клавиш (F1).
+        _hotkeysWindow = new UI.HotkeysWindow { Name = "HotkeysWindow" };
+        _hudCanvas.AddChild(_hotkeysWindow);
 
         // C3 (2026-08-26): окно Культивации Ци (K) — 3 вкладки (Техники / Меридианы / Ядро)
         // + нижняя панель слотов техник (3-9). Открывается клавишей K через
@@ -506,7 +515,7 @@ public partial class GameWorldController : Node2D
         _hudCanvas.AddChild(_cultivationWindow);
 
 #if DEBUG
-        // Этап 7 внедрения ЦИ: чит-меню разработки (F1).
+        // Этап 7: чит-меню разработки (F2, с 2026-08-28; раньше F1).
         // Видимость переключается в HandleStickyInput по PlayerInput.IsCheatMenuPressed.
         _cheatPanel = new UI.CheatPanel { Name = "CheatPanel" };
         _hudCanvas.AddChild(_cheatPanel);
@@ -620,11 +629,20 @@ public partial class GameWorldController : Node2D
                 new Core.Messaging.Contracts.MeditationToggleRequestedEvent(!_meditationActive));
         }
 
-        // Этап 2 внедрения ЦИ: T — панель техник, X — следующая техника, Z — каст.
-        if (PlayerInput is { IsTechniquesPressed: true } && _techniquesPanel != null)
+        // 2026-08-28: T — Книга Техник (модальное окно с паузой, как инвентарь:
+        // планирование арсенала — Old School). X — следующая техника, Z — каст.
+        if (PlayerInput is { IsTechniquesPressed: true } && _techniqueBook != null && Time != null)
         {
-            _techniquesPanel.Visible = !_techniquesPanel.Visible;
-            if (_techniquesPanel.Visible) _techniquesPanel.QueueRedraw();
+            _techniqueBook.Toggle();
+            if (_techniqueBook.Visible)
+            {
+                _wasPausedBeforeInventory = Time.IsPaused;
+                if (!Time.IsPaused) Time.Pause();
+            }
+            else if (!_wasPausedBeforeInventory && Time.IsPaused)
+            {
+                Time.Resume();
+            }
         }
         if (PlayerInput is { IsCycleTechniquePressed: true })
         {
@@ -687,7 +705,13 @@ public partial class GameWorldController : Node2D
         bool modalOpen = (_inventoryWindow is { Visible: true })
                       || (_characterSheetWindow is { Visible: true })
                       || (_dialogueWindow is { IsOpen: true })
-                      || (_tradeWindow is { IsOpen: true });
+                      || (_tradeWindow is { IsOpen: true })
+                      || (_techniqueBook is { Visible: true })
+                      || (_hotkeysWindow is { Visible: true })
+#if DEBUG
+                      || (_cheatPanel is { Visible: true })
+#endif
+                      || (_cultivationWindow is { Visible: true });
 
         if (@event is InputEventMouseButton mb && mb.Pressed)
         {
@@ -867,7 +891,7 @@ public partial class GameWorldController : Node2D
         if (PlayerInput == null || Time == null) return;
 
 #if DEBUG
-        // Этап 7: F1 — чит-меню (только в DEBUG-сборке).
+        // Этап 7: F2 — чит-меню (только в DEBUG-сборке).
         // Работает независимо от состояния UI (modalOpen, пауза).
         if (PlayerInput.IsCheatMenuPressed && _cheatPanel != null)
         {
@@ -876,9 +900,43 @@ public partial class GameWorldController : Node2D
         }
 #endif
 
+        // 2026-08-28: F1 — окно-справка горячих клавиш (с паузой — чтение).
+        if (PlayerInput.IsHelpHotkeysPressed && _hotkeysWindow != null && Time != null)
+        {
+            _hotkeysWindow.Toggle();
+            if (_hotkeysWindow.Visible)
+            {
+                _wasPausedBeforeInventory = Time.IsPaused;
+                if (!Time.IsPaused) Time.Pause();
+            }
+            else if (!_wasPausedBeforeInventory && Time.IsPaused)
+            {
+                Time.Resume();
+            }
+        }
+
+        // 2026-08-28: Esc сначала закрывает окна новой волны (справка/книга/чит).
+        if (PlayerInput.IsPausePressed && _hotkeysWindow is { Visible: true })
+        {
+            _hotkeysWindow.Close();
+            if (!_wasPausedBeforeInventory && Time is { IsPaused: true })
+                Time.Resume();
+        }
+        else if (PlayerInput.IsPausePressed && _techniqueBook is { Visible: true })
+        {
+            _techniqueBook.Close();
+            if (!_wasPausedBeforeInventory && Time is { IsPaused: true })
+                Time.Resume();
+        }
+#if DEBUG
+        else if (PlayerInput.IsPausePressed && _cheatPanel is { Visible: true })
+        {
+            _cheatPanel.Visible = false;
+        }
+#endif
         // Esc while trading → close the shop (Phase 5). Authoritative resume
         // happens in OnTradeClosed (bus event), like dialogues.
-        if (PlayerInput.IsPausePressed && _tradeWindow is { IsOpen: true })
+        else if (PlayerInput.IsPausePressed && _tradeWindow is { IsOpen: true })
         {
             _tradeWindow.Close();
         }
@@ -1019,9 +1077,17 @@ public partial class GameWorldController : Node2D
         }
 
         // Suppress game input when inventory OR trade window is open (Phase 5).
+        // 2026-08-28: + Книга Техник, справка, чит-окно, окно Культивации.
         if (_inputAdapter != null && _inventoryWindow != null)
         {
-            _inputAdapter.SetOverUI(_inventoryWindow.Visible || _tradeWindow is { IsOpen: true });
+            _inputAdapter.SetOverUI(_inventoryWindow.Visible
+                || _tradeWindow is { IsOpen: true }
+                || _techniqueBook is { Visible: true }
+                || _hotkeysWindow is { Visible: true }
+#if DEBUG
+                || _cheatPanel is { Visible: true }
+#endif
+                || _cultivationWindow is { Visible: true });
         }
 
         // Save/load DISABLED (Q8: user decision — saves invalid after each fix).

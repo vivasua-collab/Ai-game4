@@ -224,10 +224,10 @@ public partial class TradeWindow : Control
         _inventoryList.AddThemeConstantOverride("separation", 3);
         invScroll.AddChild(_inventoryList);
 
-        // Подвал: подсказка управления.
+        // Подвал: подсказка управления (клавиши — в окне-справке F1).
         var footer = new Label
         {
-            Text = "ЛКМ — купить/продать 1 · Shift+ЛКМ — 5 · Esc — закрыть",
+            Text = "ЛКМ — купить/продать 1 · Shift+ЛКМ — 5",
             HorizontalAlignment = HorizontalAlignment.Center,
         };
         footer.AddThemeFontSizeOverride("font_size", 12);

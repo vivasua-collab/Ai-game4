@@ -97,7 +97,8 @@ public partial class DialogueWindow : Control
 
         var hint = new Label
         {
-            Text = "1-4 / клик — ответ · E/клик — далее · Esc — уйти",
+            // 2026-08-28: клавиши — в окне-справке (F1); здесь только мышь.
+            Text = "ЛКМ — выбрать ответ · далее",
             HorizontalAlignment = HorizontalAlignment.Right,
         };
         hint.AddThemeFontSizeOverride("font_size", 12);
