@@ -12,6 +12,7 @@ using CultivationGame.Core.DI;
 using CultivationGame.Core.Events;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Core.Messaging.Contracts;
+using Vector2 = CultivationGame.Core.Data.Position2D;
 
 namespace CultivationGame.Modules.NPC;
 
@@ -53,6 +54,12 @@ public class NPCModule : IModule
     [Inject] private readonly NPCConfig _config = null!;
     private bool _isConfigured;
 
+    // M2 (2026-09-03): кэш позиции игрока для проверки дистанции NPC→игрок
+    // в ProcessNpcAttacks (паттерн NPC-B05 из NPCMovementService).
+    [Inject] private readonly ISubscriber<PlayerPositionChangedEvent> _playerPosSub = null!;
+    private IDisposable? _playerPosSubscription;
+    private Vector2 _playerPosition = Vector2.Zero;
+
     public string ModuleName => "NPC";
 
     /// NPC attack cooldown (seconds of game time).
@@ -75,6 +82,8 @@ public class NPCModule : IModule
         _aiStateChangedSubscription = _aiStateChangedSub.Subscribe(OnAIStateChanged);
         _yearChangedSubscription = _yearChangedSub.Subscribe(OnYearChanged);
         _npcDeathSubscription = _npcDeathSub.Subscribe(OnNPCDeathForLoot);
+        // M2: позиция игрока → кэш (дистанция атаки NPC→игрок).
+        _playerPosSubscription = _playerPosSub.Subscribe(OnPlayerPositionChanged);
     }
 
     /// <summary>
@@ -118,9 +127,12 @@ public class NPCModule : IModule
             }
             else
             {
-                /// Игрок — через AI-кэш недоступен здесь; атакуем, если цель не NPC
-                /// и NPC стоит в AttackRadius (Movement уже довёл до цели).
-                dx = 0; dy = 0;
+                // M2 (2026-09-03): цель — игрок: дистанция из кэша
+                // PlayerPositionChangedEvent (паттерн NPC-B05). РАНЬШЕ
+                // dx=dy=0 «всегда рядом» — NPC в Attacking бил игрока с
+                // ЛЮБОЙ дистанции (застрял у препятствия/aggro издалека).
+                dx = System.Math.Abs((int)_playerPosition.X - state.Position.X);
+                dy = System.Math.Abs((int)_playerPosition.Y - state.Position.Y);
             }
             int dist = System.Math.Max(dx, dy);
             if (dist > 2) continue; /// вне физической досягаемости
@@ -151,6 +163,8 @@ public class NPCModule : IModule
         _aiStateChangedSubscription = null;
         _yearChangedSubscription?.Dispose();
         _yearChangedSubscription = null;
+        _playerPosSubscription?.Dispose();
+        _playerPosSubscription = null;
     }
 
     /// <summary>
@@ -195,6 +209,15 @@ public class NPCModule : IModule
             if (!string.IsNullOrEmpty(targetId))
                 _combatAdapter.StartAttack(e.NpcId, targetId);
         }
+    }
+
+    /// <summary>
+    /// M2 (2026-09-03): кэш позиции игрока (тайлы) для проверки дистанции
+    /// атаки NPC→игрок в ProcessNpcAttacks.
+    /// </summary>
+    private void OnPlayerPositionChanged(in PlayerPositionChangedEvent e)
+    {
+        _playerPosition = new Vector2((int)e.X, (int)e.Y);
     }
 
     /// <summary>

@@ -1226,3 +1226,33 @@ Stage Summary:
 - Push: git push origin main.
 - Далее: физбойка Phase 8 ч.2 (isRanged/луки) → техники → стартовая
   генерация предметов.
+
+---
+Task ID: m2b-2026-09-03
+Agent: main-thread (Z.ai Code)
+Task: M2b — P0-фикс: NPC атаковал игрока с любой дистанции
+
+Work Log:
+- Продолжение аудита физбойки: NPCModule.ProcessNpcAttacks проверял
+  дистанцию только для NPC→NPC целей; для цели-игрока стояло
+  dx=dy=0 «всегда рядом» (комментарий «Movement уже довёл до цели») —
+  NPC в Attacking бил игрока с ЛЮБОЙ дистанции (застрял у препятствия,
+  aggro издалека, игрок убегает — удары продолжаются по воздуху).
+- Фикс: NPCModule подписывается на PlayerPositionChangedEvent (паттерн
+  NPC-B05 из NPCMovementService), кэш _playerPosition (тайлы), в
+  else-ветке — честная дистанция Чебышёв, gate dist>2 как у NPC→NPC.
+  Отписка в Dispose. using alias Vector2 = Position2D (модули
+  engine-agnostic — Godot types запрещены).
+- Регресс: build 0 errors; NEWGAME PASS; COMBAT_SIM VERDICT PASS (урон
+  в обе стороны, armed 7 RedHP — сим телепортирует NPC вплотную,
+  дистанция честная); TRADE PASS (TryBuy True); GEN PASS (16.8%/4.0%).
+- ИНФРА: обход FS-флапа «timeout execve ENOENT при живом файле»:
+  обёртка /tmp/run_godot.sh (bash wait+kill watchdog вместо GNU
+  timeout). Прямой exec стабилен; флапает именно связка timeout+длинный
+  путём. Скрипт сохранить в репо при следующем заходе (сейчас /tmp).
+
+Stage Summary:
+- P0 физбойки закрыт: дистанция атаки честна в обе стороны (игрок ≤2.5
+  тайла, NPC ≤2 тайла, у обоих кулдауны).
+- Коммит+push. Далее по приоритетам: Phase 8 ч.2 (isRanged/луки) или
+  техники → стартовая генерация.
