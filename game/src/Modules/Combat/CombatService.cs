@@ -383,11 +383,17 @@ namespace CultivationGame.Modules.Combat
 
             if (effectiveCastTime > 0.15f)
             {
+                // M1 (2026-09-03): резолвим defender СЕЙЧАС и запоминаем в pending —
+                // смена _currentTargetId другими атакующими во время каста больше
+                // не перенаправляет выстрел (npc не бьёт сам себя).
+                string castTargetId = attackerId == _instigatorId ? _currentTargetId : _instigatorId;
                 // Отложенное применение — установить PendingTechnique
                 _pendingTechnique = new PendingTechnique
                 {
                     AttackerId = attackerId,
                     TechniqueId = techniqueId,
+                    TargetId = castTargetId,
+                    PotencyPermil = potencyPermil,
                     RemainingCastTime = effectiveCastTime,
                     TotalCastTime = effectiveCastTime
                 };
@@ -410,12 +416,16 @@ namespace CultivationGame.Modules.Combat
         /// <summary>
         /// Спринт 8 C11: Применить технику мгновенно (после каста или если CastTime ≈ 0).
         /// Делегирует основную логику из ExecuteAttack, но без повторной проверки боя.
+        /// M1 (2026-09-03): + explicitDefenderId/explicitPotencyPermil — pending-каст
+        /// передаёт запомненные цель и potency (per-attacker), мгновенный путь
+        /// оставляет null → прежний резолв из текущего состояния боя.
         /// </summary>
-        private void ApplyTechniqueImmediately(string attackerId, string techniqueId)
+        private void ApplyTechniqueImmediately(string attackerId, string techniqueId,
+            string explicitDefenderId = null, int? explicitPotencyPermil = null)
         {
             // Делегируем общую логику в BuildAndExecuteDamageRequest
             // Редактировано: 2026-05-22 13:50:00 UTC — Этап 3.1: рефакторинг дублирования P1-8.1
-            BuildAndExecuteDamageRequest(attackerId, techniqueId);
+            BuildAndExecuteDamageRequest(attackerId, techniqueId, explicitDefenderId, explicitPotencyPermil);
         }
 
         /// <summary>
@@ -425,7 +435,8 @@ namespace CultivationGame.Modules.Combat
         /// Выполняет: получение данных техники, уровней, статов, построение DamageRequest,
         /// расчёт урона, публикацию события, проверку фатальности, переход хода.
         /// </summary>
-        private void BuildAndExecuteDamageRequest(string attackerId, string techniqueId)
+        private void BuildAndExecuteDamageRequest(string attackerId, string techniqueId,
+            string explicitDefenderId = null, int? explicitPotencyPermil = null)
         {
             // CMB-A10: получаем урон из данных техники вместо хардкода
             int baseDamage = GetTechniqueDamage(techniqueId);
@@ -433,11 +444,20 @@ namespace CultivationGame.Modules.Combat
             Element element = GetTechniqueElement(techniqueId);
             AttackType attackType = GetTechniqueAttackType(techniqueId);
             TechniqueGrade grade = GetTechniqueGrade(techniqueId);
-            int potencyPermil = _lastAttackPotencyPermil; // Stage 0: potency из зарядки игрока (не dormant lookup)
+            // Stage 0: potency из зарядки игрока (не dormant lookup).
+            // M1: pending-каст подставляет potency СВОЕГО кастера (per-attacker);
+            // мгновенный путь — глобальный _lastAttackPotencyPermil как раньше.
+            int potencyPermil = explicitPotencyPermil ?? _lastAttackPotencyPermil;
 
-            // Определяем уровни культивации атакующего и защитника
-            // Фаза 3 (3.I): пер-entity уровни через IQiDataProvider
-            string defenderId = attackerId == _instigatorId ? _currentTargetId : _instigatorId;
+            // M1 (2026-09-03): pending-каст уже знает свою цель (запомнена на старте).
+            // Мгновенный путь — прежний резолв из текущего состояния боя.
+            // Баг был: инстагатор кастует → другой атакующий переключает
+            // _currentTargetId на кастера → каст срабатывает: defender = сам кастер.
+            string defenderId = explicitDefenderId;
+            if (string.IsNullOrEmpty(defenderId))
+            {
+                defenderId = attackerId == _instigatorId ? _currentTargetId : _instigatorId;
+            }
 
             int attackerLevel;
             int defenderLevel;
@@ -702,9 +722,11 @@ namespace CultivationGame.Modules.Combat
                 {
                     string attackerId = _pendingTechnique.AttackerId;
                     string techniqueId = _pendingTechnique.TechniqueId;
+                    string pendingTargetId = _pendingTechnique.TargetId;   // M1: цель на момент старта каста
+                    int pendingPotencyPermil = _pendingTechnique.PotencyPermil; // M1: potency кастера
                     _isCasting = false;
                     _pendingTechnique = default;
-                    ApplyTechniqueImmediately(attackerId, techniqueId);
+                    ApplyTechniqueImmediately(attackerId, techniqueId, pendingTargetId, pendingPotencyPermil);
                 }
             }
         }
@@ -847,11 +869,20 @@ namespace CultivationGame.Modules.Combat
 
         /// <summary>
         /// Спринт 8 C11: Данные отложенной техники (время каста).
+        /// M1 (2026-09-03): + TargetId/PotencyPermil — pending запоминает цель и
+        /// силу КАСТЕРА на момент старта. Раньше цель резолвилась из
+        /// _currentTargetId/_instigatorId В МОМЕНТ срабатывания: если за время
+        /// каста цель боя переключалась (A3-3: другой атакующий указал TargetId),
+        /// инстагатор-кастер получал defenderId = сам себя (npc→npc self-hit).
+        /// Potency был глобальным (_lastAttackPotencyPermil): заряженная атака
+        /// игрока во время чужого каста усиливала чужой pending-выстрел.
         /// </summary>
         private struct PendingTechnique
         {
             public string AttackerId;
             public string TechniqueId;
+            public string TargetId;        // M1: defender на момент старта каста
+            public int PotencyPermil;      // M1: potency кастера на момент старта
             public float RemainingCastTime;
             public float TotalCastTime;
         }

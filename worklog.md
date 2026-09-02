@@ -1147,3 +1147,40 @@ Stage Summary:
   + стартовые квесты → M4 Faction port → M5 Save/load (ТРЕБУЕТ решения
   пользователя по Q8) → M6 полировка MVP.
 - Push: коммит worklog-записи (этап «окружение + план»).
+
+---
+Task ID: m1-2026-09-03
+Agent: main-thread (Z.ai Code)
+Task: M1 стабилизация — фикс per-attacker pending technique (npc self-hit)
+
+Work Log:
+- Регресс на входе: build 0 errors; NEWGAME/COMBAT_SIM/TRADE/GEN PASS;
+  self-hit жив (npc→npc: 21).
+- Корневая причина: цель pending-каста резолвилась в момент срабатывания
+  (attacker==instigator → defender=_currentTargetId); переключение цели
+  (A3-3) во время каста → инстагатор бьёт себя. Плюс глобальный
+  _lastAttackPotencyPermil подменял potency чужого pending.
+- Фикс: PendingTechnique.TargetId+PotencyPermil (per-attacker snapshot на
+  старте каста); ApplyTechniqueImmediately/BuildAndExecuteDamageRequest
+  принимают explicitDefenderId/explicitPotencyPermil (мгновенный путь без
+  изменений).
+- CombatSimDebug: armed-фаза PASS-илась раньше НА баге (self-hit не прерывал
+  каст игрока по C11). Теперь settle 1.4с перед armed-интентом — чистое окно
+  для weapon wiring.
+- Регресс после фикса: build 0 errors; NEWGAME PASS; COMBAT_SIM VERDICT
+  PASS (self-hit исчез, armed swing 486→479 = 7 RedHP); TRADE PASS
+  (buy=True); GEN PASS (16.8%/4.0%, 2/16).
+- НОВЫЕ УКАЗАНИЯ пользователя: cron отменён; сейвы отложить (ломаются от
+  изменений — вместо них стартовая генерация); приоритет №1 физическая
+  боевка, №2 техники; чит-меню изучить/расширить + выключатель в настройках.
+- Аномалия ФС: timeout-execve Godot периодически ENOENT при живом файле
+  (stat OK, прямой exec OK) — обход повтором/env+literal path. Headless
+  прогоны не само-завершаются: exit 124 — норма, критерий PASS = ключевые
+  строки лога.
+
+Stage Summary:
+- M1 (стабилизация боя) ЗАКРЫТ: self-hit устранён, potency per-attacker,
+  тест честен к механике C11 прерывания каста.
+- Чекпоинт: checkpoints/09_03_m1_per_attacker_pending.md.
+- Далее по указанию: физбойка (основной приоритет) → чит-меню (расширение
+  + настройки) → техники. Сейвы M5 исключены из плана до отдельного решения.

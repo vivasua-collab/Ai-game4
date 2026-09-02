@@ -157,6 +157,14 @@ public partial class CombatSimDebug : Node
         bool weaponWiringOk = true; // остаётся true, если фаза пропущена
         if (_equipmentService != null && _equipmentGenerator != null)
         {
+            // M1 (2026-09-03): после фикса per-attacker pending каст NPC больше
+            // не бьёт самого себя — урон честно летит в игрока и по механике
+            // C11 (Спринт 8) ПРЕРЫВАЕТ его догорающий pending-каст. Раньше
+            // PASS этой фазы держался на баге self-hit. Даём всем pending
+            // раундов догореть ДО armed-интента → чистое окно для проверки
+            // weapon wiring без прерывания каста.
+            GD.Print("[CombatSim] letting round pendings settle (cast-interrupt mechanics)...");
+            await ToSignal(GetTree().CreateTimer(1.4), SceneTreeTimer.SignalName.Timeout);
             var weapon = _equipmentGenerator.GenerateWeapon(level: 3);
             bool equipped = _equipmentService.TryEquip(EquipmentSlot.WeaponMain, weapon);
             if (equipped && _equipmentProvider != null)
