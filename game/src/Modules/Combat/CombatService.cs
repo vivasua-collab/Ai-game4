@@ -578,7 +578,14 @@ namespace CultivationGame.Modules.Combat
             bool isPlayerTarget = PlayerIdResolver.IsPlayer(defenderId);
 
             // P2-7.3 FIX: передаём подтип атаки для различения slashing/piercing от blunt
-            CombatSubtype attackSubtype = tech?.Subtype ?? CombatSubtype.MeleeStrike; // без техники = безоружная атака
+            // M2 (2026-09-03): basic_attack с оружием в главной руке теперь MeleeWeapon
+            // (раньше всегда MeleeStrike — вооружённый удар шёл как «безоружный»:
+            // бонус урона считался, но подтип врал в последствиях: кровотечение
+            // slashing/piercing не триггерилось для оружия).
+            // TODO isRanged (NPC_COMBAT_PREP Phase 8 ч.2): лук/арбалет → RangedProjectile
+            // (требует ammo + ProjectileRenderer — отложено до Phase 8 ч.2).
+            CombatSubtype attackSubtype = tech?.Subtype
+                ?? (hasWeapon ? CombatSubtype.MeleeWeapon : CombatSubtype.MeleeStrike);
 
             var request = new DamageRequest(
                 attackerId,

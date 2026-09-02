@@ -8,6 +8,7 @@ using CultivationGame.Core.Events;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Adapter.Di;
 using CultivationGame.Adapter.Input;
+using CultivationGame.Adapter.Persistence;
 using CultivationGame.Adapter.UI;
 using CultivationGame.Modules.Player;
 
@@ -62,6 +63,9 @@ public partial class GameWorldController : Node2D
     [Inject] private ISubscriber<Core.Messaging.Contracts.TradeOpenedEvent> TradeOpenedSub { get; set; } = null!;
     [Inject] private ISubscriber<Core.Messaging.Contracts.TradeClosedEvent> TradeClosedSub { get; set; } = null!;
     [Inject] private ISubscriber<Core.Messaging.Contracts.ToastShownEvent> ToastShownSub { get; set; } = null!;
+    // M2 (2026-09-03): отклонение атаки игрока (C-5 аудита-3) → тост причины
+    // («Каст уже идёт: …») вместо удалённого polling-тоста «⚔ Атака!».
+    [Inject] private ISubscriber<Core.Messaging.Contracts.AttackRejectedEvent> AttackRejectedSub { get; set; } = null!;
 
     private Node2D        _worldRoot     = null!;
     private Camera2D      _camera        = null!;
@@ -97,6 +101,7 @@ public partial class GameWorldController : Node2D
     private System.IDisposable? _playerDeathToken;
     private System.IDisposable? _playerDamageToken;
     private System.IDisposable? _toastShownToken;
+    private System.IDisposable? _attackRejectedToken; // M2: тост причины отклонения атаки
     private CanvasLayer   _hudCanvas     = null!;
     private Label         _timeLabel     = null!;
     private Label         _hudLabel      = null!;
@@ -667,11 +672,17 @@ public partial class GameWorldController : Node2D
 
         // Phase 6: player combat bridge — Space publishes AttackIntentEvent
         // with the nearest NPC target. Must run BEFORE ResetFrameFlags below.
+        // M2 (2026-09-03): тост «⚔ Атака!» при polling убран — спамил каждый
+        // кадр при удержании Space (~60/сек). Фидбек атаки теперь честный:
+        // урон — цифрами (DamageNumberRenderer), отклонение — тостом по
+        // AttackRejectedEvent (подписка при первом нажатии Space), попадание
+        // «вхолостую» (нет цели в радиусе) — без тоста, как у NPC.
         CombatAdapter?.Tick((float)delta);
-        if (PlayerInput is { IsAttackPressed: true })
+        if (PlayerInput is { IsAttackPressed: true } && _attackRejectedToken == null)
         {
-            // Feedback for the attack press (target resolution logs in combat module).
-            ShowToast("⚔ Атака!");
+            // Lazy-подписка на отклонения атак (первое нажатие Space):
+            // C-5 аудита-3 публикует AttackRejectedEvent при _isCasting.
+            _attackRejectedToken = AttackRejectedSub?.Subscribe(OnAttackRejected);
         }
 
         // LMB movement is handled in _UnhandledInput (respects UI consumption).
@@ -893,8 +904,16 @@ public partial class GameWorldController : Node2D
 #if DEBUG
         // Этап 7: F2 — чит-меню (только в DEBUG-сборке).
         // Работает независимо от состояния UI (modalOpen, пауза).
+        // M2 (2026-09-03): гейт по настройке — пользователь может отключить
+        // чит-меню в настройках главного меню (user://settings.json).
         if (PlayerInput.IsCheatMenuPressed && _cheatPanel != null)
         {
+            GameSettings.EnsureLoaded();
+            if (!GameSettings.CheatsEnabled)
+            {
+                ShowToast("✖ Чит-меню отключено (Настройки в главном меню)");
+                return;
+            }
             _cheatPanel.Visible = !_cheatPanel.Visible;
             GD.Print($"[GameWorld] CheatPanel: {(_cheatPanel.Visible ? "open" : "closed")}");
         }
@@ -1152,6 +1171,20 @@ public partial class GameWorldController : Node2D
     private void OnToastShown(in Core.Messaging.Contracts.ToastShownEvent e)
     {
         if (!string.IsNullOrEmpty(e.Message)) ShowToast(e.Message);
+    }
+
+    /// <summary>
+    /// M2 (2026-09-03): отклонение атаки игрока → тост причины.
+    /// C-5 аудита-3: CombatService публикует AttackRejectedEvent при попытке
+    /// атаковать во время каста. Раньше игрок не понимал, почему удар не прошёл
+    /// (тихий return). Спам невозможен: PlayerCombatAdapter теперь гейтит
+    /// базовые атаки кулдауном §8.1 (1 интент/сек, не 60/сек).
+    /// </summary>
+    private void OnAttackRejected(in Core.Messaging.Contracts.AttackRejectedEvent e)
+    {
+        // Только атаки игрока — NPC-отклонения не тостим (шум).
+        if (CultivationGame.Core.Helpers.PlayerIdResolver.IsPlayer(e.AttackerId))
+            ShowToast($"✖ Атака отклонена: {e.Reason}");
     }
 
     /// <summary>

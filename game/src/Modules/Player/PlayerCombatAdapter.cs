@@ -24,6 +24,7 @@ public sealed class PlayerCombatAdapter : IDisposable
     [Inject] private readonly IPlayerService _player = null!;
     [Inject] private readonly IPlayerInputService _input = null!;
     [Inject] private readonly INPCService _npcs = null!;
+    [Inject] private readonly IStatProvider _stats = null!;
     [Inject] private readonly IPublisher<AttackIntentEvent> _attackIntentPub = null!;
     [Inject] private readonly ISubscriber<CombatStartedEvent> _combatStartedSub = null!;
     [Inject] private readonly ISubscriber<CombatEndedEvent> _combatEndedSub = null!;
@@ -31,6 +32,16 @@ public sealed class PlayerCombatAdapter : IDisposable
 
     /// <summary>Max Chebyshev distance (tiles) for Space-key melee target lock.</summary>
     public const float AttackRangeTiles = 2.5f;
+
+    /// <summary>
+    /// COMBAT_SYSTEM.md §8.1: базовая атака = 1 игровая минута = 1 сек (Normal).
+    /// Раньше кулдауна не было: зажатый Space публиковал AttackIntentEvent
+    /// каждый физ-кадр (~60/сек) — спам AttackRejectedEvent и тостов,
+    /// атака быстрее спеки. Теперь удержание Space = автоатака с темпом §8.1-8.2.
+    /// </summary>
+    public const float BaseAttackCooldownSec = 1.0f;
+
+    private float _attackCooldownSec;
 
     private IDisposable? _combatStartedToken;
     private IDisposable? _combatEndedToken;
@@ -45,6 +56,12 @@ public sealed class PlayerCombatAdapter : IDisposable
 
     public void Tick(float deltaTime)
     {
+        // §8.1: тикт кулдауна базовой атаки (секунды на Normal).
+        if (_attackCooldownSec > 0f)
+        {
+            _attackCooldownSec -= deltaTime;
+            if (_attackCooldownSec > 0f) return;
+        }
         if (!_input.IsAttackPressed) return;
 
         string? target = FindNearestTarget();
@@ -54,6 +71,22 @@ public sealed class PlayerCombatAdapter : IDisposable
         // the 11-layer damage pipeline on ExecuteAttack.
         _attackIntentPub.Publish(new AttackIntentEvent(
             _player.PlayerId, target, "basic_attack", false));
+
+        // Кулдаун ставится только на УСПЕШНЫЙ интент (цель найдена) —
+        // атака «вхолостую» не блокирует следующий замах.
+        _attackCooldownSec = AttackCooldownSeconds();
+    }
+
+    /// <summary>
+    /// COMBAT_SYSTEM.md §8.2 (только для базовых атак):
+    /// actualDuration = baseDuration / (1 + agility × 0.01).
+    /// AGI игрока — через IStatProvider (StatProviderAdapter).
+    /// Дефолт AGI=10 → 1/(1.1) ≈ 0.91 сек.
+    /// </summary>
+    private float AttackCooldownSeconds()
+    {
+        int agi = _stats?.GetStat(_player.PlayerId, StatType.Agility) ?? 10;
+        return BaseAttackCooldownSec / (1f + agi * 0.01f);
     }
 
     /// <summary>

@@ -51,6 +51,11 @@ namespace CultivationGame.Adapter.UI
         [Inject] private IVerificationService Verifier = null!;
         [Inject] private Modules.Generator.DeduplicationService Dedup = null!;
         [Inject] private Modules.Generator.TechniqueRegistry TechniqueRegistry = null!;
+        // M2 (2026-09-03): физическая боевка — тест-кнопки (исцеление + мишень).
+        // Основной приоритет MVP — корректная боевка; кнопки ускоряют цикл тестов:
+        // не ждать регенерацию HP и не искать бандита по карте.
+        [Inject] private IBodyService Body = null!;
+        [Inject] private Modules.NPC.NPCSpawnerService NpcSpawner = null!;
 
         private Label _statusLabel = null!;
         private Button _fastLeakButton = null!;
@@ -244,6 +249,17 @@ namespace CultivationGame.Adapter.UI
             vbox.AddChild(MakeSeparator());
             vbox.AddChild(MakeLabel("▸ Техника + формация:", 12, new Color(0.94f, 0.83f, 0.66f)));
             vbox.AddChild(MakeButton("Создать Combat-Formation + старт", 264, OnGrantTechniqueWithFormation));
+
+            // === M2 (2026-09-03): физическая боевка — тест-секция ===
+            // Основной приоритет MVP — корректная физическая боевка; кнопки
+            // ускоряют итерации тестов (см. чекпоинт M2).
+            vbox.AddChild(MakeSeparator());
+            vbox.AddChild(MakeLabel("▸ Физическая боевка (M2):", 12, new Color(0.94f, 0.83f, 0.66f)));
+            var combatRow = new HBoxContainer { Name = "CombatTestRow" };
+            combatRow.AddThemeConstantOverride("separation", 4);
+            combatRow.AddChild(MakeButton("Полное исцеление", 130, OnFullHeal));
+            combatRow.AddChild(MakeButton("Мишень-бандит", 130, OnSpawnTargetBandit));
+            vbox.AddChild(combatRow);
 
             // === Phase F: Верификация (dump) ===
             vbox.AddChild(MakeSeparator());
@@ -587,6 +603,51 @@ namespace CultivationGame.Adapter.UI
             if (_statusLabel != null) _statusLabel.Text = msg;
             GD.Print($"[CheatPanel] {msg}");
             ToastPub?.Publish(new ToastShownEvent(msg, 2.0f));
+        }
+
+        // === M2 (2026-09-03): физическая боевка — обработчики ===
+
+        /// <summary>
+        /// Полное исцеление игрока: все части тела до Max (Red + Black).
+        /// Кулдаун атаки §8.1 и кулдауны последствий НЕ сбрасываем — только тело.
+        /// Для повторных боевых тестов без ожидания регенерации (BD-регенерация
+        /// медленная по дизайну BODY_SYSTEM.md).
+        /// </summary>
+        private void OnFullHeal()
+        {
+            if (Body == null || Player == null) { SetStatus("BodyService не инжектирован"); return; }
+            var parts = Body.GetAllParts();
+            if (parts == null || parts.Count == 0) { SetStatus("Тело не инициализировано"); return; }
+            int healed = 0;
+            foreach (var part in parts)
+            {
+                int redMissing = part.MaxRedHP - part.CurrentRedHP;
+                int blackMissing = part.MaxBlackHP - part.CurrentBlackHP;
+                // HealPart делит amount по RED_HP_RATIO (70/30); для полного
+                // восстановления просим максимальный дефицит — избыток
+                // клампится внутри BodyService.
+                int amount = Math.Max(redMissing, blackMissing);
+                if (amount > 0) { Body.HealPart(part.Type, amount); healed++; }
+            }
+            SetStatus($"Исцеление: восстановлено частей — {healed}/{parts.Count}");
+        }
+
+        /// <summary>
+        /// Спавн враждебного NPC-мишени в 2 тайлах от игрока (NPCRole.Enemy,
+        /// speciesId=human, level мира 1). Для быстрых боевых тестов: не бегать
+        /// по карте в поисках бандита — мишень рядом. Радиус подальше от
+        /// игрока (2 тайла) — вне melee-радиуса NPC, бой начинается по Space.
+        /// </summary>
+        private void OnSpawnTargetBandit()
+        {
+            if (NpcSpawner == null || Player == null) { SetStatus("NPCSpawnerService не инжектирован"); return; }
+            var pos = Player.Position;
+            // Чебышев-сдвиг на 2 тайла вправо-вниз от игрока.
+            var spawnPos = new Core.Data.Position2D(pos.X + 2, pos.Y + 2);
+            _seedCounter++;
+            string npcId = NpcSpawner.SpawnNPC(
+                "human", Core.Data.NPCRole.Enemy, 1, spawnPos, _seedCounter * 31);
+            SetStatus($"Мишень-бандит: {npcId} @ ({spawnPos.X},{spawnPos.Y}) — бей Space");
         }
 
         private static Label MakeLabel(string text, int fontSize, Color color)

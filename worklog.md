@@ -1184,3 +1184,45 @@ Stage Summary:
 - Чекпоинт: checkpoints/09_03_m1_per_attacker_pending.md.
 - Далее по указанию: физбойка (основной приоритет) → чит-меню (расширение
   + настройки) → техники. Сейвы M5 исключены из плана до отдельного решения.
+
+---
+Task ID: m2-2026-09-03
+Agent: main-thread (Z.ai Code)
+Task: M2 — физическая боевка (осн. приоритет) + чит-меню (настройки+расширение)
+
+Work Log:
+- Получены новые указания пользователя: cron отменён; сейвы отложены (вместо
+  них стартовая генерация); приоритет №1 — физическая боевка, №2 — техники;
+  чит-меню расширить + сделать отключаемым в настройках; регулярные пуши.
+- Аудит физбойки против COMBAT_SYSTEM.md: пайплайн (слои 1-10) полный,
+  НО: у игрока нет кулдауна атаки (спам 60 интентов/сек при удержании
+  Space, сперва спеки §8.1); подтип basic_attack всегда MeleeStrike
+  (кровотечения оружия не триггерились); polling-тост «⚔ Атака!» спамил.
+- PlayerCombatAdapter: кулдаун §8.1 (1 сек) с формулой §8.2 (AGI ускоряет
+  базовые атаки: 1/(1+AGI×0.01)), AGI через IStatProvider; кулдаун только
+  на успешный интент.
+- CombatService: подтип basic_attack при оружии → MeleeWeapon (раньше
+  MeleeStrike — врал в последствиях). isRanged TODO оставлен (Phase 8 ч.2).
+- GameWorldController: polling-тост убран; подписка AttackRejectedEvent →
+  тост причины только для атак игрока.
+- GameSettings.cs (новый, Adapter/Persistence): user://settings.json,
+  CheatsEnabled (default true); MainMenu OnSettings (stub!) → модальное
+  окно настроек с CheckButton «Чит-меню (F2)» (мгновенное сохранение);
+  F2 в GameWorld гейтится настройкой (тост при отключении).
+- CheatPanel: секция «Физическая боевка (M2)»: «Полное исцеление»
+  (IBodyService.HealPart все части до Max) + «Мишень-бандит» (спавн human
+  Enemy в 2 тайлах, NPCSpawnerService).
+- Регресс: build 0 errors; NEWGAME PASS (CheatPanel Ready, DI чисто —
+  «Could not resolve» нет); COMBAT_SIM VERDICT PASS (armed 7 RedHP);
+  TRADE PASS (TryBuy True); GEN PASS (16.8%/4.0%, 2/16).
+
+Stage Summary:
+- M2 ЗАКРЫТ: кулдаун атак по спеке, честный подтип вооружённого удара,
+  чистый фидбек отклонений, чит-меню отключаемо в настройках ( MainMenu →
+  Настройки), панель расширена секцией тестов физбойки.
+- Расхождение: CHEAT_PANEL.md отстаёт (новая секция + настройки) — обновить
+  по разрешению пользователя (docs_v2 заморожены).
+- Чекпоинт: checkpoints/09_03_m2_combat_cheats.md.
+- Push: git push origin main.
+- Далее: физбойка Phase 8 ч.2 (isRanged/луки) → техники → стартовая
+  генерация предметов.

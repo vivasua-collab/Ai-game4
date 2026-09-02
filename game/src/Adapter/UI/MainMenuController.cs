@@ -4,6 +4,7 @@ using CultivationGame.Core.Data;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Adapter.Di;
+using CultivationGame.Adapter.Persistence;
 
 namespace CultivationGame.Adapter.UI;
 
@@ -239,7 +240,105 @@ public partial class MainMenuController : Control
 
     private void OnSettings()
     {
-        GD.Print("[MainMenu] Settings (stub)");
+        // M2 (2026-09-03): реализация stub-кнопки — окно настроек с чекбоксом
+        // чит-меню (требование пользователя: чит-меню отключаемо в настройках).
+        // Хранение: user://settings.json (GameSettings), переживает перезапуски.
+        GameSettings.EnsureLoaded();
+        OpenSettingsWindow();
+    }
+
+    /// <summary>
+    /// Модальное окно настроек (пергамент, центрированное): CheckButton
+    /// «Чит-меню (F2)» + кнопка закрытия. Изменение сохраняется немедленно
+    /// (GameSettings.SetCheatsEnabled → user://settings.json).
+    /// Гейт F2 в GameWorldController читает GameSettings.CheatsEnabled.
+    /// </summary>
+    private void OpenSettingsWindow()
+    {
+        var overlay = new Control
+        {
+            Name = "SettingsOverlay",
+            AnchorsPreset = (int)LayoutPreset.FullRect,
+            MouseFilter = Control.MouseFilterEnum.Stop,
+            Modulate = new Color(0, 0, 0, 0.55f),
+        };
+
+        var panel = new PanelContainer { Name = "SettingsPanel" };
+        // Стиль в тон окна справки (HotkeysWindow — тёмный Old School, inline).
+        var panelStyle = new StyleBoxFlat
+        {
+            BgColor = new Color(0.10f, 0.08f, 0.05f, 0.98f),
+        };
+        panelStyle.SetBorderWidthAll(2);
+        panelStyle.SetBorderColor(new Color(0.55f, 0.42f, 0.20f, 0.9f));
+        panelStyle.SetCornerRadiusAll(8);
+        panelStyle.ContentMarginLeft = 20;
+        panelStyle.ContentMarginRight = 20;
+        panelStyle.ContentMarginTop = 16;
+        panelStyle.ContentMarginBottom = 16;
+        panel.AddThemeStyleboxOverride("panel", panelStyle);
+
+        var center = new CenterContainer
+        {
+            Name = "SettingsCenter",
+            AnchorsPreset = (int)LayoutPreset.FullRect,
+        };
+        center.AddChild(panel);
+        overlay.AddChild(center);
+
+        var box = new VBoxContainer { Name = "SettingsBox" };
+        box.AddThemeConstantOverride("separation", 10);
+        box.CustomMinimumSize = new Vector2(360, 0);
+        panel.AddChild(box);
+
+        var title = new Label
+        {
+            Text = "⚙ НАСТРОЙКИ",
+            HorizontalAlignment = HorizontalAlignment.Center,
+        };
+        title.AddThemeFontSizeOverride("font_size", 20);
+        title.AddThemeColorOverride("font_color", new Color(0.95f, 0.88f, 0.72f));
+        box.AddChild(title);
+
+        // ── Чит-меню ──
+        var cheatCheck = new CheckButton
+        {
+            Name = "CheatMenuCheck",
+            Text = "  Чит-меню разработки (F2)",
+            ButtonPressed = GameSettings.CheatsEnabled,
+            ToggleMode = true,
+        };
+        cheatCheck.Toggled += on =>
+        {
+            GameSettings.SetCheatsEnabled(on);
+            GD.Print($"[MainMenu] CheatsEnabled = {on} (saved to user://settings.json)");
+        };
+        box.AddChild(cheatCheck);
+
+        var hint = new Label
+        {
+            Text = "(чит-меню доступно только в dev-сборке;\nвыключение скрывает F2-панель)",
+            HorizontalAlignment = HorizontalAlignment.Center,
+        };
+        hint.AddThemeFontSizeOverride("font_size", 11);
+        hint.AddThemeColorOverride("font_color", new Color(0.65f, 0.58f, 0.45f));
+        box.AddChild(hint);
+
+        var closeBtn = UIFactory.CreateButton("SettingsClose", "Закрыть", 160, 36);
+        closeBtn.Pressed += () =>
+        {
+            overlay.QueueFree();
+            GD.Print("[MainMenu] Settings closed");
+        };
+        var closeRow = new HBoxContainer
+        {
+            Alignment = BoxContainer.AlignmentMode.Center,
+        };
+        closeRow.AddChild(closeBtn);
+        box.AddChild(closeRow);
+
+        AddChild(overlay);
+        GD.Print($"[MainMenu] Settings opened (cheatsEnabled={GameSettings.CheatsEnabled})");
     }
 
     private void OnQuit()
