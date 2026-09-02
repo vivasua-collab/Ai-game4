@@ -1256,3 +1256,26 @@ Stage Summary:
   тайла, NPC ≤2 тайла, у обоих кулдауны).
 - Коммит+push. Далее по приоритетам: Phase 8 ч.2 (isRanged/луки) или
   техники → стартовая генерация.
+
+---
+Task ID: infra-2026-09-03-fs-flap
+Agent: main-thread (Z.ai Code)
+Task: ИНФРА — обход overlayfs ENOENT-флапа (tools/run_godot.sh)
+
+Work Log:
+- РАЗГАДАНА «аномалия ФС» из worklog 08-26: корень ФС — overlayfs
+  (kata-containers, volatile, index=off). Lookup по пути в НОВОМ процессе
+  периодически ENOENT при живом файле (stat/file/прямой exec из прогретой
+  bash-сессии — OK; bash -c / timeout / новый bash-скрипт — флап).
+  Повторный lookup «прогревает» dentry → проходит. unzip-файлы не «мерцали»
+  — флапал path resolution (python-zipfile «стабильность» — артефакт).
+- tools/run_godot.sh (новый): прогрев цепочки компонентов пути + запуск
+  Godot с watchdog (bash wait+kill, НЕ GNU timeout) + ретраи при
+  ENOENT-флапе. Стабильность: 5/5 последовательных NEWGAME-прогонов PASS.
+- Использование: env GODOT_NEWGAME=1 GODOT_TIMEOUT=40 tools/run_godot.sh
+  --headless --path game scenes/MainMenu.tscn (критерий PASS — строки
+  лога, не exit-код).
+
+Stage Summary:
+- Стабильная обёртка для headless-QA в песочнице — в репо, доступна
+  будущим сессиям. Рекомендация: все headless-прогоны через неё.
