@@ -1106,3 +1106,44 @@ Stage Summary:
 - Коммит: infra: persistent GitHub token storage + caveman port.
 
 Статус: complete
+
+---
+Task ID: session-2026-09-02-mvp-planning
+Agent: main-thread (Z.ai Code)
+Task: Восстановление окружения по запросу пользователя + верификация +
+составление плана доработки игры до MVP
+
+Work Log:
+- Песочница сброшена заново (сессия началась с чистого /home/z, Next.js DEV
+  остановлен по указанию пользователя ранее).
+- Репозиторий склонирован в my-project/Ai-game4 (канонический путь по
+  START_PROMPT §5). Токен размещён: my-project/.auth/github.token (персистентно)
+  + зеркало /home/sync/.auth/ (конвенция проекта). Credential store настроен.
+- СЕКЬЮРИТИ-ФИКС песочницы: my-project/.gitignore не содержал .auth/ →
+  платформенные автокоммиты могли закоммитить токен. Добавлены .auth/,
+  Ai-game4/, aigame4, godot/ (игровое репо живёт внутри песочницы, но git
+  платформы его не трекает). Проверено git check-ignore — токен игнорируется.
+- cold_start.sh выполнен: .NET SDK 8.0.424 + 9.0.317, Godot 4.7.1 mono
+  (python-zipfile, персистентный my-project/godot), HEAD 5a084b0 = origin/main.
+- Импорт ресурсов: --headless --import (абсолютный путь) — .ctex сгенерированы.
+- Верификация полная: NEWGAME PASS (GameBoot, 14 фаз), COMBAT_SIM VERDICT
+  PASS, TRADE_DEBUG PASS (ассортимент 8 предметов), GEN_DEBUG PASS
+  (промо 16.8%/4.0%, оверкап 2/16), MAP 500×500 — 1411 мс.
+- Из COMBAT_SIM лога подтверждён ЛАТЕНТНЫЙ БАГ «per-attacker pending
+  technique»: npc→npc self-hit (npc_4f545fe0... → npc_4f545fe0...: 21).
+  Задокументирован ранее как P2-долг, актуален для MVP-фикса.
+- Прочитаны: README, START_PROMPT, SESSION_SUMMARY, SESSION_CONTEXT,
+  worklog (полностью, 1109 строк), cold_start.sh, PROJECT_CONCEPT,
+  AI_DEVELOPMENT_WORKFLOW, NPC_COMBAT_PREP, UI_DESIGN §6 (22 views).
+- Составлен план доработки до MVP (этапы M1-M6, см. ниже) и вынесен
+  пользователю вопрос по сейвам (замороженное решение Q8).
+
+Stage Summary:
+- Окружение развёрнуто и верифицировано: все 5 headless-тестов PASS.
+- Фазы NPC_COMBAT_PREP: 1,2,4,5,6,7 закрыты; остаток — Phase 3 (Faction),
+  Phase 8 ч.2 (ammo/луки), Phase 9 (thrown/dual-wield).
+- План MVP (предложен пользователю, ожидает подтверждения):
+  M1 стабилизация (self-hit баг) → M2 Tooltip/ContextMenu → M3 Quest Log UI
+  + стартовые квесты → M4 Faction port → M5 Save/load (ТРЕБУЕТ решения
+  пользователя по Q8) → M6 полировка MVP.
+- Push: коммит worklog-записи (этап «окружение + план»).
