@@ -56,6 +56,9 @@ namespace CultivationGame.Adapter.UI
         // не ждать регенерацию HP и не искать бандита по карте.
         [Inject] private IBodyService Body = null!;
         [Inject] private Modules.NPC.NPCSpawnerService NpcSpawner = null!;
+        // Phase 8 ч.2 (2026-09-03): дальний бой — экипировка лука + ranged-режим.
+        [Inject] private IEquipmentService Equipment = null!;
+        [Inject] private Modules.Player.PlayerCombatAdapter CombatAdapter = null!;
 
         private Label _statusLabel = null!;
         private Button _fastLeakButton = null!;
@@ -257,9 +260,16 @@ namespace CultivationGame.Adapter.UI
             vbox.AddChild(MakeLabel("▸ Физическая боевка (M2):", 12, new Color(0.94f, 0.83f, 0.66f)));
             var combatRow = new HBoxContainer { Name = "CombatTestRow" };
             combatRow.AddThemeConstantOverride("separation", 4);
-            combatRow.AddChild(MakeButton("Полное исцеление", 130, OnFullHeal));
-            combatRow.AddChild(MakeButton("Мишень-бандит", 130, OnSpawnTargetBandit));
+            combatRow.AddChild(MakeButton("Полное исцеление", 128, OnFullHeal));
+            combatRow.AddChild(MakeButton("Мишень-бандит", 132, OnSpawnTargetBandit));
             vbox.AddChild(combatRow);
+
+            // Phase 8 ч.2 (2026-09-03): дальний бой — лук + ranged-режим.
+            var rangedRow = new HBoxContainer { Name = "RangedTestRow" };
+            rangedRow.AddThemeConstantOverride("separation", 4);
+            rangedRow.AddChild(MakeButton("🏹 Лук в руки", 130, OnGiveBow));
+            rangedRow.AddChild(MakeButton("Дальний + мишень", 130, OnSpawnDistantTarget));
+            vbox.AddChild(rangedRow);
 
             // === Phase F: Верификация (dump) ===
             vbox.AddChild(MakeSeparator());
@@ -648,6 +658,44 @@ namespace CultivationGame.Adapter.UI
             string npcId = NpcSpawner.SpawnNPC(
                 "human", Core.Data.NPCRole.Enemy, 1, spawnPos, _seedCounter * 31);
             SetStatus($"Мишень-бандит: {npcId} @ ({spawnPos.X},{spawnPos.Y}) — бей Space");
+        }
+
+        /// <summary>
+        /// Phase 8 ч.2 (2026-09-03): выдать лук + надеть + переключить игрока
+        /// в режим дальнего боя. Полный цикл теста ranged-боёвки в один клик:
+        /// F2 → «Лук в руки» → Space (атака на дистанции оружия).
+        /// Уровень лука — по уровню культивации игрока (не выше 9).
+        /// </summary>
+        private void OnGiveBow()
+        {
+            if (EquipmentGenerator == null || Equipment == null || CombatAdapter == null)
+            { SetStatus("EquipmentGenerator/EquipmentService не инжектированы"); return; }
+            int level = Qi == null ? 1 : Math.Clamp((int)Qi.CultivationLevel, 1, 9);
+            var bow = EquipmentGenerator.GenerateWeapon(level, "bow");
+            if (!Equipment.TryEquip(EquipmentSlot.WeaponMain, bow))
+            { SetStatus($"Не удалось надеть '{bow.NameRu}' (слот занят?)"); return; }
+            CombatAdapter.SwitchToRangedMode();
+            SetStatus($"🏹 {bow.NameRu} (урон {bow.Damage}, дальность {bow.AttackRange} м) — " +
+                      $"режим дальнего боя. Space — выстрел, 1 — назад в melee");
+        }
+
+        /// <summary>
+        /// Phase 8 ч.2 (2026-09-03): «Дальний + мишень» — мишень-бандит на
+        /// дистанции 8 тайлов (вне melee 2.5, внутри дальности лука 18).
+        /// Пара к «Лук в руки»: клик → Space — верификация дальнего боя
+        /// в реальных условиях (не в headless-симе).
+        /// </summary>
+        private void OnSpawnDistantTarget()
+        {
+            if (NpcSpawner == null || Player == null) { SetStatus("NPCSpawnerService не инжектирован"); return; }
+            var pos = Player.Position;
+            // Дистанция 8: вне melee (2.5), внутри дальности лука (18).
+            var spawnPos = new Core.Data.Position2D(pos.X + 8, pos.Y);
+            _seedCounter++;
+            string npcId = NpcSpawner.SpawnNPC(
+                "human", Core.Data.NPCRole.Enemy, 1, spawnPos, _seedCounter * 37);
+            SetStatus($"Дальняя мишень: {npcId} @ ({spawnPos.X},{spawnPos.Y}) — дистанция 8, " +
+                      $"бей Space в режиме лука");
         }
 
         private static Label MakeLabel(string text, int fontSize, Color color)
