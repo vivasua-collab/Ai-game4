@@ -60,6 +60,10 @@ public class NPCModule : IModule
     private IDisposable? _playerPosSubscription;
     private Vector2 _playerPosition = Vector2.Zero;
 
+    // Phase 8 ч.2 (2026-09-03): дальнобойные NPC (лук/арбалет) бьют
+    // с дистанции оружия вместо melee-гейта dist>2.
+    [Inject] private readonly IEquipmentDataProvider _equipmentDataProvider = null!;
+
     public string ModuleName => "NPC";
 
     /// NPC attack cooldown (seconds of game time).
@@ -135,14 +139,23 @@ public class NPCModule : IModule
                 dy = System.Math.Abs((int)_playerPosition.Y - state.Position.Y);
             }
             int dist = System.Math.Max(dx, dy);
-            if (dist > 2) continue; /// вне физической досягаемости
+
+            // Phase 8 ч.2 (2026-09-03): дальность атаки — из экипированного
+            // оружия NPC (фаза 9A: AttackRange ≤ 2 = ближнее, > 2 = лук/арбалет).
+            // Раньше жёсткий гейт dist > 2: лучник с луком (range 18) мог
+            // бить только «в упор» — дальнее оружие не имело смысла.
+            var npcWeapon = _equipmentDataProvider?.GetEquipped(state.NpcId, EquipmentSlot.WeaponMain);
+            bool npcIsRanged = npcWeapon != null && npcWeapon.AttackRange > 2;
+            int maxAttackRange = npcIsRanged ? npcWeapon!.AttackRange : 2;
+            if (dist > maxAttackRange) continue; /// вне досягаемости оружия
 
             if (!_npcAttackTimers.TryGetValue(state.NpcId, out var last)) last = -999f;
             if (now - last < NpcAttackCooldownSec) continue;
 
             _npcAttackTimers[state.NpcId] = now;
+            // Phase 8 ч.2: isRanged → CombatService резолвит RangedProjectile + §4.2
             _attackIntentPub.Publish(new AttackIntentEvent(
-                state.NpcId, state.TargetId, "npc_strike", false));
+                state.NpcId, state.TargetId, "npc_strike", npcIsRanged));
         }
     }
 

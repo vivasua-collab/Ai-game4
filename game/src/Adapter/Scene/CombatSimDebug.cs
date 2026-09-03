@@ -43,6 +43,10 @@ public partial class CombatSimDebug : Node
     private readonly Dictionary<string, int> _damageByTarget = new();
     private int _eventsReceived;
 
+    // Phase 8 ч.2 (2026-09-03): трекинг ranged-попаданий (подтип RangedProjectile).
+    private int _rangedDamageEvents;
+    private int _rangedDamageTotal;
+
     private const string PlayerCombatId = "player_0"; // NPCAIService.PlayerId
 
     public override void _Ready()
@@ -66,7 +70,13 @@ public partial class CombatSimDebug : Node
             _eventsReceived++;
             _damageByTarget.TryGetValue(e.TargetId, out int sum);
             _damageByTarget[e.TargetId] = sum + e.Damage;
-            GD.Print($"[CombatSim] damage: {e.SourceId} → {e.TargetId}: {e.Damage} ({e.Result}, part={e.HitPart})");
+            // Phase 8 ч.2: ranged-попадания (стрелы должны идти как RangedProjectile)
+            if (e.AttackSubtype == CombatSubtype.RangedProjectile)
+            {
+                _rangedDamageEvents++;
+                _rangedDamageTotal += e.Damage;
+            }
+            GD.Print($"[CombatSim] damage: {e.SourceId} → {e.TargetId}: {e.Damage} ({e.Result}, part={e.HitPart}, sub={e.AttackSubtype})");
         });
 
         GD.Print("[CombatSim] Ready — scripted combat verification starts in 2s");
@@ -192,6 +202,58 @@ public partial class CombatSimDebug : Node
             GD.Print("[CombatSim] skip weapon phase — IEquipmentService/Generator not injected");
         }
 
+        // 3c. Phase 8 ч.2: end-to-end ДАЛЬНИЙ БОЙ — лук + цель на дистанции 8
+        // (вне melee 2.5, внутри дальности лука 18). Проверяем: игрок с луком
+        // и isRanged=true наносит урон на дистанции, подтип — RangedProjectile.
+        bool rangedWiringOk = true;
+        if (_equipmentService != null && _equipmentGenerator != null && _playerService != null)
+        {
+            GD.Print("[CombatSim] letting armed-swing pending settle before ranged phase...");
+            await ToSignal(GetTree().CreateTimer(1.4), SceneTreeTimer.SignalName.Timeout);
+
+            var bow = _equipmentGenerator.GenerateWeapon(level: 3, subtype: "bow");
+            bool bowEquipped = _equipmentService.TryEquip(EquipmentSlot.WeaponMain, bow);
+            if (bowEquipped)
+            {
+                GD.Print($"[CombatSim] player equipped bow '{bow.NameRu}' (dmg={bow.Damage}, range={bow.AttackRange})");
+
+                // Телепорт NPC на дистанцию 8 — вне melee, внутри дальности лука.
+                var playerPos = _playerService.Position;
+                var npcState = _npcService.GetNPCState(npcId);
+                int npcHpBeforeRanged = _bodyProvider.GetCurrentHealth(npcId);
+                int rangedDamageBefore = _rangedDamageTotal;
+                if (npcState != null)
+                {
+                    npcState.Position = new Position2D(playerPos.X + 8, playerPos.Y);
+                    GD.Print($"[CombatSim] NPC {npcId} at distance 8 (melee=2.5, bow={bow.AttackRange})");
+                }
+
+                _attackIntentPub.Publish(new Core.Messaging.Contracts.AttackIntentEvent(
+                    PlayerCombatId, npcId, "basic_attack", isRanged: true));
+                // Каст 0.5с (натяжение лука) разрешится тиком — ждём.
+                await ToSignal(GetTree().CreateTimer(1.6), SceneTreeTimer.SignalName.Timeout);
+
+                int npcHpAfterRanged = _bodyProvider.GetCurrentHealth(npcId);
+                int rangedSwing = npcHpBeforeRanged - npcHpAfterRanged;
+                int rangedSubtyped = _rangedDamageTotal - rangedDamageBefore;
+                GD.Print($"[CombatSim] ranged shot: npc HP {npcHpBeforeRanged}→{npcHpAfterRanged} " +
+                         $"({rangedSwing} dmg, subtyped RangedProjectile events={rangedSubtyped})");
+                rangedWiringOk = rangedSwing > 0 && rangedSubtyped > 0;
+                if (rangedSwing <= 0)
+                    GD.Print("[CombatSim] FAIL — ranged shot did no damage at distance 8 (range gate broken?)");
+                if (rangedSubtyped <= 0)
+                    GD.Print("[CombatSim] FAIL — no RangedProjectile-subtyped damage (subtype resolution broken?)");
+            }
+            else
+            {
+                GD.Print("[CombatSim] WARN — TryEquip(bow) failed");
+            }
+        }
+        else
+        {
+            GD.Print("[CombatSim] skip ranged phase — services not injected");
+        }
+
         // 4. Итоги.
         int playerHpAfter = _bodyProvider.GetCurrentHealth("player");
         int npcHpAfter = _bodyProvider.GetCurrentHealth(npcId);
@@ -199,17 +261,19 @@ public partial class CombatSimDebug : Node
         bool playerTookDamage = playerHpAfter < playerHpBefore;
         bool npcTookDamage = _damageByTarget.TryGetValue(npcId, out int npcDamage) && npcDamage > 0;
 
-        GD.Print($"[CombatSim] summary: events={_eventsReceived}, " +
+        GD.Print($"[CombatSim] summary: events={_eventsReceived} (ranged-subtyped={_rangedDamageEvents}), " +
                  $"player {playerHpBefore}→{playerHpAfter} ({(playerHpBefore - playerHpAfter)} dmg), " +
                  $"npc {npcHpBefore}→{npcHpAfter}");
 
-        bool pass = playerTookDamage && npcTookDamage && weaponWiringOk;
+        bool pass = playerTookDamage && npcTookDamage && weaponWiringOk && rangedWiringOk;
         if (!playerTookDamage)
             GD.Print("[CombatSim] FAIL — NPC→player damage did NOT apply (BodyService player-id mismatch?)");
         if (!npcTookDamage)
             GD.Print("[CombatSim] FAIL — player→NPC damage did NOT apply (attack pipeline broken?)");
         if (!weaponWiringOk)
             GD.Print("[CombatSim] FAIL — armed swing did no damage (weapon wiring broken?)");
+        if (!rangedWiringOk)
+            GD.Print("[CombatSim] FAIL — ranged (bow) phase broken (Phase 8 ч.2 wiring?)");
 
         PrintVerdict(pass);
     }
@@ -233,6 +297,6 @@ public partial class CombatSimDebug : Node
 
     private static void PrintVerdict(bool pass)
     {
-        GD.Print($"[CombatSim] VERDICT: {(pass ? "PASS — обе стороны боя получают урон" : "FAIL")}");
+        GD.Print($"[CombatSim] VERDICT: {(pass ? "PASS — обе стороны боя получают урон (melee + ranged)" : "FAIL")}");
     }
 }

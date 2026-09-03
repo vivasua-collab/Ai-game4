@@ -12,12 +12,17 @@ namespace CultivationGame.Modules.Player;
 /// PlayerCombatAdapter — bridges player input and combat via EventBus.
 ///
 /// ARCHITECTURE: cross-module interactions go through EventBus only — no
-/// direct injection of ICombatService / IBodyService. The one sanctioned
-/// exception is INPCService for target selection (same pattern as
-/// NPCCombatAdapter injecting NPCService). Subscribes to
+/// direct injection of ICombatService / IBodyService. The two sanctioned
+/// exceptions are INPCService for target selection and IEquipmentDataProvider
+/// for weapon-mode resolution (same pattern as NPCCombatAdapter injecting
+/// NPCService). Subscribes to
 /// <see cref="CombatStartedEvent"/> / <see cref="CombatEndedEvent"/> and
 /// <see cref="DamageAppliedEvent"/>. Publishes <see cref="AttackIntentEvent"/>
 /// with a resolved TargetId (NPC_COMBAT_PREP Phase 6: target selection).
+///
+/// Phase 8 ч.2 (2026-09-03): режим оружия (Melee/Ranged). Клавиши 1/2
+/// (GameWorldController) переключают режим; Space в Ranged-режиме с луком
+/// атакует цель на дистанции оружия (EquipmentData.AttackRange, §10.2).
 /// </summary>
 public sealed class PlayerCombatAdapter : IDisposable
 {
@@ -25,6 +30,7 @@ public sealed class PlayerCombatAdapter : IDisposable
     [Inject] private readonly IPlayerInputService _input = null!;
     [Inject] private readonly INPCService _npcs = null!;
     [Inject] private readonly IStatProvider _stats = null!;
+    [Inject] private readonly IEquipmentDataProvider _equipment = null!;
     [Inject] private readonly IPublisher<AttackIntentEvent> _attackIntentPub = null!;
     [Inject] private readonly ISubscriber<CombatStartedEvent> _combatStartedSub = null!;
     [Inject] private readonly ISubscriber<CombatEndedEvent> _combatEndedSub = null!;
@@ -43,9 +49,55 @@ public sealed class PlayerCombatAdapter : IDisposable
 
     private float _attackCooldownSec;
 
+    // === Phase 8 ч.2 (2026-09-03): режим оружия (клавиши 1/2) ===
+
+    /// <summary>Режим оружия игрока: Melee (кулаки/ближнее) или Ranged (лук).</summary>
+    public WeaponMode CurrentWeaponMode { get; private set; } = WeaponMode.Melee;
+
     private IDisposable? _combatStartedToken;
     private IDisposable? _combatEndedToken;
     private IDisposable? _damageToken;
+
+    /// <summary>
+    /// Phase 8 ч.2: режим оружия игрока (Melee по умолчанию).
+    /// переключается клавишами 1/2 (GameWorldController).
+    /// </summary>
+    public enum WeaponMode
+    {
+        /// <summary>Кулаки или ближнее оружие (Space, дистанция 2.5)</summary>
+        Melee = 0,
+        /// <summary>Дальнобойное оружие — лук/арбалет (дистанция оружия)</summary>
+        Ranged = 1,
+    }
+
+    /// <summary>
+    /// Phase 8 ч.2: экипированное дальнобойное оружие или null.
+    /// Дальнобойное = EquipmentData.AttackRange > 2 (фаза 9A: ≤2 ближний, >2 дальний).
+    /// </summary>
+    public EquipmentData? GetRangedWeapon()
+    {
+        var weapon = _equipment?.GetEquipped(_player.PlayerId, EquipmentSlot.WeaponMain);
+        return weapon != null && weapon.AttackRange > 2 ? weapon : null;
+    }
+
+    /// <summary>
+    /// Phase 8 ч.2: переключить в режим дальнего боя. Успешен только
+    /// при экипированном дальнобойном оружии (иначе переключение не имеет
+    /// смысла — стрелять нечем). Возвращает описание для тоста.
+    /// </summary>
+    public bool SwitchToRangedMode()
+    {
+        var weapon = GetRangedWeapon();
+        if (weapon == null) return false;
+        CurrentWeaponMode = WeaponMode.Ranged;
+        return true;
+    }
+
+    /// <summary>Phase 8 ч.2: переключиться в режим ближнего боя (всегда доступно — кулаки).</summary>
+    public void SwitchToMeleeMode()
+    {
+        CurrentWeaponMode = WeaponMode.Melee;
+    }
 
     public void Start()
     {
@@ -64,13 +116,22 @@ public sealed class PlayerCombatAdapter : IDisposable
         }
         if (!_input.IsAttackPressed) return;
 
-        string? target = FindNearestTarget();
+        // Phase 8 ч.2: резолв режима — Ranged требует экипированный лук;
+        // если лук сняли после переключения — атака уходит в melee (кулаки/ближнее).
+        bool wantRanged = CurrentWeaponMode == WeaponMode.Ranged;
+        var rangedWeapon = wantRanged ? GetRangedWeapon() : null;
+        bool isRanged = rangedWeapon != null;
+        float attackRange = isRanged ? rangedWeapon!.AttackRange : AttackRangeTiles;
+
+        string? target = FindNearestTarget(attackRange);
         if (target == null) return; // Nothing in range — no attack intent.
 
         // TargetId resolves the attack: CombatModule starts combat and runs
         // the 11-layer damage pipeline on ExecuteAttack.
+        // Phase 8 ч.2: isRanged → CombatService резолвит подтип RangedProjectile
+        // и урон дальнобойного оружия (§4.2: AGI 2.5% + INT 5%).
         _attackIntentPub.Publish(new AttackIntentEvent(
-            _player.PlayerId, target, "basic_attack", false));
+            _player.PlayerId, target, "basic_attack", isRanged));
 
         // Кулдаун ставится только на УСПЕШНЫЙ интент (цель найдена) —
         // атака «вхолостую» не блокирует следующий замах.
@@ -90,15 +151,17 @@ public sealed class PlayerCombatAdapter : IDisposable
     }
 
     /// <summary>
-    /// Target selection (Phase 6): nearest alive NPC within melee range of
+    /// Target selection (Phase 6): nearest alive NPC within attack range of
     /// the player, Chebyshev distance (matches harvest/interaction reach).
+    /// Phase 8 ч.2: range параметризован — 2.5 для melee, AttackRange оружия
+    /// для ranged (§10.2: лук — 18 тайлов).
     /// </summary>
-    private string? FindNearestTarget()
+    private string? FindNearestTarget(float rangeTiles)
     {
         if (_npcs == null || _player == null) return null;
 
         var playerPos = _player.Position;
-        var nearby = _npcs.GetNearbyNPCIds(playerPos, AttackRangeTiles);
+        var nearby = _npcs.GetNearbyNPCIds(playerPos, rangeTiles);
         if (nearby == null || nearby.Count == 0) return null;
 
         string? best = null;

@@ -1038,18 +1038,30 @@ public partial class GameWorldController : Node2D
             _cultivationWindow?.Toggle();
         }
 
-        // D: 1 — выбор ближнего оружия (зарезервировано, weapon switching system pending).
+        // D: 1 — выбор ближнего оружия. Phase 8 ч.2 (2026-09-03): реальный
+        // режим ближнего боя (кулаки/меч) вместо «зарезервировано».
         if (PlayerInput.IsWeaponMeleePressed)
         {
+            CombatAdapter.SwitchToMeleeMode();
             ToastPub?.Publish(new Core.Messaging.Contracts.ToastShownEvent(
-                "Слот 1: оружие ближнего боя (зарезервировано)", 1.5f));
+                "Режим: ближний бой (Space — удар)", 1.5f));
         }
 
-        // D: 2 — выбор дальнего оружия (зарезервировано).
+        // D: 2 — выбор дальнего оружия. Phase 8 ч.2: переключение в ranged
+        // при экипированном луке/арбалете (WeaponMain, AttackRange > 2).
         if (PlayerInput.IsWeaponRangedPressed)
         {
-            ToastPub?.Publish(new Core.Messaging.Contracts.ToastShownEvent(
-                "Слот 2: оружие дальнего боя (зарезервировано)", 1.5f));
+            if (CombatAdapter.SwitchToRangedMode())
+            {
+                var bow = CombatAdapter.GetRangedWeapon();
+                ToastPub?.Publish(new Core.Messaging.Contracts.ToastShownEvent(
+                    $"Режим: дальний бой — {bow!.NameRu} (дальность {bow.AttackRange} м)", 2.0f));
+            }
+            else
+            {
+                ToastPub?.Publish(new Core.Messaging.Contracts.ToastShownEvent(
+                    "Нет дальнобойного оружия — экипируйте лук в слот оружия (I)", 2.5f));
+            }
         }
 
         // D: 3..9 — каст техники из назначенного слота (CultivationWindow → slot → technique).

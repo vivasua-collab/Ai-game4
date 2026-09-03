@@ -97,6 +97,11 @@ namespace CultivationGame.Modules.Combat
         // 1000 = базовая (NPC/без зарядки); >1000 = заряженная игроком (множитель урона).
         private int _lastAttackPotencyPermil = GameConstants.POTENCY_BASE_PERMIL;
 
+        // Phase 8 ч.2 (2026-09-03): ranged-флаг текущей атаки (паттерн
+        // _lastAttackPotencyPermil — мгновенный путь; pending несёт свой).
+        // true → подтип RangedProjectile + урон дальнобойного оружия (§4.2).
+        private bool _lastAttackIsRanged;
+
         // IDisposable для подписок
         private IDisposable _qiDepletedSubscription;
         private IDisposable _qiChangedSubscription;
@@ -355,6 +360,7 @@ namespace CultivationGame.Modules.Combat
             if (isCharged || potencyPermil > GameConstants.POTENCY_BASE_PERMIL)
             {
                 _lastAttackPotencyPermil = potencyPermil;
+                _lastAttackIsRanged = isRanged;
                 ApplyTechniqueImmediately(attackerId, techniqueId);
                 return;
             }
@@ -380,6 +386,9 @@ namespace CultivationGame.Modules.Combat
 
             // Запоминаем potency для BuildAndExecuteDamageRequest (после pending-таймера)
             _lastAttackPotencyPermil = potencyPermil;
+            // Phase 8 ч.2: ranged-флаг тоже переживает pending-таймер
+            // (иначе выстрел из лука после 0.5с «натяжения» забывал бы подтип).
+            _lastAttackIsRanged = isRanged;
 
             if (effectiveCastTime > 0.15f)
             {
@@ -394,6 +403,7 @@ namespace CultivationGame.Modules.Combat
                     TechniqueId = techniqueId,
                     TargetId = castTargetId,
                     PotencyPermil = potencyPermil,
+                    IsRanged = isRanged,
                     RemainingCastTime = effectiveCastTime,
                     TotalCastTime = effectiveCastTime
                 };
@@ -419,13 +429,16 @@ namespace CultivationGame.Modules.Combat
         /// M1 (2026-09-03): + explicitDefenderId/explicitPotencyPermil — pending-каст
         /// передаёт запомненные цель и potency (per-attacker), мгновенный путь
         /// оставляет null → прежний резолв из текущего состояния боя.
+        /// Phase 8 ч.2 (2026-09-03): + explicitIsRanged — pending-каст передаёт
+        /// запомненный ranged-флаг каста.
         /// </summary>
         private void ApplyTechniqueImmediately(string attackerId, string techniqueId,
-            string explicitDefenderId = null, int? explicitPotencyPermil = null)
+            string explicitDefenderId = null, int? explicitPotencyPermil = null,
+            bool? explicitIsRanged = null)
         {
             // Делегируем общую логику в BuildAndExecuteDamageRequest
             // Редактировано: 2026-05-22 13:50:00 UTC — Этап 3.1: рефакторинг дублирования P1-8.1
-            BuildAndExecuteDamageRequest(attackerId, techniqueId, explicitDefenderId, explicitPotencyPermil);
+            BuildAndExecuteDamageRequest(attackerId, techniqueId, explicitDefenderId, explicitPotencyPermil, explicitIsRanged);
         }
 
         /// <summary>
@@ -436,7 +449,8 @@ namespace CultivationGame.Modules.Combat
         /// расчёт урона, публикацию события, проверку фатальности, переход хода.
         /// </summary>
         private void BuildAndExecuteDamageRequest(string attackerId, string techniqueId,
-            string explicitDefenderId = null, int? explicitPotencyPermil = null)
+            string explicitDefenderId = null, int? explicitPotencyPermil = null,
+            bool? explicitIsRanged = null)
         {
             // CMB-A10: получаем урон из данных техники вместо хардкода
             int baseDamage = GetTechniqueDamage(techniqueId);
@@ -448,6 +462,15 @@ namespace CultivationGame.Modules.Combat
             // M1: pending-каст подставляет potency СВОЕГО кастера (per-attacker);
             // мгновенный путь — глобальный _lastAttackPotencyPermil как раньше.
             int potencyPermil = explicitPotencyPermil ?? _lastAttackPotencyPermil;
+
+            // Phase 8 ч.2 (2026-09-03): ranged-флаг атаки (лук/арбалет).
+            // pending-каст несёт флаг каста; мгновенный путь — глобальный флаг.
+            // Базовая атака луком: подтип RangedProjectile + AttackType.Ranged
+            // (INT scaling §4.2); стрела — Physical урон (материя, не Ци-снаряд;
+            // GetTechniqueDamageType(null) уже возвращает Physical — не трогаем).
+            bool isRanged = explicitIsRanged ?? _lastAttackIsRanged;
+            if (isRanged && _techniqueService.GetTechnique(techniqueId) == null)
+                attackType = AttackType.Ranged;
 
             // M1 (2026-09-03): pending-каст уже знает свою цель (запомнена на старте).
             // Мгновенный путь — прежний резолв из текущего состояния боя.
@@ -539,9 +562,15 @@ namespace CultivationGame.Modules.Combat
             // Спринт 6 C4 + Phase 8: урон оружия для melee_weapon-техник И базовой
             // атаки с оружием (раньше удар игрока всегда давал 10 — кулак,
             // экипированное оружие не влияло на урон).
-            bool hasWeapon = _equipmentDataProvider.GetEquipped(attackerId, EquipmentSlot.WeaponMain) != null;
+            // Phase 8 ч.2 (2026-09-03): + ranged-ветка — урон дальнобойного
+            // оружия (лук) по §4.2 (AGI 2.5% + INT 5%), НЕ по melee-формуле STR/AGI.
+            var equippedWeapon = _equipmentDataProvider.GetEquipped(attackerId, EquipmentSlot.WeaponMain);
+            bool hasWeapon = equippedWeapon != null;
+            // Фаза 9A: AttackRange ≤ 2 — ближнее, > 2 — дальнобойное (лук = 18)
+            bool isRangedWeapon = isRanged && equippedWeapon != null && equippedWeapon.AttackRange > 2;
             bool useWeaponDamage = (tech != null && tech.Subtype == CombatSubtype.MeleeWeapon)
-                                   || (tech == null && hasWeapon);
+                                   || (tech == null && hasWeapon && !isRangedWeapon)
+                                   || isRangedWeapon;
             if (useWeaponDamage)
             {
                 int weaponDamage = _equipmentDataProvider.HasEntity(attackerId)
@@ -549,8 +578,13 @@ namespace CultivationGame.Modules.Combat
                     : 0;
                 if (weaponDamage > 0)
                 {
-                    int weaponBonus = WeaponDamageCalculator.CalculateMeleeWeaponDamage(
-                        weaponDamage, attackerSTR, attackerAGI);
+                    // Phase 8 ч.2: дальнобойное оружие — своя формула (§4.2),
+                    // меч — прежняя melee-формула (STR/AGI, §4.1).
+                    int weaponBonus = isRangedWeapon
+                        ? WeaponDamageCalculator.CalculateRangedWeaponDamage(
+                            weaponDamage, attackerAGI, attackerINT)
+                        : WeaponDamageCalculator.CalculateMeleeWeaponDamage(
+                            weaponDamage, attackerSTR, attackerAGI);
                     // Заменить BaseDamage на урон оружия, если он больше
                     baseDamage = Math.Max(baseDamage, weaponBonus);
                 }
@@ -582,10 +616,14 @@ namespace CultivationGame.Modules.Combat
             // (раньше всегда MeleeStrike — вооружённый удар шёл как «безоружный»:
             // бонус урона считался, но подтип врал в последствиях: кровотечение
             // slashing/piercing не триггерилось для оружия).
-            // TODO isRanged (NPC_COMBAT_PREP Phase 8 ч.2): лук/арбалет → RangedProjectile
-            // (требует ammo + ProjectileRenderer — отложено до Phase 8 ч.2).
+            // Phase 8 ч.2 (2026-09-03): ranged-атака с луком → RangedProjectile
+            // (закрыт TODO NPC_COMBAT_PREP Phase 8 ч.2). Подтип задаёт INT-scaling
+            // и piercing-последствия (стрела колет — кровотечение, P2-7.3).
+            // Ammo (расход стрел) и ProjectileRenderer (визуал трассера) —
+            // следующие итерации (см. docs_v2 COMBAT_SYSTEM.md §4.2).
             CombatSubtype attackSubtype = tech?.Subtype
-                ?? (hasWeapon ? CombatSubtype.MeleeWeapon : CombatSubtype.MeleeStrike);
+                ?? (isRangedWeapon ? CombatSubtype.RangedProjectile
+                : (hasWeapon ? CombatSubtype.MeleeWeapon : CombatSubtype.MeleeStrike));
 
             var request = new DamageRequest(
                 attackerId,
@@ -731,9 +769,10 @@ namespace CultivationGame.Modules.Combat
                     string techniqueId = _pendingTechnique.TechniqueId;
                     string pendingTargetId = _pendingTechnique.TargetId;   // M1: цель на момент старта каста
                     int pendingPotencyPermil = _pendingTechnique.PotencyPermil; // M1: potency кастера
+                    bool pendingIsRanged = _pendingTechnique.IsRanged;     // Phase 8 ч.2: ranged-флаг каста
                     _isCasting = false;
                     _pendingTechnique = default;
-                    ApplyTechniqueImmediately(attackerId, techniqueId, pendingTargetId, pendingPotencyPermil);
+                    ApplyTechniqueImmediately(attackerId, techniqueId, pendingTargetId, pendingPotencyPermil, pendingIsRanged);
                 }
             }
         }
@@ -890,6 +929,7 @@ namespace CultivationGame.Modules.Combat
             public string TechniqueId;
             public string TargetId;        // M1: defender на момент старта каста
             public int PotencyPermil;      // M1: potency кастера на момент старта
+            public bool IsRanged;          // Phase 8 ч.2: ranged-флаг каста (лук)
             public float RemainingCastTime;
             public float TotalCastTime;
         }

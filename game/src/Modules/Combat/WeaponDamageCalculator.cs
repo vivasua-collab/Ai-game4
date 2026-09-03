@@ -57,5 +57,30 @@ namespace CultivationGame.Modules.Combat
         {
             return 3 + (attackerSTR - 10) * 3 / 10;
         }
+
+        /// <summary>
+        /// Phase 8 ч.2 (2026-09-03): урон дальнобойного оружия (лук/арбалет)
+        /// для ranged-атаки без техники. COMBAT_SYSTEM.md §4.2:
+        /// ranged-подтипы получают бонусы AGI 2.5% + INT 5%.
+        ///
+        /// Формула (по аналогии с §4.3 melee_weapon, integer math):
+        /// - baseDmg  = max(2, weaponDamage / 2)        — лук не бьёт кулаком
+        /// - bonusDmg = weaponDamage × (AGI×25 + INT×50) / 1000
+        ///
+        /// ЗАПРЕТ 3.9: целочисленная арифметика.
+        /// </summary>
+        public static int CalculateRangedWeaponDamage(
+            int weaponDamage, int attackerAGI, int attackerINT)
+        {
+            // База — половина урона оружия (стрела слабее клинка,
+            // минимальный порог 2, т.к. рук нет в схеме)
+            int baseDmg = Math.Max(2, weaponDamage / 2);
+
+            // §4.2: stat scaling AGI 2.5% + INT 5%
+            // В integer math: weaponDamage × (AGI×25 + INT×50) / 1000
+            int bonusDmg = weaponDamage * (attackerAGI * 25 + attackerINT * 50) / 1000;
+
+            return baseDmg + bonusDmg;
+        }
     }
 }
