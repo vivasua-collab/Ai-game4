@@ -114,6 +114,15 @@ namespace CultivationGame.Modules.Combat
         public CombatStage CurrentStage => _currentStage;
         public string CurrentTargetId => _currentTargetId;
 
+        /// <summary>
+        /// Phase 8 ч.3 (2026-09-03): идёт ли pending-каст (натяжение лука /
+        /// каст техники). CombatModule спрашивает ПЕРЕД гейтом расхода стрел:
+        /// попытка выстрела во время каста отклоняется по C-5 БЕЗ траты
+        /// стрелы (иначе игрок терял бы расходник на каждую отклонённую
+        /// попытку — гейт ампы вызывается только для «реального» выстрела).
+        /// </summary>
+        public bool IsCasting => _isCasting;
+
         // === Конструктор (VContainer) ===
 
         public CombatService(

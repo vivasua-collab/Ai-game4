@@ -56,6 +56,8 @@ public partial class SceneBuilder : Node
         SetupFormationVisuals();
         // NPC_COMBAT_PREP Phase 7: floating damage numbers (DamageAppliedEvent).
         SetupDamageNumbers();
+        // Phase 8 ч.3 (2026-09-03): трассер стрел (полёт + вспышка попадания).
+        SetupProjectiles();
     }
 
     /// <summary>
@@ -198,6 +200,15 @@ public partial class SceneBuilder : Node
     {
         _damageNumberRenderer = new DamageNumberRenderer();
         _worldRoot.AddChild(_damageNumberRenderer);
+    }
+
+    /// <summary>Phase 8 ч.3: трассер снарядов дальнего боя (стрелы).</summary>
+    private ProjectileRenderer? _projectileRenderer;
+
+    private void SetupProjectiles()
+    {
+        _projectileRenderer = new ProjectileRenderer();
+        _worldRoot.AddChild(_projectileRenderer);
     }
 
     /// <summary>

@@ -5,6 +5,7 @@ using CultivationGame.Core.DI;
 using CultivationGame.Core.Events;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Core.Messaging.Contracts;
+using CultivationGame.Modules.Combat; // Phase 8 ч.3: CombatLos (LOS-фильтр цели)
 
 namespace CultivationGame.Modules.Player;
 
@@ -23,6 +24,10 @@ namespace CultivationGame.Modules.Player;
 /// Phase 8 ч.2 (2026-09-03): режим оружия (Melee/Ranged). Клавиши 1/2
 /// (GameWorldController) переключают режим; Space в Ranged-режиме с луком
 /// атакует цель на дистанции оружия (EquipmentData.AttackRange, §10.2).
+/// Phase 8 ч.3 (2026-09-03): LOS-фильтр выбора цели — прицеливание в
+/// ближайшую ВИДИМУЮ цель (не сквозь дерево/камень); все цели перекрыты →
+/// тост-отклонение + пауза прицеливания (анти-спам). Третья санкционированная
+/// инъекция — ITileService (позиционная проверка LOS, паттерн NPC-B05).
 /// </summary>
 public sealed class PlayerCombatAdapter : IDisposable
 {
@@ -31,7 +36,10 @@ public sealed class PlayerCombatAdapter : IDisposable
     [Inject] private readonly INPCService _npcs = null!;
     [Inject] private readonly IStatProvider _stats = null!;
     [Inject] private readonly IEquipmentDataProvider _equipment = null!;
+    // Phase 8 ч.3: LOS-фильтр цели (паттерн «sanctioned exceptions»)
+    [Inject] private readonly ITileService? _tiles = null;
     [Inject] private readonly IPublisher<AttackIntentEvent> _attackIntentPub = null!;
+    [Inject] private readonly IPublisher<AttackRejectedEvent> _attackRejectedPub = null!;
     [Inject] private readonly ISubscriber<CombatStartedEvent> _combatStartedSub = null!;
     [Inject] private readonly ISubscriber<CombatEndedEvent> _combatEndedSub = null!;
     [Inject] private readonly ISubscriber<DamageAppliedEvent> _damageSub = null!;
@@ -46,6 +54,13 @@ public sealed class PlayerCombatAdapter : IDisposable
     /// атака быстрее спеки. Теперь удержание Space = автоатака с темпом §8.1-8.2.
     /// </summary>
     public const float BaseAttackCooldownSec = 1.0f;
+
+    /// <summary>
+    /// Phase 8 ч.3: пауза повторного прицеливания, когда все цели в радиусе
+    /// перекрыты препятствием (тост «нет линии огня» не чаще 1/0.4с —
+    /// зажатый Space не спамит ни интенты, ни тосты).
+    /// </summary>
+    public const float LosRetryCooldownSec = 0.4f;
 
     private float _attackCooldownSec;
 
@@ -123,13 +138,29 @@ public sealed class PlayerCombatAdapter : IDisposable
         bool isRanged = rangedWeapon != null;
         float attackRange = isRanged ? rangedWeapon!.AttackRange : AttackRangeTiles;
 
-        string? target = FindNearestTarget(attackRange);
-        if (target == null) return; // Nothing in range — no attack intent.
+        // Phase 8 ч.3: ranged — прицеливание только в ВИДИМЫЕ цели (LOS).
+        // Ближайший по дистанции, но за камнем → берём ближайшего видимого.
+        string? target = FindNearestTarget(attackRange, isRanged, out int blockedByLos);
+        if (target == null)
+        {
+            // Цели в радиусе ЕСТЬ, но все перекрыты препятствием → тост
+            // (не каждый кадр: пауза прицеливания 0.4с = анти-спам).
+            if (isRanged && blockedByLos > 0)
+            {
+                _attackRejectedPub.Publish(new AttackRejectedEvent(
+                    _player.PlayerId, "basic_attack",
+                    "нет линии огня — препятствие на пути стрелы"));
+                _attackCooldownSec = LosRetryCooldownSec;
+            }
+            return; // Nothing VISIBLE in range — no attack intent.
+        }
 
         // TargetId resolves the attack: CombatModule starts combat and runs
         // the 11-layer damage pipeline on ExecuteAttack.
         // Phase 8 ч.2: isRanged → CombatService резолвит подтип RangedProjectile
         // и урон дальнобойного оружия (§4.2: AGI 2.5% + INT 5%).
+        // Phase 8 ч.3: CombatModule-гейт проверит LOS ещё раз (авторитетно
+        // для всех источников интентов) и спишет стрелу при прохождении.
         _attackIntentPub.Publish(new AttackIntentEvent(
             _player.PlayerId, target, "basic_attack", isRanged));
 
@@ -155,9 +186,14 @@ public sealed class PlayerCombatAdapter : IDisposable
     /// the player, Chebyshev distance (matches harvest/interaction reach).
     /// Phase 8 ч.2: range параметризован — 2.5 для melee, AttackRange оружия
     /// для ranged (§10.2: лук — 18 тайлов).
+    /// Phase 8 ч.3: requireLos — ranged-прицеливание пропускает цели без
+    /// линии огня (CombatLos: Bresenham, блок — дерево/камень); melee без
+    /// изменений (ближний бой сквозь препятствие не бывает — дистанция 2.5).
+    /// blockedByLos: сколько целей в радиусе отброшено по LOS (для тоста).
     /// </summary>
-    private string? FindNearestTarget(float rangeTiles)
+    private string? FindNearestTarget(float rangeTiles, bool requireLos, out int blockedByLos)
     {
+        blockedByLos = 0;
         if (_npcs == null || _player == null) return null;
 
         var playerPos = _player.Position;
@@ -174,7 +210,17 @@ public sealed class PlayerCombatAdapter : IDisposable
             int dist = Math.Max(
                 Math.Abs(npc.Position.X - playerPos.X),
                 Math.Abs(npc.Position.Y - playerPos.Y));
-            if (dist < bestDist) { bestDist = dist; best = id; }
+            if (dist >= bestDist) continue; // строго ближе — иначе дёшево
+
+            // Phase 8 ч.3: LOS-фильтр (только ranged).
+            if (requireLos && !CombatLos.HasLineOfSight(
+                    _tiles, playerPos.X, playerPos.Y, npc.Position.X, npc.Position.Y))
+            {
+                blockedByLos++;
+                continue;
+            }
+            bestDist = dist;
+            best = id;
         }
         return best;
     }

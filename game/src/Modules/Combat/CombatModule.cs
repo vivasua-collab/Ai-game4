@@ -36,6 +36,11 @@ public class CombatModule : IModule
     // P2-8.3 FIX: IBodyDataProvider для обновления _cachedEnemyHpRatio
     [Inject] private readonly IBodyDataProvider _bodyDataProvider = null!;
 
+    // Phase 8 ч.3 (2026-09-03): гейт дальнего боя (LOS + расход стрел)
+    // и публикация отклонений (тот же контракт C-5, что и у CombatService).
+    [Inject] private readonly CombatRangeGateService _rangeGate = null!;
+    [Inject] private readonly IPublisher<AttackRejectedEvent> _attackRejectedPub = null!;
+
     // Подписка на события
     [Inject] private readonly ISubscriber<EnemyKilledEvent> _enemyKilledSub = null!;
     [Inject] private readonly ISubscriber<CombatEndedEvent> _combatEndedSub = null!;
@@ -201,10 +206,36 @@ public class CombatModule : IModule
 
     /// <summary>
     /// Фаза 9D: Обработчик AttackIntentEvent — боевой мост.
+    /// Phase 8 ч.3 (2026-09-03): для ranged-интентов — авторитетный гейт
+    /// (LOS + стрелы) ДО StartCombat/ExecuteAttack: выстрел сквозь камень
+    /// не должен начинать бой и тратить стрелу. Паттерн отклонения — C-5
+    /// (AttackRejectedEvent, тост только для игрока — GameWorldController).
     /// </summary>
     private void OnAttackIntent(in AttackIntentEvent e)
     {
         if (!_isConfigured) return;
+
+        // Phase 8 ч.3: гейт дальнего боя. Каст в процессе → пропускаем
+        // гейт (стрелу НЕ тратим), ExecuteAttack сам отклонит по C-5.
+        // Пустой TargetId (легаси авто-выбор) — гейт не нужен: цель
+        // резолвится внутри ExecuteAttack, расход не списываем.
+        if (e.IsRanged && !string.IsNullOrEmpty(e.TargetId) && !_combatServiceImpl.IsCasting)
+        {
+            if (!_rangeGate.HasLineOfSight(e.AttackerId, e.TargetId))
+            {
+                _attackRejectedPub.Publish(new AttackRejectedEvent(
+                    e.AttackerId, e.TechniqueId,
+                    "нет линии огня — препятствие на пути стрелы"));
+                return;
+            }
+            if (!_rangeGate.TryConsumeRangedAmmo(e.AttackerId))
+            {
+                _attackRejectedPub.Publish(new AttackRejectedEvent(
+                    e.AttackerId, e.TechniqueId,
+                    "нет стрел — колчан пуст"));
+                return;
+            }
+        }
 
         if (!_combatService.IsInCombat && !string.IsNullOrEmpty(e.TargetId))
         {

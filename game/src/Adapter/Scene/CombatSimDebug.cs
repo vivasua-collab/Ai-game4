@@ -12,6 +12,7 @@ using CultivationGame.Core.Data;
 using CultivationGame.Core.Events;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Adapter.Di;
+using CultivationGame.Modules.Combat; // Phase 8 ч.3: CombatRangeGateService
 
 namespace CultivationGame.Adapter.Scene;
 
@@ -36,8 +37,20 @@ public partial class CombatSimDebug : Node
     [Inject] private Modules.Generator.EquipmentGenerator? _equipmentGenerator;
     [Inject] private IPlayerService? _playerService;
 
+    // Phase 8 ч.3: гейты дальнего боя — LOS/стрелы (верификация 3d).
+    [Inject] private ITileService? _tileService;
+    [Inject] private IInventoryService? _inventory;
+    [Inject] private IItemDatabaseService? _itemDb;
+    [Inject] private ISubscriber<Core.Messaging.Contracts.AttackRejectedEvent>? _rejectedSub;
+    [Inject] private Modules.Combat.CombatService? _combatServiceImpl;
+
     private System.IDisposable? _damageToken;
     private System.IDisposable? _intentEchoToken;
+    private System.IDisposable? _rejectedToken;
+
+    // Phase 8 ч.3: трекинг отклонений (причины — LOS/стрелы/каст).
+    private int _rejectedCount;
+    private string _lastRejection = "";
 
     // Учёт урона по целям за время симуляции.
     private readonly Dictionary<string, int> _damageByTarget = new();
@@ -65,6 +78,14 @@ public partial class CombatSimDebug : Node
             GD.Print($"[CombatSim] intent echo: {e.AttackerId} → {e.TargetId} ({e.TechniqueId})");
         });
 
+        // Phase 8 ч.3: отклонения атак (LOS / стрелы / каст).
+        _rejectedToken = _rejectedSub?.Subscribe((in Core.Messaging.Contracts.AttackRejectedEvent e) =>
+        {
+            _rejectedCount++;
+            _lastRejection = e.Reason;
+            GD.Print($"[CombatSim] rejected: {e.AttackerId} — {e.Reason}");
+        });
+
         _damageToken = _damageSub?.Subscribe((in Core.Messaging.Contracts.DamageAppliedEvent e) =>
         {
             _eventsReceived++;
@@ -87,8 +108,10 @@ public partial class CombatSimDebug : Node
     {
         _damageToken?.Dispose();
         _intentEchoToken?.Dispose();
+        _rejectedToken?.Dispose();
         _damageToken = null;
         _intentEchoToken = null;
+        _rejectedToken = null;
     }
 
     private async System.Threading.Tasks.Task RunSequenceAsync()
@@ -205,6 +228,10 @@ public partial class CombatSimDebug : Node
         // 3c. Phase 8 ч.2: end-to-end ДАЛЬНИЙ БОЙ — лук + цель на дистанции 8
         // (вне melee 2.5, внутри дальности лука 18). Проверяем: игрок с луком
         // и isRanged=true наносит урон на дистанции, подтип — RangedProjectile.
+        // Phase 8 ч.3: перед выстрелом очищаем полосу линии огня от случайных
+        // деревьев/камней (гейт LOS должен зависеть только от теста, не от
+        // генерации террейна); оригиналы восстанавливаются после фазы 3d.
+        var clearedLosTiles = new List<(int x, int y, GameTile tile)>();
         bool rangedWiringOk = true;
         if (_equipmentService != null && _equipmentGenerator != null && _playerService != null)
         {
@@ -228,6 +255,27 @@ public partial class CombatSimDebug : Node
                     GD.Print($"[CombatSim] NPC {npcId} at distance 8 (melee=2.5, bow={bow.AttackRange})");
                 }
 
+                // Phase 8 ч.3: чистая линия огня p.X+1..p.X+7 (только блокирующие
+                // тайлы — минимум вмешательства в мир; восстановление после 3d).
+                if (_tileService != null)
+                {
+                    for (int x = playerPos.X + 1; x <= playerPos.X + 7; x++)
+                    {
+                        var orig = _tileService.GetTile(x, playerPos.Y);
+                        if (CombatLos.BlocksLineOfFire(orig))
+                        {
+                            clearedLosTiles.Add((x, playerPos.Y, orig));
+                            _tileService.SetTile(x, playerPos.Y,
+                                GameTile.CreateTerrain(x, playerPos.Y, TerrainType.Grass));
+                            GD.Print($"[CombatSim] LOS clear: tile ({x},{playerPos.Y}) «{orig.Object}» → Grass");
+                        }
+                    }
+                }
+
+                // Phase 8 ч.3: детерминизм — выстрел должен пройти гейт
+                // (LOS+стрелы), а не упереться в догорающий каст (C-5).
+                await WaitForCastClearAsync(2.0f);
+
                 _attackIntentPub.Publish(new Core.Messaging.Contracts.AttackIntentEvent(
                     PlayerCombatId, npcId, "basic_attack", isRanged: true));
                 // Каст 0.5с (натяжение лука) разрешится тиком — ждём.
@@ -237,7 +285,7 @@ public partial class CombatSimDebug : Node
                 int rangedSwing = npcHpBeforeRanged - npcHpAfterRanged;
                 int rangedSubtyped = _rangedDamageTotal - rangedDamageBefore;
                 GD.Print($"[CombatSim] ranged shot: npc HP {npcHpBeforeRanged}→{npcHpAfterRanged} " +
-                         $"({rangedSwing} dmg, subtyped RangedProjectile events={rangedSubtyped})");
+                         $"({rangedSwing} dmg, RangedProjectile-subtyped dmg={rangedSubtyped})");
                 rangedWiringOk = rangedSwing > 0 && rangedSubtyped > 0;
                 if (rangedSwing <= 0)
                     GD.Print("[CombatSim] FAIL — ranged shot did no damage at distance 8 (range gate broken?)");
@@ -254,6 +302,96 @@ public partial class CombatSimDebug : Node
             GD.Print("[CombatSim] skip ranged phase — services not injected");
         }
 
+        // 3d. Phase 8 ч.3: гейты дальнего боя — LOS (препятствие) + расход
+        // стрел. Проверяем ОБА отклонения и что стрелы реально списываются.
+        bool gatesOk = true;
+        if (_tileService != null && _inventory != null && _playerService != null && _npcService != null)
+        {
+            // Цель могла умереть от предыдущих фаз — ищем живую (или исходную).
+            string? targetId = _npcService.IsAlive(npcId) ? npcId : FindHostileNpc();
+            if (targetId != null)
+            {
+                // === 3d-1: LOS — стрельба сквозь камень отклоняется ===
+                // Детерминизм: телепорт цели на линию, камень в середину,
+                // интент публикуется сразу (NPC не успевает сдвинуться).
+                var p = _playerService.Position;
+                var targetState = _npcService.GetNPCState(targetId);
+                if (targetState != null)
+                {
+                    await WaitForCastClearAsync(2.0f);
+                    targetState.Position = new Position2D(p.X + 8, p.Y);
+                    int midX = p.X + 4, midY = p.Y;
+                    var originalTile = _tileService.GetTile(midX, midY);
+                    _tileService.SetTile(midX, midY,
+                        GameTile.CreateWithObject(midX, midY, TerrainType.Grass, ObjectType.Rock_Large));
+
+                    int rangedBefore = _rangedDamageTotal;
+                    _rejectedCount = 0; _lastRejection = "";
+                    _attackIntentPub!.Publish(new Core.Messaging.Contracts.AttackIntentEvent(
+                        PlayerCombatId, targetId, "basic_attack", isRanged: true));
+                    await ToSignal(GetTree().CreateTimer(1.2), SceneTreeTimer.SignalName.Timeout);
+
+                    int blockedDamage = _rangedDamageTotal - rangedBefore;
+                    bool losRejected = _rejectedCount > 0 && _lastRejection.Contains("линии огня");
+                    bool losDirect = !CombatLos.HasLineOfSight(
+                        _tileService, p.X, p.Y, p.X + 8, p.Y);
+                    GD.Print($"[CombatSim] LOS-blocked shot: ranged dmg +{blockedDamage}, " +
+                             $"rejected={losRejected} ('{_lastRejection}'), direct-LOS-check={losDirect}");
+                    gatesOk &= losRejected && blockedDamage == 0 && losDirect;
+
+                    // Чистим препятствие (чтобы не мешать остальным фазам).
+                    _tileService.SetTile(midX, midY, originalTile);
+
+                    // === 3d-2: LOS восстановлен — прямая проверка гейта ===
+                    bool losClear = CombatLos.HasLineOfSight(
+                        _tileService, p.X, p.Y, p.X + 8, p.Y);
+                    GD.Print($"[CombatSim] LOS after rock removed: {losClear} (ожидаем True)");
+                    gatesOk &= losClear;
+
+                    // === 3d-3: стрелы — пустой колчан отклоняет выстрел ===
+                    int arrowsBefore = _inventory.GetItemCount(CombatRangeGateService.ArrowItemId);
+                    if (arrowsBefore > 0)
+                        _inventory.TryRemoveItem(CombatRangeGateService.ArrowItemId, arrowsBefore);
+
+                    await WaitForCastClearAsync(2.0f);
+                    targetState.Position = new Position2D(p.X + 8, p.Y);
+                    rangedBefore = _rangedDamageTotal;
+                    _rejectedCount = 0; _lastRejection = "";
+                    _attackIntentPub!.Publish(new Core.Messaging.Contracts.AttackIntentEvent(
+                        PlayerCombatId, targetId, "basic_attack", isRanged: true));
+                    await ToSignal(GetTree().CreateTimer(1.2), SceneTreeTimer.SignalName.Timeout);
+
+                    int noAmmoDamage = _rangedDamageTotal - rangedBefore;
+                    bool ammoRejected = _rejectedCount > 0 && _lastRejection.Contains("стрел");
+                    GD.Print($"[CombatSim] no-ammo shot: arrows was {arrowsBefore}, " +
+                             $"ranged dmg +{noAmmoDamage}, rejected={ammoRejected} ('{_lastRejection}')");
+                    gatesOk &= ammoRejected && noAmmoDamage == 0;
+
+                    // Восстанавливаем колчан (гарантия: предмет в БД после 3c).
+                    if (_itemDb != null && _itemDb.TryGetItem(CombatRangeGateService.ArrowItemId, out var arrowItem))
+                        _inventory.TryAddItem(arrowItem, 20);
+                    GD.Print($"[CombatSim] quiver restored: {_inventory.GetItemCount(CombatRangeGateService.ArrowItemId)}");
+                }
+            }
+            else
+            {
+                GD.Print("[CombatSim] WARN — no alive NPC for gate phase");
+            }
+        }
+        else
+        {
+            GD.Print("[CombatSim] skip gate phase — LOS/ammo services not injected");
+        }
+
+        // Phase 8 ч.3: восстановить случайно-очищенные тайлы линии огня.
+        if (_tileService != null)
+        {
+            foreach (var (x, y, orig) in clearedLosTiles)
+                _tileService.SetTile(x, y, orig);
+            if (clearedLosTiles.Count > 0)
+                GD.Print($"[CombatSim] LOS tiles restored: {clearedLosTiles.Count}");
+        }
+
         // 4. Итоги.
         int playerHpAfter = _bodyProvider.GetCurrentHealth("player");
         int npcHpAfter = _bodyProvider.GetCurrentHealth(npcId);
@@ -263,9 +401,9 @@ public partial class CombatSimDebug : Node
 
         GD.Print($"[CombatSim] summary: events={_eventsReceived} (ranged-subtyped={_rangedDamageEvents}), " +
                  $"player {playerHpBefore}→{playerHpAfter} ({(playerHpBefore - playerHpAfter)} dmg), " +
-                 $"npc {npcHpBefore}→{npcHpAfter}");
+                 $"npc {npcHpBefore}→{npcHpAfter}, arrows now={_inventory?.GetItemCount(CombatRangeGateService.ArrowItemId) ?? -1}");
 
-        bool pass = playerTookDamage && npcTookDamage && weaponWiringOk && rangedWiringOk;
+        bool pass = playerTookDamage && npcTookDamage && weaponWiringOk && rangedWiringOk && gatesOk;
         if (!playerTookDamage)
             GD.Print("[CombatSim] FAIL — NPC→player damage did NOT apply (BodyService player-id mismatch?)");
         if (!npcTookDamage)
@@ -274,8 +412,28 @@ public partial class CombatSimDebug : Node
             GD.Print("[CombatSim] FAIL — armed swing did no damage (weapon wiring broken?)");
         if (!rangedWiringOk)
             GD.Print("[CombatSim] FAIL — ranged (bow) phase broken (Phase 8 ч.2 wiring?)");
+        if (!gatesOk)
+            GD.Print("[CombatSim] FAIL — LOS/ammo gates broken (Phase 8 ч.3?)");
 
         PrintVerdict(pass);
+    }
+
+    /// <summary>
+    /// Phase 8 ч.3: ждать очистки pending-каста (глобальный _isCasting в
+    /// CombatService). Детерминизм фаз 3d: выстрел не должен упереться в
+    /// чужой догорающий каст (C-5 отклонил бы с другой причиной — не LOS).
+    /// Опрос каждые 0.1с, таймаут — идти дальше (тесты ниже заметят).
+    /// </summary>
+    private async System.Threading.Tasks.Task WaitForCastClearAsync(float timeoutSec)
+    {
+        float waited = 0f;
+        while (waited < timeoutSec)
+        {
+            if (_combatServiceImpl == null || !_combatServiceImpl.IsCasting) return;
+            await ToSignal(GetTree().CreateTimer(0.1), SceneTreeTimer.SignalName.Timeout);
+            waited += 0.1f;
+        }
+        GD.Print($"[CombatSim] WARN — cast still pending after {timeoutSec}s (gate phase may be C-5-rejected)");
     }
 
     private string? FindHostileNpc()
@@ -297,6 +455,6 @@ public partial class CombatSimDebug : Node
 
     private static void PrintVerdict(bool pass)
     {
-        GD.Print($"[CombatSim] VERDICT: {(pass ? "PASS — обе стороны боя получают урон (melee + ranged)" : "FAIL")}");
+        GD.Print($"[CombatSim] VERDICT: {(pass ? "PASS — обе стороны боя получают урон (melee + ranged + LOS/ammo gates)" : "FAIL")}");
     }
 }

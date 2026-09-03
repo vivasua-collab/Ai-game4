@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Interfaces;
+using CultivationGame.Modules.Combat; // Phase 8 ч.3: CombatRangeGateService.ArrowItemId
 using CultivationGame.Modules.Generator;
 
 namespace CultivationGame.Entry.Phases;
@@ -48,6 +49,12 @@ public sealed class StartingGearPhase : AbstractSceneAssemblyPhase
 
     /// <summary>Детерминированный сид стартового набора (одинаков в каждой игре).</summary>
     private const long Seed = 1000;
+
+    /// <summary>
+    /// Phase 8 ч.3: стартовый колчан. 30 стрел — базовый запас на первые
+    /// бои (дальний бой — приоритет MVP); расход 1 стрела/выстрел.
+    /// </summary>
+    private const int ArrowQuiverSize = 30;
 
     public override Task ExecuteAsync()
     {
@@ -115,6 +122,30 @@ public sealed class StartingGearPhase : AbstractSceneAssemblyPhase
             registered++;
             if (_inventory.TryAddItem(item, 5)) granted++;
         }
+
+        // === 2b. Phase 8 ч.3: стрелы (боеприпас дальнего боя) ===
+        // Расходник лука: 1 стрела = 1 выстрел (CombatRangeGateService
+        // списывает при каждом ranged-интенте). Стартовый колчан 30 —
+        // хватает на тесты боёвки без читов; докупается/добывается позже.
+        var arrow = new ItemData
+        {
+            ItemId = CombatRangeGateService.ArrowItemId,
+            NameRu = "Стрела",
+            NameEn = "Arrow",
+            Description = "Боеприпас для лука",
+            Category = ItemCategory.Material,
+            ItemType = "Ammo",
+            Rarity = ItemRarity.Common,
+            Stackable = true,
+            MaxStack = 100,
+            Weight = 0.02f,
+            Volume = 0.05f,
+            Value = 1,
+            HasDurability = false,
+        };
+        _itemDb.Register(arrow);
+        registered++;
+        if (_inventory.TryAddItem(arrow, ArrowQuiverSize)) granted++;
 
         // === 3. Камни Ци: регистрация 10 канонических + стартовый набор ===
         QiStoneSeeder.Seed(_itemDb);
@@ -185,7 +216,8 @@ public sealed class StartingGearPhase : AbstractSceneAssemblyPhase
             $"[Phase {PhaseOrder}] {PhaseName} complete — стартовый набор: " +
             $"БД +{registered}, выдано {granted} позиций, оружие {weapons} шт " +
             $"(кинжал надет: {daggerEquipped}, лук в инвентаре: {bow != null}), " +
-            $"броня {armors} шт. Замена сейвов: каждая новая игра = одинаковый старт (сид {Seed}).");
+            $"броня {armors} шт, стрел {ArrowQuiverSize}. " +
+            $"Замена сейвов: каждая новая игра = одинаковый старт (сид {Seed}).");
 
         return Task.CompletedTask;
     }

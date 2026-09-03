@@ -50,6 +50,11 @@ public static class CombatModuleServices
         // Спринт 7 C8: ElementalEffectService
         builder.Register<ElementalEffectService>(Lifetime.Singleton);
 
+        // Phase 8 ч.3 (2026-09-03): гейт дальнего боя — LOS + расход стрел.
+        // Потребители: CombatModule (авторитетный гейт интентов),
+        // CombatSimDebug (headless-верификация 3d), CheatPanel (статус колчана).
+        builder.Register<CombatRangeGateService>(Lifetime.Singleton);
+
         // === Точка входа модуля ===
         builder.Register<CombatModule>(Lifetime.Singleton);
 

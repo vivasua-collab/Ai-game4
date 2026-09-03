@@ -59,6 +59,8 @@ namespace CultivationGame.Adapter.UI
         // Phase 8 ч.2 (2026-09-03): дальний бой — экипировка лука + ranged-режим.
         [Inject] private IEquipmentService Equipment = null!;
         [Inject] private Modules.Player.PlayerCombatAdapter CombatAdapter = null!;
+        // Phase 8 ч.3 (2026-09-03): гейты дальнего боя — стрелы + LOS-тест.
+        [Inject] private ITileService? TileService = null;
 
         private Label _statusLabel = null!;
         private Button _fastLeakButton = null!;
@@ -270,6 +272,15 @@ namespace CultivationGame.Adapter.UI
             rangedRow.AddChild(MakeButton("🏹 Лук в руки", 130, OnGiveBow));
             rangedRow.AddChild(MakeButton("Дальний + мишень", 130, OnSpawnDistantTarget));
             vbox.AddChild(rangedRow);
+
+            // Phase 8 ч.3 (2026-09-03): гейты дальнего боя — стрелы + LOS.
+            // Расход 1 стрела/выстрел (CombatRangeGateService); мишень за
+            // камнем — ручная верификация линии огня (тост «нет линии огня»).
+            var gatesRow = new HBoxContainer { Name = "RangedGatesRow" };
+            gatesRow.AddThemeConstantOverride("separation", 4);
+            gatesRow.AddChild(MakeButton("Стрелы ×50", 130, OnGiveArrows));
+            gatesRow.AddChild(MakeButton("Мишень за камнем", 130, OnSpawnTargetBehindRock));
+            vbox.AddChild(gatesRow);
 
             // === Phase F: Верификация (dump) ===
             vbox.AddChild(MakeSeparator());
@@ -696,6 +707,46 @@ namespace CultivationGame.Adapter.UI
                 "human", Core.Data.NPCRole.Enemy, 1, spawnPos, _seedCounter * 37);
             SetStatus($"Дальняя мишень: {npcId} @ ({spawnPos.X},{spawnPos.Y}) — дистанция 8, " +
                       $"бей Space в режиме лука");
+        }
+
+        /// <summary>
+        /// Phase 8 ч.3 (2026-09-03): «Стрелы ×50» — пополнить колчан.
+        /// Стрелы — расходник дальнего боя (1 стрела/выстрел, спишет
+        /// CombatRangeGateService). Кнопка для длинных тестовых серий без
+        /// перезапуска игры.
+        /// </summary>
+        private void OnGiveArrows()
+        {
+            if (Inventory == null || ItemDatabase == null)
+            { SetStatus("Inventory/ItemDatabase не инжектированы"); return; }
+            if (!ItemDatabase.TryGetItem(Modules.Combat.CombatRangeGateService.ArrowItemId, out var arrow))
+            { SetStatus("Стрелы не зарегистрированы в БД (StartingGearPhase?)"); return; }
+            if (!Inventory.TryAddItem(arrow, 50))
+            { SetStatus("Не удалось добавить стрелы (инвентарь полон?)"); return; }
+            SetStatus($"🏹 Стрелы +50 — в колчане {Inventory.GetItemCount(arrow.ItemId)}");
+        }
+
+        /// <summary>
+        /// Phase 8 ч.3 (2026-09-03): «Мишень за камнем» — бандит на дистанции 8
+        /// + большой камень в середине линии огня. Ручная верификация LOS-гейта:
+        /// Space в режиме лука → тост «нет линии огня», урона нет; разрушить
+        /// камень ( кирка/удары) → стрельба проходит.
+        /// </summary>
+        private void OnSpawnTargetBehindRock()
+        {
+            if (NpcSpawner == null || Player == null || TileService == null)
+            { SetStatus("NPCSpawner/Player/TileService не инжектированы"); return; }
+            var pos = Player.Position;
+            var spawnPos = new Core.Data.Position2D(pos.X + 8, pos.Y);
+            _seedCounter++;
+            string npcId = NpcSpawner.SpawnNPC(
+                "human", Core.Data.NPCRole.Enemy, 1, spawnPos, _seedCounter * 41);
+            // Камень в середине прямой игрок→мишень (блокирует линию огня).
+            int midX = pos.X + 4, midY = pos.Y;
+            TileService.SetTile(midX, midY,
+                GameTile.CreateWithObject(midX, midY, TerrainType.Grass, ObjectType.Rock_Large));
+            SetStatus($"Мишень за камнем: {npcId} @ ({spawnPos.X},{spawnPos.Y}), " +
+                      $"камень @ ({midX},{midY}) — Space должен дать «нет линии огня»");
         }
 
         private static Label MakeLabel(string text, int fontSize, Color color)
