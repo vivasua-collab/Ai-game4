@@ -26,6 +26,10 @@ public static class SceneAssemblyRegistrar
         builder.Register<TileMapGenPhase>(Lifetime.Singleton);
         builder.Register<WorldInitPhase>(Lifetime.Singleton);
         builder.Register<PlayerSpawnPhase>(Lifetime.Singleton);
+        // 2026-09-03: стартовая генерация предметов (замена сейвов по решению
+        // пользователя) — стартовый набор + регистрация канонических предметов
+        // в БД. Заменяет dev-хак InventoryWindow.SeedGeneratedItems (#if DEBUG).
+        builder.Register<StartingGearPhase>(Lifetime.Singleton);
         // Этап 1 внедрения ЦИ (2026-08-23): случайный тест-набор техник игроку
         // (слоты по TECHNIQUE_SYSTEM.md §12).
         builder.Register<TechniqueGrantPhase>(Lifetime.Singleton);

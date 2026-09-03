@@ -40,7 +40,6 @@ public partial class InventoryWindow : Control
     [Inject] private IGroundItemService GroundItems { get; set; } = null!;
     [Inject] private IEquipmentService EquipmentService { get; set; } = null!;
     [Inject] private IPlayerService PlayerService { get; set; } = null!;
-    [Inject] private IEquipmentGenerator EquipmentGenerator { get; set; } = null!;
     [Inject] private IQiService QiService { get; set; } = null!;
     [Inject] private IBodyService BodyService { get; set; } = null!;
     [Inject] private CultivationGame.Core.Events.IPublisher<CultivationGame.Core.Messaging.Contracts.ToastShownEvent> ToastPub { get; set; } = null!;
@@ -54,7 +53,6 @@ public partial class InventoryWindow : Control
     private CharacterDollPanel _dollPanel = null!;
     private HBoxContainer _contentRow = null!;
 
-    private static bool _itemsSeeded = false;
 
     public override void _Ready()
     {
@@ -64,16 +62,9 @@ public partial class InventoryWindow : Control
             ContainerAdapter.InjectProperties(this, container);
         }
 
-        // Generate starting equipment via EquipmentGenerator (replaces hardcoded TestItemSeeder).
-        // Generates: 3 weapons + 3 armor + 2 accessories + 4 consumables + 4 materials.
-#if DEBUG
-        if (!_itemsSeeded)
-        {
-            SeedGeneratedItems();
-            _itemsSeeded = true;
-            GD.Print("[Inventory] Generated items seeded via EquipmentGenerator");
-        }
-#endif
+        // 2026-09-03: стартовый набор предметов генерирует StartingGearPhase
+        // (Entry, PhaseOrder 5) — заменяет этот DEBUG-хак: работает в release,
+        // регистрирует предметы ДО спавна NPC (лавки находят материалы).
 
         BuildUI();
         _isVisible = false;
@@ -237,125 +228,6 @@ public partial class InventoryWindow : Control
     }
 
     // Note: B and Esc handling done by GameWorldController.HandleStickyInput.
-
-    /// <summary>
-    /// Generate starting items via EquipmentGenerator (replaces TestItemSeeder).
-    /// Generates diverse equipment + materials + consumables.
-    /// </summary>
-    private void SeedGeneratedItems()
-    {
-        long seed = 1000;
-
-        // === Equipment (via EquipmentGenerator "Matryoshka") ===
-        // 4 weapons (varied subtypes).
-        for (int i = 0; i < 4; i++)
-        {
-            var weapon = EquipmentGenerator.GenerateWeapon(level: 1 + i, seed: seed + i);
-            if (weapon != null)
-            {
-                ItemDatabase.Register(weapon);
-                InventoryService.TryAddItem(weapon, 1);
-            }
-        }
-
-        // 4 armor pieces (varied slots).
-        for (int i = 0; i < 4; i++)
-        {
-            var armor = EquipmentGenerator.GenerateArmor(level: 1 + i, seed: seed + 100 + i);
-            if (armor != null)
-            {
-                ItemDatabase.Register(armor);
-                InventoryService.TryAddItem(armor, 1);
-            }
-        }
-
-        // 2 random equipment (could be weapon or armor).
-        for (int i = 0; i < 2; i++)
-        {
-            var eq = EquipmentGenerator.GenerateRandom(level: 2, seed: seed + 200 + i);
-            if (eq != null)
-            {
-                ItemDatabase.Register(eq);
-                InventoryService.TryAddItem(eq, 1);
-            }
-        }
-
-        // === Materials (for crafting + harvest resolution) ===
-        var materials = new[]
-        {
-            ("material_wood", "Древесина", 0.5f, 1.0f, ItemRarity.Common, 100),
-            ("material_stone", "Камень", 1.0f, 1.0f, ItemRarity.Common, 100),
-            ("material_iron_ore", "Железная руда", 1.5f, 1.0f, ItemRarity.Uncommon, 50),
-            ("material_fiber", "Растительное волокно", 0.05f, 0.2f, ItemRarity.Common, 100),
-        };
-
-        foreach (var (id, name, weight, volume, rarity, maxStack) in materials)
-        {
-            var item = new ItemData
-            {
-                ItemId = id,
-                NameRu = name,
-                NameEn = name,
-                Description = "Материал",
-                Category = ItemCategory.Material,
-                ItemType = "Material",
-                Rarity = rarity,
-                Stackable = true,
-                MaxStack = maxStack,
-                Weight = weight,
-                Volume = volume,
-                Value = 5,
-                HasDurability = false,
-            };
-            ItemDatabase.Register(item);
-            InventoryService.TryAddItem(item, 5);
-        }
-
-        // === Consumables ===
-        var consumables = new[]
-        {
-            ("consumable_berry", "Ягоды", 0.05f, 0.1f, ItemRarity.Common, 50, "heal", 5),
-            ("consumable_herb", "Лекарственная трава", 0.03f, 0.1f, ItemRarity.Uncommon, 50, "material", 0),
-            ("con_pill_healing", "Пилюля лечения", 0.05f, 0.1f, ItemRarity.Common, 20, "heal", 30),
-            ("con_pill_qi", "Пилюля Ци", 0.05f, 0.1f, ItemRarity.Uncommon, 20, "qi_restore", 50),
-        };
-
-        foreach (var (id, name, weight, volume, rarity, maxStack, effect, value) in consumables)
-        {
-            var item = new ItemData
-            {
-                ItemId = id,
-                NameRu = name,
-                NameEn = name,
-                Description = "Расходник",
-                Category = ItemCategory.Consumable,
-                ItemType = "Consumable",
-                Rarity = rarity,
-                Stackable = true,
-                MaxStack = maxStack,
-                Weight = weight,
-                Volume = volume,
-                Value = value,
-                HasDurability = false,
-            };
-            ItemDatabase.Register(item);
-            InventoryService.TryAddItem(item, 5);
-        }
-
-        // === Этап 7 внедрения ЦИ: камни Ци (GENERATORS_SYSTEM.md §10) ===
-        // Регистрируем все 10 канонических камней (5 размеров × calm/chaotic)
-        // в БД предметов. Игроку выдаём 3 стартовых камня (calm: dust, pebble, shard).
-        QiStoneSeeder.Seed(ItemDatabase);
-        if (ItemDatabase.TryGetItem("qistone_dust_calm", out var qDust))
-            InventoryService.TryAddItem(qDust, 3);
-        if (ItemDatabase.TryGetItem("qistone_pebble_calm", out var qPebble))
-            InventoryService.TryAddItem(qPebble, 2);
-        if (ItemDatabase.TryGetItem("qistone_shard_calm", out var qShard))
-            InventoryService.TryAddItem(qShard, 1);
-        // Один хаотичный камень — для теста риска.
-        if (ItemDatabase.TryGetItem("qistone_dust_chaotic", out var qChaotic))
-            InventoryService.TryAddItem(qChaotic, 1);
-    }
 
     /// <summary>Toggle inventory visibility.</summary>
     public void Toggle()

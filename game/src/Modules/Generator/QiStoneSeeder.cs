@@ -16,8 +16,11 @@ using System.Collections.Generic;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.Interfaces;
 
-namespace CultivationGame.Adapter.UI
+namespace CultivationGame.Modules.Generator
 {
+    // 2026-09-03: перенесён из Adapter/UI → Modules/Generator (правильный слой:
+    // предметная генерация, без Godot-зависимостей). Потребители:
+    // StartingGearPhase (Entry), InventoryWindow/CheatPanel (UI).
     /// <summary>
     /// Сидер камней Ци — регистрирует канонический набор (5 размеров × 2 типа).
     /// Канон: GENERATORS_SYSTEM.md §10. Плотность 1024 ед/см³.

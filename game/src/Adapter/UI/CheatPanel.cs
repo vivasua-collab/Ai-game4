@@ -355,10 +355,10 @@ namespace CultivationGame.Adapter.UI
         {
             if (Inventory == null || ItemDatabase == null) return;
             // Случайно 3 камня из 10 канонических.
-            var ids = QiStoneSeeder.AllItemIds();
+            var ids = Modules.Generator.QiStoneSeeder.AllItemIds();
             if (ids.Count == 0) return;
             // Убедимся, что камни зарегистрированы в БД.
-            QiStoneSeeder.Seed(ItemDatabase);
+            Modules.Generator.QiStoneSeeder.Seed(ItemDatabase);
 
             var rng = new System.Random((int)DateTime.UtcNow.Ticks);
             int granted = 0;
