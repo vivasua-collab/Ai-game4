@@ -113,8 +113,44 @@ public partial class GameWorldController : Node2D
     private CanvasLayer   _hudCanvas     = null!;
     private Label         _timeLabel     = null!;
     private Label         _hudLabel      = null!;
-    private Label         _toastLabel    = null!;
-    private float         _toastTimer    = 0f;
+
+    // 2026-09-04 S2: тост-стек — несколько сообщений одновременно (было: один
+    // Label, новое сообщение затирало предыдущее). Повторы агрегируются ×N,
+    // строки затухают fade-out'ом, стек максимум MaxToastLines строк.
+    private VBoxContainer _toastStack    = null!;
+    private sealed class ToastLine
+    {
+        public Label Label = null!;
+        public float Remaining;
+        public float Total;
+        public string BaseText = "";
+        public int RepeatCount = 1;
+    }
+    private readonly List<ToastLine> _toastLines = new();
+    private const int   MaxToastLines  = 5;      // видимых строк стека
+    private const float ToastFadeSec   = 0.45f;  // fade-out в конце жизни
+    private const float ToastFadeInSec = 0.12f;  // fade-in появления
+
+    /// <summary>2026-09-04 S2: QA-доступ (GODOT_TOAST_DEBUG) — число строк стека.</summary>
+    public int ToastLineCount => _toastLines?.Count ?? 0;
+
+    /// <summary>2026-09-04 S2: QA-доступ — текст последней (нижней) строки.</summary>
+    public string? LastToastText => _toastLines is { Count: > 0 } ? _toastLines[^1].Label.Text : null;
+
+    /// <summary>2026-09-04 S2: QA — число строк стека с заданным префиксом
+    /// (изоляция проверок от боевых тостов при комбинированных прогонах).</summary>
+    public int ToastLinesWithPrefix(string prefix)
+    {
+        if (_toastLines == null) return 0;
+        int n = 0;
+        for (int i = 0; i < _toastLines.Count; i++)
+            if (_toastLines[i].BaseText.StartsWith(prefix, System.StringComparison.Ordinal)) n++;
+        return n;
+    }
+
+    /// <summary>2026-09-04 S2: красная виньетка опасности при низком HP.</summary>
+    private ColorRect _lowHpOverlay = null!;
+    private float _lowHpPulseTime; // для пульсации при критическом HP
 
     // Cached bounds of the test polygon (50×50) for camera limits.
     private int _worldWidth  = 50;
@@ -197,6 +233,20 @@ public partial class GameWorldController : Node2D
         {
             var combatSim = new CombatSimDebug { Name = "CombatSimDebug" };
             AddChild(combatSim);
+        }
+        // 2026-09-04 S2: headless-верификация тост-стека (GODOT_TOAST_DEBUG=1)
+        // — стек не затирает сообщения, агрегирует повторы ×N, кап 5 строк.
+        if (System.Environment.GetEnvironmentVariable("GODOT_TOAST_DEBUG") == "1")
+        {
+            var toastSim = new ToastSimDebug { Name = "ToastSimDebug" };
+            AddChild(toastSim);
+        }
+        // 2026-09-04 S2: headless-верификация виньетки опасности
+        // (GODOT_LOWHP_DEBUG=1) — alpha/пульс оверлея при HP < 35%/15%.
+        if (System.Environment.GetEnvironmentVariable("GODOT_LOWHP_DEBUG") == "1")
+        {
+            var lowHpSim = new LowHpSimDebug { Name = "LowHpSimDebug" };
+            AddChild(lowHpSim);
         }
         // Stage 0+1 (2026-08-25, GLM-5.3): верификация модели заполнения +
         // ауры-задержки (вариант В): зарядка → hold → release → урон.
@@ -406,6 +456,18 @@ public partial class GameWorldController : Node2D
         _hudCanvas = new CanvasLayer { Name = "HUDCanvas", Layer = 10 };
         AddChild(_hudCanvas);
 
+        // 2026-09-04 S2: виньетка опасности — полноэкранный тёмно-красный
+        // оверлей при HP < 35% (пульсация при HP < 15%). Добавлен ПЕРВЫМ —
+        // рисуется под всеми элементами HUD; не блокирует ввод (Ignore).
+        _lowHpOverlay = new ColorRect
+        {
+            Name = "LowHpOverlay",
+            Color = new Color(0.55f, 0.05f, 0.05f, 0f),
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
+        _lowHpOverlay.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        _hudCanvas.AddChild(_lowHpOverlay);
+
         // Time label — TOP line (visible, parchment color).
         // 2026-09-04 S1: + тёмная тень (VLM-аудит: светлый текст на светлом
         // фоне воды/неба был нечитаем — критичный контраст-баг).
@@ -528,22 +590,20 @@ public partial class GameWorldController : Node2D
         _hudLabel.Position = new Vector2(20, 1020);  // bottom of 1080p screen
         _hudCanvas.AddChild(_hudLabel);
 
-        // Toast label — top-center, for harvest/interaction feedback.
-        _toastLabel = new Label
+        // 2026-09-04 S2: тост-стек (top-center): до 5 сообщений одновременно,
+        // новое появляется снизу, старые поднимаются вверх и затухают.
+        // Повторное сообщение не создаёт новую строку, а обновляет счётчик ×N.
+        _toastStack = new VBoxContainer
         {
-            Name = "ToastLabel",
-            Text = "",
-            HorizontalAlignment = HorizontalAlignment.Center,
-            Visible = false,
+            Name = "ToastStack",
+            MouseFilter = Control.MouseFilterEnum.Ignore,
         };
-        _toastLabel.AddThemeFontSizeOverride("font_size", 18);
-        _toastLabel.AddThemeColorOverride("font_color", new Color(0.98f, 0.85f, 0.3f));
-        _toastLabel.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.9f));
-        _toastLabel.SetAnchorsPreset(Control.LayoutPreset.CenterTop);
-        _toastLabel.OffsetTop = 60;
-        _toastLabel.OffsetLeft = -200;
-        _toastLabel.OffsetRight = 200;
-        _hudCanvas.AddChild(_toastLabel);
+        _toastStack.AddThemeConstantOverride("separation", 2);
+        _toastStack.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.CenterTop);
+        _toastStack.OffsetTop = 56;
+        _toastStack.OffsetLeft = -260;
+        _toastStack.OffsetRight = 260;
+        _hudCanvas.AddChild(_toastStack);
 
         // Inventory window (opens with B key) — must be created AFTER _hudCanvas.
         _inventoryWindow = new InventoryWindow { Name = "InventoryWindow" };
@@ -671,6 +731,22 @@ public partial class GameWorldController : Node2D
                     0.35f + 0.65f * (1f - ratio), 0.3f + 0.6f * ratio, 0.25f);
                 if (_hpBarText != null)
                     _hpBarText.Text = $"HP {cur}/{max}";
+
+                // 2026-09-04 S2: виньетка опасности — «экран краснеет» при
+                // HP < 35%, пульсация при HP < 15% (информирование без
+                // чтения цифр — периферийное зрение).
+                if (_lowHpOverlay != null)
+                {
+                    float danger = ratio < 0.35f
+                        ? Mathf.Clamp((0.35f - ratio) / 0.30f, 0f, 1f)
+                        : 0f;
+                    if (ratio < 0.15f)
+                    {
+                        _lowHpPulseTime += (float)delta;
+                        danger *= 0.72f + 0.28f * Mathf.Sin(_lowHpPulseTime * 5f);
+                    }
+                    _lowHpOverlay.Color = new Color(0.55f, 0.05f, 0.05f, 0.32f * danger);
+                }
             }
         }
 
@@ -711,14 +787,23 @@ public partial class GameWorldController : Node2D
                 : Colors.White;
         }
 
-        // Toast timer: hide toast after expiry.
-        if (_toastLabel != null && _toastLabel.Visible)
+        // 2026-09-04 S2: тик тост-стека — таймеры, fade-in/out, удаление истёкших.
+        for (int i = _toastLines.Count - 1; i >= 0; i--)
         {
-            _toastTimer -= (float)delta;
-            if (_toastTimer <= 0)
+            var line = _toastLines[i];
+            line.Remaining -= (float)delta;
+            if (line.Remaining <= 0f)
             {
-                _toastLabel.Visible = false;
+                _toastStack.RemoveChild(line.Label);
+                line.Label.QueueFree();
+                _toastLines.RemoveAt(i);
+                continue;
             }
+            float elapsed = line.Total - line.Remaining;
+            float alpha = 1f;
+            if (elapsed < ToastFadeInSec) alpha = elapsed / ToastFadeInSec;
+            else if (line.Remaining < ToastFadeSec) alpha = line.Remaining / ToastFadeSec;
+            line.Label.Modulate = new Color(1f, 1f, 1f, Mathf.Clamp(alpha, 0f, 1f));
         }
 
         HandleStickyInput();
@@ -1319,10 +1404,12 @@ public partial class GameWorldController : Node2D
         ShowToast($"💥 −{e.Damage} HP");
     }
 
-    /// <summary>Этап 7: тост от модуля (QiStone use, чит-меню и т.д.).</summary>
+    /// <summary>Этап 7: тост от модуля (QiStone use, чит-меню и т.д.).
+    /// 2026-09-04 S2: передаём длительность из события (если задана).</summary>
     private void OnToastShown(in Core.Messaging.Contracts.ToastShownEvent e)
     {
-        if (!string.IsNullOrEmpty(e.Message)) ShowToast(e.Message);
+        if (!string.IsNullOrEmpty(e.Message))
+            ShowToast(e.Message, e.Duration > 0f ? e.Duration : 2.5f);
     }
 
     /// <summary>
@@ -1578,13 +1665,56 @@ public partial class GameWorldController : Node2D
         }
     }
 
-    /// <summary>Show a toast message at top-center of screen for 2.5 seconds.</summary>
-    private void ShowToast(string message)
+    /// <summary>
+    /// 2026-09-04 S2: показать тост в стеке (top-center). Новые сообщения
+    /// НЕ затирают предыдущие: стек до MaxToastLines строк, повтор подряд
+    /// агрегируется в «×N» с продлением показа.
+    /// </summary>
+    private void ShowToast(string message, float duration = 2.5f)
     {
-        if (_toastLabel == null) return;
-        _toastLabel.Text = message;
-        _toastLabel.Visible = true;
-        _toastTimer = 2.5f;
+        if (_toastStack == null || string.IsNullOrEmpty(message)) return;
+        if (duration <= 0f) duration = 2.5f;
+
+        // Агрегация: тот же текст в последней (нижней) строке → счётчик ×N.
+        if (_toastLines.Count > 0 && _toastLines[^1].BaseText == message)
+        {
+            var last = _toastLines[^1];
+            last.RepeatCount++;
+            last.Remaining = duration;
+            last.Total = duration;
+            last.Label.Text = last.RepeatCount > 1 ? $"{message} ×{last.RepeatCount}" : message;
+            return;
+        }
+
+        // Переполнение стека: убрать самую старую (верхнюю) строку.
+        while (_toastLines.Count >= MaxToastLines)
+        {
+            var oldest = _toastLines[0];
+            _toastStack.RemoveChild(oldest.Label);
+            oldest.Label.QueueFree();
+            _toastLines.RemoveAt(0);
+        }
+
+        var label = new Label
+        {
+            Text = message,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+        };
+        label.AddThemeFontSizeOverride("font_size", 17);
+        label.AddThemeColorOverride("font_color", new Color(0.98f, 0.85f, 0.3f));
+        label.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.9f));
+        label.Modulate = new Color(1f, 1f, 1f, 0f); // появится через fade-in
+
+        _toastStack.AddChild(label);
+        _toastLines.Add(new ToastLine
+        {
+            Label = label,
+            Remaining = duration,
+            Total = duration,
+            BaseText = message,
+        });
         GD.Print($"[GameWorld] Toast: {message}");
     }
 
