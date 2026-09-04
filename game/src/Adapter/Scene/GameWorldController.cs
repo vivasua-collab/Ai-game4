@@ -262,6 +262,13 @@ public partial class GameWorldController : Node2D
             var killFeedSim = new KillFeedSimDebug { Name = "KillFeedSimDebug" };
             AddChild(killFeedSim);
         }
+        // 2026-09-04 S4: headless-верификация хотбара v2 (GODOT_HOTBAR_DEBUG=1)
+        // — техники в слотах 3-9, кулдаун-оверлей, Qi-гейт, пояс-ряд.
+        if (System.Environment.GetEnvironmentVariable("GODOT_HOTBAR_DEBUG") == "1")
+        {
+            var hotbarSim = new HotbarSimDebug { Name = "HotbarSimDebug" };
+            AddChild(hotbarSim);
+        }
         // Stage 0+1 (2026-08-25, GLM-5.3): верификация модели заполнения +
         // ауры-задержки (вариант В): зарядка → hold → release → урон.
         if (System.Environment.GetEnvironmentVariable("GODOT_CHARGE_SIM") == "1")

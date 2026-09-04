@@ -578,6 +578,20 @@ namespace CultivationGame.Modules.Combat
             return _cooldowns.TryGetValue(techniqueId, out var remaining) ? remaining : 0f;
         }
 
+#if DEBUG
+        /// <summary>
+        /// S4 (2026-09-04): принудительная установка кулдауна для headless-QA
+        /// хотбара (GODOT_HOTBAR_DEBUG) — без полного боевого каста.
+        /// seconds ≤ 0 снимает кулдаун.
+        /// </summary>
+        public void DEBUG_SetCooldown(string techniqueId, float seconds)
+        {
+            if (string.IsNullOrEmpty(techniqueId)) return;
+            if (seconds <= 0f) _cooldowns.Remove(techniqueId);
+            else _cooldowns[techniqueId] = seconds;
+        }
+#endif
+
         /// <summary>
         /// Проверить, изучена ли техника.
         /// </summary>
