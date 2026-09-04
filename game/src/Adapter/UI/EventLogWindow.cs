@@ -38,12 +38,18 @@ public partial class EventLogWindow : Control
     [Inject] private readonly ISubscriber<ResourceHarvestedEvent> _harvestSub = null!;
     [Inject] private readonly ISubscriber<ItemPickedUpEvent> _pickupSub = null!;
     [Inject] private readonly ISubscriber<CultivationLevelChangedEvent> _levelSub = null!;
+    // 2026-09-04 S3: kill-feed физического боя (NPCCombatAdapter → NPCDeathEvent);
+    // EnemyKilledEvent покрывает только stage-бой (CombatService поединки).
+    [Inject] private readonly ISubscriber<NPCDeathEvent> _npcDeathSub = null!;
 
     private readonly List<(string Time, string Text, Godot.Color Colour)> _entries = new();
     private VBoxContainer? _list;
     private ScrollContainer? _scroll;
     private Label? _countLabel;
-    private System.IDisposable? _t1, _t2, _t3, _t4, _t5, _t6, _t7;
+    private System.IDisposable? _t1, _t2, _t3, _t4, _t5, _t6, _t7, _t8;
+
+    /// <summary>2026-09-04 S3: QA-доступ (GODOT_KILLFEED_DEBUG) — последний лог.</summary>
+    public string? LastEntryText => _entries is { Count: > 0 } ? _entries[^1].Text : null;
 
     public override void _Ready()
     {
@@ -61,6 +67,8 @@ public partial class EventLogWindow : Control
         _t5 = _harvestSub?.Subscribe(OnHarvest);
         _t6 = _pickupSub?.Subscribe(OnPickup);
         _t7 = _levelSub?.Subscribe(OnLevelChanged);
+        // 2026-09-04 S3: kill-feed физического боя.
+        _t8 = _npcDeathSub?.Subscribe(OnNpcDeathFeed);
 
         GD.Print("[EventLogWindow] Ready");
     }
@@ -68,7 +76,7 @@ public partial class EventLogWindow : Control
     public override void _ExitTree()
     {
         _t1?.Dispose(); _t2?.Dispose(); _t3?.Dispose(); _t4?.Dispose();
-        _t5?.Dispose(); _t6?.Dispose(); _t7?.Dispose();
+        _t5?.Dispose(); _t6?.Dispose(); _t7?.Dispose(); _t8?.Dispose();
     }
 
     public void Toggle()
@@ -114,6 +122,35 @@ public partial class EventLogWindow : Control
     {
         Add($"☠ {Name(e.EnemyId)} повержен", new Godot.Color(0.6f, 0.8f, 0.35f));
     }
+
+    /// <summary>
+    /// 2026-09-04 S3: kill-feed физического боя — NPCDeathEvent.
+    /// Дедуп: то же событие может прийти и через stage-бой (EnemyKilledEvent)
+    /// в тот же момент — пропускаем, если этот NPC уже залогирован < 2с назад.
+    /// </summary>
+    private void OnNpcDeathFeed(in NPCDeathEvent e)
+    {
+        string name = Name(e.NpcId);
+        // Дедуп по последней записи (тот же NPC + слово «повержен»).
+        var now = System.DateTime.UtcNow;
+        if (_lastKillLog is { } last && last.Name == name &&
+            (now - last.At).TotalSeconds < 2.0)
+            return;
+        _lastKillLog = (name, now);
+
+        if (e.KillerId is ("player_0" or "player"))
+            Add($"☠ {name} повержен (руками)", new Godot.Color(0.55f, 0.85f, 0.4f));
+        else if (e.KillerId == "old_age")
+            Add($"✝ {name} ушёл из мира (старость)", new Godot.Color(0.7f, 0.65f, 0.55f));
+        else
+        {
+            string killer = Name(e.KillerId);
+            Add($"☠ {name} погиб ({(killer != "???" ? killer : "причина неизвестна")})",
+                new Godot.Color(0.7f, 0.5f, 0.3f));
+        }
+    }
+
+    private (string Name, System.DateTime At)? _lastKillLog;
 
     private void OnHarvest(in ResourceHarvestedEvent e)
     {

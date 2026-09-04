@@ -66,6 +66,10 @@ public partial class GameWorldController : Node2D
     // M2 (2026-09-03): отклонение атаки игрока (C-5 аудита-3) → тост причины
     // («Каст уже идёт: …») вместо удалённого polling-тоста «⚔ Атака!».
     [Inject] private ISubscriber<Core.Messaging.Contracts.AttackRejectedEvent> AttackRejectedSub { get; set; } = null!;
+    // 2026-09-04 S3: kill-feed — смерть NPC в физическом бою (NPCCombatAdapter
+    // публикует NPCDeathEvent; ранее UI не был подписан — убийства невидимы:
+    // игроку не было никакого отклика, только лут падал).
+    [Inject] private ISubscriber<Core.Messaging.Contracts.NPCDeathEvent> NpcDeathSub { get; set; } = null!;
 
     private Node2D        _worldRoot     = null!;
     private Camera2D      _camera        = null!;
@@ -109,6 +113,7 @@ public partial class GameWorldController : Node2D
     private System.IDisposable? _playerDeathToken;
     private System.IDisposable? _playerDamageToken;
     private System.IDisposable? _toastShownToken;
+    private System.IDisposable? _npcDeathToken; // 2026-09-04 S3: kill-feed
     private System.IDisposable? _attackRejectedToken; // M2: тост причины отклонения атаки
     private CanvasLayer   _hudCanvas     = null!;
     private Label         _timeLabel     = null!;
@@ -209,6 +214,8 @@ public partial class GameWorldController : Node2D
         // Этап 4 (2026-08-22): смерть игрока → респавн; урон игроку → тост.
         _playerDeathToken = PlayerDeathSub?.Subscribe(OnPlayerDeath);
         _playerDamageToken = DamageSub?.Subscribe(OnPlayerDamaged);
+        // 2026-09-04 S3: kill-feed — смерти NPC → тост «☠ Имя повержен».
+        _npcDeathToken = NpcDeathSub?.Subscribe(OnNpcDied);
         // Этап 7: тосты от модулей (InventoryWindow.TryUseQiStone и др.)
         _toastShownToken = ToastShownSub?.Subscribe(OnToastShown);
         // Phase 2 fix: dialogue can end from MANY paths (E advance, Esc, choice
@@ -247,6 +254,13 @@ public partial class GameWorldController : Node2D
         {
             var lowHpSim = new LowHpSimDebug { Name = "LowHpSimDebug" };
             AddChild(lowHpSim);
+        }
+        // 2026-09-04 S3: headless-верификация kill-feed (GODOT_KILLFEED_DEBUG=1)
+        // — тост/журнал/дедуп смертей NPC в физическом бою.
+        if (System.Environment.GetEnvironmentVariable("GODOT_KILLFEED_DEBUG") == "1")
+        {
+            var killFeedSim = new KillFeedSimDebug { Name = "KillFeedSimDebug" };
+            AddChild(killFeedSim);
         }
         // Stage 0+1 (2026-08-25, GLM-5.3): верификация модели заполнения +
         // ауры-задержки (вариант В): зарядка → hold → release → урон.
@@ -1397,11 +1411,34 @@ public partial class GameWorldController : Node2D
 
     /// <summary>
     /// Этап 4 (2026-08-22): урон игроку → тост-фидбек.
+    /// 2026-09-04 S3: атрибуция атакующего — «💥 −12 HP — Разбойник»:
+    /// раньше игрок не видел, КТО наносит урон (в замесе непонятно,
+    /// кого бить в ответ).
     /// </summary>
     private void OnPlayerDamaged(in Core.Messaging.Contracts.DamageAppliedEvent e)
     {
         if (e.TargetId is not ("player_0" or "player")) return;
-        ShowToast($"💥 −{e.Damage} HP");
+        string attacker = e.SourceId is ("player_0" or "player")
+            ? ""
+            : $" — {Npcs?.GetNPCState(e.SourceId)?.DisplayName ?? "?"}";
+        ShowToast($"💥 −{e.Damage} HP{attacker}");
+    }
+
+    /// <summary>
+    /// 2026-09-04 S3: kill-feed — смерть NPC (физический бой) → тост.
+    /// Ранее NPCDeathEvent не потреблялся UI: убийство NPC не давало
+    /// никакого отклика (только лут падал) — игрок не понимал, что убил.
+    /// </summary>
+    private void OnNpcDied(in Core.Messaging.Contracts.NPCDeathEvent e)
+    {
+        string name = Npcs?.GetNPCState(e.NpcId)?.DisplayName ?? "Существо";
+        if (e.KillerId is ("player_0" or "player"))
+            ShowToast($"☠ {name} повержен", 3.0f);
+        else if (e.KillerId == "old_age")
+            ShowToast($"✝ {name} ушёл из мира (старость)", 2.5f);
+        // Смерть от другого NPC — без тоста (анти-спам npc-npc боя),
+        // но в EventLogWindow пишется (см. OnNpcDeathFeed).
+        GD.Print($"[GameWorld] NPC death: {e.NpcId} '{name}' by {e.KillerId}");
     }
 
     /// <summary>Этап 7: тост от модуля (QiStone use, чит-меню и т.д.).
