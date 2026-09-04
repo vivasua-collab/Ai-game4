@@ -139,3 +139,26 @@ Stage Summary:
   (новые секции) — обновление ТОЛЬКО по явному разрешению пользователя.
 - ENV-флап: если песочница снова упадёт — re-clone + cold_start.sh +
   `godot --headless --import` (см. чекпоинт «Найденные проблемы»).
+
+---
+Task ID: S1 (автосеанс 1/6)
+Agent: cron webDevReview (Z.ai Code)
+Task: UI-итерация 1 — HUD-информативность + фикс «мёртвых проводок» (J/Q)
+
+Work Log:
+- Восстановление окружения после сброса песочницы: re-clone GitHub (HEAD 65e0d04),
+  .NET 8/9 + Godot 4.7.1 (python-zipfile — unzip-флап), credential store, import.
+- Все 5 QA-тестов PASS до начала работ (NEWGAME/COMBAT_SIM/TRADE/GEN/MAP).
+- VLM-аудит скриншота боя (Xvfb+opengl3): контраст-баги + список «чего не хватает».
+- HUD: тени статусных строк, StyleBoxFlat-рамки баров, цифры HP/Ци на барах,
+  ⚔-индикатор режима+кулдауна атаки (PlayerCombatAdapter.AttackCooldownRemaining).
+- NPCSpriteRenderer: нейм-плейты «Имя · L{lvl} · {hp}HP» над HP-барами врагов.
+- НОВЫЕ окна: EventLogWindow (J) и QuestWindow (Q) — обе клавиши были
+  «мёртвой проводкой»; квест-система впервые достижима из UI.
+- IQuestService.GetQuestSummaries() + Core-DTO QuestSummary (слойность чистая).
+- build 0 errors; 5 QA PASS; VLM-верификация скриншота (до/после, кроп).
+
+Stage Summary:
+- Коммит S1 + push. Счётчик автосеансов: 1/6.
+- Отложено в S2: кулдаун-индикатор хотбара, мини-карта (N?), RuItem-имена,
+  цветовая кодировка угрозы. Чекпоинт: checkpoints/09_04_s1_ui_hud_session1.md.

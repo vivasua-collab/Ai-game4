@@ -145,6 +145,51 @@ public class QuestService : IQuestService, IDisposable
         return quest.Type;
     }
 
+    /// <summary>
+    /// 2026-09-04 S1: сводки всех квестов для UI (окно квестов Q).
+    /// Map module QuestData → Core-level QuestSummary (read-only DTO).
+    /// </summary>
+    public System.Collections.Generic.IReadOnlyList<Core.Interfaces.QuestSummary> GetQuestSummaries()
+    {
+        var list = new System.Collections.Generic.List<Core.Interfaces.QuestSummary>(_allQuests.Count);
+        foreach (var q in _allQuests.Values)
+        {
+            var summary = new Core.Interfaces.QuestSummary
+            {
+                QuestId = q.QuestId,
+                DisplayName = q.DisplayName,
+                Description = q.Description,
+                Status = q.Status,
+                OverallProgress = q.OverallProgress,
+                Objectives = new (string, int, int, bool)[q.Objectives.Count],
+            };
+            for (int i = 0; i < q.Objectives.Count; i++)
+            {
+                var o = q.Objectives[i];
+                string desc = !string.IsNullOrEmpty(o.Description)
+                    ? o.Description.Replace("{progress}", o.Progress.ToString())
+                                      .Replace("{target}", o.Target.ToString())
+                    : $"{o.Type} {o.TargetId}";
+                summary.Objectives[i] = (desc, o.Progress, o.Target, o.IsComplete);
+            }
+            summary.RewardTexts = new string[q.Rewards.Count];
+            for (int i = 0; i < q.Rewards.Count; i++)
+            {
+                var r = q.Rewards[i];
+                summary.RewardTexts[i] = r.Type switch
+                {
+                    QuestRewardType.Qi     => $"Ци +{r.Amount}",
+                    QuestRewardType.Item   => $"Предмет {r.TargetId} ×{r.Amount}",
+                    QuestRewardType.Technique => $"Свиток техники {r.TargetId}",
+                    QuestRewardType.Experience => $"Опыт +{r.Amount}",
+                    _ => $"{r.Type} +{r.Amount}",
+                };
+            }
+            list.Add(summary);
+        }
+        return list;
+    }
+
     // === Дополнительные методы (внутримодульные) ===
 
     /// <summary>

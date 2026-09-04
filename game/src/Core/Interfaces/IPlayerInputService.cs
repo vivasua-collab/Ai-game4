@@ -60,6 +60,18 @@ namespace CultivationGame.Core.Interfaces
         /// <summary>Нажата ли панель техник (T, однократное)</summary>
         bool IsTechniquesPressed { get; }
 
+        /// <summary>
+        /// 2026-09-04 S1: Нажата ли клавиша журнала событий (J, однократное).
+        /// Открывает EventLogWindow (бой/добыча/подбор/прорывы).
+        /// </summary>
+        bool IsJournalPressed { get; }
+
+        /// <summary>
+        /// 2026-09-04 S1: Нажата ли клавиша окна квестов (Q, однократное).
+        /// Открывает QuestWindow (квесты, цели, принятие).
+        /// </summary>
+        bool IsQuestLogPressed { get; }
+
         // === D (2026-08-26): Окно Культивации + хоткеи武器/техник ===
 
         /// <summary>

@@ -75,6 +75,13 @@ public sealed class PlayerInputService : IPlayerInputService
     public bool IsCycleTechniquePressed => _specialAction; // X (special_action)
     public bool IsTechniquesPressed => _techniques;        // T
 
+    // 2026-09-04 S1: журнал событий (J) — «мёртвая проводка» исправлена
+    // (_journal захватывался, но не экспонировался в интерфейсе).
+    public bool IsJournalPressed => _journal && !InputDisabled;
+
+    // 2026-09-04 S1: окно квестов (Q) — вторая «мёртвая проводка».
+    public bool IsQuestLogPressed => _questLog && !InputDisabled;
+
     // === D (2026-08-26): Окно Культивации + хоткеи оружие/техник ===
     public bool IsCultivationWindowPressed => _cultivationWindow;
     public bool IsWeaponMeleePressed => _weaponMelee;

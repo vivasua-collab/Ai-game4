@@ -84,6 +84,10 @@ public partial class GameWorldController : Node2D
     private UI.TechniqueBookWindow _techniqueBook = null!;
     // 2026-08-28: окно-справка горячих клавиш (F1).
     private UI.HotkeysWindow _hotkeysWindow = null!;
+    // 2026-09-04 S1: журнал событий (J).
+    private UI.EventLogWindow _eventLogWindow = null!;
+    // 2026-09-04 S1: окно квестов (Q).
+    private UI.QuestWindow _questWindow = null!;
     // C3 (2026-08-26): окно Культивации Ци (K) — 3 вкладки + панель слотов техник 3-9.
     private UI.CultivationWindow _cultivationWindow = null!;
 #if DEBUG
@@ -91,6 +95,10 @@ public partial class GameWorldController : Node2D
 #endif
     private Godot.ProgressBar _hpBar = null!;
     private Godot.ProgressBar _qiBar = null!;
+    // 2026-09-04 S1: числовые подписи на барах + индикатор боевой готовности.
+    private Label _hpBarText = null!;
+    private Label _qiBarText = null!;
+    private Label _attackStateLabel = null!;
     private Label _qiLabel = null!;
     private Label _meditationLabel = null!;
     private bool _meditationActive;           // кэш из MeditationStateChangedEvent
@@ -399,14 +407,18 @@ public partial class GameWorldController : Node2D
         AddChild(_hudCanvas);
 
         // Time label — TOP line (visible, parchment color).
+        // 2026-09-04 S1: + тёмная тень (VLM-аудит: светлый текст на светлом
+        // фоне воды/неба был нечитаем — критичный контраст-баг).
         _timeLabel = new Label { Name = "TimeLabel" };
         _timeLabel.AddThemeFontSizeOverride("font_size", 18);
         _timeLabel.AddThemeColorOverride("font_color", new Color(0.94f, 0.83f, 0.66f));
+        _timeLabel.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.85f));
         _timeLabel.Position = new Vector2(20, 10);
         _hudCanvas.AddChild(_timeLabel);
 
         // Player HP bar (этап 4, 2026-08-22): под временем. HP = Σ RedHP по
         // частям тела (Q4). Цвет от зелёного к красному по мере потерь.
+        // 2026-09-04 S1: + тёмная подложка-рамка (VLM: бары терялись на фоне).
         _hpBar = new ProgressBar
         {
             Name = "HpBar",
@@ -416,10 +428,30 @@ public partial class GameWorldController : Node2D
             Position = new Vector2(20, 38),
         };
         _hpBar.AddThemeFontSizeOverride("font_size", 12);
+        var hpBgStyle = new StyleBoxFlat { BgColor = new Color(0.08f, 0.05f, 0.03f, 0.85f) };
+        hpBgStyle.SetBorderWidthAll(1);
+        hpBgStyle.SetBorderColor(new Color(0.45f, 0.30f, 0.15f, 0.9f));
+        hpBgStyle.SetCornerRadiusAll(3);
+        _hpBar.AddThemeStyleboxOverride("background", hpBgStyle);
         _hudCanvas.AddChild(_hpBar);
+
+        // 2026-09-04 S1: цифры HP поверх бара (VLM: нет числового HP игрока).
+        _hpBarText = new Label
+        {
+            Name = "HpBarText",
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
+        _hpBarText.AddThemeFontSizeOverride("font_size", 12);
+        _hpBarText.AddThemeColorOverride("font_color", new Color(0.95f, 0.92f, 0.85f));
+        _hpBarText.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.9f));
+        _hpBarText.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        _hpBar.AddChild(_hpBarText);
 
         // Qi bar (этап 1 внедрения ЦИ, 2026-08-23): под HP-баром, золотой цвет.
         // Ци игрока из QiService (long — отображаем как double в ProgressBar).
+        // 2026-09-04 S1: + тёмная подложка-рамка + цифры на баре.
         _qiBar = new ProgressBar
         {
             Name = "QiBar",
@@ -430,16 +462,47 @@ public partial class GameWorldController : Node2D
         };
         _qiBar.AddThemeFontSizeOverride("font_size", 11);
         _qiBar.AddThemeColorOverride("font_color", new Color(0.98f, 0.85f, 0.3f));
+        var qiBgStyle = new StyleBoxFlat { BgColor = new Color(0.08f, 0.05f, 0.03f, 0.85f) };
+        qiBgStyle.SetBorderWidthAll(1);
+        qiBgStyle.SetBorderColor(new Color(0.45f, 0.38f, 0.15f, 0.9f));
+        qiBgStyle.SetCornerRadiusAll(3);
+        _qiBar.AddThemeStyleboxOverride("background", qiBgStyle);
         _hudCanvas.AddChild(_qiBar);
 
-        // Подпись Ци (значения + уровень культивации).
+        _qiBarText = new Label
+        {
+            Name = "QiBarText",
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
+        _qiBarText.AddThemeFontSizeOverride("font_size", 10);
+        _qiBarText.AddThemeColorOverride("font_color", new Color(0.98f, 0.92f, 0.75f));
+        _qiBarText.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.9f));
+        _qiBarText.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        _qiBar.AddChild(_qiBarText);
+
+        // Подпись Ци (уровень культивации + проводимость — без дубля цифр,
+        // они теперь на самом баре). 2026-09-04 S1: + тень (контраст).
         _qiLabel = new Label { Name = "QiLabel", Position = new Vector2(288, 60) };
         _qiLabel.AddThemeFontSizeOverride("font_size", 12);
         _qiLabel.AddThemeColorOverride("font_color", new Color(0.94f, 0.83f, 0.66f));
+        _qiLabel.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.85f));
         _hudCanvas.AddChild(_qiLabel);
 
+        // 2026-09-04 S1: индикатор оружия/атаки под Qi-баром (VLM: не хватало
+        // статуса боевой готовности): режим + кулдаун атаки (M2 §8.1).
+        _attackStateLabel = new Label { Name = "AttackStateLabel", Position = new Vector2(20, 78) };
+        _attackStateLabel.AddThemeFontSizeOverride("font_size", 12);
+        _attackStateLabel.AddThemeColorOverride("font_color", new Color(0.85f, 0.78f, 0.6f));
+        _attackStateLabel.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.85f));
+        _attackStateLabel.Text = "⚔ Ближний бой — атака готова";
+        _hudCanvas.AddChild(_attackStateLabel);
+
         // Индикатор медитации (V): статус под Ци-баром.
-        _meditationLabel = new Label { Name = "MeditationLabel", Position = new Vector2(20, 78), Visible = false };
+        // Meditation label position shift (was 78): теперь на 96 — под новым
+        // индикатором атаки.
+        _meditationLabel = new Label { Name = "MeditationLabel", Position = new Vector2(20, 96), Visible = false };
         _meditationLabel.AddThemeFontSizeOverride("font_size", 13);
         _meditationLabel.AddThemeColorOverride("font_color", new Color(0.55f, 0.75f, 0.95f));
         _meditationLabel.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.9f));
@@ -459,8 +522,9 @@ public partial class GameWorldController : Node2D
 #endif
             ,
         };
-        _hudLabel.AddThemeFontSizeOverride("font_size", 13);
+        _hudLabel.AddThemeFontSizeOverride("font_size", 14);
         _hudLabel.AddThemeColorOverride("font_color", new Color(0.1f, 0.08f, 0.05f));  // near-black
+        _hudLabel.AddThemeColorOverride("font_shadow_color", new Color(0.9f, 0.87f, 0.8f, 0.7f));  // светл. тень — отделяет от тёмных участков
         _hudLabel.Position = new Vector2(20, 1020);  // bottom of 1080p screen
         _hudCanvas.AddChild(_hudLabel);
 
@@ -512,6 +576,15 @@ public partial class GameWorldController : Node2D
         // 2026-08-28: окно-справка горячих клавиш (F1).
         _hotkeysWindow = new UI.HotkeysWindow { Name = "HotkeysWindow" };
         _hudCanvas.AddChild(_hotkeysWindow);
+
+        // 2026-09-04 S1: Журнал событий (J) — был рекламирован в легенде HUD
+        // и F1-справке, но не существовал («мёртвая проводка» клавиши journal).
+        _eventLogWindow = new UI.EventLogWindow { Name = "EventLogWindow" };
+        _hudCanvas.AddChild(_eventLogWindow);
+
+        // 2026-09-04 S1: Журнал заданий (Q) — вторая «мёртвая проводка».
+        _questWindow = new UI.QuestWindow { Name = "QuestWindow" };
+        _hudCanvas.AddChild(_questWindow);
 
         // C3 (2026-08-26): окно Культивации Ци (K) — 3 вкладки (Техники / Меридианы / Ядро)
         // + нижняя панель слотов техник (3-9). Открывается клавишей K через
@@ -580,6 +653,7 @@ public partial class GameWorldController : Node2D
         }
 
         // Этап 4: HP bar — сумма RedHP по частям тела (Q4).
+        // 2026-09-04 S1: + числовая подпись на баре.
         if (_hpBar != null && BodyService != null)
         {
             int cur = 0, max = 0;
@@ -595,10 +669,14 @@ public partial class GameWorldController : Node2D
                 float ratio = (float)cur / max;
                 _hpBar.Modulate = new Color(
                     0.35f + 0.65f * (1f - ratio), 0.3f + 0.6f * ratio, 0.25f);
+                if (_hpBarText != null)
+                    _hpBarText.Text = $"HP {cur}/{max}";
             }
         }
 
         // Этап 1 внедрения ЦИ: Qi bar — текущее Ци / MaxQi (long → double).
+        // 2026-09-04 S1: цифры на баре; подпись справа = только прогресс
+        // культивации (без дубля значений Ци).
         if (_qiBar != null && QiService != null)
         {
             double qiMax = QiService.MaxQi;
@@ -610,9 +688,27 @@ public partial class GameWorldController : Node2D
                 // Золотой → тускло-серый при истощении.
                 _qiBar.Modulate = new Color(
                     0.55f + 0.45f * qiRatio, 0.45f + 0.4f * qiRatio, 0.15f + 0.15f * qiRatio);
-                _qiLabel.Text = $"Ци {QiService.CurrentQi}/{qiMax} | L{(int)QiService.CultivationLevel}.{QiService.SubLevel}" +
+                if (_qiBarText != null)
+                    _qiBarText.Text = $"Ци {QiService.CurrentQi}/{qiMax}";
+                _qiLabel.Text = $"L{(int)QiService.CultivationLevel}.{QiService.SubLevel}" +
                                 $" | пров. {QiService.Conductivity:F1}/с";
             }
+        }
+
+        // 2026-09-04 S1: индикатор боевой готовности — режим оружия +
+        // кулдаун атаки (M2 §8.1). Информативность: игрок видит, когда удар
+        // снова доступен, и в каком он режиме (melee/ranged).
+        if (_attackStateLabel != null && CombatAdapter != null)
+        {
+            bool ranged = CombatAdapter.CurrentWeaponMode == Modules.Player.PlayerCombatAdapter.WeaponMode.Ranged;
+            float cd = CombatAdapter.AttackCooldownRemaining;
+            _attackStateLabel.Text = cd > 0.05f
+                ? $"⚔ {(ranged ? "Дальний бой" : "Ближний бой")} — удар через {cd:F1}с"
+                : $"⚔ {(ranged ? "Дальний бой" : "Ближний бой")} — атака готова";
+            // Готовность = ярче; перезарядка = приглушено.
+            _attackStateLabel.Modulate = cd > 0.05f
+                ? new Color(0.75f, 0.7f, 0.6f)
+                : Colors.White;
         }
 
         // Toast timer: hide toast after expiry.
@@ -934,10 +1030,54 @@ public partial class GameWorldController : Node2D
             }
         }
 
+        // 2026-09-04 S1: J — Журнал событий (модальное окно, пауза как F1).
+        if (PlayerInput.IsJournalPressed && _eventLogWindow != null && Time != null)
+        {
+            _eventLogWindow.Toggle();
+            if (_eventLogWindow.Visible)
+            {
+                _wasPausedBeforeInventory = Time.IsPaused;
+                if (!Time.IsPaused) Time.Pause();
+            }
+            else if (!_wasPausedBeforeInventory && Time.IsPaused)
+            {
+                Time.Resume();
+            }
+        }
+
+        // 2026-09-04 S1: Q — Журнал заданий (модальное окно, пауза как F1).
+        if (PlayerInput.IsQuestLogPressed && _questWindow != null && Time != null)
+        {
+            _questWindow.Toggle();
+            if (_questWindow.Visible)
+            {
+                _wasPausedBeforeInventory = Time.IsPaused;
+                if (!Time.IsPaused) Time.Pause();
+            }
+            else if (!_wasPausedBeforeInventory && Time.IsPaused)
+            {
+                Time.Resume();
+            }
+        }
+
         // 2026-08-28: Esc сначала закрывает окна новой волны (справка/книга/чит).
         if (PlayerInput.IsPausePressed && _hotkeysWindow is { Visible: true })
         {
             _hotkeysWindow.Close();
+            if (!_wasPausedBeforeInventory && Time is { IsPaused: true })
+                Time.Resume();
+        }
+        // 2026-09-04 S1: Esc закрывает журнал событий (J).
+        else if (PlayerInput.IsPausePressed && _eventLogWindow is { Visible: true })
+        {
+            _eventLogWindow.Toggle();
+            if (!_wasPausedBeforeInventory && Time is { IsPaused: true })
+                Time.Resume();
+        }
+        // 2026-09-04 S1: Esc закрывает окно квестов (Q).
+        else if (PlayerInput.IsPausePressed && _questWindow is { Visible: true })
+        {
+            _questWindow.Toggle();
             if (!_wasPausedBeforeInventory && Time is { IsPaused: true })
                 Time.Resume();
         }

@@ -69,6 +69,12 @@ public sealed class PlayerCombatAdapter : IDisposable
     /// <summary>Режим оружия игрока: Melee (кулаки/ближнее) или Ranged (лук).</summary>
     public WeaponMode CurrentWeaponMode { get; private set; } = WeaponMode.Melee;
 
+    /// <summary>
+    /// 2026-09-04 S1: остаток кулдауна атаки (сек) — для HUD-индикатора
+    /// боевой готовности (GameWorldController). 0 = удар доступен.
+    /// </summary>
+    public float AttackCooldownRemaining => _attackCooldownSec > 0f ? _attackCooldownSec : 0f;
+
     private IDisposable? _combatStartedToken;
     private IDisposable? _combatEndedToken;
     private IDisposable? _damageToken;

@@ -84,12 +84,27 @@ public partial class NPCSpriteRenderer : Node2D
 
             // Phase 7: HP-бар над NPC — только если повреждён (полный HP не рисуем,
             // чтобы не засорять HUD в мирное время). Высота полосы — над спрайтом.
+            // 2026-09-04 S1 (VLM-аудит): + имя и уровень NPC над баром —
+            // информативность боя (видно КТО ранен и его силу).
             if (_bodyProvider != null)
             {
                 int hp = _bodyProvider.GetCurrentHealth(id);
                 int maxHp = _bodyProvider.GetMaxHealth(id);
                 if (maxHp > 0 && hp < maxHp)
-                    DrawNpcHealthBar(cx, cy - spriteSize / 2f - 8f, hp, maxHp);
+                {
+                    float barTop = cy - spriteSize / 2f - 8f;
+                    DrawNpcHealthBar(cx, barTop, hp, maxHp);
+
+                    var st = _npcService.GetNPCState(id);
+                    if (st != null)
+                    {
+                        int lvl = (int)st.CultivationLevel;
+                        string nameText = lvl > 0
+                            ? $"{st.DisplayName} · L{lvl} · {hp}HP"
+                            : $"{st.DisplayName} · {hp}HP";
+                        DrawNpcNamePlate(cx, barTop, nameText);
+                    }
+                }
             }
         }
     }
@@ -121,6 +136,29 @@ public partial class NPCSpriteRenderer : Node2D
         // Тонкая рамка.
         DrawRect(new Rect2(cx - barWidth / 2f, top, barWidth, barHeight),
             new Color(0f, 0f, 0f, 0.5f), false, 1f);
+    }
+
+    /// <summary>
+    /// 2026-09-04 S1: нейм-плейт над HP-баром NPC: «Имя · L{уровень} · {hp}HP».
+    /// Рисуется только вместе с HP-баром (NPC повреждён → бой идёт).
+    /// Центрируется над баром (паттерн FormationVisualRenderer), тень для
+    /// читаемости на любом фоне.
+    /// </summary>
+    private void DrawNpcNamePlate(float cx, float barTop, string text)
+    {
+        if (string.IsNullOrEmpty(text)) return;
+        var font = ThemeDB.FallbackFont;
+        const int fontSize = 10;
+        const float plateWidth = 96f;
+        var pos = new Vector2(cx - plateWidth / 2f, barTop - 4f);
+
+        // Тень (контраст на любом фоне) + основной текст.
+        DrawString(font, pos + new Vector2(1, 1), text,
+            HorizontalAlignment.Center, plateWidth, fontSize,
+            new Color(0, 0, 0, 0.75f));
+        DrawString(font, pos, text,
+            HorizontalAlignment.Center, plateWidth, fontSize,
+            new Color(0.95f, 0.9f, 0.8f));
     }
 
     private static Color GetColourForRole(NPCRole role) => role switch

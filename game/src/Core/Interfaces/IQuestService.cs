@@ -34,5 +34,30 @@ namespace CultivationGame.Core.Interfaces
 
         /// <summary>Тип квеста</summary>
         QuestType GetQuestType(string questId);
+
+        /// <summary>
+        /// 2026-09-04 S1: сводки ВСЕХ квестов (id, название, статус, прогресс,
+        /// цели, награды) — для окна квестов (Q). Read-only DTO: Core не
+        /// ссылается на типы модуля Quest.
+        /// </summary>
+        IReadOnlyList<QuestSummary> GetQuestSummaries();
+    }
+
+    /// <summary>
+    /// 2026-09-04 S1: read-only сводка квеста для UI (окно квестов Q).
+    /// </summary>
+    public sealed class QuestSummary
+    {
+        public string QuestId = "";
+        public string DisplayName = "";
+        public string Description = "";
+        public QuestStatus Status;
+        /// <summary>0..1 по всем целям</summary>
+        public float OverallProgress;
+        /// <summary>Цели: текст + прогресс</summary>
+        public (string Description, int Progress, int Target, bool Complete)[] Objectives =
+            System.Array.Empty<(string, int, int, bool)>();
+        /// <summary>Награды: человекочитаемые строки</summary>
+        public string[] RewardTexts = System.Array.Empty<string>();
     }
 }
