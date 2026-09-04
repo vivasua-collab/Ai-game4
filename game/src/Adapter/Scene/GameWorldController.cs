@@ -136,6 +136,10 @@ public partial class GameWorldController : Node2D
     private const float ToastFadeSec   = 0.45f;  // fade-out в конце жизни
     private const float ToastFadeInSec = 0.12f;  // fade-in появления
 
+    // 2026-09-04 S5: стрелки направления атакующих вне экрана (см. DamageDirectionIndicator).
+    private UI.DamageDirectionIndicator _dmgDirIndicator = null!;
+    private const float DamageDirScreenMarginPx = 48f; // отступ стрелки от края экрана
+
     /// <summary>2026-09-04 S2: QA-доступ (GODOT_TOAST_DEBUG) — число строк стека.</summary>
     public int ToastLineCount => _toastLines?.Count ?? 0;
 
@@ -152,6 +156,14 @@ public partial class GameWorldController : Node2D
             if (_toastLines[i].BaseText.StartsWith(prefix, System.StringComparison.Ordinal)) n++;
         return n;
     }
+
+    // === 2026-09-04 S5: QA-доступ для индикатора направления урона ===
+
+    /// <summary>Число активных стрелок направления (GODOT_DAMAGEDIR_DEBUG).</summary>
+    public int DamageDirCount => _dmgDirIndicator?.ActiveCount ?? 0;
+
+    /// <summary>Угол стрелки npcId в градусах (null — стрелки нет; 0°=восток, -90°=север).</summary>
+    public float? DamageDirAngleOf(string npcId) => _dmgDirIndicator?.AngleOf(npcId);
 
     /// <summary>2026-09-04 S2: красная виньетка опасности при низком HP.</summary>
     private ColorRect _lowHpOverlay = null!;
@@ -268,6 +280,13 @@ public partial class GameWorldController : Node2D
         {
             var hotbarSim = new HotbarSimDebug { Name = "HotbarSimDebug" };
             AddChild(hotbarSim);
+        }
+        // 2026-09-04 S5: headless-верификация стрелок направления урона
+        // (GODOT_DAMAGEDIR_DEBUG=1) — показать/следовать/на-экране/TTL.
+        if (System.Environment.GetEnvironmentVariable("GODOT_DAMAGEDIR_DEBUG") == "1")
+        {
+            var dmgDirSim = new DamageDirSimDebug { Name = "DamageDirSimDebug" };
+            AddChild(dmgDirSim);
         }
         // Stage 0+1 (2026-08-25, GLM-5.3): верификация модели заполнения +
         // ауры-задержки (вариант В): зарядка → hold → release → урон.
@@ -626,6 +645,11 @@ public partial class GameWorldController : Node2D
         _toastStack.OffsetRight = 260;
         _hudCanvas.AddChild(_toastStack);
 
+        // 2026-09-04 S5: стрелки направления атакующих вне экрана — игрок
+        // видит, ОТКУДА прилетает урон, даже когда источник за кадром.
+        _dmgDirIndicator = new UI.DamageDirectionIndicator { Name = "DamageDirIndicator" };
+        _hudCanvas.AddChild(_dmgDirIndicator);
+
         // Inventory window (opens with B key) — must be created AFTER _hudCanvas.
         _inventoryWindow = new InventoryWindow { Name = "InventoryWindow" };
         _hudCanvas.AddChild(_inventoryWindow);
@@ -826,6 +850,10 @@ public partial class GameWorldController : Node2D
             else if (line.Remaining < ToastFadeSec) alpha = line.Remaining / ToastFadeSec;
             line.Label.Modulate = new Color(1f, 1f, 1f, Mathf.Clamp(alpha, 0f, 1f));
         }
+
+        // 2026-09-04 S5: тик стрелок направления — обновить позы живых стрелок
+        // (NPC движется), убрать стрелки вернувшихся на экран/умерших.
+        UpdateDamageDirIndicators();
 
         HandleStickyInput();
 
@@ -1429,6 +1457,89 @@ public partial class GameWorldController : Node2D
             ? ""
             : $" — {Npcs?.GetNPCState(e.SourceId)?.DisplayName ?? "?"}";
         ShowToast($"💥 −{e.Damage} HP{attacker}");
+        // 2026-09-04 S5: если атакующий вне экрана — стрелка его направления.
+        if (e.SourceId is not ("player_0" or "player"))
+            ShowDamageDirection(e.SourceId);
+    }
+
+    // === 2026-09-04 S5: стрелка направления атакующего вне экрана ==========
+
+    /// <summary>
+    /// Показать/продлить стрелку направления атакующего (вызывается при уроне
+    /// игроку). Стрелка — только если источник ВНЕ видимой области; угол — от
+    /// игрока к источнику; точка — клэмп к краю экрана с отступом.
+    /// public: headless-QA (GODOT_DAMAGEDIR_DEBUG) вызывает напрямую, не
+    /// публикуя DamageAppliedEvent (его слушают 10+ боевых сервисов).
+    /// </summary>
+    public bool ShowDamageDirection(string sourceId)
+    {
+        if (string.IsNullOrEmpty(sourceId) || _dmgDirIndicator == null) return false;
+        if (sourceId is "player_0" or "player") return false;
+        var st = Npcs?.GetNPCState(sourceId);
+        if (st == null || !st.IsAlive) return false;
+
+        var world = TileToWorldCenter(st.Position);
+        var (screen, angle, onScreen) = WorldToScreen(world);
+        if (onScreen) return false;
+
+        _dmgDirIndicator.ShowOrUpdate(sourceId, screen, angle);
+        return true;
+    }
+
+    /// <summary>
+    /// Тик стрелок (каждый физ-кадр): позы обновляются (NPC движется),
+    /// стрелки источников, вернувшихся на экран / умерших — убираются.
+    /// TTL НЕ продлевается (только новый урон через ShowDamageDirection).
+    /// </summary>
+    private void UpdateDamageDirIndicators()
+    {
+        if (_dmgDirIndicator == null || _dmgDirIndicator.ActiveCount == 0) return;
+        foreach (var id in _dmgDirIndicator.GetActiveIds())
+        {
+            var st = Npcs?.GetNPCState(id);
+            if (st == null || !st.IsAlive)
+            {
+                _dmgDirIndicator.FadeOut(id);
+                continue;
+            }
+            var world = TileToWorldCenter(st.Position);
+            var (screen, angle, onScreen) = WorldToScreen(world);
+            if (onScreen)
+                _dmgDirIndicator.FadeOut(id); // источник виден глазами — стрелка не нужна
+            else
+                _dmgDirIndicator.UpdatePose(id, screen, angle);
+        }
+    }
+
+    /// <summary>Тайл → центр тайла в мировых пикселях.</summary>
+    private static Vector2 TileToWorldCenter(Core.Data.Position2D tile) =>
+        new(tile.X * GameConstants.TILE_PIXELS + GameConstants.TILE_PIXELS / 2f,
+            tile.Y * GameConstants.TILE_PIXELS + GameConstants.TILE_PIXELS / 2f);
+
+    /// <summary>
+    /// Мир → экран: screen = (world − camera) × zoom + viewport/2 (Camera2D
+    /// в центре экрана, оси экрана совпадают с миром). Возвращает точку,
+    /// угол направления от игрока к цели (рад) и флаг «на экране».
+    /// </summary>
+    private (Vector2 screen, float angleRad, bool onScreen) WorldToScreen(Vector2 world)
+    {
+        var vp = GetViewport().GetVisibleRect().Size;
+        var cam = _camera != null ? _camera.Position : _visualPosition;
+        var zoom = _camera != null ? _camera.Zoom : Vector2.One;
+        var screen = (world - cam) * zoom + vp / 2f;
+
+        bool onScreen = screen.X >= DamageDirScreenMarginPx
+                        && screen.X <= vp.X - DamageDirScreenMarginPx
+                        && screen.Y >= DamageDirScreenMarginPx
+                        && screen.Y <= vp.Y - DamageDirScreenMarginPx;
+
+        var dir = world - _visualPosition;
+        float angle = dir.LengthSquared() > 1f ? Mathf.Atan2(dir.Y, dir.X) : 0f;
+
+        var clamped = new Vector2(
+            Mathf.Clamp(screen.X, DamageDirScreenMarginPx, vp.X - DamageDirScreenMarginPx),
+            Mathf.Clamp(screen.Y, DamageDirScreenMarginPx, vp.Y - DamageDirScreenMarginPx));
+        return (clamped, angle, onScreen);
     }
 
     /// <summary>
