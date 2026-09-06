@@ -1445,9 +1445,12 @@ public partial class GameWorldController : Node2D
 
         // Save/load DISABLED (Q8: user decision — saves invalid after each fix).
         // Will be re-enabled when save system is stable.
-        // F5/F9 do nothing — no toast, no log, no action.
-        // if (PlayerInput.IsQuickSavePressed) { ... }
-        // if (PlayerInput.IsQuickLoadPressed) { ... }
+        // Аудит 2026-09-06 (P1, честность UI): тихий обман → явный тост.
+        // Игрок жмёт F5/F9 и не понимает, почему ничего не происходит.
+        if (PlayerInput.IsQuickSavePressed)
+            ShowToast("⏳ Сейвы отключены (этап разработки)");
+        if (PlayerInput.IsQuickLoadPressed)
+            ShowToast("⏳ Сейвы отключены (этап разработки)");
 
         // Time speed control: PageUp = faster, PageDown = slower.
         // Debounce: max 1 change per real second (prevents rapid cycling).
@@ -1640,34 +1643,48 @@ public partial class GameWorldController : Node2D
         CallDeferred(nameof(RespawnAfterDeath));
     }
 
+    /// <summary>
+    /// Аудит 2026-09-06 (P0): async void обёрнут в try/catch — исключение
+    /// внутри респавна больше не роняет процесс без лога (async void —
+    /// исключение уходит в unhandled-обработчик рантайма).
+    /// </summary>
     private async void RespawnAfterDeath()
     {
-        await ToSignal(GetTree().CreateTimer(3.0), SceneTreeTimer.SignalName.Timeout);
-
-        // Полное лечение всех частей (Q4: HP = Σ RedHP).
-        if (BodyService != null)
+        try
         {
-            var parts = BodyService.GetAllParts();
-            if (parts != null)
+            await ToSignal(GetTree().CreateTimer(3.0), SceneTreeTimer.SignalName.Timeout);
+
+            // Полное лечение всех частей (Q4: HP = Σ RedHP).
+            if (BodyService != null)
             {
-                foreach (var p in parts)
+                var parts = BodyService.GetAllParts();
+                if (parts != null)
                 {
-                    int missing = p.MaxRedHP - p.CurrentRedHP;
-                    if (missing > 0) BodyService.HealPart(p.Type, missing);
+                    foreach (var p in parts)
+                    {
+                        int missing = p.MaxRedHP - p.CurrentRedHP;
+                        if (missing > 0) BodyService.HealPart(p.Type, missing);
+                    }
                 }
             }
-        }
-        (Player as Modules.Player.PlayerService)?.Revive();
+            (Player as Modules.Player.PlayerService)?.Revive();
 
-        // Телепорт в центр карты.
-        int cx = (Tiles is { MapWidth: > 0 } ? Tiles.MapWidth : 50) / 2;
-        int cy = (Tiles is { MapHeight: > 0 } ? Tiles.MapHeight : 50) / 2;
-        _visualPosition = new Vector2(
-            cx * GameConstants.TILE_PIXELS + GameConstants.TILE_PIXELS / 2f,
-            cy * GameConstants.TILE_PIXELS + GameConstants.TILE_PIXELS / 2f);
-        Player?.SetPosition(new Position2D(cx, cy));
-        _mouseTarget = null;
-        ShowToast("✦ Вы возродились");
+            // Телепорт в центр карты.
+            int cx = (Tiles is { MapWidth: > 0 } ? Tiles.MapWidth : 50) / 2;
+            int cy = (Tiles is { MapHeight: > 0 } ? Tiles.MapHeight : 50) / 2;
+            _visualPosition = new Vector2(
+                cx * GameConstants.TILE_PIXELS + GameConstants.TILE_PIXELS / 2f,
+                cy * GameConstants.TILE_PIXELS + GameConstants.TILE_PIXELS / 2f);
+            Player?.SetPosition(new Position2D(cx, cy));
+            _mouseTarget = null;
+            ShowToast("✦ Вы возродились");
+        }
+        catch (Exception ex)
+        {
+            // P0-фикс аудита: респавн не должен ронять игру молча.
+            GD.PrintErr($"[GameWorld] RespawnAfterDeath FAILED: {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
+            ShowToast("⚠ Ошибка возрождения — см. лог");
+        }
     }
 
     /// <summary>

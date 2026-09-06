@@ -3,6 +3,12 @@
 > **Дата:** 2026-08-19
 > **Статус:** PLAN (подготовка к следующему этапу)
 > **Источники:** Аудиты Task 5-a (NPC), 5-b (Combat), 5-c (Generators)
+>
+> ⚠️ **Исторический документ (2026-09-06):** план ВЫПОЛНЕН последующими фазами —
+> NPC спавн реализован (AnimalSpawnPhase/HumanNPCSpawnPhase/GroupSpawnPhase;
+> v1-stub NPCSpawnPhase удалён 2026-09-06 при санации мёртвого API), рендер —
+> NPCSpriteRenderer, DialogueWindow/Trade/чаты реализованы (см. 07_ui/DIALOGUE_SYSTEM.md,
+> 06_player/TRADE_SYSTEM.md). Снимки состояния «❌ …» ниже — на момент 2026-08-19.
 
 ---
 

@@ -112,7 +112,6 @@ CultivationGame.Core/
 │   ├── IBuffService.cs
 │   ├── IStatService.cs
 │   ├── IInventoryService.cs
-│   ├── IStorageService.cs
 │   ├── ICraftingService.cs
 │   ├── IEquipmentService.cs
 │   ├── ICombatService.cs
@@ -219,7 +218,6 @@ CultivationGame.Modules/
 │   ├── EquipmentService.cs
 │   ├── EquipmentValidator.cs
 │   ├── EquipmentStatAggregator.cs
-│   ├── StorageService.cs             # Spirit + Ring (через StorageType)
 │   ├── CraftingService.cs
 │   ├── MaterialService.cs
 │   └── Data/
@@ -383,18 +381,23 @@ CultivationGame.Entry/
 ├── SceneAssemblyRegistrar.cs         # Регистрация фаз
 ├── MessagingRegistrar.cs             # Регистрация контрактов шины
 │
-├── Phases/                           # Фазы сборки сцены (10)
+├── Phases/                           # Фазы сборки сцены (15; порядок — PhaseOrder)
 │   ├── AbstractSceneAssemblyPhase.cs # Базовый класс фазы
 │   ├── CoreValidationPhase.cs        # Фаза 1: Валидация DI
 │   ├── TileMapGenPhase.cs            # Фаза 2: Генерация тайлов
 │   ├── WorldInitPhase.cs             # Фаза 3: Инициализация мира
 │   ├── PlayerSpawnPhase.cs           # Фаза 4: Спавн игрока
-│   ├── NPCSpawnPhase.cs              # Фаза 5: Спавн NPC
-│   ├── FormationInitPhase.cs         # Фаза 6: Формации
-│   ├── ChargerInitPhase.cs           # Фаза 7: Зарядники
-│   ├── QuestInitPhase.cs             # Фаза 8: Квесты
-│   ├── UIInitPhase.cs                # Фаза 9: UI
-│   └── FinalizePhase.cs              # Фаза 10: Финализация
+│   ├── StartingGearPhase.cs          # Фаза 5: Стартовый набор (детерминированный)
+│   ├── AnimalSpawnPhase.cs           # Фаза 5: Спавн животных
+│   ├── HumanNPCSpawnPhase.cs         # Фаза 6: Спавн человекоподобных NPC
+│   ├── GroupSpawnPhase.cs            # Фаза 7: Спавн NPC-групп
+│   ├── FormationInitPhase.cs         # Фаза 8: Формации
+│   ├── ChargerInitPhase.cs           # Фаза 9: Зарядники
+│   ├── QuestInitPhase.cs             # Фаза 10: Квесты
+│   ├── UIInitPhase.cs                # Фаза 11: UI
+│   ├── PreGenTechniquePhase.cs       # Фаза 12: Пред-генерация техник
+│   ├── TechniqueGrantPhase.cs        # Фаза 13: Выдача стартовых техник
+│   └── FinalizePhase.cs              # Фаза 14: Финализация
 │
 └── UI/                               # Entry-level UI views (22 файла)
     ├── HUDPanelView.cs

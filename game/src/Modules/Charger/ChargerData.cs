@@ -78,9 +78,12 @@ namespace CultivationGame.Modules.Charger
 
     /// <summary>
     /// Данные слота для камня Ци.
+    /// 2026-09-06 (аудит, MODULE_STRUCTURE §0): struct → class —
+    /// все конфиги должны быть классами (правило модульной структуры).
+    /// ChargerSlot копирует поля в конструкторе — семантика не изменилась.
     /// </summary>
     [Serializable]
-    public struct ChargerSlotConfig
+    public class ChargerSlotConfig
     {
         public int Index;
         public QiStoneQuality MinQualityRequired;

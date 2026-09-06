@@ -42,7 +42,7 @@ Modules/Xxx/
 | 3 | Charger | IChargerService | 5+ | 5 | ✓ | Зарядники Ци, слоты, буфер, тепло |
 | 4 | Combat | ICombatService, IDamageService | 10+ | 5 | ✓ | 11-слойный пайплайн урона |
 | 5 | Formation | IFormationService | 5+ | 5 | ✓ | Магические массивы, контур, пул |
-| 6 | Inventory | IInventoryService, IStorageService, ICraftingService, IEquipmentService | 7+ | 7 | — | Инвентарь, экипировка, крафт |
+| 6 | Inventory | IInventoryService, ISpiritStorageService, IStorageRingService, ICraftingService, IEquipmentService | 7+ | 7 | — | Инвентарь, экипировка, крафт |
 | 7 | NPC | INPCService, INPCSpawnerService | 6+ | 7 | ✓ | Спавн, AI, отношения, движение |
 | 8 | Player | IPlayerService, IPlayerInputService | 5+ | 4 | ✓ | Игрок, ввод, сон, стойки |
 | 9 | Qi | IQiService, IQiBufferService | 4+ | 11+ | ✓ | Ци, ядро, проводимость, прорывы |
@@ -208,7 +208,7 @@ Modules/Xxx/
 
 | Свойство | Значение |
 |----------|----------|
-| Главные интерфейсы | `IInventoryService`, `IStorageService`, `ICraftingService`, `IEquipmentService` |
+| Главные интерфейсы | `IInventoryService`, `ISpiritStorageService`, `IStorageRingService`, `ICraftingService`, `IEquipmentService` |
 | Контракты | `InventoryContracts` (5) + `CraftingContracts` (2) |
 | Tick | Нет (event-driven) |
 | Зависимости Core | IBodyService (косвенно, через события) |
@@ -216,7 +216,8 @@ Modules/Xxx/
 
 **Ключевые методы:**
 - IInventoryService: `TryAddItem`, `TryRemoveItem`, `GetItemCount`, `GetAllSlots`
-- IStorageService: `TryStore`, `TryRetrieve`, `GetStoredItems`
+- ISpiritStorageService: духовное хранилище (Q9=B: сплит вместо унифицированного IStorageService)
+- IStorageRingService: кольцо хранения
 - ICraftingService: `CanCraft`, `TryCraft`
 - IEquipmentService: `GetEquipped`, `TryEquip`, `TryUnequip`, `IsSlotBlocked`, `GetTotalArmor`, `GetTotalDamage`
 
@@ -225,7 +226,8 @@ Modules/Xxx/
 - EquipmentService — экипировка
 - EquipmentValidator — проверки слотов, требований, совместимости с телом
 - EquipmentStatAggregator — подсчёт бонусов
-- StorageService — Spirit + Ring хранилища (унифицированы через StorageType)
+- StorageRingService — кольцо хранения (Q9=B)
+- SpiritStorageService — духовное хранилище (Q9=B; legacy-унифицированный StorageService удалён 2026-09-06, санация мёртвого API)
 - CraftingService — крафт
 - MaterialService — работа с материалами
 

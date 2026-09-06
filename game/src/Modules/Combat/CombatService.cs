@@ -348,8 +348,12 @@ namespace CultivationGame.Modules.Combat
                 _currentTargetId = targetId;
             }
 
-            // A3-4 FIX: IsRanged сохраняем для будущих расширений (пока влияет на выбор AttackType)
-            // TODO: Использовать isRanged для выбора CombatSubtype в BuildAndExecuteDamageRequest
+            // A3-4 FIX: IsRanged сохраняем для пайплайна урона (Phase 8 ч.2):
+            // влияет на AttackType (базовая атака луком → AttackType.Ranged) и на
+            // CombatSubtype в BuildAndExecuteDamageRequest (лук → RangedProjectile,
+            // INT-скейлинг §4.2, piercing-последствия). Покрыто QA CombatSimDebug
+            // (ranged-фаза: RangedProjectile-subtyped dmg > 0).
+            // 2026-09-06 (аудит): устаревший TODO удалён — реализован в Phase 8 p2.
 
             // Спринт 8 C11: Уже кастует — нельзя начать новый
             // C-5 FIX (аудит-3): раньше тихий return — игрок не понимал, почему

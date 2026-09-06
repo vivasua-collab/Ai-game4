@@ -81,7 +81,7 @@
 |-----------|----------|--------------|---------|
 | **Backpack** | Основной инвентарь (line model) | `INVENTORY_SYSTEM.md §3` | ✅ `IInventoryService` |
 | **Storage Ring** | Кольцо хранения (экипируется, N слотов) | `INVENTORY_SYSTEM.md §6` | ✅ `IStorageRingService` |
-| **Spirit Storage** | Духовное хранилище (Qi cost per access) | `INVENTORY_SYSTEM.md §5` | ✅ `IStorageService` (Spirit) |
+| **Spirit Storage** | Духовное хранилище (Qi cost per access) | `INVENTORY_SYSTEM.md §5` | ✅ `ISpiritStorageService` (Q9=B) |
 
 **Без вложенности:** Backpack → item, Storage Ring → item, Spirit Storage → item. Контейнеры не вкладываются друг в друга.
 

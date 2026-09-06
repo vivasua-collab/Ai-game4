@@ -37,12 +37,8 @@ public class InventoryModule : IModule
     [Inject] private readonly ISubscriber<EquipmentChangedEvent> _equipChangedSub = null!;
     [Inject] private readonly ISubscriber<CraftCompletedEvent> _craftCompletedSub = null!;
 
-    [Inject] private readonly IPublisher<ItemAddedEvent> _itemAddedPub = null!;
-    [Inject] private readonly IPublisher<ItemRemovedEvent> _itemRemovedPub = null!;
-
     // IMPL-3: Config injected via DI (replaces obsolete SetConfig()).
     [Inject] private readonly InventoryConfig _config = null!;
-    private StorageService? _ringStorage;
 
     [Inject] private readonly BeltService _beltService = null!;
 
@@ -64,13 +60,6 @@ public class InventoryModule : IModule
         _storageRingService.Initialize();
         _beltService.Initialize();
 
-        // Создание Ring Storage
-        _ringStorage = new StorageService(
-            StorageType.Ring,
-            _config.RingStorageCapacity,
-            _itemAddedPub,
-            _itemRemovedPub);
-
         // === Подписка на кросс-модульные события ===
         _resourceHarvestedSubscription = _resourceHarvestedSub.Subscribe(OnResourceHarvested);
         _itemAddRequestSubscription = _itemAddRequestSub.Subscribe(OnItemAddRequest);
@@ -82,9 +71,6 @@ public class InventoryModule : IModule
     {
         // Inventory has no per-tick work
     }
-
-    /// <summary>Получить кольцо хранения.</summary>
-    public StorageService? GetRingStorage() => _ringStorage;
 
     private void OnResourceHarvested(in ResourceHarvestedEvent e)
     {

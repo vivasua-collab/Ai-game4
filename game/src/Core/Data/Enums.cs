@@ -568,16 +568,6 @@ namespace CultivationGame.Core.Data
         None = 2        // Не применимо (броня, аксессуары, зарядник)
     }
 
-    /// <summary>
-    /// Тип хранилища предметов.
-    /// Перенесён из IInventoryService.cs (аудит P0-02: 1 интерфейс = 1 файл).
-    /// </summary>
-    public enum StorageType
-    {
-        Spirit,     // Духовное хранилище
-        Ring        // Кольцо хранения
-    }
-
     #endregion
 
     #region Materials

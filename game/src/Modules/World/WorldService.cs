@@ -12,10 +12,13 @@ namespace CultivationGame.Modules.World;
 /// <summary>
 /// TimeService — engine-agnostic source of game time. Tracks WorldTime
 /// (1 tick = 1 game minute), tick counter, and current speed (Pause/Normal/Fast/Quick).
-/// Fires OnTick / OnTimeChanged events.
+/// Consumers poll ITimeService (DeltaTime/TotalTime/CurrentTime); speed changes
+/// go through the bus (TimeSpeedChangedEvent).
 ///
 /// Note: ITimeService (Core) does not expose AdvanceTick on the interface;
 /// WorldModule calls it via a concrete cast (DI-cast allowed inside module).
+/// 2026-09-06 (аудит, санация мёртвого API): удалены C#-event'ы OnTick/OnTimeChanged —
+/// 0 подписчиков, живой паттерн — опрос через ITimeService.
 /// </summary>
 public sealed class TimeService : ITimeService
 {
@@ -52,9 +55,6 @@ public sealed class TimeService : ITimeService
     public int CurrentHour => CurrentTime.Hour;
     public TimeOfDay TimeOfDay => CurrentTime.TimeOfDay;
 
-    public event Action<int>? OnTick;
-    public event Action<WorldTime>? OnTimeChanged;
-
     public void Pause()
     {
         if (Speed == TimeSpeed.Paused) return;
@@ -88,8 +88,6 @@ public sealed class TimeService : ITimeService
         DeltaTime = 1f;
         TotalTime += DeltaTime;
         CurrentTime = CurrentTime.AddMinutes(GameConstants.TICKS_PER_MINUTE);
-        OnTick?.Invoke(TickCount);
-        OnTimeChanged?.Invoke(CurrentTime);
     }
 }
 
@@ -113,7 +111,9 @@ public sealed class WorldService : IWorldService
     public string CurrentLocationId => _current?.Id ?? string.Empty;
     public string CurrentSectorId => _current?.ParentSectorId ?? "0_0";
 
-    public event Action<LocationData>? OnLocationChanged;
+    // 2026-09-06 (аудит, санация мёртвого API): удалён C#-event OnLocationChanged —
+    // 0 подписчиков, дублировал живой контракт шины LocationChangedEvent
+    // (публикуется ниже в SetActiveLocation).
 
     /// <summary>Register a location in the catalogue. Not on interface.</summary>
     public void RegisterLocation(LocationData location)
@@ -141,7 +141,6 @@ public sealed class WorldService : IWorldService
         _current = loc;
         Console.WriteLine($"[WorldService] Active location: {loc.Name} (id={loc.Id})");
         _locationChangedPub.Publish(new LocationChangedEvent(old?.Id ?? string.Empty, loc.Id));
-        OnLocationChanged?.Invoke(loc);
     }
 
     public IReadOnlyList<LocationData> GetAvailableLocations()

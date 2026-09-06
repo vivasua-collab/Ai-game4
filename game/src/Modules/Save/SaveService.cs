@@ -37,8 +37,10 @@ public sealed class SaveService : ISaveService, ISaveable
     }
 
     // ISaveService
-    public event Action<bool, string>? OnSaveCompleted;
-    public event Action<bool, string>? OnLoadCompleted;
+    // 2026-09-06 (аудит, санация мёртвого API): удалены C#-event'ы
+    // OnSaveCompleted/OnLoadCompleted — 0 подписчиков, дублировали живой
+    // контракт шины SaveCompletedEvent (публикует SaveModule по
+    // SaveRequestedEvent). Межмодульные уведомления — только через шину.
 
     public bool Save(SaveSlot slot)
     {
@@ -47,7 +49,6 @@ public sealed class SaveService : ISaveService, ISaveable
         _saveStartedPub?.Publish(new SaveStartedEvent(slot.Name, slot.Type));
 
         bool ok = _aggregator.Save(slot.Name);
-        OnSaveCompleted?.Invoke(ok, slot.Name);
         Console.WriteLine($"[SaveService] Save('{slot}') → {(ok ? "OK" : "FAILED")}");
         return ok;
     }
@@ -55,7 +56,6 @@ public sealed class SaveService : ISaveService, ISaveable
     public bool Load(SaveSlot slot)
     {
         bool ok = _aggregator.Load(slot.Name);
-        OnLoadCompleted?.Invoke(ok, slot.Name);
         Console.WriteLine($"[SaveService] Load('{slot}') → {(ok ? "OK" : "FAILED")}");
         return ok;
     }

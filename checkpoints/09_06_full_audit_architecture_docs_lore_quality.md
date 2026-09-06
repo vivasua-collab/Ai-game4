@@ -200,3 +200,75 @@ HOTKEYS.md, CHEAT_PANEL.md, MODULE_STRUCTURE.md (+Trade, 17 модулей), SAV
 ---
 
 *Аудит выполнен без изменения игровой логики (кроме 3 точечных фиксов UI-безопасности). Сборка: 0 errors. QA-регрессия: см. worklog.*
+
+---
+
+# ДОПОЛНЕНИЕ: санация по решениям пользователя (2026-09-06, сеанс 2)
+
+Пользователь рассмотрел аудит и принял три решения:
+
+1. **Стартовый набор** — временное решение для тестов в процессе разработки.
+   **Оставляем как есть**, ещё неоднократно будет меняться.
+   → Синхронизация START_LORE §5 ↔ StartingGearPhase отложена до стабилизации.
+   Отражено: SAVE_SYSTEM.md (шапка-статус), P3-пункт 10 закрыт решением.
+
+2. **Баги исправляем** (активный процесс разработки):
+   - ✅ **P0-2 (CombatService:352)** — при верификации выяснилось: TODO был
+     **устаревшим комментарием**, а не живым багом. Реализация isRanged→
+     CombatSubtype.RangedProjectile существует с Phase 8 p2 (строки 480, 633-635),
+     отдельная ranged-формула AGI/INT §4.2, QA CombatSim покрывает
+     (ranged-фаза: RangedProjectile-subtyped dmg > 0 — PASS).
+     Исправление = удалён ложный TODO, комментарий приведён к реальности.
+   - ✅ **P0-3 RespawnAfterDeath** — async void обёрнут в try/catch +
+     GD.PrintErr + тост (GameWorldController). Исключение в респавне больше
+     не роняет игру молча.
+   - ✅ **P1-4 F5/F9** — вместо тихого «ничего» честный тост
+     «⏳ Сейвы отключены (этап разработки)» (Q8). Паттерн соседних тостов.
+   - ✅ **P2-8 (частично) ChargerSlotConfig struct→class** — MODULE_STRUCTURE
+     §0 «Config — class». ChargerSlot копирует поля в конструкторе —
+     семантика не изменилась.
+
+3. **Мёртвый API** — каждый пункт оценён: «заглушка под будущее» vs «ошибка
+   реализации». Legasy-кода быть не должно.
+
+   **УДАЛЕНО (ошибки реализации / легаси):**
+   | Что | Вердикт |
+   |---|---|
+   | `NPCSpawnPhase.cs` (+.uid) | Мёртвый файл с Phase 5: не регистрируется (заменён Animal/Human/Group-фазами), только упоминания в комментариях. Легаси v1-stub. |
+   | `Core/Interfaces/IGeneratorService.cs` (+.uid) | Core-контракт, 0 реализаций, 0 потребителей. Дизайн-рудимент, вытеснен конкретными сервисами генератора (ItemGeneratorService и др.). |
+   | `Modules/Inventory/StorageService.cs` + `Core/Interfaces/IStorageService.cs` (+.uid) + `StorageType` enum + `InventoryModule._ringStorage/GetRingStorage()` | Легаси-цепочка Q9=B: dead store (создаётся, никем не потребляется), в DI не регистрируется, заменён живыми SpiritStorageService + StorageRingService. |
+   | `SaveService.OnSaveCompleted/OnLoadCompleted` (C#-event'ы) | 0 подписчиков; дублируют живой контракт шины SaveCompletedEvent (публикует SaveModule). Межмодульные уведомления — только через шину (ARCHITECTURE). |
+   | `TimeService.OnTick/OnTimeChanged` | 0 подписчиков; живой паттерн — опрос ITimeService; шина — TimeSpeedChangedEvent. «V1 stubs»-рудимент до-шинной эпохи. |
+   | `WorldService.OnLocationChanged` | 0 подписчиков; чистое дублирование живого LocationChangedEvent (публикуется в той же строке кода). |
+
+   **ОСТАВЛЕНО (заглушки под будущие реализации):**
+   | Что | Обоснование |
+   |---|---|
+   | `IGameSession.OnStateChanged` | Entry-слой (не межмодульное — правило шины не нарушает). Живой стейт-машины наблюдатель для будущего UI (Loading-экран/меню). State-машина активна (гарды NewGame-реентри). |
+   | PlayerInput: rest (R) / world_map (M) / minimap (N) / save (F5) / load (F9) | Ввод для запланированных систем (карты, отдых, сейвы). F1-справка честно помечает «не реализовано/отключено». |
+   | `ContextMenuRequestedEvent` (контракт) | Будущее ПКМ-меню (UI_DESIGN). |
+   | ElementalEffectService: ApplyKnockback / ApplyChain | Явные заглушки будущих фаз (Air-knockback, Lightning-chain, требуют IPositionService). |
+   | BodyModuleServices TODO EntityId="player" | Живой конфиг + честная пометка параметризации (P2-03). |
+
+   **Документация синхронизирована** (8 файлов): FILE_TREE (минус 3 файла,
+   фазы 15), ARCHITECTURE (таблица фаз 10→актуальная, 14 строк + примечание),
+   MODULE_STRUCTURE (Inventory-интерфейсы Q9=B), DI_AND_EVENTBUS (регистрации
+   + INV-02 «суперседед»), GLOSSARY (−StorageType), ENVIRONMENT_CONCEPT
+   (ISpiritStorageService), SAVE_SYSTEM (решение по стартовому набору + тост
+   F5/F9), HOTKEYS (F5/F9 честный тост; заглушки сохранены решением
+   2026-09-06), NPC_COMBAT_PREP (помечен историческим — план выполнен).
+
+**Проверка:** build --no-incremental 0 errors (300 warn, −1);
+QA-регрессия 11/11 PASS: COMBAT (melee+ranged+LOS/ammo), CHARGE, TOAST,
+LOWHP, KILLFEED, HOTBAR, DAMAGEDIR, DIALOGUE, TRADEUX, TRADE smoke
+(buy True/sell True), GEN (0 исключений C#; движковые shutdown-шумы не
+считаются). Сборка сцены: «15 phases, 84 ms».
+
+**Осталось из рекомендаций аудита (следующие окна):**
+- P2-7: IBodyFactory + IFormationGeneratorService → в Core; убрать
+  даункаст PlayerTechniqueCaster:290 (живые интерфейсы — перенос, не удаление).
+- P2-9: QueueFree-хелпер (10+ UI-мест), dirty-check HUD/InputAdapter,
+  лог-гейты рендереров (zero-GC, ~37 мест).
+- P2-8 (остаток): развести PhaseOrder StartingGear/AnimalSpawn (5/5).
+- Декомпозиция GameWorldController (1967→ строк).
+

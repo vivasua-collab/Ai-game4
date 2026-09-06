@@ -52,7 +52,7 @@ public class GameLifetimeScope  // концептуальный псевдоко
         BodyModuleServices.Register(builder);       // IBodyService, BodyFactory, SpeciesRegistry
         QiModuleServices.Register(builder);         // IQiService, IQiBufferService
         BuffModuleServices.Register(builder);       // IBuffService
-        InventoryModuleServices.Register(builder);  // IInventoryService, IEquipmentService, ICraftingService, IStorageService
+        InventoryModuleServices.Register(builder);  // IInventoryService, IEquipmentService, ICraftingService, ISpiritStorageService, IStorageRingService
         CombatModuleServices.Register(builder);     // ICombatService, IDamageService
         FormationModuleServices.Register(builder);  // IFormationService
         NPCModuleServices.Register(builder);        // INPCService, INPCSpawnerService
@@ -123,7 +123,7 @@ public static class ChargerModuleServices
 | Core сервисы | ITimeService, IStatService |
 | Body/Buff/Qi | IBodyService, IBuffService, IQiService, IQiBufferService |
 | Combat | ICombatService, IDamageService |
-| Inventory | IInventoryService, IStorageService, ICraftingService, IEquipmentService |
+| Inventory | IInventoryService, ISpiritStorageService, IStorageRingService, ICraftingService, IEquipmentService |
 | Tile/World | ITileService, IResourceService, IWorldService, IEventService |
 | NPC/Player | INPCService, INPCSpawnerService, IPlayerService, IPlayerInputService |
 | Quest/Interaction | IQuestService, IQuestRewardService, IInteractionService, IDialogueService |
@@ -379,7 +379,7 @@ public async Task TickBuffAsync() { await Task.Delay(...); }
 | BF-A01 | 5 | Формула CalculateStatModifier должна точно совпадать с документацией |
 | BF-A03 | 5 | Маппинг иммунитетов требует словарь Effect→Immunity |
 | INV-01 | 6 | EquipmentService НЕ ссылается на BodySlotMapping — использует `BodyPartSeveredEvent.BlockedSlots` (Hub-and-Spoke) |
-| INV-02 | 6 | SpiritStorage + StorageRing унифицированы в StorageService с параметром StorageType |
+| INV-02 | 6 | SpiritStorage + StorageRing унифицированы в StorageService с параметром StorageType. **(Суперседед Q9=B: сплит ISpiritStorageService + IStorageRingService; legacy-StorageService удалён 2026-09-06 — санация мёртвого API)** |
 | INV-03 | 6 | EquipmentController God Object разбит на EquipmentService + EquipmentValidator + EquipmentStatAggregator |
 | INV-04 | 6 | EquipmentService НЕ инжектит IBodyService — sibling scopes не видят регистрации. Использует события |
 | NPC-A07 | 9 | GetAllNPCIds/SetAIState/UpdatePosition добавлены в интерфейс (баг: отсутствовали) |

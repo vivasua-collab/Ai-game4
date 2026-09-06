@@ -116,7 +116,6 @@
 | `ItemCategory` | Категория предмета | Weapon, Armor, Accessory, Consumable, Material, Technique, Quest, Misc | — |
 | `WeaponHandType` | Тип хвата | OneHand, TwoHand. TwoHand → Unequip WeaponOff | — |
 | `NestingFlag` | Флаг вложенности (кольца) | [Flags]: None, Spirit, Ring, Any | — |
-| `StorageType` | Тип хранилища | Spirit, Ring (доступ через `IStorageService`) | — |
 
 ### Слоты экипировки (гуманоид)
 

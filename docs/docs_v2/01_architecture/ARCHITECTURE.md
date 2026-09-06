@@ -253,7 +253,7 @@ public static class ChargerModuleServices
 
 ### 6.1. SceneOrchestrator
 
-Оркестратор программной сборки сцены. Выполняет 10 фаз последовательно (через async/await).
+Оркестратор программной сборки сцены. Выполняет фазы последовательно (через async/await), порядок задаётся `PhaseOrder` (stable sort).
 
 | # | Фаза | Что делает |
 |---|------|------------|
@@ -261,12 +261,19 @@ public static class ChargerModuleServices
 | 2 | TileMapGenPhase | Генерация тайловой карты |
 | 3 | WorldInitPhase | Инициализация мира (время, локации, фракции) |
 | 4 | PlayerSpawnPhase | Спавн игрока (центр карты) |
-| 5 | NPCSpawnPhase | Спавн NPC |
-| 6 | FormationInitPhase | Инициализация формаций |
-| 7 | ChargerInitPhase | Инициализация зарядников |
-| 8 | QuestInitPhase | Инициализация квестов |
-| 9 | UIInitPhase | Инициализация UI |
-| 10 | FinalizePhase | Финализация (публикация SceneAssemblyCompletedEvent) |
+| 5 | StartingGearPhase / AnimalSpawnPhase | Стартовый набор (детерминированный, сид 1000 — замена сейвов, Q8) / спавн животных (коллизия PhaseOrder=5 — известный долг, спасует stable sort) |
+| 6 | HumanNPCSpawnPhase | Спавн человекоподобных NPC (полный пайплайн сборки) |
+| 7 | GroupSpawnPhase | Спавн NPC-групп (стаи, патрули, караваны) |
+| 8 | FormationInitPhase | Инициализация формаций |
+| 9 | ChargerInitPhase | Инициализация зарядников |
+| 10 | QuestInitPhase | Инициализация квестов |
+| 11 | UIInitPhase | Инициализация UI |
+| 12 | PreGenTechniquePhase | Пред-генерация техник по уровням (верификация + дедуп) |
+| 13 | TechniqueGrantPhase | Выдача стартовых техник игроку |
+| 14 | FinalizePhase | Финализация (публикация SceneAssemblyCompletedEvent) |
+
+> 2026-09-06 (аудит + санация): таблица синхронизирована с кодом (было 10 фаз).
+> Мёртвая NPCSpawnPhase (v1-stub, заменена Animal/Human/Group) — удалена из кода.
 
 ### 6.2. Интерфейс фазы
 
