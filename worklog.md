@@ -162,3 +162,51 @@ Stage Summary:
 - Коммит S1 + push. Счётчик автосеансов: 1/6.
 - Отложено в S2: кулдаун-индикатор хотбара, мини-карта (N?), RuItem-имена,
   цветовая кодировка угрозы. Чекпоинт: checkpoints/09_04_s1_ui_hud_session1.md.
+
+---
+Task ID: AUDIT-FULL (ручной сеанс по прямому указанию пользователя)
+Agent: main-agent (Z.ai Code)
+Task: Полный аудит кода проекта: архитектура / документация / лор / качество (2026-09-06)
+
+Work Log:
+- Прочитаны архитектурные и связанные документы: ARCHITECTURE, MODULE_STRUCTURE,
+  FILE_TREE, DI-порядок, HOTKEYS, CHEAT_PANEL, LORE_SYSTEM, START_LORE,
+  SAVE_SYSTEM, DIALOGUE_SYSTEM, SESSION_CONTEXT, START_PROMPT, Q1-Q14.
+- 3 параллельных Explore-агента: (2a) архитектурное соответствие, (2b) доки↔код,
+  (2c) качество кода. Ключевые находки лично перепроверены по коду.
+- КРИТИЧЕСКИЙ баг: EventLogWindow — QueueFree не исключал узел из дерева до
+  конца кадра → бесконечный цикл после 61-го события = ФРИЗ игры. Эмпирически
+  доказано (GDScript: 65 детей после QueueFree; RemoveChild+QueueFree → 60).
+  ИСПРАВЛЕНО в этой сессии.
+- Атака/каст (Space/Z) работали во время диалога и окон C/J/Q — вопреки
+  HOTKEYS §9.2. ИСПРАВЛЕНО: SetOverUI + dialogue/charSheet/eventLog/quest.
+- F1-справка рекламировала мёртвые клавиши (M/N/R/F5/F9/бэктик) — ИСПРАВЛЕНО:
+  секция «В разработке / отключено».
+- Архитектура: Core без Godot 100%; контракты 100% readonly struct; DI-порядок
+  1:1; НО 10 межмодульных импортов (Player→Combat/Formation касты, NPC→Body/
+  Qi/Inventory, Generator→Formation), 5 мёртвых C#-event'ов, мёртвый
+  StorageService/NPCSpawnPhase/IGeneratorService, коллизия PhaseOrder=5.
+- Документация: 17-й модуль Trade был не документирован; хотбар/медитация V/
+  F2/скорость — расхождения; F5/F9 «живые» в доке при отключённом Q8; QA-хуки
+  2/19 документированы. Синхронизировано по указанию пользователя: HOTKEYS,
+  CHEAT_PANEL (F1→F2), MODULE_STRUCTURE (+Trade), SAVE_SYSTEM (статус Q8),
+  DIALOGUE_SYSTEM (S6), TESTING_RULES (§0 реестр хуков), UI_DESIGN (статус),
+  README, НОВЫЙ TRADE_SYSTEM.md.
+- ЛОР: ИИ-фичи S1-S6 не нарушают законы мира; дивергенция — стартовый набор
+  (START_LORE §5: меч/роба/хлеб vs StartingGearPhase: кинжал/лук/стрелы) —
+  требует решения пользователя; Element.Poison (Q10) vs канон — принятое
+  отклонение, отражено в аудите.
+- Качество: 301 warning (172 null-класса), 7 файлов >800 строк
+  (GameWorldController 1967), ~37 hot-path аллокаций (zero-GC нарушен),
+  ParchmentTheme игнорируется (15 копий литералов), техдолг ~53-81 ч.
+- QA: build 0 errors; регрессия 12/12 хуков PASS (9 VERDICT + 3 smoke),
+  0 исключений; GDScript-доказательство фикса EventLog.
+
+Stage Summary:
+- Коммит 80e2e67 запушен. Счётчик 6/6 (без изменений — цель дня выполнена,
+  аудит вне автоконвейера, по прямому указанию).
+- Полный отчёт: checkpoints/09_06_full_audit_architecture_docs_lore_quality.md.
+- Время сеанса: 2026-09-06 08:49:47 UTC → 09:20:09 UTC (~31 мин).
+- Приоритеты следующего этапа: P0 TODO CombatService:352 (ranged-subtype) +
+  RespawnAfterDeath try/catch; P1 тост «сейвы отключены» на F5/F9; P2 санация
+  мёртвого API + IBodyFactory/IFormationGeneratorService в Core.
