@@ -6,6 +6,52 @@
 
 ---
 
+## 0. Реальный QA-конвейер проекта (актуализировано 2026-09-06, аудит)
+
+Классические `dotnet test`-наборы (§1-§10) в репозитории **не созданы** (плановая работа).
+Фактический QA-конвейер — **headless env-харнесс Godot**: QA-сцены (`*SimDebug.cs` в
+`Adapter/Scene/`) запускаются переменными окружения `GODOT_*`, логируют прогресс и
+печатают вердикт `VERDICT: PASS/FAIL` (строка ищется в логе). Регрессия = полный
+прогон всех хуков + `dotnet build` с 0 errors.
+
+### 0.1. Реестр env-хуков (19)
+
+| Хук | Сцена/файл | Что проверяет |
+|---|---|---|
+| `GODOT_NEWGAME=1` | MainMenuController | Полный флоу: меню → New Game → сборка сцены |
+| `GODOT_COMBAT_SIM=1` | CombatSimDebug | Бой в обе стороны + weapon end-to-end (VERDICT) |
+| `GODOT_CHARGE_SIM=1` | ChargeSimDebug | Заряд техник (кулдауны/ёмкость) |
+| `GODOT_TRADE_DEBUG=1` | TradeModule | Smoke покупки/продажи |
+| `GODOT_TRADE_HOLD=1` | TradeModule | Не закрывать лавку (скриншоты) |
+| `GODOT_TRADEUX_DEBUG=1` | TradeUXSimDebug | S6 UX лавки: пометки/тултипы/hover/Esc |
+| `GODOT_GEN_DEBUG=1` | GeneratorModule | Дамп генераторов (легендарки/оверкап/верификация) |
+| `GODOT_MAP_SIZE=500` | TileModule/AnimalService | Большая карта 500×500 |
+| `GODOT_TOAST_DEBUG=1` | ToastSimDebug | S2 тост-стек: незатирание/×N/кап/TTL |
+| `GODOT_LOWHP_DEBUG=1` | LowHpSimDebug | S2 виньетка HP<35%: alpha/пульс |
+| `GODOT_KILLFEED_DEBUG=1` | KillFeedSimDebug | S3 kill-feed + атрибуция |
+| `GODOT_HOTBAR_DEBUG=1` | HotbarSimDebug | S4 хотбар v2: кулдауны/Qi-гейт/пояс |
+| `GODOT_DAMAGEDIR_DEBUG=1` | DamageDirSimDebug | S5 стрелка атакующего: 4/4 |
+| `GODOT_DIALOGUE_DEBUG=1` | DialogueSimDebug | S6 диалог: геометрия/fit/индикатор/выбор |
+| `GODOT_DIALOGUE_HOLD=1` | DialogueSimDebug | Держать диалог (скриншоты) |
+| `GODOT_TRADEUX_HOLD=1` | TradeUXSimDebug | Держать лавку UX |
+| `GODOT_FORMATION_TEST=1` | TechniqueGrantPhase | Формационный тест (этап формаций) |
+| `GODOT_SCREENSHOT=<путь>` | GameBoot | Скриншот в файл (VLM-верификация) |
+| `GODOT_SCREENSHOT_DELAY=<сек>` | GameBoot | Задержка кадра для скриншота |
+
+### 0.2. Типовой прогон регрессии
+
+```bash
+cd game && dotnet build                                # 0 errors обязательно
+GODOT_NEWGAME=1 timeout 25 "$GODOT" --headless --path "$PWD" scenes/MainMenu.tscn
+GODOT_NEWGAME=1 GODOT_COMBAT_SIM=1 ... (и т.д. по реестру)
+# Каждый хук: ждём «VERDICT: PASS» / отсутствие исключений в логе.
+```
+
+> Правило: **новая фича = новый хук** (паттерн S1-S6). Скриншот + VLM — для
+> визуальных изменений (Xvfb + `--rendering-driver opengl3`).
+
+---
+
 ## 1. Принципы
 
 1. **AAA Pattern** — все тесты следуют паттерну Arrange-Act-Assert.

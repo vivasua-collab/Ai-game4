@@ -3,6 +3,15 @@
 > **Назначение:** Движко-независимая спецификация UI: тема, целевое разрешение, слои компоновки, 22 UI Views, паттерн UI Builder, рендеринг текста. Без привязки к конкретному UI-фреймворку движка.
 >
 > **Связанные документы:** `RENDER_LAYERS.md`, `SPRITE_CATALOG.md`, `HOTKEYS.md`, `06_player/INVENTORY_SYSTEM.md`, `01_architecture/PERFORMANCE_STRATEGY.md`.
+>
+> **Статус реализации (актуализировано 2026-09-06, аудит):** из 22 Views §6 реализовано
+> 10 полностью (HUD, Hotbar v2, Inventory, Techniques=T-Книга, CharacterSheet, Cultivation
+> (K), QuestLog, Trade, Dialogue, Toast v2-стек) + 3 частично (Journal=EventLog лента,
+> Equipment=кукла в инвентаре, Tooltip=только Trade) + 9 не реализованы (MiniMap, WorldMap,
+> Status, Rest, Formation-окно, Achievements, Crafting-окно, ContextMenu, InputLog; из §6.4:
+> PauseMenu, LootWindow). Реализованы, но не были в спеке: HotkeysWindow (F1), CheatPanel
+> (F2, DEBUG), CultivationWindow (K), DamageDirectionIndicator (S5), LowHpVignette (S2),
+> KillFeed (S3, тосты+EventLog), DamageNumberRenderer. Документ ниже — целевая концепция.
 
 ---
 

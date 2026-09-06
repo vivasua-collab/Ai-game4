@@ -1422,12 +1422,21 @@ public partial class GameWorldController : Node2D
 
         // Suppress game input when inventory OR trade window is open (Phase 5).
         // 2026-08-28: + Книга Техник, справка, чит-окно, окно Культивации.
+        // FIX (аудит 2026-09-06): + диалог, лист персонажа (C), журнал событий (J),
+        // журнал заданий (Q) — Space (атака) и Z (каст) работали во время
+        // диалога/чтения, вопреки HOTKEYS.md §9.2 «Dialogue/Journal: Атака ❌».
+        // Движение уже было заблокировано через Time.IsPaused (все эти окна
+        // паузят время; Культивация K сознательно НЕ паузит — она уже была здесь).
         if (_inputAdapter != null && _inventoryWindow != null)
         {
             _inputAdapter.SetOverUI(_inventoryWindow.Visible
                 || _tradeWindow is { IsOpen: true }
                 || _techniqueBook is { Visible: true }
                 || _hotkeysWindow is { Visible: true }
+                || _dialogueWindow is { IsOpen: true }
+                || _characterSheetWindow is { Visible: true }
+                || _eventLogWindow is { Visible: true }
+                || _questWindow is { Visible: true }
 #if DEBUG
                 || _cheatPanel is { Visible: true }
 #endif

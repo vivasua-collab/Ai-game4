@@ -1,8 +1,10 @@
-# Структура модулей — 16 модулей Hub-and-Spoke
+# Структура модулей — 17 модулей Hub-and-Spoke
 
 > **Раздел:** 01_architecture
 > **Статус:** Детальная спецификация модулей.
-> **Связанные документы:** `ARCHITECTURE.md`, `DI_AND_EVENTBUS.md`, `09_workflow/ALGORITHMS.md`.
+> **Синхронизировано с кодом:** 2026-09-06 (аудит): добавлен модуль 17 — Trade
+> (реализован 2026-08-25, ранее не был отражён в спецификации).
+> **Связанные документы:** `ARCHITECTURE.md`, `DI_AND_EVENTBUS.md`, `09_workflow/ALGORITHMS.md`, `06_player/TRADE_SYSTEM.md`.
 
 ---
 
@@ -51,8 +53,9 @@ Modules/Xxx/
 | 14 | UI | IUIService | 4+ | 10 | ✓ | HUD, тосты, презентеры |
 | 15 | Save | ISaveService, ISaveable | 3+ | 4 | ✓ | Сохранения, агрегация |
 | 16 | Generator | — (утилитарный) | 2+ | — | — | Генерация предметов/техник/NPC |
+| 17 | **Trade** | ITradeService, ICurrencyService | 2+ | 5 | — (event-driven) | Торговля с NPC, духовные камни |
 
-**Итого:** ~44 интерфейсов ядра, ~130 контрактов сообщений.
+**Итого:** ~46 интерфейсов ядра, ~135 контрактов сообщений, 17 модулей.
 
 ---
 
@@ -514,6 +517,34 @@ Modules/Xxx/
 - Унификация Grade: НЕ зависит от уровня. Даже на L1 есть шанс (2%) получить transcendent.
 - Распределение Grade: common 60%, refined 28%, perfect 10%, transcendent 2%.
 - Применяется к: экипировке, техникам, расходникам, формациям, камням Ци.
+
+---
+
+### 2.17. Trade (добавлен 2026-08-25, отражён в спеке 2026-09-06)
+
+| Свойство | Значение |
+|----------|----------|
+| Главные интерфейсы | `ITradeService`, `ICurrencyService` (в Core/Interfaces) |
+| Контракты | `TradeContracts` — TradeRequestedEvent (подписка), TradeOpened/Closed/Completed/Failed (публикация) |
+| Tick | Нет (event-driven; Tick используется только headless-хуком GODOT_TRADE_DEBUG) |
+| Зависимости Core | INPCService, IItemDatabaseService, IInventoryService (опосредованно) |
+| Подписки на события | TradeRequestedEvent (от DialogueService — реплика торговца «Покажи товары») |
+
+**Ключевые методы:**
+- ITradeService: `OpenTrade`, `CloseTrade`, `GetMerchantStock`, `TryBuy`, `TrySell`, `GetBuyPrice`, `GetSellPrice`, `ActiveMerchantId`, `IsTrading`
+- ICurrencyService: `SpiritStones`, `Add`, `Spend`, `SetBalance` (int — ЗАПРЕТ 3.9 целочисленной арифметики)
+
+**Ключевые сервисы:**
+- TradeService — сессия торговли, сделки, цены (Permil)
+- CurrencyService — баланс духовных камней (старт 50), CurrencyChangedEvent
+
+**Особенности:**
+- Мост диалог → лавка через шину: sentinel-реплика «Покажи товары» → TradeRequestedEvent (EndDialogue ДО публикации — иначе resume поверх паузы лавки).
+- Ассортимент мерчанта: детерминированный сид FNV-1a(npcId): 1–2 оружия + 1–2 брони «Матрёшка» L1–3, 3–4 расходника, 1 материал.
+- Цены: Permil 1200‰ (покупка) / 500‰ (продажа) от базовой стоимости предмета.
+- UI: TradeWindow «Лавка торговца» (900×600, Товары/Инвентарь, ЛКМ=1/Shift=5, Esc; S6: пометки «не хватает камней», тултипы имя+описание+редкость+цена, hover-подсветка).
+- Валюта — духовные камни (ЛОР §9.2: «твёрдое» Ци, расходник) — интеграция с экономикой камней Ци в планах.
+- Подробно — `06_player/TRADE_SYSTEM.md`.
 
 ---
 

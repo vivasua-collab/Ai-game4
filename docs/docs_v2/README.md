@@ -65,22 +65,33 @@ docs_v2/
 │   ├── INVENTORY_SYSTEM.md
 │   ├── EQUIPMENT_SYSTEM.md
 │   ├── JOURNAL_SYSTEM.md
+│   ├── DIALOGUE_SYSTEM.md             — (синхронизировано с кодом 2026-09-06)
+│   ├── GROUND_ITEM_SYSTEM.md
+│   ├── TRADE_SYSTEM.md                — (добавлен 2026-09-06, аудит: модуль Trade был не документирован)
+│   ├── SMOOTH_MOVEMENT_PLAN.md
 │   └── MORTAL_DEVELOPMENT.md
 ├── 07_ui/                             ← UI концепции (engine-agnostic)
-│   ├── UI_DESIGN.md
+│   ├── UI_DESIGN.md                   — (статусная сводка реализации: 2026-09-06)
 │   ├── RENDER_LAYERS.md
 │   ├── SPRITE_CATALOG.md
-│   ├── HOTKEYS.md
-│   └── CHEAT_PANEL.md                 — (2026-08-27) чит-меню разработки (F1)
+│   ├── HOTKEYS.md                     — (синхронизировано с кодом 2026-09-06: V/Z/X/K/F1/F2/PageUp, хотбар v2)
+│   ├── CHEAT_PANEL.md                 — (синхронизировано: F2, модальное окно, M2-секции, гейт настроек)
+│   └── PROCEDURAL_SPRITES.md
 ├── 08_content/                        ← лор, имена, контент
 │   ├── LORE_SYSTEM.md
 │   ├── START_LORE.md
 │   └── NAME_GENERATOR.md
 └── 09_workflow/                       ← процесс разработки
     ├── AI_DEVELOPMENT_WORKFLOW.md
-    ├── TESTING_RULES.md
+    ├── TESTING_RULES.md               — (§0: реестр 19 GODOT_* QA-хуков, 2026-09-06)
     └── ALGORITHMS.md
 ```
+
+> **Синхронизация с кодом (аудит 2026-09-06):** ряд документов отражал целевое
+> состояние, а не реализацию. Актуализированы: HOTKEYS, CHEAT_PANEL, MODULE_STRUCTURE
+> (+17-й модуль Trade), SAVE_SYSTEM (статус Q8), DIALOGUE_SYSTEM, TESTING_RULES,
+> UI_DESIGN (статусная сводка). Создан TRADE_SYSTEM.md. Полный реестр расхождений
+> и решений — `checkpoints/09_06_full_audit_architecture_docs_lore_quality.md`.
 
 ## Источники (migration mapping)
 

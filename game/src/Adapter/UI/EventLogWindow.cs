@@ -327,8 +327,15 @@ public partial class EventLogWindow : Control
         _list.AddChild(row);
 
         // Ring-buffer GUI: убираем старейшие строки (детей списка).
+        // FIX (аудит 2026-09-06): QueueFree НЕ исключает узел из дерева до конца
+        // кадра — GetChildCount() не уменьшался в цикле → бесконечный цикл =
+        // ПОЛНЫЙ ФРИЗ игры после 61-го события. RemoveChild синхронен.
         while (_list.GetChildCount() > MaxEntries)
-            _list.GetChild(0).QueueFree();
+        {
+            var oldest = _list.GetChild(0);
+            _list.RemoveChild(oldest);
+            oldest.QueueFree();
+        }
 
         if (Visible)
             ScrollToBottom();
