@@ -222,6 +222,17 @@ namespace CultivationGame.Modules.Interaction
         /// <summary>Завершён ли typewriter-эффект</summary>
         internal bool IsTypewriterComplete => _typewriter.IsComplete;
 
+        /// <summary>
+        /// S6-BUGFIX (2026-09-06): продвижение typewriter РЕАЛЬНЫМ временем.
+        /// Диалог ставит игровые тики на паузу (GameBoot._PhysicsProcess не
+        /// гонит InteractionModule.Tick при IsPaused) — typewriter, тикующий
+        /// только в игровых тиках, был заморожен всё время диалога: текст узла
+        /// не печатался, пока игрок не нажимал E (Advance → CompleteImmediately).
+        /// DialogueWindow._Process вызывает этот метод, пока игра на паузе;
+        /// пути взаимоисключающие (GameBoot тикает только при !IsPaused).
+        /// </summary>
+        internal void TickTypewriter(float deltaTime) => _typewriter.Tick(deltaTime);
+
         /// <summary>Текущие варианты выбора</summary>
         internal IReadOnlyList<DialogueChoice> CurrentChoices
         {

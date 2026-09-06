@@ -165,6 +165,31 @@ public partial class GameWorldController : Node2D
     /// <summary>Угол стрелки npcId в градусах (null — стрелки нет; 0°=восток, -90°=север).</summary>
     public float? DamageDirAngleOf(string npcId) => _dmgDirIndicator?.AngleOf(npcId);
 
+    // === 2026-09-06 S6: QA-доступ для UX диалога и лавки ===
+
+    /// <summary>Диалоговое окно (GODOT_DIALOGUE_DEBUG).</summary>
+    public UI.DialogueWindow? DialogueWindowForQA => _dialogueWindow;
+
+    /// <summary>Торговое окно (GODOT_TRADEUX_DEBUG).</summary>
+    public UI.TradeWindow? TradeWindowForQA => _tradeWindow;
+
+    /// <summary>
+    /// Открыть диалог с NPC по QA-пути (пауза+окно) — те же действия,
+    /// что и HandleNpcTalk, без поиска ближнего NPC (GODOT_DIALOGUE_DEBUG).
+    /// </summary>
+    public bool DialogueDebugOpen(string npcId)
+    {
+        var dialogueSvc = DialogueService;
+        if (dialogueSvc == null || _dialogueWindow == null) return false;
+        if (string.IsNullOrEmpty(npcId)) return false;
+        if (!dialogueSvc.TryStartNpcDialogue(npcId)) return false;
+
+        _wasPausedBeforeInventory = Time is { IsPaused: true };
+        if (Time is { IsPaused: false }) Time.Pause();
+        _dialogueWindow.Open(npcId);
+        return true;
+    }
+
     /// <summary>2026-09-04 S2: красная виньетка опасности при низком HP.</summary>
     private ColorRect _lowHpOverlay = null!;
     private float _lowHpPulseTime; // для пульсации при критическом HP
@@ -287,6 +312,20 @@ public partial class GameWorldController : Node2D
         {
             var dmgDirSim = new DamageDirSimDebug { Name = "DamageDirSimDebug" };
             AddChild(dmgDirSim);
+        }
+        // 2026-09-06 S6: headless-верификация UX окна диалога
+        // (GODOT_DIALOGUE_DEBUG=1) — подсказка/геометрия/индикатор/выбор/закрытие.
+        if (System.Environment.GetEnvironmentVariable("GODOT_DIALOGUE_DEBUG") == "1")
+        {
+            var dlgSim = new DialogueSimDebug { Name = "DialogueSimDebug" };
+            AddChild(dlgSim);
+        }
+        // 2026-09-06 S6: headless-верификация UX лавки
+        // (GODOT_TRADEUX_DEBUG=1) — пометки «не хватает камней»/тултипы/hover/футер.
+        if (System.Environment.GetEnvironmentVariable("GODOT_TRADEUX_DEBUG") == "1")
+        {
+            var tradeUxSim = new TradeUXSimDebug { Name = "TradeUXSimDebug" };
+            AddChild(tradeUxSim);
         }
         // Stage 0+1 (2026-08-25, GLM-5.3): верификация модели заполнения +
         // ауры-задержки (вариант В): зарядка → hold → release → урон.

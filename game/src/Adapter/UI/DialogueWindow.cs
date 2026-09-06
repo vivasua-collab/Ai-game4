@@ -1,16 +1,24 @@
 #nullable enable
 // Создано: 2026-08-22 — NPC_COMBAT_PREP Phase 2: окно диалога.
-// DialogueWindow — простой чат с NPC: текст узла (typewriter) + варианты
-// ответа кнопками 1..N или кликом. Esc/E — закрыть/продвинуть.
+// Переписано: 2026-09-06 — S6 UX-аудит:
+//   1) FIX layout: BottomWide (якоря 0/1 = ширина экрана!) → CenterBottom,
+//      панель была шириной экран+900px и вылезала за края.
+//   2) FIX переполнение: высота панели динамическая (ResizeToFit) —
+//      3+ варианта ответа больше не выталкиваются за нижний край.
+//   3) FIX подсказка: была «ЛКМ — выбрать ответ · далее» (клик по панели
+//      не работал) → честная «1-9 — выбор · E — далее · Esc — выход».
+//   4) Клик по панели = Advance (тот же путь, что E).
+//   5) Индикатор «▼» пока typewriter печатает текст.
+//   6) Клавиши выбора расширены 1..9 (было 1..4).
+// DialogueWindow — чат с NPC: текст узла (typewriter) + варианты ответа.
 // Backend: Modules/Interaction/DialogueService (ветвящиеся деревья).
-// Источник: docs/docs_v2/09_workflow/NPC_COMBAT_PREP.md §Phase 2
 using Godot;
+using System;
 using System.Collections.Generic;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Adapter.Di;
 using CultivationGame.Modules.Interaction;
-using CultivationGame.Modules.Interaction.Data;
 
 namespace CultivationGame.Adapter.UI;
 
@@ -24,14 +32,61 @@ public partial class DialogueWindow : Control
 {
     [Inject] private DialogueService Dialogue = null!;
     [Inject] private INPCService NpcService = null!;
+    [Inject] private ITimeService Time = null!;
 
     private Panel _panel = null!;
     private Label _npcNameLabel = null!;
     private Label _textLabel = null!;
+    private Label _typingLabel = null!;
+    private Label _hintLabel = null!;
     private VBoxContainer _choicesBox = null!;
     private readonly List<Button> _choiceButtons = new();
 
+    // Ширина панели (900) и отступ от низа экрана (40) — см. BuildUI/ResizeToFit.
+    private const float PanelWidth = 900f;
+    // S6 (VLM): 40px было мало — хотбар (до ~108px с поясом, по центру низа)
+    // перекрывал нижнюю часть окна (подсказку/кнопки). Поднимаем над хотбаром.
+    private const float PanelBottomMargin = 118f;
+
     public bool IsOpen => Visible;
+
+    // === Диагностика (public: headless-QA GODOT_DIALOGUE_DEBUG=1) ===
+
+    /// <summary>Число кнопок-вариантов ответа (QA).</summary>
+    public int ChoiceButtonCount => _choiceButtons.Count;
+
+    /// <summary>Текст шапки с именем NPC (QA).</summary>
+    public string NpcNameText => _npcNameLabel?.Text ?? "";
+
+    /// <summary>Текст подсказки управления (QA: упоминает E/Esc/цифры).</summary>
+    public string HintText => _hintLabel?.Text ?? "";
+
+    /// <summary>Виден ли индикатор печати «▼» (QA).</summary>
+    public bool TypingIndicatorVisible => _typingLabel?.Visible ?? false;
+
+    /// <summary>Отображаемый текст узла (QA).</summary>
+    public string BodyText => _textLabel?.Text ?? "";
+
+    /// <summary>Полный текст текущего узла (QA: сравнение после Advance).</summary>
+    public string FullTextForQA => Dialogue?.CurrentFullText ?? "";
+
+    /// <summary>Фактическая ширина панели (QA: ≈900 после CenterBottom-фикса).</summary>
+    public float PanelWidthActual => _panel?.Size.X ?? 0f;
+
+    /// <summary>Фактическая высота панели (QA: динамическая, ≥190).</summary>
+    public float PanelHeightActual => _panel?.Size.Y ?? 0f;
+
+    /// <summary>Все ли варианты уложились в панель по вертикали (QA).</summary>
+    public bool ChoicesFitPanel
+    {
+        get
+        {
+            if (_choicesBox == null || _panel == null || !IsInsideTree()) return true;
+            float panelBottom = _panel.GlobalPosition.Y + _panel.Size.Y;
+            float boxBottom = _choicesBox.GlobalPosition.Y + _choicesBox.Size.Y;
+            return boxBottom <= panelBottom + 1f;
+        }
+    }
 
     public override void _Ready()
     {
@@ -53,14 +108,17 @@ public partial class DialogueWindow : Control
         SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         MouseFilter = MouseFilterEnum.Ignore;
 
-        // Bottom-anchored panel (900 wide, 230 tall, 40 px from bottom).
+        // Bottom-anchored панель, 900 шириной, по центру.
+        // S6 FIX: был BottomWide (якоря 0/1 = вся ширина экрана) + оффсеты
+        // ±450 → фактическая ширина «экран+900», панель вылезала за края.
         _panel = new Panel { Name = "DialoguePanel" };
-        _panel.SetAnchorsPreset(Control.LayoutPreset.BottomWide);
-        _panel.OffsetLeft = -450;
-        _panel.OffsetRight = 450;
-        _panel.OffsetTop = -230;
-        _panel.OffsetBottom = -40;
+        _panel.SetAnchorsPreset(Control.LayoutPreset.CenterBottom);
+        _panel.OffsetLeft = -PanelWidth / 2f;
+        _panel.OffsetRight = PanelWidth / 2f;
+        _panel.OffsetBottom = -PanelBottomMargin;
         _panel.MouseFilter = MouseFilterEnum.Stop;
+        // S6: клик по панели = Advance (тот же путь, что клавиша E).
+        _panel.GuiInput += OnPanelGuiInput;
         AddChild(_panel);
 
         var outer = new VBoxContainer();
@@ -91,19 +149,43 @@ public partial class DialogueWindow : Control
         _textLabel.CustomMinimumSize = new Vector2(0, 72);
         outer.AddChild(_textLabel);
 
+        // S6: индикатор печати — виден, пока typewriter не допечатал текст.
+        _typingLabel = new Label
+        {
+            Text = "▼",
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Visible = false,
+        };
+        _typingLabel.AddThemeFontSizeOverride("font_size", 12);
+        _typingLabel.AddThemeColorOverride("font_color", ParchmentTheme.AccentGold);
+        outer.AddChild(_typingLabel);
+
         _choicesBox = new VBoxContainer();
         _choicesBox.AddThemeConstantOverride("separation", 4);
         outer.AddChild(_choicesBox);
 
-        var hint = new Label
+        // S6: честная подсказка — цифры/E/Esc (клавиши реально работают).
+        // Прежняя «ЛКМ — выбрать ответ · далее» вводила в заблуждение:
+        // клик по панели ничего не делал.
+        _hintLabel = new Label
         {
-            // 2026-08-28: клавиши — в окне-справке (F1); здесь только мышь.
-            Text = "ЛКМ — выбрать ответ · далее",
+            Text = "1-9 — выбор · E — далее · Esc — выход",
             HorizontalAlignment = HorizontalAlignment.Right,
         };
-        hint.AddThemeFontSizeOverride("font_size", 12);
-        hint.AddThemeColorOverride("font_color", ParchmentTheme.InkFaded);
-        outer.AddChild(hint);
+        _hintLabel.AddThemeFontSizeOverride("font_size", 12);
+        _hintLabel.AddThemeColorOverride("font_color", ParchmentTheme.InkFaded);
+        outer.AddChild(_hintLabel);
+    }
+
+    /// <summary>S6: клик по панели = Advance() — как клавиша E (кнопки поглощают свой клик сами).</summary>
+    private void OnPanelGuiInput(InputEvent @event)
+    {
+        if (!Visible) return;
+        if (@event is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
+        {
+            Advance();
+            GetViewport().SetInputAsHandled();
+        }
     }
 
     /// <summary>Open the window — called after DialogueService.StartDialogue succeeded.</summary>
@@ -126,7 +208,7 @@ public partial class DialogueWindow : Control
         _panel.MouseFilter = MouseFilterEnum.Ignore;
     }
 
-    /// <summary>Advance dialogue (E key / click on text panel).</summary>
+    /// <summary>Advance dialogue (E key / click on panel).</summary>
     public void Advance()
     {
         if (Dialogue == null || !Dialogue.IsInDialogue) { Close(); return; }
@@ -135,7 +217,8 @@ public partial class DialogueWindow : Control
         else Refresh();
     }
 
-    private void Select(int index)
+    /// <summary>Select a choice by index (кнопка/клавиша 1-9/QA).</summary>
+    public void Select(int index)
     {
         Dialogue?.SelectChoice(index);
         if (Dialogue == null || !Dialogue.IsInDialogue) Close();
@@ -172,21 +255,67 @@ public partial class DialogueWindow : Control
                 _choiceButtons.Add(btn);
             }
         }
+
+        ResizeToFit();
+    }
+
+    /// <summary>
+    /// S6: динамическая высота панели. Фиксированные 190px не вмещали
+    /// 3+ кнопок ответа (старейшина: 3 варианта) — низ выталкивался за край.
+    /// Оценка по полному тексту узла + числу кнопок; клампы [190; 460].
+    /// </summary>
+    private void ResizeToFit()
+    {
+        if (_panel == null) return;
+
+        float textH = EstimateTextHeight(Dialogue?.CurrentFullText ?? "");
+        int n = _choiceButtons.Count;
+        float choicesH = n * 40f + MathF.Max(0, n - 1) * 4f;
+        // шапка 26 + текст + индикатор 18 + кнопки + подсказка 20 + поля/сепараторы ~56
+        float h = 26f + textH + 18f + choicesH + 20f + 56f;
+        h = Mathf.Clamp(h, 190f, 460f);
+
+        _panel.OffsetTop = -(PanelBottomMargin + h);
+        _panel.OffsetBottom = -PanelBottomMargin;
+    }
+
+    /// <summary>Оценка высоты многострочного текста узла (autowrap ~864px, шрифт 16).</summary>
+    private static float EstimateTextHeight(string fullText)
+    {
+        if (string.IsNullOrEmpty(fullText)) return 72f;
+        const float width = 864f;      // панель 900 − поля 2×18
+        const float fontPx = 16f;
+        const float charW = fontPx * 0.62f;   // консервативно (кириллица)
+        const float lineH = fontPx * 1.45f;
+        int charsPerLine = Math.Max(20, (int)(width / charW));
+        int lines = (fullText.Length + charsPerLine - 1) / charsPerLine;
+        return MathF.Max(72f, lines * lineH + 6f);
     }
 
     public override void _Process(double delta)
     {
-        // Keep the typewriter text flowing while the node is shown.
         if (Visible && Dialogue is { IsInDialogue: true })
         {
+            // S6-BUGFIX: диалог ставит игровые тики на паузу (GameBoot
+            // гонит InteractionModule.Tick только при !IsPaused) — typewriter
+            // в игровых тиках был заморожен всё время диалога: текст не
+            // печатался, пока игрок не нажмёт E. Пока игра на паузе — окно
+            // двигает typewriter реальным временем.
+            if (Time is { IsPaused: true })
+                Dialogue.TickTypewriter((float)delta);
+
             string display = Dialogue.CurrentDisplayText;
             if (_textLabel.Text != display)
                 _textLabel.Text = display;
+
+            // S6: индикатор печати виден, пока текст не допечатан.
+            _typingLabel.Visible = !Dialogue.IsTypewriterComplete
+                                   && !string.IsNullOrEmpty(Dialogue.CurrentFullText);
         }
     }
 
     /// <summary>
-    /// Number keys 1..4 select a choice while the window is open.
+    /// Number keys 1..9 select a choice while the window is open.
     /// </summary>
     public override void _Input(InputEvent @event)
     {
@@ -200,6 +329,11 @@ public partial class DialogueWindow : Control
                 Godot.Key.Key2 => 1,
                 Godot.Key.Key3 => 2,
                 Godot.Key.Key4 => 3,
+                Godot.Key.Key5 => 4,
+                Godot.Key.Key6 => 5,
+                Godot.Key.Key7 => 6,
+                Godot.Key.Key8 => 7,
+                Godot.Key.Key9 => 8,
                 _ => -1,
             };
             if (index >= 0)

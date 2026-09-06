@@ -12,6 +12,7 @@
 // контроллере), BeltSlotRow (подписки + _ExitTree dispose).
 using Godot;
 using System.Collections.Generic;
+using System.Linq;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Interfaces;
@@ -47,9 +48,42 @@ public partial class TradeWindow : Control
     private VBoxContainer _inventoryList = null!;
     private Label _stockSummary = null!;
     private Label _inventorySummary = null!;
+    private Label _footerLabel = null!;
 
     private string _merchantId = string.Empty;
     private string _merchantName = string.Empty;
+
+    // S6: диагностика строк ассортимента для headless-QA
+    // ("itemId|price|affordable") — заполняется в RefreshStock.
+    private readonly List<string> _debugStockRows = new();
+
+    // === Диагностика (internal: headless-QA GODOT_TRADEUX_DEBUG=1) ===
+
+    /// <summary>Число строк ассортимента (QA).</summary>
+    internal int StockRowCount => _stockList?.GetChildren()
+        .OfType<TradeItemRow>().Count(r => !r.IsQueuedForDeletion()) ?? 0;
+
+    /// <summary>Снимок строк ассортимента "itemId|price|affordable" (QA).</summary>
+    internal IReadOnlyList<string> DebugStockRows => _debugStockRows;
+
+    /// <summary>Текст футера с подсказками (QA: упоминает Esc).</summary>
+    internal string DebugFooterText => _footerLabel?.Text ?? "";
+
+    /// <summary>Тултип первой строки ассортимента (QA: имя+описание+редкость+цена).</summary>
+    internal string DebugFirstStockRowTooltip()
+        => _stockList?.GetChildren()
+            .OfType<TradeItemRow>()
+            .FirstOrDefault(r => !r.IsQueuedForDeletion())
+            ?.TooltipText ?? "";
+
+    /// <summary>Найти строку лавки по itemId (QA: hover-фидбек). Поиск по
+    /// ItemId, НЕ по Node.Name — Godot автопереименовывает дубликаты имён
+    /// при пересборке строк (QueueFree отложен, старая строка ещё ребёнок).</summary>
+    internal TradeItemRow? DebugFindRow(string itemId, bool isBuy)
+        => _stockList?.GetChildren()
+            .OfType<TradeItemRow>()
+            .FirstOrDefault(r => !r.IsQueuedForDeletion()
+                && r.ItemId == itemId && r.IsBuyRow == isBuy);
 
     private System.IDisposable? _openedToken;
     private System.IDisposable? _closedToken;
@@ -225,14 +259,15 @@ public partial class TradeWindow : Control
         invScroll.AddChild(_inventoryList);
 
         // Подвал: подсказка управления (клавиши — в окне-справке F1).
-        var footer = new Label
+        // S6: + Esc — прежде способ закрытия не упоминался вовсе.
+        _footerLabel = new Label
         {
-            Text = "ЛКМ — купить/продать 1 · Shift+ЛКМ — 5",
+            Text = "ЛКМ — купить/продать 1 · Shift+ЛКМ — 5 · Esc — выход",
             HorizontalAlignment = HorizontalAlignment.Center,
         };
-        footer.AddThemeFontSizeOverride("font_size", 12);
-        footer.AddThemeColorOverride("font_color", ParchmentTheme.InkFaded);
-        outer.AddChild(footer);
+        _footerLabel.AddThemeFontSizeOverride("font_size", 12);
+        _footerLabel.AddThemeColorOverride("font_color", ParchmentTheme.InkFaded);
+        outer.AddChild(_footerLabel);
     }
 
     // === Открытие/закрытие (по событиям шины) ===
@@ -291,7 +326,9 @@ public partial class TradeWindow : Control
 
     private void OnCurrencyChanged(in CoreContracts.CurrencyChangedEvent e)
     {
-        RefreshBalance();
+        // S6: при изменении баланса пересобираем и строки — пометки
+        // «не хватает камней» должны сняться без переоткрытия лавки.
+        RefreshAll();
     }
 
     internal void HandleBuy(string itemId, int count)
@@ -326,6 +363,7 @@ public partial class TradeWindow : Control
     {
         foreach (var child in _stockList.GetChildren())
             child.QueueFree();
+        _debugStockRows.Clear();
 
         var stock = Trade?.GetMerchantStock(_merchantId);
         if (stock is not { Count: > 0 })
@@ -334,6 +372,9 @@ public partial class TradeWindow : Control
             _stockSummary.Text = "Товары (ЛКМ — купить)";
             return;
         }
+
+        // S6: баланс нужен для пометки «не хватает камней» прямо в строке.
+        int stones = Currency?.SpiritStones ?? 0;
 
         int positions = 0;
         int totalUnits = 0;
@@ -344,8 +385,10 @@ public partial class TradeWindow : Control
             totalUnits += entry.Count;
 
             int price = Trade!.GetBuyPrice(entry.ItemId);
+            bool affordable = stones >= price;
             _stockList.AddChild(new TradeItemRow(
-                entry.ItemId, entry.Count, price, isBuy: true, this));
+                entry.ItemId, entry.Count, price, isBuy: true, this, affordable));
+            _debugStockRows.Add($"{entry.ItemId}|{price}|{(affordable ? "1" : "0")}");
         }
 
         if (positions == 0)
@@ -420,6 +463,35 @@ public partial class TradeWindow : Control
     /// <summary>Название предмета для строки (резолв через БД окна).</summary>
     internal string GetItemName(string itemId) => ResolveItemName(itemId);
 
+    /// <summary>Описание предмета для тултипа строки (S6).</summary>
+    internal string GetItemDescription(string itemId)
+    {
+        if (ItemDb != null && ItemDb.TryGetItem(itemId, out var item)
+            && !string.IsNullOrEmpty(item.Description))
+            return item.Description;
+        return "Описание отсутствует";
+    }
+
+    /// <summary>Человекочитаемая редкость предмета для тултипа (S6).</summary>
+    internal string GetItemRarityName(string itemId)
+    {
+        if (ItemDb != null && ItemDb.TryGetItem(itemId, out var item))
+            return RarityNameRu(item.Rarity);
+        return "—";
+    }
+
+    /// <summary>Русское название редкости (S6: тултипы строк лавки).</summary>
+    internal static string RarityNameRu(ItemRarity rarity) => rarity switch
+    {
+        ItemRarity.Common => "Обычный",
+        ItemRarity.Uncommon => "Необычный",
+        ItemRarity.Rare => "Редкий",
+        ItemRarity.Epic => "Эпический",
+        ItemRarity.Legendary => "Легендарный",
+        ItemRarity.Mythic => "Мифический",
+        _ => rarity.ToString(),
+    };
+
     /// <summary>Цвет редкости предмета для строки (fallback — чернила).</summary>
     internal Godot.Color GetItemRowColor(string itemId)
     {
@@ -441,15 +513,30 @@ public partial class TradeItemRow : HBoxContainer
     private readonly bool _isBuy;
     private readonly TradeWindow _parent;
 
-    public TradeItemRow(string itemId, int count, int price, bool isBuy, TradeWindow parent)
+    // S6: hover-подсветка строки (прежде строки никак не реагировали на мышь).
+    private static readonly Godot.Color HoverTint = new(1.08f, 1.05f, 0.9f);
+
+    /// <summary>Подсвечена ли строка наведением (QA).</summary>
+    public bool IsHoverHighlighted => Modulate != Colors.White;
+
+    /// <summary>ItemId строки (QA: поиск по содержимому, не по Node.Name).</summary>
+    public string ItemId => _itemId;
+
+    /// <summary>Строка покупки (true) или продажи (false) — QA.</summary>
+    public bool IsBuyRow => _isBuy;
+
+    public static string BuildName(string itemId, bool isBuy)
+        => $"Trade_{(isBuy ? "Buy" : "Sell")}_{itemId}";
+
+    public TradeItemRow(string itemId, int count, int price, bool isBuy,
+        TradeWindow parent, bool affordable = true)
     {
         _itemId = itemId;
         _isBuy = isBuy;
         _parent = parent;
 
-        Name = $"Trade_{(isBuy ? "Buy" : "Sell")}_{itemId}";
+        Name = BuildName(itemId, isBuy);
         MouseFilter = MouseFilterEnum.Stop;
-        TooltipText = $"{itemId} · цена за 1 шт.: {price}";
 
         AddThemeConstantOverride("separation", 10);
 
@@ -469,7 +556,9 @@ public partial class TradeItemRow : HBoxContainer
             CustomMinimumSize = new Vector2(230, 22),
         };
         nameLabel.AddThemeFontSizeOverride("font_size", 14);
-        nameLabel.AddThemeColorOverride("font_color", nameColor);
+        // S6: не по карману — имя тускнеет, цена краснеет: клик не вслепую.
+        nameLabel.AddThemeColorOverride("font_color",
+            affordable ? nameColor : nameColor * new Godot.Color(1f, 1f, 1f, 0.55f));
 
         var qtyLabel = new Label
         {
@@ -487,13 +576,30 @@ public partial class TradeItemRow : HBoxContainer
             HorizontalAlignment = HorizontalAlignment.Right,
         };
         priceLabel.AddThemeFontSizeOverride("font_size", 14);
-        priceLabel.AddThemeColorOverride("font_color", ParchmentTheme.AccentGold);
+        priceLabel.AddThemeColorOverride("font_color",
+            affordable ? ParchmentTheme.AccentGold : ParchmentTheme.AccentRed);
+
+        // S6: содержательный тултип вместо сырого itemId: имя + описание +
+        // редкость + цена, для покупки — предупреждение при нехватке камней.
+        TooltipText = $"{displayName}\n{_parent.GetItemDescription(itemId)}\n"
+            + $"Редкость: {_parent.GetItemRarityName(itemId)}\n"
+            + $"Цена за 1 шт.: {price} 🔶";
+        if (isBuy && !affordable)
+            TooltipText += "\n⚠ Не хватает духовных камней";
 
         AddChild(indicator);
         AddChild(nameLabel);
         AddChild(qtyLabel);
         AddChild(priceLabel);
+
+        // S6: hover-подсветка (строки выглядят некликабельными без фидбека).
+        MouseEntered += () => SetHovered(true);
+        MouseExited += () => SetHovered(false);
     }
+
+    /// <summary>S6: подсветка строки (вызов и из QA — GODOT_TRADEUX_DEBUG).</summary>
+    public void SetHovered(bool hovered)
+        => Modulate = hovered ? HoverTint : Colors.White;
 
     /// <summary>ЛКМ — сделка на 1 шт., Shift+ЛКМ — на партию (5).</summary>
     public override void _GuiInput(InputEvent @event)
