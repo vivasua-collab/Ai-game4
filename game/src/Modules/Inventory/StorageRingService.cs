@@ -40,6 +40,9 @@ namespace CultivationGame.Modules.Inventory
         private readonly ISubscriber<EquipmentChangedEvent> _equipChangedSub;
         private readonly IItemDatabaseService _itemDatabase;
         private readonly IEquipmentService _equipmentService;
+        // Review этап 4 (P1-3): операции с кольцом реально платят Ци (контракт
+        // IStorageRingService: qiCost — не только «посчитать», но и списать).
+        private readonly IQiService? _qiService;
 
         // === Состояние ===
         private readonly Dictionary<string, StorageRingEntry> _rings = new();
@@ -58,11 +61,13 @@ namespace CultivationGame.Modules.Inventory
         public StorageRingService(
             ISubscriber<EquipmentChangedEvent> equipChangedSub,
             IItemDatabaseService itemDatabase,
-            IEquipmentService equipmentService)
+            IEquipmentService equipmentService,
+            IQiService? qiService = null)
         {
             _equipChangedSub = equipChangedSub;
             _itemDatabase = itemDatabase;
             _equipmentService = equipmentService;
+            _qiService = qiService;
         }
 
         /// <summary>
@@ -114,6 +119,15 @@ namespace CultivationGame.Modules.Inventory
             // Вычислить Qi стоимость
             qiCost = GetStoreQiCost(entry.Tier, item.Weight);
 
+            // Review этап 4 (P1-3): проверка баланса ДО изменения содержимого;
+            // списание — после успешного мутацирования (транзакция: операция
+            // с кольцом либо полностью проходит с оплатой, либо не проходит).
+            if (!HasQiFor(qiCost))
+            {
+                Console.WriteLine($"[StorageRingService] Недостаточно Ци для помещения: {CurrentQi}/{qiCost}");
+                return false;
+            }
+
             // Стакающиеся предметы — ищем существующий слот
             if (item.Stackable)
             {
@@ -135,6 +149,7 @@ namespace CultivationGame.Modules.Inventory
 
                         // STR-MODEL: пересчитать объём
                         entry.RecalculateVolume(_itemDatabase);
+                        ChargeQi(qiCost);
                         return true;
                     }
                 }
@@ -145,6 +160,7 @@ namespace CultivationGame.Modules.Inventory
 
             // STR-MODEL: пересчитать объём
             entry.RecalculateVolume(_itemDatabase);
+            ChargeQi(qiCost);
             return true;
         }
 
@@ -178,13 +194,26 @@ namespace CultivationGame.Modules.Inventory
                 var slot = entry.StoredItems[i];
                 float itemWeight = 0f;
 
-                if (_itemDatabase != null && _itemDatabase.TryGetItem(storedItemId, out var itemData))
+                // Review этап 4 (P0-1-паттерн): предмет должен быть известен базе
+                // ДО удаления из кольца (иначе та же потеря: удалли + item=null).
+                if (_itemDatabase == null || !_itemDatabase.TryGetItem(storedItemId, out var itemData) || itemData == null)
                 {
-                    item = itemData;
-                    itemWeight = itemData.Weight;
+                    Console.WriteLine($"[StorageRingService] Предмет '{storedItemId}' не найден в ItemDatabase — извлечение отклонено");
+                    return false;
                 }
 
+                item = itemData;
+                itemWeight = itemData.Weight;
+
                 qiCost = GetRetrieveQiCost(entry.Tier, itemWeight);
+
+                // Review этап 4 (P1-3): проверка баланса ДО удаления из кольца.
+                if (!HasQiFor(qiCost))
+                {
+                    Console.WriteLine($"[StorageRingService] Недостаточно Ци для извлечения: {CurrentQi}/{qiCost}");
+                    item = null;
+                    return false;
+                }
 
                 int remaining = slot.Count - 1;
                 if (remaining <= 0)
@@ -198,6 +227,7 @@ namespace CultivationGame.Modules.Inventory
 
                 // STR-MODEL: пересчитать объём
                 entry.RecalculateVolume(_itemDatabase);
+                ChargeQi(qiCost);
                 return true;
             }
 
@@ -310,6 +340,25 @@ namespace CultivationGame.Modules.Inventory
         {
             if (string.IsNullOrEmpty(ringItemId)) return false;
             return _rings.TryGetValue(ringItemId, out var entry) && entry.IsActive;
+        }
+
+        // === Review этап 4 (P1-3): Ци-транзакции ===
+
+        private long CurrentQi => _qiService?.CurrentQi ?? 0;
+
+        /// <summary>Баланса хватает на операцию? (списание — только после мутации)</summary>
+        private bool HasQiFor(long cost)
+        {
+            return _qiService == null || cost <= 0 || _qiService.CurrentQi >= cost;
+        }
+
+        /// <summary>Списать Ци за операцию (после успешного изменения содержимого).</summary>
+        private void ChargeQi(long cost)
+        {
+            if (_qiService != null && cost > 0)
+            {
+                _qiService.TryConsumeQi(cost);
+            }
         }
 
         // === Обработчики событий ===

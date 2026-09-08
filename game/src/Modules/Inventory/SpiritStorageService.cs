@@ -22,6 +22,9 @@ namespace CultivationGame.Modules.Inventory
         private readonly IPublisher<ItemAddedEvent> _itemAddedPub;
         private readonly IPublisher<ItemRemovedEvent> _itemRemovedPub;
         private readonly IQiService _qiService;
+        // Review этап 4 (P0-1): резолв ItemData при извлечении (раньше out item
+        // всегда null — предмет исчезал из хранилища, вызывающий получал ничего).
+        private readonly IItemDatabaseService? _itemDatabase;
 
         private readonly int _capacity;
         private readonly long _accessCost;
@@ -38,12 +41,14 @@ namespace CultivationGame.Modules.Inventory
             IPublisher<ItemAddedEvent> itemAddedPub,
             IPublisher<ItemRemovedEvent> itemRemovedPub,
             IQiService qiService,
+            IItemDatabaseService itemDatabase,
             int capacity = 20,
             long accessCost = 10)
         {
             _itemAddedPub = itemAddedPub;
             _itemRemovedPub = itemRemovedPub;
             _qiService = qiService;
+            _itemDatabase = itemDatabase;
             _capacity = capacity;
             _accessCost = accessCost;
         }
@@ -61,31 +66,35 @@ namespace CultivationGame.Modules.Inventory
                 return false;
             }
 
-            // Check capacity
-            if (_storedItems.Count >= _capacity)
+            // Review этап 4 (P1-2): ВСЕГДА сначала ищем неполный стек того же
+            // ItemId (раньше — только при заполненном хранилище: stackable-предмет
+            // расходовал слот на каждую единицу, UsedSlots достигал capacity
+            // искусственно быстро).
+            if (item.Stackable)
             {
-                // Try stacking
-                if (item.Stackable)
+                for (int i = 0; i < _storedItems.Count; i++)
                 {
-                    for (int i = 0; i < _storedItems.Count; i++)
+                    if (_storedItems[i].ItemId == item.ItemId && _storedItems[i].Count < item.MaxStack)
                     {
-                        if (_storedItems[i].ItemId == item.ItemId && _storedItems[i].Count < item.MaxStack)
-                        {
-                            int newCount = System.Math.Min(_storedItems[i].Count + 1, item.MaxStack);
-                            _storedItems[i] = new InventorySlot(item.ItemId, newCount, item.Category, item.Rarity);
-                            _itemCountCache[item.ItemId] = newCount;
-                            DeductQi();
-                            _itemAddedPub.Publish(new ItemAddedEvent(item.ItemId, 1));
-                            return true;
-                        }
+                        int newCount = System.Math.Min(_storedItems[i].Count + 1, item.MaxStack);
+                        _storedItems[i] = new InventorySlot(item.ItemId, newCount, item.Category, item.Rarity);
+                        RecalcCountCache(item.ItemId);
+                        DeductQi();
+                        _itemAddedPub.Publish(new ItemAddedEvent(item.ItemId, 1));
+                        return true;
                     }
                 }
+            }
+
+            // Check capacity (новый слот — только если подходящего стека нет)
+            if (_storedItems.Count >= _capacity)
+            {
                 return false;
             }
 
             // Add new slot
             _storedItems.Add(new InventorySlot(item.ItemId, 1, item.Category, item.Rarity));
-            _itemCountCache[item.ItemId] = 1;
+            RecalcCountCache(item.ItemId);
             DeductQi();
             _itemAddedPub.Publish(new ItemAddedEvent(item.ItemId, 1));
             return true;
@@ -95,6 +104,15 @@ namespace CultivationGame.Modules.Inventory
         {
             item = null!;
             if (string.IsNullOrEmpty(itemId)) return false;
+
+            // Review этап 4 (P0-1): резолвим ItemData ДО изменения слота.
+            // Если предмет неизвестен базе — ничего не удаляем (раньше:
+            // удаляли из хранилища, возвращали true с item = null → потеря).
+            if (_itemDatabase == null || !_itemDatabase.TryGetItem(itemId, out var resolved) || resolved == null)
+            {
+                Console.WriteLine($"[SpiritStorage] Предмет '{itemId}' не найден в ItemDatabase — извлечение отклонено");
+                return false;
+            }
 
             // Check Qi cost
             if (_qiService != null && _qiService.CurrentQi < _accessCost)
@@ -118,9 +136,11 @@ namespace CultivationGame.Modules.Inventory
                     else
                     {
                         _storedItems[i] = new InventorySlot(itemId, newCount, slot.Category, slot.Rarity);
-                        _itemCountCache[itemId] = newCount;
+                        RecalcCountCache(itemId);
                     }
 
+                    // Review этап 4 (P0-1): возвращаем РЕАЛЬНЫЙ предмет вызывающему.
+                    item = resolved!;
                     DeductQi();
                     _itemRemovedPub.Publish(new ItemRemovedEvent(itemId, 1));
                     return true;
@@ -138,6 +158,22 @@ namespace CultivationGame.Modules.Inventory
             {
                 _qiService.TryConsumeQi(_accessCost);
             }
+        }
+
+        /// <summary>
+        /// Review этап 4 (P1-2): кэш = СУММА по всем слотам itemId (раньше
+        /// кэшировалось количество одного стека — при нескольких стеках
+        /// кэш расходился с фактическим содержимым).
+        /// </summary>
+        private void RecalcCountCache(string itemId)
+        {
+            int total = 0;
+            for (int i = 0; i < _storedItems.Count; i++)
+            {
+                if (_storedItems[i].ItemId == itemId) total += _storedItems[i].Count;
+            }
+            if (total > 0) _itemCountCache[itemId] = total;
+            else _itemCountCache.Remove(itemId);
         }
     }
 }

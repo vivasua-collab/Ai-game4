@@ -22,6 +22,9 @@ namespace CultivationGame.Modules.Inventory
         private readonly IInventoryService _inventoryService;
         private readonly IPublisher<CraftCompletedEvent> _craftCompletedPub;
         private readonly IPublisher<CraftFailedEvent> _craftFailedPub;
+        // Review этап 4 (P1-4): валидация результата ДО расхода ингредиентов
+        // (транзакция: крафт неизвестного базе предмета не должен уничтожать материалы).
+        private readonly IItemDatabaseService? _itemDatabase;
 
         // === Состояние ===
         private readonly Dictionary<string, CraftingRecipe> _recipes = new();
@@ -30,11 +33,13 @@ namespace CultivationGame.Modules.Inventory
         public CraftingService(
             IInventoryService inventoryService,
             IPublisher<CraftCompletedEvent> craftCompletedPub,
-            IPublisher<CraftFailedEvent> craftFailedPub)
+            IPublisher<CraftFailedEvent> craftFailedPub,
+            IItemDatabaseService? itemDatabase = null)
         {
             _inventoryService = inventoryService;
             _craftCompletedPub = craftCompletedPub;
             _craftFailedPub = craftFailedPub;
+            _itemDatabase = itemDatabase;
         }
 
         /// <summary>
@@ -89,6 +94,17 @@ namespace CultivationGame.Modules.Inventory
             if (!recipe.IsAvailable)
             {
                 _craftFailedPub.Publish(new CraftFailedEvent(recipeId, "Рецепт недоступен"));
+                return false;
+            }
+
+            // Review этап 4 (P1-4): результат должен быть известен базе ДО
+            // расхода ингредиентов — иначе материалы уничтожены, а предмет
+            // «потерян» в OnCraftCompleted (не найден в ItemDatabase).
+            if (_itemDatabase != null
+                && !_itemDatabase.TryGetItem(recipe.ResultItemId, out _))
+            {
+                _craftFailedPub.Publish(new CraftFailedEvent(recipeId,
+                    $"Результат '{recipe.ResultItemId}' не найден в ItemDatabase"));
                 return false;
             }
 

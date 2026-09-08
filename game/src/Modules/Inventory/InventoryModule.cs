@@ -147,8 +147,21 @@ public class InventoryModule : IModule
 
         if (_itemDatabase.TryGetItem(e.ResultItemId, out var resultItem))
         {
-            _inventoryServiceImpl.TryAddItem(resultItem, e.Count);
-            Console.WriteLine($"[InventoryModule] Результат крафта '{e.ResultItemId}' добавлен в инвентарь");
+            // Review этап 4 (P1-4): результат крафта НЕ теряется при полном
+            // инвентаре — overflow выбрасывается на землю у игрока (тот же
+            // компенсирующий путь, что и у pickup-overflow; раньше TryAddItem
+            // игнорировался и предмет «исчезал» после списания ингредиентов).
+            bool added = _inventoryServiceImpl.TryAddItem(resultItem, e.Count, out int addedCount);
+            int overflow = e.Count - addedCount;
+            if (overflow > 0)
+            {
+                DropItemsNearPlayer(e.ResultItemId, overflow);
+                Console.WriteLine($"[InventoryModule] Результат крафта '{e.ResultItemId}': {addedCount} в инвентарь, {overflow} на землю (инвентарь полон)");
+            }
+            else
+            {
+                Console.WriteLine($"[InventoryModule] Результат крафта '{e.ResultItemId}' добавлен в инвентарь (added={added})");
+            }
         }
         else
         {

@@ -285,6 +285,14 @@ public partial class GameWorldController : Node2D
             var toastSim = new ToastSimDebug { Name = "ToastSimDebug" };
             AddChild(toastSim);
         }
+        // 2026-09-08 (review этап 4): headless-верификация инвентарных
+        // транзакций (GODOT_STORAGE_DEBUG=1) — spirit retrieve/stacking,
+        // ring Qi, craft overflow, pickup integrity/граница.
+        if (System.Environment.GetEnvironmentVariable("GODOT_STORAGE_DEBUG") == "1")
+        {
+            var storageSim = new StorageSimDebug { Name = "StorageSimDebug" };
+            AddChild(storageSim);
+        }
         // 2026-09-04 S2: headless-верификация виньетки опасности
         // (GODOT_LOWHP_DEBUG=1) — alpha/пульс оверлея при HP < 35%/15%.
         if (System.Environment.GetEnvironmentVariable("GODOT_LOWHP_DEBUG") == "1")

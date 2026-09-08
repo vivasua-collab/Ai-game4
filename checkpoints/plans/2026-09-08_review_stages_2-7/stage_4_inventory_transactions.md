@@ -1,7 +1,22 @@
 # Этап 4 — Инвентарь, предметы на земле, крафт, хранилища
 
-> Статус: ⬜ план → исполнение. Файлы: InventoryService/InventoryModule, GroundItemService, CraftingService,
-> EquipmentService, StorageRingService, SpiritStorageService, InventoryWindow, CharacterDollPanel, интерфейсы.
+> Статус: ✅ **ВЫПОЛНЕН** (валидация: 6/6 подтверждены; фиксы + QA + регрессия PASS).
+
+## Вердикты и фиксы
+
+| # | Находка | Вердикт | Фикс |
+|---|---|---|---|
+| P0-1 | SpiritStorage.TryRetrieve удаляет предмет, не возвращая его | ✅ Подтверждено | Инжект IItemDatabaseService; резолв ДО мутации (unknown → false, ничего не удалено); `item = resolved` (реальный предмет). StorageRing.TryRetrieve — тот же паттерн |
+| P1-2 | Нет stacking, кэш портится | ✅ Подтверждено | TryStore ВСЕГДА ищет неполный стек (не только при заполненности); кэш = сумма по всем слотам (RecalcCountCache) |
+| P1-3 | StorageRing не списывает Ци | ✅ Подтверждено | Инжект IQiService; HasQiFor ДО мутации, ChargeQi ПОСЛЕ успешного изменения (транзакция); отказ при нехватке — содержимое не меняется |
+| P1-4 | Крафт при полном инвентаре теряет результат | ✅ Подтверждено | OnCraftCompleted: TryAddItem(out addedCount) + overflow → DropItemsNearPlayer (как pickup); CraftingService: результат валидируется в ItemDatabase ДО расхода ингредиентов |
+| P1-5 | Pickup unknown itemId теряет дроп | ✅ Подтверждено | Валидация в TryPickupNearest ДО удаления (инжект IItemDatabaseService) — предмет остаётся на земле с причиной в логе |
+| P2-6 | Граничная дистанция `<` | ✅ Подтверждено | `distSq <= nearestDistSq` — предмет ровно на maxDistance подбирается |
+
+## QA
+
+- **НОВЫЙ хук `GODOT_STORAGE_DEBUG=1`** (StorageSimDebug, хук №21 в TESTING_RULES §0.1): spirit store×3 → 1 слот/стек 3; retrieve → реальный ItemId; Qi −40 (=4×10); ring store/retrieve списывают Ци (15/7); unknown из кольца не извлекается; craft overflow → ItemDroppedEvent + часть в инвентарь; pickup unknown остаётся на земле; граничная дистанция подбирается. VERDICT: PASS.
+- Регрессия: COMBAT (ammo-путь), CHARGE, TRADEUX, GEN (0 искл.), TOAST, KILLFEED, REASSEMBLY, TRADE smoke — все PASS. Build 0 errors (308 warnings, +8 — nullable-инжекты).
 
 ## Находки ревью → план валидации и фикса
 

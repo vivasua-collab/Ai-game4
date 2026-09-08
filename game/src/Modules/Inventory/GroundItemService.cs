@@ -2,6 +2,7 @@
 // Создано: 2026-08-21 — Ground item system for dropped items.
 // Хранит предметы, выпавшие на землю (overflow inventory OR player throw).
 // Поддерживает drop (создание) и pickup (подбор ближайшего).
+using System;
 using System.Collections.Generic;
 using CultivationGame.Core;
 using CultivationGame.Core.Data;
@@ -21,6 +22,10 @@ namespace CultivationGame.Modules.Inventory
         private readonly IPublisher<ItemDroppedEvent> _droppedPub;
         private readonly IPublisher<ItemPickedUpEvent> _pickedUpPub;
         private readonly IPublisher<ItemAddRequestEvent> _itemAddPub;
+        // Review этап 4 (P1-5): валидация itemId ДО удаления предмета с земли
+        // (раньше unknown-item подбирался и «исчезал»: InventoryModule не
+        // находил его в базе и предмет терялся навсегда).
+        private readonly IItemDatabaseService? _itemDatabase;
 
         private readonly List<GroundItem> _items = new();
         private long _nextDropId = 1;
@@ -30,11 +35,13 @@ namespace CultivationGame.Modules.Inventory
         public GroundItemService(
             IPublisher<ItemDroppedEvent> droppedPub,
             IPublisher<ItemPickedUpEvent> pickedUpPub,
-            IPublisher<ItemAddRequestEvent> itemAddPub)
+            IPublisher<ItemAddRequestEvent> itemAddPub,
+            IItemDatabaseService? itemDatabase = null)
         {
             _droppedPub = droppedPub;
             _pickedUpPub = pickedUpPub;
             _itemAddPub = itemAddPub;
+            _itemDatabase = itemDatabase;
         }
 
         public long DropItem(string itemId, int count, float worldX, float worldY)
@@ -63,7 +70,10 @@ namespace CultivationGame.Modules.Inventory
                 float dx = item.WorldX - worldX;
                 float dy = item.WorldY - worldY;
                 float distSq = dx * dx + dy * dy;
-                if (distSq < nearestDistSq)
+                // Review этап 4 (P2-6): <= — предмет на СТРОГО граничной
+                // дистанции (ровно maxDistance) подбирается: интерфейс
+                // определяет радиус как максимальную ДОПУСТИМУЮ дистанцию.
+                if (distSq <= nearestDistSq)
                 {
                     nearestDistSq = distSq;
                     nearestIdx = i;
@@ -73,6 +83,15 @@ namespace CultivationGame.Modules.Inventory
             if (nearestIdx < 0) return false;
 
             var picked = _items[nearestIdx];
+
+            // Review этап 4 (P1-5): валидация ДО удаления — предмет неизвестен
+            // базе → остаётся на земле (с причиной в логе), не теряется.
+            if (_itemDatabase != null && !_itemDatabase.TryGetItem(picked.ItemId, out _))
+            {
+                Console.WriteLine($"[GroundItemService] Предмет '{picked.ItemId}' (drop {picked.DropId}) неизвестен ItemDatabase — подбор отклонён, предмет остаётся на земле");
+                return false;
+            }
+
             _items.RemoveAt(nearestIdx);
 
             // Publish pickup event (renderer removes sprite).
