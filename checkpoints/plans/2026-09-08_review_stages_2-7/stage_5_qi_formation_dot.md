@@ -1,8 +1,22 @@
 # Этап 5 — Ци, формации, тело, периодические эффекты
 
-> Статус: ⬜ план → исполнение. Файлы: QiModule/QiService/QiDataProvider/QiBufferService/QiConfig,
-> FormationModule/FormationService, BodyModule/BodyService, IQiService/IQiDataProvider/IFormationService/
-> IBodyService, QiContracts.
+> Статус: ✅ **ВЫПОЛНЕН** (валидация: 5/5 подтверждены; фиксы + QA + регрессия PASS).
+
+## Вердикты и фиксы
+
+| # | Находка | Вердикт | Фикс |
+|---|---|---|---|
+| P0-1 | NPC-вклад Ци в формацию списывает Ци игрока | ✅ Подтверждено (ContributeQi: contributorId → RequesterId, EntityId пуст) | Игрок — QiConsumeRequestEvent с ЯВНЫМ EntityId + подтверждение списания по кэшу QiChangedEvent (EventBus диспатчит синхронно); NPC — прямое синхронное списание IQiDataProvider.TryConsumeQi. QiService: алиас-безопасное сравнение EntityId (AreSameEntity — "player"/"player_0") |
+| P0-2 | Создание формации всегда оплачивает игрок | ✅ Подтверждено (StartDrawing: пустой EntityId) | Контур оплачивает ИМЕННО кастер (игрок: событие с EntityId + подтверждение; NPC: IQiDataProvider.TryConsumeQi) |
+| P1-3 | Проверка/списание Ци не атомарны | ✅ Подтверждено (fire-and-forget + пул «в кредит») | Пул пополняется ТОЛЬКО по подтверждённому списанию (charged-блок); при неподтверждении — return 0 |
+| P1-4 | DoT только логируется | ✅ Подтверждено (Console.WriteLine, HP не менялся) | BodyModule публикует DamageAppliedEvent(source="dot:{buffId}", target=e.EntityId, Torso, Qi/Physical) — ЕДИНЫЙ пайплайн: BodyService применяет по частям, NPCCombatAdapter → смерть, kill-feed. Броня/Ци-буфер не применяются (DoT-значение финальное) |
+| P2-5 | Кэш уровня культивации тела не синхронизируется при инициализации | ✅ Подтверждено (QiService.Initialize публикует только QiChangedEvent) | BodyService подписан на QiChangedEvent (OnQiChangedForLevel, фильтр по сущности с алиасами) — начальный уровень актуален |
+
+## QA
+
+- **НОВЫЙ хук `GODOT_DOT_DEBUG=1`** (DotSimDebug, №22): Poison/Burn/Bleed/Freeze → DamageAppliedEvent → HP падает (NPC −4/7 и игрок −3/5 — 70/30-сплит как у обычных ударов), 4 события, устойчивость после QiChanged(level=3). VERDICT: PASS.
+- FORMATION_TEST: StartDrawing → Filling → Active 800/800 (контур+вклад оплачены через новый подтверждённый путь).
+- Регрессия: COMBAT, CHARGE, TOAST, LOWHP, KILLFEED, STORAGE, DIALOGUE, REASSEMBLY, GEN — все PASS. Build 0 errors.
 
 ## Находки ревью → план валидации и фикса
 

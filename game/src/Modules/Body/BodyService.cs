@@ -85,6 +85,10 @@ namespace CultivationGame.Modules.Body
         // === IDisposable для подписок ===
         private IDisposable _damageSubscription;
 
+        // Review этап 5 (P2-5): подписка на QiChangedEvent для синхронизации
+        // НАЧАЛЬНОГО уровня культивации (Initialize публикует только QiChanged).
+        private IDisposable _qiChangedForLevelSubscription;
+
         // === Конструктор ===
 
         // === Фабрика (инжектируется через интерфейс — P1-10 FIX) ===
@@ -98,6 +102,7 @@ namespace CultivationGame.Modules.Body
             IPublisher<BodyCriticalEvent> criticalPublisher,  // P2-07 FIX
             ISubscriber<DamageAppliedEvent> damageSubscriber,
             ISubscriber<CultivationLevelChangedEvent> cultivationLevelSub,  // P1-14 FIX
+            ISubscriber<QiChangedEvent> qiChangedSub, // Review этап 5 (P2-5)
             IBodyFactory bodyFactory)
         {
             _damagedPublisher = damagedPublisher ?? throw new ArgumentNullException(nameof(damagedPublisher));
@@ -111,6 +116,13 @@ namespace CultivationGame.Modules.Body
             // P1-14 FIX: подписка на CultivationLevelChangedEvent вместо QiChangedEvent
             // Получаем событие ТОЛЬКО при изменении уровня (не при каждом изменении Ци)
             _cultivationLevelSubscription = cultivationLevelSub.Subscribe(OnCultivationLevelChanged);
+
+            // Review этап 5 (P2-5): QiService.Initialize публикует ТОЛЬКО
+            // QiChangedEvent (без CultivationLevelChangedEvent) — кэш уровня
+            // тела оставался =1 до первого прорыва. Подписка на QiChangedEvent
+            // синхронизирует начальный уровень (фильтр — наша сущность; для
+            // NPC-событий нет — QiChangedEvent публикует только QiService игрока).
+            _qiChangedForLevelSubscription = qiChangedSub.Subscribe(OnQiChangedForLevel);
         }
 
         // === Инициализация (вызывается из BodyModule) ===
@@ -443,6 +455,19 @@ namespace CultivationGame.Modules.Body
             _cachedCultivationLevel = e.NewLevel;
         }
 
+        /// <summary>
+        /// Review этап 5 (P2-5): синхронизация кэша уровня из QiChangedEvent —
+        /// QiService.Initialize публикует ТОЛЬКО QiChangedEvent (без
+        /// CultivationLevelChangedEvent), поэтому при старте с уровнем >1
+        /// регенерация считалась как L1 до первого прорыва. Фильтр по сущности
+        /// (пустой EntityId = игрок-владелец QiService; алиасы учитываем).
+        /// </summary>
+        private void OnQiChangedForLevel(in QiChangedEvent e)
+        {
+            if (string.IsNullOrEmpty(e.EntityId) || PlayerIdResolver.AreSameEntity(e.EntityId, _entityId))
+                _cachedCultivationLevel = e.CultivationLevel;
+        }
+
         private void OnDamageApplied(in DamageAppliedEvent e)
         {
             // 1. Игрок: урон по нашим собственным BodyParts.
@@ -662,6 +687,8 @@ namespace CultivationGame.Modules.Body
             _damageSubscription = null;
             _cultivationLevelSubscription?.Dispose();
             _cultivationLevelSubscription = null;
+            _qiChangedForLevelSubscription?.Dispose();
+            _qiChangedForLevelSubscription = null;
         }
 
         // === П.24: Vitality → HP пересчёт ===

@@ -14,7 +14,7 @@
 печатают вердикт `VERDICT: PASS/FAIL` (строка ищется в логе). Регрессия = полный
 прогон всех хуков + `dotnet build` с 0 errors.
 
-### 0.1. Реестр env-хуков (21)
+### 0.1. Реестр env-хуков (22)
 
 | Хук | Сцена/файл | Что проверяет |
 |---|---|---|
@@ -37,6 +37,7 @@
 | `GODOT_FORMATION_TEST=1` | TechniqueGrantPhase | Формационный тест (этап формаций) |
 | `GODOT_REASSEMBLY_DEBUG=1` | ReAssemblySimDebug | Ревью-1: повторная сборка в одном процессе — Reset фаз оркестратора + world-scoped реестр (15/15 Completed, реестр не ×2) |
 | `GODOT_STORAGE_DEBUG=1` | StorageSimDebug | Ревью-этап-4: инвентарные транзакции — spirit retrieve/stacking (P0-1/P1-2), ring Qi (P1-3), craft overflow (P1-4), pickup unknown/граница (P1-5/P2-6) |
+| `GODOT_DOT_DEBUG=1` | DotSimDebug | Ревью-этап-5: DoT (Poison/Burn/Bleed/Freeze) наносит реальный урон через DamageAppliedEvent (игрок + NPC, P1-4) |
 | `GODOT_SCREENSHOT=<путь>` | GameBoot | Скриншот в файл (VLM-верификация) |
 | `GODOT_SCREENSHOT_DELAY=<сек>` | GameBoot | Задержка кадра для скриншота |
 

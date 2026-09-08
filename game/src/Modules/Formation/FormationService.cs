@@ -13,6 +13,7 @@
 using System;
 using System.Collections.Generic;
 using CultivationGame.Core;
+using CultivationGame.Core.Helpers;
 using CultivationGame.Core.Messaging.Contracts;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.Events;
@@ -190,13 +191,29 @@ namespace CultivationGame.Modules.Formation
             _positionX = posX;
             _positionY = posY;
 
-            // FMT-A05: Проверяем, достаточно ли Ци у создателя для прорисовки контура
+            // FMT-A05 + Review этап 5 (P0-2): контур оплачивает ИМЕННО кастер.
+            // Раньше публиковался QiConsumeRequestEvent с ПУСТЫМ EntityId → QiService
+            // списывал у игрока, даже если создатель — NPC. Теперь:
+            //   игрок — событие с явным EntityId (синхронный диспатч: QiService
+            //           списывает ДО возврата Publish; подтверждаем по кэшу);
+            //   NPC  — прямое синхронное списание через IQiDataProvider.
             long contourQi = FormationCalculator.CalculateContourQi(_currentFormation.RequiredLevel);
-            if (_cachedCurrentQi < contourQi)
-                return false; // Недостаточно Ци для прорисовки контура
+            if (PlayerIdResolver.IsPlayer(casterId))
+            {
+                if (_cachedCurrentQi < contourQi)
+                    return false; // Недостаточно Ци для прорисовки контура
 
-            // Публикуем команду расхода Ци для прорисовки контура
-            _qiConsumeRequestPub.Publish(new QiConsumeRequestEvent(contourQi, "Formation"));
+                long qiBeforeContour = _cachedCurrentQi;
+                _qiConsumeRequestPub.Publish(new QiConsumeRequestEvent(contourQi, "Formation", casterId));
+                // Списание не подтвердилось (рассинхрон кэша) → формация не начинается.
+                if (_cachedCurrentQi == qiBeforeContour)
+                    return false;
+            }
+            else
+            {
+                if (!_qiDataProvider.TryConsumeQi(casterId, contourQi))
+                    return false;
+            }
 
             // Инициализируем пул Ци
             _qiPool.Initialize(formationId, _currentFormation.RequiredLevel, _currentFormation.Size);
@@ -297,13 +314,31 @@ namespace CultivationGame.Modules.Formation
                     return 0; // Недостаточно Ци у NPC-участника
             }
 
-            // Публикуем команду расхода Ци с участника
-            _qiConsumeRequestPub.Publish(new QiConsumeRequestEvent(effectiveAmount, contributorId));
+            // Review этап 5 (P0-1 + P1-3): списание — СИНХРОННО с ПОДТВЕРЖДЕНИЕМ.
+            // Раньше: contributorId попадал в RequesterId, EntityId оставался
+            // пустым → QiService списывал у ИГРОКА (вклад NPC оплачивал игрок!).
+            // Теперь: игрок — событие с явным EntityId (EventBus диспатчит
+            // синхронно — подтверждение по кэшу QiChangedEvent); NPC — прямое
+            // списание через IQiDataProvider.TryConsumeQi. Пул пополняется
+            // ТОЛЬКО по подтверждённому списанию (атомарность P1-3).
+            bool charged;
+            if (PlayerIdResolver.IsPlayer(contributorId))
+            {
+                long qiBefore = _cachedCurrentQi;
+                _qiConsumeRequestPub.Publish(new QiConsumeRequestEvent(effectiveAmount, "Formation", contributorId));
+                charged = _cachedCurrentQi != qiBefore;
+            }
+            else
+            {
+                charged = _qiDataProvider.TryConsumeQi(contributorId, effectiveAmount);
+            }
+            if (!charged)
+            {
+                return 0; // Списание не подтверждено — пул НЕ пополняем «в кредит»
+            }
 
-            // Задача 4.7: Добавляем в пул ТОЛЬКО после успешной проверки доступности Ци.
-            // QiConsumeRequestEvent — fire-and-forget команда, но предварительная
-            // проверка через IQiDataProvider/кэш гарантирует достаточность Ци.
-            // QiService может отклонить (рассинхрон кэша), но вероятность минимизирована.
+            // Задача 4.7 (обновлено review-5): добавляем в пул после ПОДТВЕРЖДЁННОГО
+            // списания Ци (см. блок charged выше — атомарность гарантирована).
             long added = _qiPool.AddQi(effectiveAmount);
 
             // Регистрируем участника (после успешного внесения Ци)

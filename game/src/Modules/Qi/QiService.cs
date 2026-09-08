@@ -13,6 +13,7 @@
 using System;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.Events;
+using CultivationGame.Core.Helpers;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Core.Messaging.Contracts;
 
@@ -314,14 +315,17 @@ public class QiService : IQiService, IDisposable
     /// <summary>P0-X1 FIX: обработать запрос расхода Ци.</summary>
     private void OnQiConsumeRequest(in QiConsumeRequestEvent e)
     {
-        if (string.IsNullOrEmpty(e.EntityId) || e.EntityId == _entityId)
+        // Review этап 5 (P0-1/P0-2): алиас-безопасное сравнение — формации и
+        // другие системы публикуют с явным EntityId ("player_0"), а QiService
+        // владеет "player": строгое == игнорировало бы запрос и Ци не списывалось.
+        if (string.IsNullOrEmpty(e.EntityId) || PlayerIdResolver.AreSameEntity(e.EntityId, _entityId))
             TryConsumeQi(e.Amount);
     }
 
     /// <summary>P0-X1 FIX: обработать запрос добавления Ци.</summary>
     private void OnQiAddRequest(in QiAddRequestEvent e)
     {
-        if (string.IsNullOrEmpty(e.EntityId) || e.EntityId == _entityId)
+        if (string.IsNullOrEmpty(e.EntityId) || PlayerIdResolver.AreSameEntity(e.EntityId, _entityId))
             AddQi(e.Amount);
     }
 

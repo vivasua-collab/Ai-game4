@@ -293,6 +293,14 @@ public partial class GameWorldController : Node2D
             var storageSim = new StorageSimDebug { Name = "StorageSimDebug" };
             AddChild(storageSim);
         }
+        // 2026-09-08 (review этап 5): headless-верификация DoT-пайплайна
+        // (GODOT_DOT_DEBUG=1) — Poison/Burn/Bleed/Freeze наносят реальный
+        // урон через DamageAppliedEvent (игрок + NPC).
+        if (System.Environment.GetEnvironmentVariable("GODOT_DOT_DEBUG") == "1")
+        {
+            var dotSim = new DotSimDebug { Name = "DotSimDebug" };
+            AddChild(dotSim);
+        }
         // 2026-09-04 S2: headless-верификация виньетки опасности
         // (GODOT_LOWHP_DEBUG=1) — alpha/пульс оверлея при HP < 35%/15%.
         if (System.Environment.GetEnvironmentVariable("GODOT_LOWHP_DEBUG") == "1")

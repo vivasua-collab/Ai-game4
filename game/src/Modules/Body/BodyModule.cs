@@ -41,6 +41,11 @@ public class BodyModule : IModule
     [Inject] private readonly ISubscriber<BuffTickedEvent> _buffTickedSub = null!;
     private IDisposable? _buffTickedSubscription;
 
+    // Review этап 5 (P1-4): публикация DamageAppliedEvent для DoT — урон
+    // идёт через ЕДИНЫЙ пайплайн (BodyService применяет по частям тела,
+    // NPCCombatAdapter/PlayerService обрабатывают смерть, kill-feed стреляет).
+    [Inject] private readonly IPublisher<DamageAppliedEvent> _damageAppliedPub = null!;
+
     // П.24: Подписка на изменение Vitality → пересчёт HP
     [Inject] private readonly ISubscriber<StatChangedEvent> _statChangedSub = null!;
     private IDisposable? _statChangedSubscription;
@@ -95,10 +100,24 @@ public class BodyModule : IModule
             case BuffType.Burn:
             case BuffType.Bleed:
             case BuffType.Freeze:
-                // DoT: урон должен проходить через CombatPipeline
-                // Пока логируем — полная реализация в будущих фазах
+                // Review этап 5 (P1-4): DoT реально наносит урон через ЕДИНЫЙ
+                // damage-пайплайн (раньше — только Console.WriteLine, HP не менялся).
+                // Публикуем DamageAppliedEvent: BodyService.ApplyDamage по частям
+                // тела цели (e.EntityId, НЕ всегда игрок), NPCCombatAdapter →
+                // смерть/NPCDeathEvent, kill-feed и визуал работают как для удара.
+                // Броня/Ци-буфер НЕ применяются: DoT-значение уже «финальный» урон
+                // периода (тип — метаданные: Poison/Burn — Qi-природа, Bleed/Freeze —
+                // Physical); Torso — системный эффект для всего тела.
+                int dotDamage = Math.Max(1, (int)e.TickValue);
+                DamageType dotType = e.Type == BuffType.Poison || e.Type == BuffType.Burn
+                    ? DamageType.Qi
+                    : DamageType.Physical;
+                _damageAppliedPub.Publish(new DamageAppliedEvent(
+                    $"dot:{e.BuffId}", e.EntityId, dotDamage, dotType,
+                    Element.Neutral, BodyPartType.Torso, CombatAttackResult.Hit,
+                    CombatSubtype.None));
                 Console.WriteLine(
-                    $"[BodyModule] DoT тик: {e.BuffId} → {e.EntityId}, урон={e.TickValue}");
+                    $"[BodyModule] DoT тик: {e.BuffId} → {e.EntityId}, урон={dotDamage} ({dotType})");
                 break;
 
             default:
