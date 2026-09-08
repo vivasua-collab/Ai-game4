@@ -258,3 +258,55 @@ Stage Summary:
 - Счётчик 6/6 — не менялся (валидация ревью = прямое указание, вне
   автоконвейера; прецедент AUDIT/SANITIZE).
 - Время окончания: 2026-09-08 14:50:57 UTC
+
+---
+Task ID: R5-STAGES3-7-FINAL
+Agent: main-agent (Z.ai Code)
+Task: Внешнее ревью этапы 3–7 (по файлу upload/запрос 2026_09_08_17_xx.txt):
+боевка/инвентарь/Ци/мир/квесты + финализация. План на каждый этап
+(checkpoints/plans/2026-09-08_review_stages_2-7/) — commit 2223fca.
+
+Work Log:
+- Этап 3 (91dea48, 15:35 UTC): P0 turn-gate — _currentTurnOwnerId как
+  авторитетный гейт, инициатива у инициатора, тайм-аут чужого хода 2.5с;
+  P0 CombatAIService+AIPersonality УДАЛЕНЫ (фантомный «enemy»); P1 ammo-
+  транзакция (списание после Accepted); P1 цель боя — только игрок (1v1 MVP);
+  P2 StartAttack → MarkNpcCombatStarted. CombatSim переписан (фаза turn-gate).
+- Этап 4 (aed371b, 15:49): P0 SpiritStorage.TryRetrieve возвращает реальный
+  ItemData (резолв ДО мутации); P1 stacking неполных стеков + RecalcCountCache;
+  P1 ring Qi-транзакция; P1 craft overflow → на землю; P1 pickup unknown →
+  валидация ДО удаления; P2 граница <=. Хук №21 GODOT_STORAGE_DEBUG.
+- Этап 5 (31d53da, 16:09): P0 NPC-вклад НЕ списывает Ци игрока (EntityId
+  явный); P0 контур формации платит кастер; P1 атомарность (пул только по
+  подтверждению); P1 DoT наносит РЕАЛЬНЫЙ урон через DamageAppliedEvent;
+  P2 BodyService sync уровня культивации. Хук №22 GODOT_DOT_DEBUG.
+- Этап 6 (57a73fb, 16:27): P0 respawn ресурсов (TileService подписан на
+  ResourceRespawnedEvent, пересборка тайла); P1 TryTravel честный false;
+  P1 InteractionService без фикций (статический registry удалён); P2 Delta
+  = DeltaTime; P2 TryPickup → RequestPickup. Хук №23 GODOT_RESPAWN_DEBUG.
+- Этап 7 (97cee42, 16:47): P0 semantic TargetId (волки species, руда
+  material_iron_ore, travel-квест НЕ регистрируется, elder по NPCRole);
+  P1 награда material_steel_ingot + валидация наград; P1 диалог запускает
+  квесты (DialogueChoice.QuestIdsToStart + QuestStartRequestedEvent);
+  P2 мёртвые поля удалены; P2 гейт RequiredCultivationLevel. Хук №24
+  GODOT_QUEST_DEBUG.
+- ФИНАЛИЗАЦИЯ (этот коммит): сессия этапов 3–7 зависла на синхронизации
+  доков — докончено. Сводная таблица 34 находок: 33 исправлено / 1
+  отклонена (quicksave, этап 2). Полная QA-регрессия: build 0 errors,
+  17/17 хуков PASS (COMBAT/CHARGE/TOAST/LOWHP/KILLFEED/HOTBAR/DAMAGEDIR/
+  DIALOGUE/TRADEUX/TRADE/REASSEMBLY/STORAGE/DOT/RESPAWN/QUEST/FORMATION/
+  GEN-0-исключений). Доки: COMBAT_SYSTEM §1.4 «Модель боя 1v1 и владение
+  ходом (MVP)»; FILE_TREE/MODULE_STRUCTURE — удаление CombatAIService;
+  TESTING_RULES §0.1 — 24 хука. Чекпоинт итоговый:
+  checkpoints/09_08_review_stages_2-7_final.md. Статусы всех планов ⬜→✅.
+
+Stage Summary:
+- Время: этапы 14:58–16:47 UTC (сессия зависла), финализация ~17:15 UTC.
+- Технические находки: (1) batch-запуск QA через $env в for-цикле НЕ
+  работает — переменные инлайнить (подтверждено повторно); (2) Godot требует
+  export DOTNET_ROOT перед КАЖДОЙ сессией shell — иначе crash hostfxr
+  (signal 11); (3) локальный worklog песочницы откатывается при зависании
+  —GitHub остаётся источником истины.
+- Отложено (следующие фазы): encounter-модель боя, travel pipeline,
+  процедурные квесты, warnings 327 (P2), стихийные проки chain/knockback.
+- Все коммиты цикла запушены; origin/main == HEAD, рабочее дерево чистое.

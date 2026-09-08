@@ -164,10 +164,15 @@ Modules/Xxx/
 - LevelSuppression — подавление по разнице уровней
 - DefenseProcessor — обработка уклонения, парирования, блокирования
 - TechniqueCapacity — расчёт ёмкости техник
-- CombatAIService — AI противника
 - CombatLootService — добыча после боя
 - TechniqueChargeService — заряд техник
 - TechniqueService — управление техниками
+
+> 2026-09-08 (review-3): CombatAIService УДАЛЁН (фантомный "enemy" без тела/Ци
+> конкурировал с реальными NPC из NPCModule.ProcessNpcAttacks). Ходовая модель:
+> CombatService — единственный authority (владение ходом `_currentTurnOwnerId`,
+> гейт участника/хода в ExecuteAttack → AttackAcceptance, инициатива у
+> инициатора боя, тайм-аут чужого хода EnemyTurnTimeoutSec).
 
 **Особенности:**
 - Полная реализация 11-слойного пайплайна урона (см. `09_workflow/ALGORITHMS.md` §5).
