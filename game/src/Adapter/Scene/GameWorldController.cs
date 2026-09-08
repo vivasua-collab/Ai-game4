@@ -173,6 +173,9 @@ public partial class GameWorldController : Node2D
     /// <summary>Торговое окно (GODOT_TRADEUX_DEBUG).</summary>
     public UI.TradeWindow? TradeWindowForQA => _tradeWindow;
 
+    /// <summary>Инвентарное окно (GODOT_TRASHDROP_DEBUG).</summary>
+    public UI.InventoryWindow? InventoryWindowForQA => _inventoryWindow;
+
     /// <summary>
     /// Открыть диалог с NPC по QA-пути (пауза+окно) — те же действия,
     /// что и HandleNpcTalk, без поиска ближнего NPC (GODOT_DIALOGUE_DEBUG).
@@ -316,6 +319,14 @@ public partial class GameWorldController : Node2D
         {
             var questSim = new QuestSimDebug { Name = "QuestSimDebug" };
             AddChild(questSim);
+        }
+        // 2026-09-08 (баг-репорт пользователя): headless-верификация
+        // инвентарного drag&drop в корзину (GODOT_TRASHDROP_DEBUG=1) —
+        // материалы draggable, корзина выбрасывает, кукла отклоняет.
+        if (System.Environment.GetEnvironmentVariable("GODOT_TRASHDROP_DEBUG") == "1")
+        {
+            var trashDropSim = new TrashDropSimDebug { Name = "TrashDropSimDebug" };
+            AddChild(trashDropSim);
         }
         // 2026-09-04 S2: headless-верификация виньетки опасности
         // (GODOT_LOWHP_DEBUG=1) — alpha/пульс оверлея при HP < 35%/15%.

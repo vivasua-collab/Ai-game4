@@ -14,7 +14,7 @@
 печатают вердикт `VERDICT: PASS/FAIL` (строка ищется в логе). Регрессия = полный
 прогон всех хуков + `dotnet build` с 0 errors.
 
-### 0.1. Реестр env-хуков (24)
+### 0.1. Реестр env-хуков (25)
 
 | Хук | Сцена/файл | Что проверяет |
 |---|---|---|
@@ -40,6 +40,7 @@
 | `GODOT_DOT_DEBUG=1` | DotSimDebug | Ревью-этап-5: DoT (Poison/Burn/Bleed/Freeze) наносит реальный урон через DamageAppliedEvent (игрок + NPC, P1-4) |
 | `GODOT_RESPAWN_DEBUG=1` | RespawnSimDebug | Ревью-этап-6: respawn ресурсов (истощение→7 дней→восстановление тайла), честный TryTravel, TimeChangedEvent.Delta == DeltaTime |
 | `GODOT_QUEST_DEBUG=1` | QuestSimDebug | Ревью-этап-7: полный цикл квестов — accept (через реальный диалог старейшины) → событие → complete → reward; гейт RequiredCultivationLevel |
+| `GODOT_TRASHDROP_DEBUG=1` | TrashDropSimDebug | Баг-репорт 09-08: инвентарный drag&drop в корзину — материалы draggable (раньше пустой Variant), корзина выбрасывает весь стек, кукла отклоняет не-экипировку, чужой source отвергается |
 | `GODOT_SCREENSHOT=<путь>` | GameBoot | Скриншот в файл (VLM-верификация) |
 | `GODOT_SCREENSHOT_DELAY=<сек>` | GameBoot | Задержка кадра для скриншота |
 

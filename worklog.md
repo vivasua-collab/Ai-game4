@@ -310,3 +310,37 @@ Stage Summary:
 - Отложено (следующие фазы): encounter-модель боя, travel pipeline,
   процедурные квесты, warnings 327 (P2), стихийные проки chain/knockback.
 - Все коммиты цикла запушены; origin/main == HEAD, рабочее дерево чистое.
+
+---
+Task ID: R6-TRASHDROP-BUGFIX
+Agent: main-agent (Z.ai Code)
+Task: Баг-репорт пользователя: добыл камни → перевес (работает), но в
+инвентаре НЕЛЬЗЯ перетащить камень на иконку корзины «Выбросить».
+
+Work Log:
+- Диагноз: InventoryItemRow._GetDragData возвращал ПУСТОЙ Variant для всех
+  не-экипировочных категорий (Material/Consumable/QiStone) — перетаскивание
+  физически не начиналось, зона «Выбросить» была недостижима. Логика писалась
+  до появления TrashDropZone (drag был только для надевания на куклу).
+- Фикс (минимальный): drag стартует для ВСЕХ предметов. Превью для
+  не-экипировки: «🗑 {имя} — в корзину (на куклу не надеть)». Валидация
+  unchanged: кукла отклоняет не-экипировку (HandleDropOnSlot), корзина
+  принимает только source="inventory".
+- QA-хук №25 GODOT_TRASHDROP_DEBUG (TrashDropSimDebug): 1) материал даёт
+  drag-data (багфикс), 2) CanDrop+DropData: инвентарь→0, ItemDroppedEvent
+  ×N, ground+1, 3) кукла отклоняет камень, 4) экипировка draggable
+  (регрессия), 5) чужой source отвергается. VERDICT: PASS (2 прогона).
+- Регрессия 8/8 PASS: COMBAT/STORAGE/TRADEUX/DIALOGUE/QUEST/TOAST/HOTBAR
+  + TRASHDROP. Build 0 errors. TESTING_RULES §0.1: 24→25 хуков.
+- Технические находки: (1) RefreshExternally имеет гард _isVisible — в QA
+  окно открывать через Toggle(); (2) DropItemOnGround выбрасывает ВЕСЬ стек
+  (by design); (3) прямой вызов _GetDragData в headless даёт безвредный
+  engine-ERROR SetDragPreview (gui_is_dragging) — шум теста, задокументирован.
+- QA-аксессоры: GameWorldController.InventoryWindowForQA,
+  InventoryWindow.FindRowForQA/FindTrashZoneForQA, InventoryItemRow.ItemIdForQA.
+
+Stage Summary:
+- Баг «камень не перетаскивается в корзину» исправлен и покрыт хуком №25.
+- Пользователь: перевес от камней теперь снимается перетаскиванием любого
+  предмета (материалы/расходники/камни Ци) в зону «Выбросить» — предмет
+  падает на землю рядом с игроком (можно подобрать обратно).

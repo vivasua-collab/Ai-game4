@@ -351,6 +351,36 @@ public partial class InventoryWindow : Control
         ToastPub?.Publish(new CultivationGame.Core.Messaging.Contracts.ToastShownEvent(message, 2.5f));
     }
 
+    // === QA-аксессоры (GODOT_TRASHDROP_DEBUG, №25) ===
+
+    /// <summary>Найти строку предмета по ItemId (для TrashDropSimDebug).</summary>
+    public InventoryItemRow? FindRowForQA(string itemId)
+    {
+        foreach (var child in _itemList.GetChildren())
+        {
+            if (child is InventoryItemRow row && row.ItemIdForQA == itemId)
+                return row;
+        }
+        return null;
+    }
+
+    /// <summary>Найти зону «Выбросить» (для TrashDropSimDebug).</summary>
+    public TrashDropZone? FindTrashZoneForQA()
+    {
+        return FindTrashZoneRecursive(this);
+    }
+
+    private static TrashDropZone? FindTrashZoneRecursive(Node node)
+    {
+        foreach (var child in node.GetChildren())
+        {
+            if (child is TrashDropZone zone) return zone;
+            var nested = FindTrashZoneRecursive(child);
+            if (nested != null) return nested;
+        }
+        return null;
+    }
+
     /// <summary>
     /// Drop an item from inventory onto the ground near the player.
     /// Called by TrashDropZone when item is dragged to trash basket.
@@ -468,6 +498,10 @@ public partial class InventoryItemRow : HBoxContainer
 {
     private readonly InventorySlot _slot;
     private readonly InventoryWindow _parent;
+
+    /// <summary>ItemId строки (QA-аксессор для TrashDropSimDebug).</summary>
+    public string ItemIdForQA => _slot.ItemId;
+
     private readonly IItemDatabaseService _itemDb;
 
     private ColorRect _rarityIndicator = null!;
@@ -563,31 +597,32 @@ public partial class InventoryItemRow : HBoxContainer
 
     public override Variant _GetDragData(Vector2 atPosition)
     {
-        // Only equipment is draggable (consumables cannot be equipped).
+        // 2026-09-08 fix: drag starts for ALL items, not only equipment.
+        // Раньше для материалов/расходников/камней Ци возвращался пустой
+        // Variant — перетаскивание вообще не начиналось, и зона «Выбросить»
+        // была недостижима (баг: «не могу перетащить камень в корзину»).
+        // Кукла сама отклоняет не-экипировку (HandleDropOnSlot), корзина
+        // принимает любой drag из инвентаря (source == "inventory").
         if (!_itemDb.TryGetItem(_slot.ItemId, out var itemData))
             return new Variant();
 
         bool isEquipment = itemData.Category == ItemCategory.Weapon
                         || itemData.Category == ItemCategory.Armor
                         || itemData.Category == ItemCategory.Accessory;
-        if (!isEquipment)
-        {
-            // Show feedback for consumables (not draggable to doll).
-            SetDragPreview(BuildConsumablePreview(itemData.NameRu));
-            return new Variant(); // empty = no drag
-        }
 
         var dragData = CharacterDollPanel.CreateDragData(itemData, "inventory");
-        SetDragPreview(CharacterDollPanel.BuildDragPreview(itemData.NameRu,
-            CharacterDollPanel.GetRarityColor(itemData.Rarity)));
+        SetDragPreview(isEquipment
+            ? CharacterDollPanel.BuildDragPreview(itemData.NameRu,
+                CharacterDollPanel.GetRarityColor(itemData.Rarity))
+            : BuildTrashHintPreview(itemData.NameRu));
         return dragData;
     }
 
-    private static Control BuildConsumablePreview(string name)
+    private static Control BuildTrashHintPreview(string name)
     {
         var preview = new Label
         {
-            Text = $"💊 {name} — нельзя надеть",
+            Text = $"🗑 {name} — в корзину (на куклу не надеть)",
         };
         preview.AddThemeFontSizeOverride("font_size", 13);
         preview.AddThemeColorOverride("font_color", ParchmentTheme.InkFaded);
