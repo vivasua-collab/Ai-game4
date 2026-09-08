@@ -58,6 +58,20 @@ public readonly struct QuestAbandonedEvent
 }
 
 /// <summary>
+/// Review этап 7 (P1-3): команда «принять квест» из игрового контента
+/// (выбор в диалоге). Публикуется DialogueService при выборе реплики с
+/// QuestIdsToStart; QuestService подписан и вызывает StartQuest.
+/// Решает разрыв «нарратив обещает задания, но контракт не связан».
+/// </summary>
+public readonly struct QuestStartRequestedEvent
+{
+    public readonly string QuestId;
+    public readonly string RequesterId;
+    public QuestStartRequestedEvent(string questId, string requesterId = "")
+        { QuestId = questId; RequesterId = requesterId; }
+}
+
+/// <summary>
 /// Награда за квест выдана.
 /// Публикуется QuestRewardService после успешной выдачи.
 /// </summary>

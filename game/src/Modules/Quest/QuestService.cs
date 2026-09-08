@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Events;
+using CultivationGame.Core.Helpers;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Core.Messaging.Contracts;
 using CultivationGame.Modules.Quest.Data;
@@ -32,6 +33,18 @@ public class QuestService : IQuestService, IDisposable
     [Inject] private readonly IPublisher<QuestCompletedEvent> _questCompletedPub = null!;
     [Inject] private readonly IPublisher<QuestFailedEvent> _questFailedPub = null!;
     [Inject] private readonly IPublisher<QuestAbandonedEvent> _questAbandonedPub = null!;
+    // Review этап 7 (P2-5): тосты обратной связи приёма квестов (паттерн QiStone).
+    [Inject] private readonly IPublisher<ToastShownEvent>? _toastPub = null;
+
+    // === EventBus: подписки (Review этап 7) ===
+    // P1-3: QuestStartRequestedEvent — команда «принять квест» из диалога.
+    [Inject] private readonly ISubscriber<QuestStartRequestedEvent>? _questStartRequestSub = null;
+    // P2-5: кэш уровня культивации игрока из QiChangedEvent (EVT-01: без
+    // инъекции IQiService — тот же паттерн кэша, что в CombatService).
+    [Inject] private readonly ISubscriber<QiChangedEvent>? _qiChangedSub = null;
+    private IDisposable? _questStartRequestSubscription;
+    private IDisposable? _qiChangedForLevelSubscription;
+    private int _playerCultivationLevel = 1;
 
     // === Хранилище квестов ===
     private readonly Dictionary<string, QuestData> _allQuests = new();
@@ -56,6 +69,56 @@ public class QuestService : IQuestService, IDisposable
         _config = config;
         RegisterDefaultQuests();
         _progressTracker?.Initialize(this);
+
+        // Review этап 7 (P1-3): команда принятия квеста из игрового контента
+        // (выбор «Конечно, помогу» в диалоге старейшины).
+        _questStartRequestSubscription?.Dispose();
+        _questStartRequestSubscription = _questStartRequestSub?.Subscribe(OnQuestStartRequested);
+
+        // Review этап 7 (P2-5): кэш уровня игрока для проверки
+        // RequiredCultivationLevel (QiChangedEvent от QiService игрока).
+        _qiChangedForLevelSubscription?.Dispose();
+        _qiChangedForLevelSubscription = _qiChangedSub?.Subscribe(OnQiChangedForLevel);
+    }
+
+    private void OnQuestStartRequested(in QuestStartRequestedEvent e)
+    {
+        // P1-3: команда из диалога — с честной обратной связью (тост).
+        bool started = StartQuest(e.QuestId);
+        if (_toastPub != null)
+        {
+            if (started)
+            {
+                _toastPub.Publish(new ToastShownEvent($"📜 Квест принят: {QuestDisplayName(e.QuestId)}", 2.5f));
+            }
+            else
+            {
+                string why = StartQuestRejectionReason(e.QuestId);
+                _toastPub.Publish(new ToastShownEvent($"📜 Квест «{QuestDisplayName(e.QuestId)}» не принят: {why}", 2.5f));
+            }
+        }
+    }
+
+    private void OnQiChangedForLevel(in QiChangedEvent e)
+    {
+        if (string.IsNullOrEmpty(e.EntityId) || PlayerIdResolver.IsPlayer(e.EntityId))
+            _playerCultivationLevel = e.CultivationLevel;
+    }
+
+    private string QuestDisplayName(string questId)
+        => _allQuests.TryGetValue(questId, out var q) ? q.DisplayName : questId;
+
+    /// <summary>Review этап 7: человекочитаемая причина отказа StartQuest (для тоста).</summary>
+    private string StartQuestRejectionReason(string questId)
+    {
+        if (!_allQuests.TryGetValue(questId, out var quest)) return "квест не найден";
+        if (quest.Status != QuestStatus.NotStarted) return "уже взят или завершён";
+        if (_config != null && _activeQuestIds.Count >= _config.MaxActiveQuests) return "слишком много активных квестов";
+        if (!string.IsNullOrEmpty(quest.PrerequisiteQuestId) && !IsQuestComplete(quest.PrerequisiteQuestId))
+            return "не выполнено условие (предквест)";
+        if (quest.RequiredCultivationLevel > 0 && _playerCultivationLevel < quest.RequiredCultivationLevel)
+            return $"нужен уровень культивации {quest.RequiredCultivationLevel}";
+        return "неизвестная причина";
     }
 
     // === IQuestService ===
@@ -71,6 +134,11 @@ public class QuestService : IQuestService, IDisposable
         {
             if (!IsQuestComplete(quest.PrerequisiteQuestId)) return false;
         }
+
+        // Review этап 7 (P2-5): гейт уровня культивации (поле существовало,
+        // но не проверялось — gated-квесты можно было взять раньше срока).
+        if (quest.RequiredCultivationLevel > 0 && _playerCultivationLevel < quest.RequiredCultivationLevel)
+            return false;
 
         quest.Status = QuestStatus.Active;
         quest.StartDay = _currentDay;
@@ -255,6 +323,16 @@ public class QuestService : IQuestService, IDisposable
 
     /// <summary>
     /// Регистрация базовых квестов по умолчанию.
+    /// Review этап 7 (P0-1): TargetId квестов — РЕАЛЬНЫЕ доменные идентификаторы
+    /// (инстанс-ID сущностей динамические и не могут быть семантической целью):
+    /// - волки: конвенция AnimalService animal_{species}_{n} → нормализация в
+    ///   QuestProgressTracker ("animal_wolf_5" → "wolf");
+    /// - руда: canonical item ID material_iron_ore (было "iron" — совпадений нет);
+    /// - старейшина: роль NPC "Elder" (NPCInteractedEvent.RoleId; спавн —
+    ///   HumanNPCSpawnPhase);
+    /// - quest_reach_forest НЕ регистрируется: физический переход между
+    ///   локациями не реализован (review-6 P1-2) — невыполнимый квест в UI
+    ///   сломан бы как обещание (перерегистрируем с travel-pipeline).
     /// </summary>
     private void RegisterDefaultQuests()
     {
@@ -300,9 +378,11 @@ public class QuestService : IQuestService, IDisposable
                 {
                     ObjectiveId = "gather_iron",
                     Type = QuestObjectiveType.GatherItem,
-                    TargetId = "iron",
+                    // Review этап 7 (P0-1): canonical item ID (было "iron" —
+                    // ItemAddedEvent.ItemId = material_iron_ore, совпадений нет).
+                    TargetId = "material_iron_ore",
                     Target = 5,
-                    Description = "Собери железо: {progress}/{target}"
+                    Description = "Собери железную руду: {progress}/{target}"
                 }
             },
             Rewards =
@@ -311,40 +391,18 @@ public class QuestService : IQuestService, IDisposable
                 {
                     RewardId = "quest_gather_iron_item",
                     Type = QuestRewardType.Item,
-                    TargetId = "steel",
+                    // Review этап 7 (P1-2): «steel» НЕ существовал в ItemDatabase
+                    // (steel — только материалная характеристика MaterialService) —
+                    // награда «выдавалась» в пустоту. Теперь: канонический слиток,
+                    // регистрируется StartingGearPhase.
+                    TargetId = "material_steel_ingot",
                     Amount = 2
                 }
             }
         });
 
-        RegisterQuest(new QuestData
-        {
-            QuestId = "quest_reach_forest",
-            DisplayName = "Исследование леса",
-            Description = "Старейшина просит разведать Тёмный лес.",
-            Type = QuestType.Side,
-            Status = QuestStatus.NotStarted,
-            Objectives =
-            {
-                new QuestObjective
-                {
-                    ObjectiveId = "reach_forest",
-                    Type = QuestObjectiveType.ReachLocation,
-                    TargetId = "forest",
-                    Target = 1,
-                    Description = "Достигни Тёмного леса"
-                }
-            },
-            Rewards =
-            {
-                new QuestReward
-                {
-                    RewardId = "quest_reach_forest_qi",
-                    Type = QuestRewardType.Qi,
-                    Amount = 200
-                }
-            }
-        });
+        // Review этап 7 (P0-1): quest_reach_forest НЕ регистрируется —
+        // физический travel не реализован (см. шапку метода).
 
         RegisterQuest(new QuestData
         {
@@ -359,7 +417,11 @@ public class QuestService : IQuestService, IDisposable
                 {
                     ObjectiveId = "talk_elder",
                     Type = QuestObjectiveType.TalkToNPC,
-                    TargetId = "elder_01",
+                    // Review этап 7 (P0-1): семантическая ЦЕЛЬ — роль NPC
+                    // (было "elder_01" — фиксированный ID, который не спавнился;
+                    // реальные NPC имеют динамические npc_xxx). NPCInteractedEvent
+                    // несёт RoleId; старейшина спавнится HumanNPCSpawnPhase (Elder).
+                    TargetId = "Elder",
                     Target = 1,
                     Description = "Поговори со старейшиной"
                 }
@@ -378,6 +440,10 @@ public class QuestService : IQuestService, IDisposable
 
     public void Dispose()
     {
+        _questStartRequestSubscription?.Dispose();
+        _questStartRequestSubscription = null;
+        _qiChangedForLevelSubscription?.Dispose();
+        _qiChangedForLevelSubscription = null;
         _progressTracker?.Dispose();
         _activeQuestIds.Clear();
         _allQuests.Clear();

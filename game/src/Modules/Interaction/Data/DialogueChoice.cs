@@ -1,5 +1,6 @@
 #nullable enable
 // Создано: 2026-05-09 — Phase 13: модель выбора в диалоге
+using System.Collections.Generic;
 namespace CultivationGame.Modules.Interaction.Data
 {
     /// <summary>
@@ -19,5 +20,13 @@ namespace CultivationGame.Modules.Interaction.Data
 
         /// <summary>Условие доступности (будущее расширение: уровень культивации, фракция и т.д.)</summary>
         public string ConditionId;
+
+        /// <summary>
+        /// Review этап 7 (P1-3): квесты, принимаемые этим выбором (команда
+        /// QuestStartRequestedEvent при SelectChoice). Нарратив «Конечно,
+        /// помогу» теперь связан с контрактом StartQuest (раньше выбор только
+        /// менял узел — квесты приходилось принимать вручную в окне квестов).
+        /// </summary>
+        public readonly List<string> QuestIdsToStart = new List<string>();
     }
 }

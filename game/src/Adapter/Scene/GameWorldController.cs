@@ -309,6 +309,14 @@ public partial class GameWorldController : Node2D
             var respawnSim = new RespawnSimDebug { Name = "RespawnSimDebug" };
             AddChild(respawnSim);
         }
+        // 2026-09-08 (review этап 7): headless-верификация квестов
+        // (GODOT_QUEST_DEBUG=1) — полный цикл: accept (через реальный
+        // диалог) → событие → complete → reward; гейт уровня.
+        if (System.Environment.GetEnvironmentVariable("GODOT_QUEST_DEBUG") == "1")
+        {
+            var questSim = new QuestSimDebug { Name = "QuestSimDebug" };
+            AddChild(questSim);
+        }
         // 2026-09-04 S2: headless-верификация виньетки опасности
         // (GODOT_LOWHP_DEBUG=1) — alpha/пульс оверлея при HP < 35%/15%.
         if (System.Environment.GetEnvironmentVariable("GODOT_LOWHP_DEBUG") == "1")
@@ -1791,6 +1799,14 @@ public partial class GameWorldController : Node2D
         {
             ShowToast("Нечего сказать друг другу");
             return true; // NPC was in range — don't fall through to item pickup.
+        }
+
+        // Review этап 7 (P0-1): реальный E-путь взаимодействия публикует
+        // NPCInteractedEvent (квесты TalkToNPC отслеживают разговор; роль
+        // NPC попадает в событие через NPCService.OnNPCInteracted).
+        if (Npcs is Modules.NPC.NPCService npcServiceImpl)
+        {
+            npcServiceImpl.OnNPCInteracted(best, Player?.PlayerId ?? "player", "talk");
         }
 
         _wasPausedBeforeInventory = Time is { IsPaused: true };

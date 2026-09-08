@@ -215,11 +215,14 @@ namespace CultivationGame.Modules.NPC
         /// <summary>
         /// Обработать взаимодействие с NPC (задача 3.8).
         /// Публикует NPCInteractedEvent через MessagePipe.
+        /// Review этап 7 (P0-1): событие несёт RoleId (семантическая роль NPC —
+        /// квесты TalkToNPC матчатся по роли, а не по динамическому инстанс-ID).
         /// </summary>
         public void OnNPCInteracted(string npcId, string initiatorId, string interactionType)
         {
-            if (!_npcStates.ContainsKey(npcId)) return;
-            _npcInteractedPub.Publish(new NPCInteractedEvent(npcId, initiatorId, interactionType));
+            if (!_npcStates.TryGetValue(npcId, out var state)) return;
+            _npcInteractedPub.Publish(new NPCInteractedEvent(
+                npcId, initiatorId, interactionType, state.Role.ToString()));
         }
 
         /// <summary>

@@ -147,6 +147,29 @@ public sealed class StartingGearPhase : AbstractSceneAssemblyPhase
         registered++;
         if (_inventory.TryAddItem(arrow, ArrowQuiverSize)) granted++;
 
+        // === 2c. Review этап 7 (P1-2): канонический стальной слиток ===
+        // Награда quest_gather_iron («steel» не существовал в ItemDatabase —
+        // награда «выдавалась» в пустоту). Только регистрация в БД — игроку
+        // на старте НЕ выдаётся (это квестовая награда от кузнеца).
+        var steelIngot = new ItemData
+        {
+            ItemId = "material_steel_ingot",
+            NameRu = "Стальной слиток",
+            NameEn = "Steel Ingot",
+            Description = "Выкованный кузнецом слиток стали",
+            Category = ItemCategory.Material,
+            ItemType = "Material",
+            Rarity = ItemRarity.Rare,
+            Stackable = true,
+            MaxStack = 50,
+            Weight = 2.0f,
+            Volume = 1.0f,
+            Value = 40,
+            HasDurability = false,
+        };
+        _itemDb.Register(steelIngot);
+        registered++;
+
         // === 3. Камни Ци: регистрация 10 канонических + стартовый набор ===
         QiStoneSeeder.Seed(_itemDb);
         registered += 10; // 5 размеров × calm/chaotic

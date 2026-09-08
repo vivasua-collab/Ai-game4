@@ -28,6 +28,12 @@ public class QuestRewardService : IQuestRewardService, IDisposable
     [Inject] private readonly IPublisher<ItemAddRequestEvent> _itemAddRequestPub = null!;
     [Inject] private readonly IPublisher<QiAddRequestEvent> _qiAddRequestPub = null!;
     [Inject] private readonly IPublisher<QuestRewardGrantedEvent> _rewardGrantedPub = null!;
+    // Review этап 7 (P1-2): валидация item-наград ДО публикации (паттерн
+    // санкционированных исключений — IItemDatabaseService инжектят InventoryModule,
+    // StorageRingService, CraftingService; ItemDatabase — общие данные).
+    [Inject] private readonly IItemDatabaseService? _itemDb = null;
+    // Review этап 7: тост при отказе (не молчать — игрок должен знать).
+    [Inject] private readonly IPublisher<ToastShownEvent>? _toastPub = null;
 
     // Подписка на QuestCompletedEvent для автовойды наград
     [Inject] private readonly ISubscriber<QuestCompletedEvent> _questCompletedSub = null!;
@@ -53,6 +59,9 @@ public class QuestRewardService : IQuestRewardService, IDisposable
     /// <summary>
     /// Выдать все награды за квест.
     /// Публикует command-события для каждого типа награды.
+    /// Review этап 7 (P1-2): item-награды валидируются через IItemDatabaseService
+    /// ДО публикации — неизвестные базе предметы не «выдаются в пустоту»;
+    /// квест НЕ помечается выданным (повторная попытка возможна после починки контента).
     /// </summary>
     public bool GrantRewards(string questId)
     {
@@ -61,6 +70,21 @@ public class QuestRewardService : IQuestRewardService, IDisposable
         var quest = _questService.GetQuestData(questId);
         if (quest == null) return false;
         if (quest.Status != QuestStatus.Completed) return false;
+
+        // Review этап 7 (P1-2): предварительная валидация всех item-наград.
+        for (int i = 0; i < quest.Rewards.Count; i++)
+        {
+            var reward = quest.Rewards[i];
+            if (reward.Type == QuestRewardType.Item
+                && _itemDb != null && !_itemDb.TryGetItem(reward.TargetId, out _))
+            {
+                Console.WriteLine($"[QuestRewardService] Награда '{reward.RewardId}' квеста '{questId}': " +
+                                  $"предмет '{reward.TargetId}' не найден в ItemDatabase — выдача отклонена");
+                _toastPub?.Publish(new ToastShownEvent(
+                    $"⚠ Награда «{reward.TargetId}» не выдана: предмет не зарегистрирован", 3.0f));
+                return false;
+            }
+        }
 
         for (int i = 0; i < quest.Rewards.Count; i++)
         {

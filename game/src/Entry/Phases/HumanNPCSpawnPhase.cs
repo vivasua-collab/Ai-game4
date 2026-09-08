@@ -38,6 +38,8 @@ public sealed class HumanNPCSpawnPhase : AbstractSceneAssemblyPhase
     // Этап 5 (2026-08-22): играбельный состав малой локации —
     // враги, союзник, нейтралы, торговец. Диспозиции назначает
     // NPCSpawnerService.RoleToDisposition (Hostile/Friendly/Neutral/Merchant).
+    // Review этап 7 (P0-1): +Elder — старейшина (квест «Совет старейшины»
+    // и диалог «Мне нужны задания» связывают нарратив с контрактами).
     private static readonly (NPCRole Role, int Level)[] SpawnRoles =
     {
         (NPCRole.Enemy,    1),  // бандит #1 — Hostile
@@ -46,6 +48,7 @@ public sealed class HumanNPCSpawnPhase : AbstractSceneAssemblyPhase
         (NPCRole.Passerby, 0),  // нейтрал #1
         (NPCRole.Passerby, 1),  // нейтрал #2
         (NPCRole.Merchant, 1),  // торговец (E → диалог, стоит на месте)
+        (NPCRole.Elder,    2),  // Review этап 7: старейшина (E → dialogue_elder, квесты)
     };
 
     public override Task ExecuteAsync()

@@ -80,7 +80,7 @@ public class QuestProgressTracker : IDisposable
     }
 
     private void OnEnemyKilled(in EnemyKilledEvent e)
-        => ProcessObjectiveUpdate(QuestObjectiveType.KillEnemy, e.EnemyId, 1);
+        => ProcessObjectiveUpdate(QuestObjectiveType.KillEnemy, NormalizeKillTargetId(e.EnemyId), 1);
 
     private void OnItemAdded(in ItemAddedEvent e)
         => ProcessObjectiveUpdate(QuestObjectiveType.GatherItem, e.ItemId, e.Count);
@@ -89,7 +89,31 @@ public class QuestProgressTracker : IDisposable
         => ProcessObjectiveUpdate(QuestObjectiveType.ReachLocation, e.NewLocationId, 1);
 
     private void OnNPCInteracted(in NPCInteractedEvent e)
-        => ProcessObjectiveUpdate(QuestObjectiveType.TalkToNPC, e.NpcId, 1);
+    {
+        // Review этап 7 (P0-1): семантика TalkToNPC — ДВА измерения цели:
+        // инстанс-ID (точное совпадение для конкретного NPC) и РОЛЬ
+        // ("Elder" — квесты сравнивают по роли; инстанс-ID динамические).
+        // Объектив матчится максимум одним измерением (роли и npc_xxx не пересекаются).
+        ProcessObjectiveUpdate(QuestObjectiveType.TalkToNPC, e.NpcId, 1);
+        if (!string.IsNullOrEmpty(e.RoleId))
+            ProcessObjectiveUpdate(QuestObjectiveType.TalkToNPC, e.RoleId, 1);
+    }
+
+    /// <summary>
+    /// Review этап 7 (P0-1): семантический вид жертвы из инстанс-ID.
+    /// Конвенция AnimalService: animal_{species}_{n} → {species}
+    /// ("animal_wolf_5" → "wolf"; квест TargetId="wolf"). Прочие ID — как есть
+    /// (npc_xxx не матчатся с видовыми квестами — корректно).
+    /// </summary>
+    private static string NormalizeKillTargetId(string? enemyId)
+    {
+        if (string.IsNullOrEmpty(enemyId)) return enemyId ?? string.Empty;
+        if (enemyId.StartsWith("animal_") && enemyId.Split('_') is { Length: >= 3 } parts)
+        {
+            return parts[1];
+        }
+        return enemyId;
+    }
 
     private void OnBreakthrough(in CultivationBreakthroughEvent e)
     {

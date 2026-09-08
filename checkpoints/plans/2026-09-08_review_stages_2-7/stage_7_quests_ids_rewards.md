@@ -1,9 +1,21 @@
 # Этап 7 — Генерация, registry предметов, система квестов
 
-> Статус: ⬜ план → исполнение. Файлы: ItemDatabaseService/ItemGeneratorService/EquipmentGenerator/
-> TechniqueGeneratorService/TechniqueRegistry/VerificationService/DeduplicationService, QuestService/
-> QuestProgressTracker/QuestRewardService/QuestModule/QuestConfig, Data/QuestData/QuestObjective,
-> AnimalService/NPCSpawnerService, StartingGearPhase, IQuestService/IQuestRewardService.
+> Статус: ✅ **ВЫПОЛНЕН** (валидация: 5/5 подтверждены; фиксы + QA + регрессия PASS).
+
+## Вердикты и фиксы
+
+| # | Находка | Вердикт | Фикс |
+|---|---|---|---|
+| P0-1 | Все 4 квеста: TargetId не совпадают с реальными событиями | ✅ Подтверждено (4/4) | 1) Волки: нормализация `animal_{species}_{n}` → `{species}` в трекере (конвенция AnimalService); 2) Руда: TargetId = material_iron_ore (canonical); 3) Travel-квест НЕ регистрируется (физический переход не реализован — review-6); 4) Старейшина: +NPCRole.Elder в HumanNPCSpawnPhase (7/7 NPC, dialogue_elder); TalkToNPC матчится по роли — NPCInteractedEvent несёт RoleId, реальный E-путь публикует событие (GameWorldController → NPCService.OnNPCInteracted) |
+| P1-2 | Награда 'steel' — несуществующий ItemData | ✅ Подтверждено (steel есть только в MaterialService) | TargetId = material_steel_ingot (регистрируется StartingGearPhase, игроку не выдаётся); QuestRewardService валидирует item-награды через IItemDatabaseService ДО публикации (неизвестный предмет → отказ + тост, квест не помечается выданным) |
+| P1-3 | Диалог «Мне нужны задания» не вызывает StartQuest | ✅ Подтверждено | DialogueChoice.QuestIdsToStart; SelectChoice публикует QuestStartRequestedEvent (новый контракт) → QuestService.StartQuest + тост-обратная связь (принят/причина отказа); «Конечно, помогу» принимает оба квеста (проверено реальным диалоговым путём в QA) |
+| P2-4 | QuestConfig auto-generation — мёртвые поля | ✅ Подтверждено (QuestModule.Tick пуст) | EnableAutoGeneration/AutoGenerateIntervalTicks/AutoGenerateChance УДАЛЕНЫ |
+| P2-5 | RequiredCultivationLevel не проверяется | ✅ Подтверждено | Гейт в StartQuest; кэш уровня игрока из QiChangedEvent (EVT-01, паттерн CombatService); человекочитаемая причина отказа в тосте |
+
+## QA
+
+- **НОВЫЙ хук `GODOT_QUEST_DEBUG=1`** (QuestSimDebug, №24): elder спавнится; travel-квест не зарегистрирован; ДИАЛОГ (реальный путь: TryStartNpcDialogue → SelectChoice×2) принимает оба квеста; talk_elder completes + Qi-награда (700→750); gather_iron completes + 2 стальных слитка в инвентаре; kill_wolves completes (3× animal_wolf_N → нормализация); gated quest (L99 при L1) отклонён. VERDICT: PASS.
+- Регрессия 13 хуков: DIALOGUE, COMBAT, REASSEMBLY (7/7 NPC ×2 сборки), KILLFEED, GEN, TOAST, CHARGE, STORAGE, DOT, RESPAWN, TRADEUX, QUEST — все PASS. Build 0 errors.
 
 ## Находки ревью → план валидации и фикса
 

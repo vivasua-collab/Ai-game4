@@ -32,6 +32,8 @@ namespace CultivationGame.Modules.Interaction
         private readonly IPublisher<DialogueChoiceSelectedEvent> _choiceSelectedPub;
         // NPC_COMBAT_PREP Phase 4: диалог торговца запрашивает лавку.
         private readonly IPublisher<TradeRequestedEvent> _tradeRequestedPub;
+        // Review этап 7 (P1-3): команда принятия квеста из выбора в диалоге.
+        private readonly IPublisher<QuestStartRequestedEvent> _questStartRequestPub;
 
         // === MessagePipe: подписки ===
         private readonly ISubscriber<NPCInteractedEvent> _npcInteractedSub;
@@ -64,6 +66,7 @@ namespace CultivationGame.Modules.Interaction
             IPublisher<DialogueEndedEvent> dialogueEndedPub,
             IPublisher<DialogueChoiceSelectedEvent> choiceSelectedPub,
             IPublisher<TradeRequestedEvent> tradeRequestedPub,
+            IPublisher<QuestStartRequestedEvent> questStartRequestPub, // Review этап 7 (P1-3)
             ISubscriber<NPCInteractedEvent> npcInteractedSub,
             ISubscriber<InteractionCompletedEvent> interactionCompletedSub,
             ISubscriber<UIAdvanceDialogueRequestEvent> uiAdvanceSub, // Q13-E02 FIX
@@ -74,6 +77,7 @@ namespace CultivationGame.Modules.Interaction
             _dialogueEndedPub = dialogueEndedPub;
             _choiceSelectedPub = choiceSelectedPub;
             _tradeRequestedPub = tradeRequestedPub;
+            _questStartRequestPub = questStartRequestPub; // Review этап 7 (P1-3)
             _npcInteractedSub = npcInteractedSub;
             _interactionCompletedSub = interactionCompletedSub;
             _uiAdvanceSub = uiAdvanceSub; // Q13-E02 FIX
@@ -179,6 +183,18 @@ namespace CultivationGame.Modules.Interaction
                 EndDialogue();
                 _tradeRequestedPub.Publish(new TradeRequestedEvent(tradeNpcId));
                 return;
+            }
+
+            // Review этап 7 (P1-3): выбор с QuestIdsToStart публикует команду
+            // принятия квестов ДО перехода к узлу (нарратив ↔ игровой контракт;
+            // раньше «Конечно, помогу» только менял узел диалога).
+            if (choice.QuestIdsToStart != null)
+            {
+                for (int q = 0; q < choice.QuestIdsToStart.Count; q++)
+                {
+                    _questStartRequestPub.Publish(new QuestStartRequestedEvent(
+                        choice.QuestIdsToStart[q], _currentNpcId));
+                }
             }
 
             // Переходим к узлу, указанному в выборе
@@ -372,7 +388,13 @@ namespace CultivationGame.Modules.Interaction
                     Text = "Волки терроризируют пастухов, а кузнецу нужно железо. Поможешь?",
                     Choices =
                     {
-                        new DialogueChoice { Index = 0, Text = "Конечно, помогу", TargetNodeId = "quests_accept" },
+                        // Review этап 7 (P1-3): реплика принимает ОБА квеста
+                        // (команда QuestStartRequestedEvent → QuestService.StartQuest).
+                        new DialogueChoice
+                        {
+                            Index = 0, Text = "Конечно, помогу", TargetNodeId = "quests_accept",
+                            QuestIdsToStart = { "quest_kill_wolves", "quest_gather_iron" }
+                        },
                         new DialogueChoice { Index = 1, Text = "Потом", TargetNodeId = null }
                     }
                 },

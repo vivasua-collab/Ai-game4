@@ -67,8 +67,19 @@ public readonly struct NPCInteractedEvent
     public readonly string NpcId;
     public readonly string InitiatorId;
     public readonly string InteractionType; // "talk", "trade", "attack", "gift" и т.д.
+
+    /// <summary>
+    /// Review этап 7 (P0-1): семантическая роль NPC ("Elder", "Merchant"...) —
+    /// квесты TalkToNPC сравнивают по роли (инстанс-ID npc_xxx динамические).
+    /// Заполняется NPCService.OnNPCInteracted из NPCState.Role.
+    /// </summary>
+    public readonly string RoleId;
+
     public NPCInteractedEvent(string npcId, string initiatorId, string interactionType)
-        { NpcId = npcId; InitiatorId = initiatorId; InteractionType = interactionType; }
+        : this(npcId, initiatorId, interactionType, "") { }
+
+    public NPCInteractedEvent(string npcId, string initiatorId, string interactionType, string roleId)
+        { NpcId = npcId; InitiatorId = initiatorId; InteractionType = interactionType; RoleId = roleId; }
 }
 
 /// <summary>
