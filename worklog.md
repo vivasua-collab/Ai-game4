@@ -210,3 +210,51 @@ Stage Summary:
 - Приоритеты следующего этапа: P0 TODO CombatService:352 (ranged-subtype) +
   RespawnAfterDeath try/catch; P1 тост «сейвы отключены» на F5/F9; P2 санация
   мёртвого API + IBodyFactory/IFormationGeneratorService в Core.
+
+---
+Task ID: R4-REVIEW1
+Agent: main-agent (Z.ai Code)
+Task: 2026-09-08 — 4-й сброс песочницы: восстановление окружения + валидация
+внешнего ревью кода (ChatGPT, этап 1) + исправление подтверждённых ошибок
+
+Work Log:
+- 14:01:16 UTC — старт. Токен из истории чата восстановлен в
+  .auth/github.token; клон HEAD 76b314d; .NET 8.0.424+9.0.317 и Godot
+  4.7.1 mono (python-zipfile → /home/z/godot_flat) установлены; build 0 errors.
+- Прочитаны README, START_PROMPT, cold_start.sh/recover_sandbox.sh/run_godot.sh.
+- Валидация 7 находок ревью ПО КОДУ: P1-1 подтверждён (грейды фиктивны +
+  реестр засорён), P1-2 ЛОЖНОЕ срабатывание (маршрутизация по slot.Name —
+  один файл; но SaveSlot.FileName мёртв и вводил ревьюера в заблуждение),
+  P1-3 подтверждён (lifecycle не работал, skipped всегда 0), P1-4 подтверждён
+  (2/12 токенов диспозились), P2-1/2/3 подтверждены.
+- Исправления: BuildSpecified(type,grade,...) без авто-регистрации + PreGen
+  регистрирует только валидные/уникальные + WorldInit Clear реестра;
+  LoadGame(SaveSlot) + удаление мёртвого FileName; оркестратор
+  RunAssembly(ct, SceneAssemblyMode) с Reset/CanExecute/MarkAs*/SkipOnLoad
+  и честным SceneReadyEvent; _ExitTree диспозит все 12 токенов; нумерация
+  фаз 1..15 уникальна; ComparePhaseOrder и ISceneAssemblyLogger удалены.
+- QA-инфраструктура: новый хук GODOT_REASSEMBLY_DEBUG (ReAssemblySimDebug) —
+  повторная сборка в одном процессе (15/15 Completed, реестр не ×2).
+- QA: build 0 errors; 12/12 PASS (COMBAT/CHARGE/TOAST/LOWHP/KILLFEED/HOTBAR/
+  DAMAGEDIR/DIALOGUE/TRADEUX/TRADE-smoke/GEN/REASSEMBLY); PreGen-метрики:
+  grades [28/27/28/10], gradeMismatches=0, registryInvalid=0.
+- Доки синхронизированы: ARCHITECTURE §6 (таблица 1..15 + SkipOnLoad-колонка,
+  реальный интерфейс), PRE_GENERATION (BuildSpecified, метрики), TESTING_RULES
+  §0.1 (хуков 19→20).
+- Commit 3e41927 запушен (токен перечитан из файла). Чекпоинт:
+  checkpoints/09_08_external_review_validation.md (вердикты+фиксы+наблюдения).
+- Cron job 368841 (1800с, Europe/Moscow) восстановлен — дежурный.
+
+Stage Summary:
+- Время сеанса: 2026-09-08 14:01:16 UTC → см. дату ниже (~2 ч 15 мин).
+- Из 7 находок: 6 реальных бага исправлены, 1 отклонена с доказательством
+  (quicksave); дополнительно удалены 2 мёртвых API (FileName,
+  ISceneAssemblyLogger) по правилу «легаси не держим».
+- Наблюдения для будущих этапов: (1) HumanNPCSpawn не чистит NPC при
+  повторной сборке (паттерн ClearAnimals существует у животных — нужен при
+  реализации «возврата в меню»); (2) GenerateSpecified регистрирует неудачные
+  попытки выдачи (+~9 записей, невалидных нет — integrity-check подтверждает);
+  (3) SceneAssemblyCompletedWithErrorsEvent — заглушка «мягкого сбоя», оставлена.
+- Счётчик 6/6 — не менялся (валидация ревью = прямое указание, вне
+  автоконвейера; прецедент AUDIT/SANITIZE).
+- Время окончания: 2026-09-08 14:50:57 UTC
