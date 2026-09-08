@@ -332,8 +332,44 @@ namespace CultivationGame.Modules.Generator
         /// Тип фиксируется явно; подтип/стихия/грейд/мастерство — SeededRandom.
         /// Cultivation — пассивная техника (TECHNIQUE_SYSTEM.md §11.5:
         /// capacity=null, qiCost=0, element=neutral, BaseDamage=0).
+        /// 2026-09-08 (ревью-1 P1-1): тело вынесено в BuildCore; грейд
+        /// выбирается из ОТДЕЛЬНОГО детерминированного потока (seed ^ 0x5A5A),
+        /// чтобы основной поток (подтип/стихия/мастерство) не зависел от
+        /// способа выбора грейда. Регистрирует в TechniqueRegistry (семантика
+        /// Generate*: техника сразу доступна боевому поиску по id).
         /// </summary>
         public TechniqueData GenerateSpecified(TechniqueType type, int level, int cultivationLevel, long seed)
+        {
+            TechniqueGrade grade = type == TechniqueType.Cultivation
+                ? TechniqueGrade.Common
+                : DetermineGrade(new SeededRandom(seed ^ 0x5A5A5A5A));
+
+            var technique = BuildCore(type, grade, level, cultivationLevel, seed);
+
+            // === Регистрация в TechniqueRegistry (semantic: generate+register) ===
+            _registry.Register(technique);
+            return technique;
+        }
+
+        /// <summary>
+        /// 2026-09-08 (ревью-1 P1-1): построить технику заданного типа И ГРЕЙДА
+        /// БЕЗ регистрации в TechniqueRegistry. Для пакетной пред-генерации
+        /// (PreGenTechniquePhase): вызывающий валидирует через
+        /// IVerificationService.FilterValid, дедуплицирует через
+        /// DeduplicationService и регистрирует ТОЛЬКО валидные уникальные
+        /// техники — реестр не засоряется отбракованными/дублями.
+        /// Для Cultivation передавайте Common (§11.5 — пассив).
+        /// </summary>
+        public TechniqueData BuildSpecified(TechniqueType type, TechniqueGrade grade, int level, int cultivationLevel, long seed)
+        {
+            return BuildCore(type, grade, level, cultivationLevel, seed);
+        }
+
+        /// <summary>
+        /// 2026-09-08 (ревью-1 P1-1): общее ядро построения TechniqueData.
+        /// НЕ регистрирует в реестре — только конструирует объект.
+        /// </summary>
+        private TechniqueData BuildCore(TechniqueType type, TechniqueGrade grade, int level, int cultivationLevel, long seed)
         {
             if (cultivationLevel < 1) cultivationLevel = 1;
             if (cultivationLevel > GameConstants.MAX_CULTIVATION_LEVEL)
@@ -346,9 +382,6 @@ namespace CultivationGame.Modules.Generator
             var rng = new SeededRandom(seed);
 
             CombatSubtype subtype = DetermineSubtype(type, rng);
-            TechniqueGrade grade = type == TechniqueType.Cultivation
-                ? TechniqueGrade.Common
-                : DetermineGrade(rng);
             Element element = DetermineElement(type, rng);
             float mastery = rng.NextFloat() * 100f;
 
@@ -399,7 +432,6 @@ namespace CultivationGame.Modules.Generator
                 Mastery = mastery
             };
 
-            _registry.Register(technique);
             return technique;
         }
 

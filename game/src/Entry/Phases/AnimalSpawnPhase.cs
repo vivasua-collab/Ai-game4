@@ -22,7 +22,10 @@ namespace CultivationGame.Entry.Phases;
 public sealed class AnimalSpawnPhase : AbstractSceneAssemblyPhase
 {
     public override string PhaseName => "AnimalSpawn";
-    public override int PhaseOrder => 5;
+    // 2026-09-08 (ревью-1 P2-1): 5 → 6 — коллизия с StartingGearPhase(5)
+    // устранена: порядок словаря DI больше не решает, кто первый. Порядок
+    // StartingGear(5) → AnimalSpawn(6) → HumanNPCSpawn(7) задан ЯВНО.
+    public override int PhaseOrder => 6;
 
     [Inject] private readonly AnimalService _animalService = null!;
     [Inject] private readonly IGameSession _session = null!;

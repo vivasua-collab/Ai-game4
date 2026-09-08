@@ -22,7 +22,8 @@ namespace CultivationGame.Entry.Phases;
 public sealed class HumanNPCSpawnPhase : AbstractSceneAssemblyPhase
 {
     public override string PhaseName => "HumanNPCSpawn";
-    public override int PhaseOrder => 6;
+    // 2026-09-08 (ревью-1 P2-1): 6 → 7 — сдвиг из-за уникализации AnimalSpawn(6).
+    public override int PhaseOrder => 7;
 
     [Inject] private readonly INPCSpawnerService _spawner = null!;
     [Inject] private readonly ITileService _tiles = null!;

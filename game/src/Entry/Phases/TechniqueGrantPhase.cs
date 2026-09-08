@@ -28,7 +28,8 @@ public sealed class TechniqueGrantPhase : AbstractSceneAssemblyPhase
     public override string PhaseName => "TechniqueGrant";
     // 2026-08-26 (аудит-1 A-1): 45 → 13 — уникальные порядки, финализация (14)
     // теперь ПОСЛЕ выдачи техник. Требует PlayerSpawn (4); до NPC-фаз не критично.
-    public override int PhaseOrder => 13;
+    // 2026-09-08 (ревью-1 P2-1): 13 → 14 — сдвиг из-за уникализации порядков.
+    public override int PhaseOrder => 14;
 
     [Inject] private readonly ITechniqueGeneratorService _techniqueGenerator = null!;
     [Inject] private readonly TechniqueService _techniques = null!;

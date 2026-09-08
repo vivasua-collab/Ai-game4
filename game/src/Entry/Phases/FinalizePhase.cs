@@ -17,7 +17,14 @@ public sealed class FinalizePhase : AbstractSceneAssemblyPhase
     // 2026-08-26 (аудит-1 A-1): 10 → 14 — финализация теперь ПОСЛЕДНЯЯ фаза.
     // Раньше порядок 10 выполнялся до PreGenTechnique(44)/TechniqueGrant(45),
     // т.е. «Scene assembly complete» логировался до выдачи техник.
-    public override int PhaseOrder => 14;
+    // 2026-09-08 (ревью-1 P2-1): 14 → 15 — сдвиг из-за уникализации порядков.
+    public override int PhaseOrder => 15;
+
+    /// <summary>
+    /// 2026-09-08 (ревью-1 P1-3): финализация — wiring-фаза, выполняется и
+    /// при загрузке сейва (SkipOnLoad=false).
+    /// </summary>
+    public override bool SkipOnLoad => false;
 
     public override Task ExecuteAsync()
     {

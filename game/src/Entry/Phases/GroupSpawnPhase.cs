@@ -35,7 +35,8 @@ namespace CultivationGame.Entry.Phases;
 public sealed class GroupSpawnPhase : AbstractSceneAssemblyPhase
 {
     public override string PhaseName => "GroupSpawn";
-    public override int PhaseOrder => 7;
+    // 2026-09-08 (ревью-1 P2-1): 7 → 8 — сдвиг из-за уникализации порядков.
+    public override int PhaseOrder => 8;
 
     [Inject] private readonly INPCGroupService _groupService = null!;
     [Inject] private readonly INPCSpawnerService _spawner = null!;

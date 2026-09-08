@@ -62,8 +62,38 @@ public abstract class AbstractSceneAssemblyPhase : ISceneAssemblyPhase
         BlockReason = reason ?? "skipped";
     }
 
+    /// <summary>
+    /// 2026-09-08 (ревью-1): вызывается оркестратором перед ExecuteAsync.
+    /// </summary>
+    public void MarkAsRunning()
+    {
+        State = SceneAssemblyPhaseState.Running;
+    }
+
+    /// <summary>
+    /// 2026-09-08 (ревью-1): вызывается оркестратором после успешного ExecuteAsync.
+    /// </summary>
+    public void MarkAsCompleted()
+    {
+        State = SceneAssemblyPhaseState.Completed;
+        BlockReason = string.Empty;
+    }
+
+    /// <summary>
+    /// 2026-09-08 (ревью-1): вызывается оркестратором при исключении в ExecuteAsync.
+    /// </summary>
+    public void MarkAsFailed(string error)
+    {
+        State = SceneAssemblyPhaseState.Failed;
+        BlockReason = string.IsNullOrEmpty(error) ? "failed" : error;
+    }
+
     /// <inheritdoc />
-    public void Reset() => State = SceneAssemblyPhaseState.Pending;
+    public void Reset()
+    {
+        State = SceneAssemblyPhaseState.Pending;
+        BlockReason = string.Empty;
+    }
 
     /// <inheritdoc />
     public abstract Task ExecuteAsync();

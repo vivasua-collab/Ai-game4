@@ -14,7 +14,7 @@
 печатают вердикт `VERDICT: PASS/FAIL` (строка ищется в логе). Регрессия = полный
 прогон всех хуков + `dotnet build` с 0 errors.
 
-### 0.1. Реестр env-хуков (19)
+### 0.1. Реестр env-хуков (20)
 
 | Хук | Сцена/файл | Что проверяет |
 |---|---|---|
@@ -35,6 +35,7 @@
 | `GODOT_DIALOGUE_HOLD=1` | DialogueSimDebug | Держать диалог (скриншоты) |
 | `GODOT_TRADEUX_HOLD=1` | TradeUXSimDebug | Держать лавку UX |
 | `GODOT_FORMATION_TEST=1` | TechniqueGrantPhase | Формационный тест (этап формаций) |
+| `GODOT_REASSEMBLY_DEBUG=1` | ReAssemblySimDebug | Ревью-1: повторная сборка в одном процессе — Reset фаз оркестратора + world-scoped реестр (15/15 Completed, реестр не ×2) |
 | `GODOT_SCREENSHOT=<путь>` | GameBoot | Скриншот в файл (VLM-верификация) |
 | `GODOT_SCREENSHOT_DELAY=<сек>` | GameBoot | Задержка кадра для скриншота |
 

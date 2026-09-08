@@ -23,7 +23,7 @@
 | Параметр | Значение | Описание |
 |----------|----------|----------|
 | `PhaseName` | "PreGenTechnique" | Имя фазы для логов |
-| `PhaseOrder` | 44 | Перед TechniqueGrantPhase (45) |
+| `PhaseOrder` | 13 | После UIInit (12), перед TechniqueGrant (14); аудит-1: 44 → 12, ревью-1: 12 → 13 |
 | `SkipOnLoad` | true (default) | При загрузке сейва фаза пропускается |
 | `PerBatch` | 3 | Кол-во техник на (type, level, grade) перед валидацией |
 | `GenRole` | NPCRole.Elder | Самый разнообразный пул типов |
@@ -72,7 +72,10 @@ sessionSeed = Environment.TickCount
             generated = []
             для i = 0..batch-1:
                 seed = sessionSeed + level*1000 + t*100 + g*10 + i
-                tech = _techniqueGenerator.GenerateSpecified(GenTypes[t], level, level, seed)
+                # 2026-09-08 (ревью-1 P1-1): BuildSpecified — ЯВНЫЙ грейд +
+                # БЕЗ авто-регистрации (раньше GenerateSpecified выбирал грейд
+                # случайно и регистрировал ДО валидации/дедупа — реестр засорялся)
+                tech = _techniqueGenerator.BuildSpecified(GenTypes[t], GenGrades[g], level, level, seed)
                 generated.Add(tech)
             
             # Фильтр валидных
@@ -87,9 +90,13 @@ sessionSeed = Environment.TickCount
             # Внутрипакетная дедупликация
             unique = _dedup.Deduplicate(filtered)
             
-            # Регистрация
+            # Регистрация — ЕДИНСТВЕННАЯ точка записи: только валидные + уникальные
             для tech в unique:
                 _registry.Register(tech)
+
+# Контроль качества (ревью-1): gradeMismatches (грейд не тот, что просили —
+#                          должен быть 0) и registryInvalid (статы вне границ
+#                          СОБСТВЕННОГО уровня — должен быть 0)
 ```
 
 ### Логирование
@@ -99,6 +106,7 @@ sessionSeed = Environment.TickCount
 ```
 [PreGenTechnique] start — maxLevel=5 seed=1234567
 [PreGenTechnique] done — generated=600 valid=540 duplicates=12 registered=528 (registry total=528)
+[PreGenTechnique] grades registered: [Common=140, Refined=132, Perfect=140, Transcendent=16] gradeMismatches=0 registryInvalid=0
 ```
 
 - `generated` — всего попыток генерации.
@@ -106,6 +114,12 @@ sessionSeed = Environment.TickCount
 - `duplicates` — отброшено как дубли (по fingerprint).
 - `registered` — зарегистрировано в реестре.
 - `registry total` — итоговый размер реестра после фазы.
+- `grades registered` — распределение зарегистрированных по грейдам (контроль,
+  что грейд = запрошенному; ревью-1 P1-1: раньше грейд выбирался случайно).
+- `gradeMismatches` — техники с НЕзапрошенным грейдом (должно быть 0).
+- `registryInvalid` — техники в реестре со статами вне границ их уровня
+  (должно быть 0; ревью-1 P1-1: раньше генератор регистрировал ДО валидации —
+  отбракованные оставались в реестре навсегда).
 
 ---
 
@@ -137,18 +151,18 @@ sessionSeed = Environment.TickCount
 builder.Register<PreGenTechniquePhase>(Lifetime.Singleton);
 ```
 
-Порядок выполнения (по PhaseOrder):
+Порядок выполнения (по PhaseOrder, нумерация 2026-09-08):
 
-1. `CoreValidationPhase` (10)
-2. `TileMapGenPhase` (20)
-3. `WorldInitPhase` (30)
-4. `PlayerSpawnPhase` (40)
-5. **`PreGenTechniquePhase` (44)** ← НАША фаза
-6. `TechniqueGrantPhase` (45) — выдаёт игроку техники (может использовать
+1. `CoreValidationPhase` (1)
+2. `TileMapGenPhase` (2)
+3. `WorldInitPhase` (3) — world-scoped сброс TechniqueRegistry (ревью-1)
+4. `PlayerSpawnPhase` (4)
+5. `StartingGearPhase` (5) / `AnimalSpawnPhase` (6) / `HumanNPCSpawnPhase` (7) / `GroupSpawnPhase` (8)
+6. `FormationInitPhase` (9) / `ChargerInitPhase` (10) / `QuestInitPhase` (11) / `UIInitPhase` (12)
+7. **`PreGenTechniquePhase` (13)** ← НАША фаза
+8. `TechniqueGrantPhase` (14) — выдаёт игроку техники (может использовать
    зарегистрированные в реестре)
-7. `AnimalSpawnPhase` (50)
-8. `HumanNPCSpawnPhase` (55)
-9. ... последующие фазы
+9. `FinalizePhase` (15)
 
 ---
 

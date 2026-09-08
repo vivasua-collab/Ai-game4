@@ -16,6 +16,12 @@ public sealed class CoreValidationPhase : AbstractSceneAssemblyPhase
     public override string PhaseName => "CoreValidation";
     public override int PhaseOrder => 1;
 
+    /// <summary>
+    /// 2026-09-08 (ревью-1 P1-3): проверка DI — wiring-фаза, выполняется и
+    /// при загрузке сейва (SkipOnLoad=false): сейв не чинит сломанный DI.
+    /// </summary>
+    public override bool SkipOnLoad => false;
+
     public override Task ExecuteAsync()
     {
         // Actively resolve each core interface — if any is missing the

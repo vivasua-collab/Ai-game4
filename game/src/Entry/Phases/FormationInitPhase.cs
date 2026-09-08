@@ -12,7 +12,14 @@ public sealed class FormationInitPhase : AbstractSceneAssemblyPhase
 {
     public override string PhaseName => "FormationInit";
     // 2026-08-26 (аудит-1 A-1): 6 → 8 — уникальный порядок (был дубль с HumanNPCSpawn).
-    public override int PhaseOrder => 8;
+    // 2026-09-08 (ревью-1 P2-1): 8 → 9 — сдвиг из-за уникализации AnimalSpawn(6).
+    public override int PhaseOrder => 9;
+
+    /// <summary>
+    /// 2026-09-08 (ревью-1 P1-3): инициализация системы — wiring-фаза,
+    /// выполняется и при загрузке сейва (SkipOnLoad=false).
+    /// </summary>
+    public override bool SkipOnLoad => false;
 
     public override Task ExecuteAsync()
     {

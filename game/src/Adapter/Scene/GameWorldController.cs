@@ -299,6 +299,14 @@ public partial class GameWorldController : Node2D
             var killFeedSim = new KillFeedSimDebug { Name = "KillFeedSimDebug" };
             AddChild(killFeedSim);
         }
+        // 2026-09-08 (ревью-1 P1-3): headless-верификация ПОВТОРНОЙ сборки
+        // сцены в одном процессе (GODOT_REASSEMBLY_DEBUG=1) — Reset фаз
+        // оркестратора + world-scoped сброс реестра техник.
+        if (System.Environment.GetEnvironmentVariable("GODOT_REASSEMBLY_DEBUG") == "1")
+        {
+            var reAssemblySim = new ReAssemblySimDebug { Name = "ReAssemblySimDebug" };
+            AddChild(reAssemblySim);
+        }
         // 2026-09-04 S4: headless-верификация хотбара v2 (GODOT_HOTBAR_DEBUG=1)
         // — техники в слотах 3-9, кулдаун-оверлей, Qi-гейт, пояс-ряд.
         if (System.Environment.GetEnvironmentVariable("GODOT_HOTBAR_DEBUG") == "1")
@@ -1975,15 +1983,59 @@ public partial class GameWorldController : Node2D
     // ---- Public accessors for child nodes / tests ----
 
     /// <summary>
-    /// NPC_COMBAT_PREP Phase 5: dispose trade-подписок при уходе сцены
-    /// (правило «токены подписок диспозятся» — BeltSlotRow._ExitTree паттерн).
+    /// NPC_COMBAT_PREP Phase 5 → 2026-09-08 (ревью-1 P1-4): dispose ВСЕХ
+    /// подписок EventBus при уходе сцены (правило «токены подписок диспозятся»
+    /// — BeltSlotRow._ExitTree паттерн). Раньше диспозились только 2 торговых
+    /// токена из 12: EventBus (процесс-глобальный, GameBoot-контейнер) держал
+    /// callbacks уничтоженного controller-узла → повторные обработчики,
+    /// обращения к освобождённым Godot-узлам, дублированные тосты, утечка
+    /// удерживаемых объектов при возврате в меню/повторном входе в мир.
     /// </summary>
     public override void _ExitTree()
     {
+        DisposeSubscriptionTokens();
+    }
+
+    /// <summary>
+    /// 2026-09-08 (ревью-1 P1-4): единая точка диспоза всех токенов подписок
+    /// GameWorldController (11 из _Ready + 1 lazy _attackRejectedToken).
+    /// Порядок = порядку создания в _Ready; каждый токен обнуляется.
+    /// </summary>
+    private void DisposeSubscriptionTokens()
+    {
+        // Смерть/урон игрока (Этап 4 внедрения ЦИ).
+        _playerDeathToken?.Dispose();
+        _playerDeathToken = null;
+        _playerDamageToken?.Dispose();
+        _playerDamageToken = null;
+        // Kill-feed (S3).
+        _npcDeathToken?.Dispose();
+        _npcDeathToken = null;
+        // Тосты от модулей (Этап 7).
+        _toastShownToken?.Dispose();
+        _toastShownToken = null;
+        // Диалоги (Phase 2 fix).
+        _dialogueEndedToken?.Dispose();
+        _dialogueEndedToken = null;
+        // Торговля (NPC_COMBAT_PREP Phase 4-5).
         _tradeOpenedToken?.Dispose();
-        _tradeClosedToken?.Dispose();
         _tradeOpenedToken = null;
+        _tradeClosedToken?.Dispose();
         _tradeClosedToken = null;
+        // Медитация (Этап 1 внедрения ЦИ).
+        _meditationStateToken?.Dispose();
+        _meditationStateToken = null;
+        // Результаты каста техник (Этап 2).
+        _techniqueCastResultToken?.Dispose();
+        _techniqueCastResultToken = null;
+        // Формации (Этап 5).
+        _formationStageToken?.Dispose();
+        _formationStageToken = null;
+        _formationActivatedToken2?.Dispose();
+        _formationActivatedToken2 = null;
+        // Lazy-подписка отклонений атак (первое нажатие Space, M2/C-5).
+        _attackRejectedToken?.Dispose();
+        _attackRejectedToken = null;
     }
 
     public Node2D WorldRoot => _worldRoot;

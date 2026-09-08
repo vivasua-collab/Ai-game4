@@ -407,6 +407,12 @@ public readonly struct InputFrameData : IEquatable<InputFrameData>
 /// <summary>
 /// Identifies a save slot. Combines a slot name (player-chosen or auto)
 /// with the slot type so the SaveService can route to the correct file.
+/// 2026-09-08 (ревью-1): свойство FileName УДАЛЕНО — мёртвый код (0
+/// использований) с ложной семантикой «тип задаёт имя файла»: реальная
+/// маршрутизация в SaveService идёт ТОЛЬКО по slot.Name (все типы одного
+/// имени читают один и тот же файл), а «type-based routing» не реализован.
+/// Если будущая реализация сейвов потребует раздельные файлы по типам —
+/// вводить маршрутизацию осознанно, в SaveService.
 /// </summary>
 public readonly struct SaveSlot : IEquatable<SaveSlot>
 {
@@ -418,13 +424,6 @@ public readonly struct SaveSlot : IEquatable<SaveSlot>
         Name = name ?? string.Empty;
         Type = type;
     }
-
-    public string FileName => Type switch
-    {
-        SaveSlotType.AutoSave => "autosave.sav",
-        SaveSlotType.QuickSave => "quicksave.sav",
-        _ => string.IsNullOrEmpty(Name) ? "default.sav" : $"{Name}.sav",
-    };
 
     public bool Equals(SaveSlot other) => Name == other.Name && Type == other.Type;
     public override bool Equals(object? obj) => obj is SaveSlot s && Equals(s);

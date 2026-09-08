@@ -223,7 +223,9 @@ public partial class MainMenuController : Control
         {
             try
             {
-                Session?.LoadGame("quicksave");
+                // 2026-09-08 (ревью-1): передаём ПОЛНЫЙ слот — тот же SaveSlot,
+                // что проверялся в HasSave (тип QuickSave совпадает с чтением).
+                Session?.LoadGame(new SaveSlot("quicksave", SaveSlotType.QuickSave));
                 GetTree().ChangeSceneToFile(GameWorldScenePath);
             }
             catch (System.Exception ex)

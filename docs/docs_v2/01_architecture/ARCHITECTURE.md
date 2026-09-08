@@ -253,27 +253,32 @@ public static class ChargerModuleServices
 
 ### 6.1. SceneOrchestrator
 
-Оркестратор программной сборки сцены. Выполняет фазы последовательно (через async/await), порядок задаётся `PhaseOrder` (stable sort).
+Оркестратор программной сборки сцены. Выполняет фазы последовательно (через async/await), порядок задаётся `PhaseOrder` (stable sort). 2026-09-08 (ревью-1): LIFECYCLE — ответственность оркестратора: перед прогоном `Reset()` всех фаз (DI-синглтоны!), гейт `CanExecute()`, переходы `MarkAsRunning → ExecuteAsync → MarkAsCompleted/MarkAsFailed`, `MarkAsSkipped` для SkipOnLoad-фаз в Load-режиме; `SceneReadyEvent` публикуется с реальными completed/skipped.
 
-| # | Фаза | Что делает |
-|---|------|------------|
-| 1 | CoreValidationPhase | Проверка DI-резолва всех интерфейсов ядра |
-| 2 | TileMapGenPhase | Генерация тайловой карты |
-| 3 | WorldInitPhase | Инициализация мира (время, локации, фракции) |
-| 4 | PlayerSpawnPhase | Спавн игрока (центр карты) |
-| 5 | StartingGearPhase / AnimalSpawnPhase | Стартовый набор (детерминированный, сид 1000 — замена сейвов, Q8) / спавн животных (коллизия PhaseOrder=5 — известный долг, спасует stable sort) |
-| 6 | HumanNPCSpawnPhase | Спавн человекоподобных NPC (полный пайплайн сборки) |
-| 7 | GroupSpawnPhase | Спавн NPC-групп (стаи, патрули, караваны) |
-| 8 | FormationInitPhase | Инициализация формаций |
-| 9 | ChargerInitPhase | Инициализация зарядников |
-| 10 | QuestInitPhase | Инициализация квестов |
-| 11 | UIInitPhase | Инициализация UI |
-| 12 | PreGenTechniquePhase | Пред-генерация техник по уровням (верификация + дедуп) |
-| 13 | TechniqueGrantPhase | Выдача стартовых техник игроку |
-| 14 | FinalizePhase | Финализация (публикация SceneAssemblyCompletedEvent) |
+| # | Фаза | Что делает | SkipOnLoad |
+|---|------|------------|------------|
+| 1 | CoreValidationPhase | Проверка DI-резолва всех интерфейсов ядра | false (wiring) |
+| 2 | TileMapGenPhase | Генерация тайловой карты | true (ген.) |
+| 3 | WorldInitPhase | Инициализация мира + world-scoped сброс TechniqueRegistry | true (ген.) |
+| 4 | PlayerSpawnPhase | Спавн игрока (центр карты) | true (ген.) |
+| 5 | StartingGearPhase | Стартовый набор (детерминированный, сид 1000 — замена сейвов, Q8) | true (ген.) |
+| 6 | AnimalSpawnPhase | Спавн животных | true (ген.) |
+| 7 | HumanNPCSpawnPhase | Спавн человекоподобных NPC (полный пайплайн сборки) | true (ген.) |
+| 8 | GroupSpawnPhase | Спавн NPC-групп (стаи, патрули, караваны) | true (ген.) |
+| 9 | FormationInitPhase | Инициализация формаций | false (wiring) |
+| 10 | ChargerInitPhase | Инициализация зарядников | false (wiring) |
+| 11 | QuestInitPhase | Инициализация квестов | false (wiring) |
+| 12 | UIInitPhase | Инициализация UI (показ HUD) | false (wiring) |
+| 13 | PreGenTechniquePhase | Пред-генерация техник по уровням/грейдам (BuildSpecified: явный грейд, валидация + дедуп ДО регистрации) | true (ген.) |
+| 14 | TechniqueGrantPhase | Выдача стартовых техник игроку | true (ген.) |
+| 15 | FinalizePhase | Финализация (лог) | false (wiring) |
 
 > 2026-09-06 (аудит + санация): таблица синхронизирована с кодом (было 10 фаз).
 > Мёртвая NPCSpawnPhase (v1-stub, заменена Animal/Human/Group) — удалена из кода.
+> 2026-09-08 (ревью-1 P2-1): коллизия PhaseOrder 5/5 (StartingGear/AnimalSpawn)
+> устранена — порядки 1..15 уникальны, порядок обхода словаря DI больше не
+> участвует в семантике. SkipOnLoad-колонка: генеративные фазы пропускаются в
+> Load-режиме (SceneAssemblyMode.LoadGame), wiring-фазы выполняются всегда.
 
 ### 6.2. Интерфейс фазы
 
@@ -281,12 +286,27 @@ public static class ChargerModuleServices
 public interface ISceneAssemblyPhase
 {
     string PhaseName { get; }
-    int PhaseOrder { get; }
-    Task ExecuteAsync(CancellationToken ct = default);
+    int Order { get; }
+    SceneAssemblyPhaseState State { get; }     // Pending/Running/Completed/Failed/Skipped
+    string BlockReason { get; }
+    bool CanExecute();
+    Task ExecuteAsync();
+    void MarkAsSkipped(string reason);
+    void MarkAsRunning();                      // 2026-09-08: вызывает оркестратор
+    void MarkAsCompleted();                    // 2026-09-08: вызывает оркестратор
+    void MarkAsFailed(string error);           // 2026-09-08: вызывает оркестратор
+    void Reset();                              // State → Pending + BlockReason очистка
+    bool SkipOnLoad { get; }                   // true = генеративная (пропуск при Load)
 }
+
+public enum SceneAssemblyMode { NewGame, LoadGame }  // режим прогона RunAssembly
 ```
 
 Фазы регистрируются в SceneOrchestrator через `SceneAssemblyRegistrar` (открытый список — новые фазы добавляются декларативно).
+
+> 2026-09-08 (ревью-1): легаси-контракт `ISceneAssemblyLogger` (Unity-итерация,
+> UnityEngine.Debug.Log, 0 реализаций/потребителей) — УДАЛЁН. Оркестратор
+> логирует в Console/GD.Print напрямую.
 
 ### 6.3. Сборщик сцены (Scene Builder)
 
@@ -306,8 +326,8 @@ public interface ISceneAssemblyPhase
 
 | Действие | Что происходит |
 |----------|----------------|
-| NewGame | SceneOrchestrator.RunAssembly() → Playing |
-| LoadGame | SaveService.Load() → SceneOrchestrator.RunAssembly() (LoadMode) → Playing |
+| NewGame | SceneOrchestrator.RunAssembly(NewGame) → Playing |
+| LoadGame | SaveService.Load(slot) → SceneOrchestrator.RunAssembly(LoadGame: пропуск генеративных фаз SkipOnLoad) → Playing. 2026-09-08 (ревью-1): `LoadGame(SaveSlot)` — UI передаёт тот же слот, что проверял в HasSave |
 | Pause | Подписка на GamePausedEvent |
 | Resume | Подписка на GameResumedEvent |
 | SaveAndQuit | SaveService.Save() → Cleanup |

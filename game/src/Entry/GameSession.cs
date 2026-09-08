@@ -88,7 +88,10 @@ public sealed class GameSession : IGameSession
         Console.WriteLine($"[GameSession] NewGame variant={startVariant} location={loc.Id} ({loc.Width}×{loc.Height}) — assembling scene...");
         try
         {
-            _orchestrator.RunAssembly(CancellationToken.None).GetAwaiter().GetResult();
+            // 2026-09-08 (ревью-1): режим NewGame — все фазы выполняются
+            // (оркестратор сам Reset-ит и ведёт lifecycle фаз).
+            _orchestrator.RunAssembly(CancellationToken.None, SceneAssemblyMode.NewGame)
+                .GetAwaiter().GetResult();
             SetState(SessionState.Playing);
             Console.WriteLine("[GameSession] NewGame ready — state=Playing");
         }
@@ -102,20 +105,36 @@ public sealed class GameSession : IGameSession
     /// <inheritdoc />
     public void LoadGame(string slotName)
     {
+        // 2026-09-08 (ревью-1): обратно-совместимая обёртка — слот по имени
+        // трактуется как Manual (канонические слоты UI).
+        LoadGame(new SaveSlot(slotName, SaveSlotType.Manual));
+    }
+
+    /// <summary>
+    /// 2026-09-08 (ревью-1, санитация P1-2): загрузка ПОЛНОГО слота.
+    /// Раньше IGameSession.LoadGame(string) внутренне конструировал
+    /// SaveSlotType.Manual, а MainMenu проверял HasSave(QuickSave) — тип
+    /// не совпадал с проверкой UI. Теперь вызывающая сторона (UI) передаёт
+    /// тот же SaveSlot, что и в HasSave. Маршрутизация файла — по
+    /// slot.Name (см. SaveService), тип участвует только в семантике слота.
+    /// </summary>
+    public void LoadGame(SaveSlot slot)
+    {
         if (State != SessionState.MainMenu && State != SessionState.Quitting)
         {
             Console.WriteLine($"[GameSession] LoadGame rejected — state={State}");
             return;
         }
 
+        string slotName = slot.Name;
         SetState(SessionState.Loading);
-        Console.WriteLine($"[GameSession] LoadGame slot='{slotName}' — loading...");
+        Console.WriteLine($"[GameSession] LoadGame slot='{slot}' — loading...");
         try
         {
             // ISaveService.Load triggers ISaveable.RestoreState on every
             // registered saveable. GameSession.Data is refreshed minimally
             // here; full restoration happens inside the save module.
-            _save.Load(new SaveSlot(slotName, SaveSlotType.Manual));
+            _save.Load(slot);
 
             Data = new GameSessionData
             {
@@ -128,7 +147,11 @@ public sealed class GameSession : IGameSession
                 IsPaused = false,
             };
 
-            _orchestrator.RunAssembly(CancellationToken.None).GetAwaiter().GetResult();
+            // 2026-09-08 (ревью-1): режим LoadGame — оркестратор пропускает
+            // генеративные фазы (SkipOnLoad), wiring-фазы (UI, валидация,
+            // финализация) выполняются; мировое состояние восстанавливает сейв.
+            _orchestrator.RunAssembly(CancellationToken.None, SceneAssemblyMode.LoadGame)
+                .GetAwaiter().GetResult();
             SetState(SessionState.Playing);
             Console.WriteLine("[GameSession] LoadGame ready — state=Playing");
         }
