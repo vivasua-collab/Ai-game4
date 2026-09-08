@@ -301,6 +301,14 @@ public partial class GameWorldController : Node2D
             var dotSim = new DotSimDebug { Name = "DotSimDebug" };
             AddChild(dotSim);
         }
+        // 2026-09-08 (review этап 6): headless-верификация мира/тайлов
+        // (GODOT_RESPAWN_DEBUG=1) — respawn ресурсов, честный travel,
+        // согласованность TimeChangedEvent.Delta.
+        if (System.Environment.GetEnvironmentVariable("GODOT_RESPAWN_DEBUG") == "1")
+        {
+            var respawnSim = new RespawnSimDebug { Name = "RespawnSimDebug" };
+            AddChild(respawnSim);
+        }
         // 2026-09-04 S2: headless-верификация виньетки опасности
         // (GODOT_LOWHP_DEBUG=1) — alpha/пульс оверлея при HP < 35%/15%.
         if (System.Environment.GetEnvironmentVariable("GODOT_LOWHP_DEBUG") == "1")

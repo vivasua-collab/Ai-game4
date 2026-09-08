@@ -17,8 +17,13 @@ namespace CultivationGame.Core.Interfaces
         /// <summary>Попытаться разместить ресурс на тайле</summary>
         bool TrySpawnResource(int x, int y, string resourceId);
 
-        /// <summary>Попытаться подобрать ресурс как предмет</summary>
-        bool TryPickup(string resourceId, out ItemData item);
+        /// <summary>
+        /// Review этап 6 (P2-5): команда запроса подбора предмета (БЫЛО
+        /// TryPickup(resourceId, out ItemData) — out всегда null! при true:
+        /// «успех» не означал выдачу предмета). Команда асинхронна по своей
+        /// природе: InventoryModule реагирует на ItemAddRequestEvent.
+        /// </summary>
+        bool RequestPickup(string itemId);
 
         /// <summary>Собрать ресурс с тайла. Возвращает результат сбора.</summary>
         HarvestResult Harvest(int x, int y, in GameTile tile);

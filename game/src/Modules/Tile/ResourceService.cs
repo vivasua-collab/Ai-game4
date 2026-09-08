@@ -42,12 +42,13 @@ public sealed class ResourceService : IResourceService, IDisposable
         return !string.IsNullOrEmpty(resourceId);
     }
 
-    public bool TryPickup(string resourceId, out ItemData item)
+    public bool RequestPickup(string itemId)
     {
-        item = null!;
-        if (string.IsNullOrEmpty(resourceId)) return false;
-        // Publish an add-item request; consumers (Inventory module) react.
-        _itemAddPub.Publish(new ItemAddRequestEvent(resourceId, 1, "pickup"));
+        // Review этап 6 (P2-5): честная КОМАНДА (было TryPickup(out ItemData)
+        // с item = null! — вызывающий получал null при «успехе"). Выдача предмета —
+        // асинхронный ответ InventoryModule на ItemAddRequestEvent.
+        if (string.IsNullOrEmpty(itemId)) return false;
+        _itemAddPub.Publish(new ItemAddRequestEvent(itemId, 1, "pickup"));
         return true;
     }
 

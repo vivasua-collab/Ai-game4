@@ -28,7 +28,6 @@ namespace CultivationGame.Modules.Interaction
     {
         // === MessagePipe: паблишеры ===
         private readonly IPublisher<InteractionCompletedEvent> _interactionCompletedPub;
-        private readonly IPublisher<NPCInteractedEvent> _npcInteractedPub; // Q13-E01 FIX
 
         // === MessagePipe: подписки ===
         private readonly ISubscriber<PlayerPositionChangedEvent> _positionChangedSub;
@@ -45,20 +44,24 @@ namespace CultivationGame.Modules.Interaction
         private string _nearestInteractableId;
 
         /// <summary>
-        /// Реестр интерактивных объектов.
-        /// В будущем — динамический, пополняемый через события.
-        /// Пока — простой словарь Id → позиция.
+        /// Реестр ДИНАМИЧЕСКИ зарегистрированных интерактивных объектов.
+        /// Review этап 6 (P1-3): фиктивный статический registry (elder_01/
+        /// merchant_01/chest_01 на выдуманных координатах) УДАЛЁН — реальные
+        /// NPC спавнятся с динамическими ID, а рабочий E-путь взаимодействия
+        /// живёт в GameWorldController (INPCService.GetNearbyNPCIds →
+        /// DialogueService.TryStartNpcDialogue). Реестр пополняют системы-
+        /// владельцы через RegisterInteractable (будущие сундуки/объекты);
+        /// prefix-эвристика «NPC по строке ID» удалена (не соответствует
+        /// процедурным сущностям).
         /// </summary>
         private readonly Dictionary<string, Position2D> _interactablePositions = new Dictionary<string, Position2D>();
 
         public InteractionService(
             IPublisher<InteractionCompletedEvent> interactionCompletedPub,
-            IPublisher<NPCInteractedEvent> npcInteractedPub, // Q13-E01 FIX
             ISubscriber<PlayerPositionChangedEvent> positionChangedSub,
             ISubscriber<UIInteractRequestEvent> interactRequestSub) // Q14-E01 FIX
         {
             _interactionCompletedPub = interactionCompletedPub;
-            _npcInteractedPub = npcInteractedPub; // Q13-E01 FIX
             _positionChangedSub = positionChangedSub;
             _interactRequestSub = interactRequestSub; // Q14-E01 FIX
         }
@@ -81,8 +84,8 @@ namespace CultivationGame.Modules.Interaction
             // Q14-E01 FIX: подписка на запрос взаимодействия от UI
             _interactRequestSubscription = _interactRequestSub.Subscribe(OnUIInteractRequest);
 
-            // Регистрация тестовых интерактивных объектов
-            RegisterDefaultInteractables();
+            // Review этап 6 (P1-3): регистрация фиктивных интерактивных объектов
+            // (elder_01/merchant_01/chest_01) УДАЛЕНА — реестр динамический.
         }
 
         // === IInteractionService ===
@@ -108,10 +111,10 @@ namespace CultivationGame.Modules.Interaction
         public bool TryInteract(string targetId)
         {
             if (string.IsNullOrEmpty(targetId)) return false;
-            if (!_interactablePositions.ContainsKey(targetId)) return false;
+            if (!_interactablePositions.TryGetValue(targetId, out var targetPos)) return false;
 
             // Проверка дальности
-            float distSq = (_interactablePositions[targetId] - _playerPosition).SqrMagnitude;
+            float distSq = (targetPos - _playerPosition).SqrMagnitude;
             float range = _config != null ? _config.DefaultInteractionRange : 2f;
             if (distSq > range * range) return false;
 
@@ -119,13 +122,10 @@ namespace CultivationGame.Modules.Interaction
             _interactionCompletedPub.Publish(new InteractionCompletedEvent(
                 targetId, GameConstants.InteractionType.Interact));
 
-            // Q13-E01 FIX: Публикация NPCInteractedEvent для NPC-целей
-            // Позволяет DialogueService реагировать на взаимодействия с NPC
-            if (IsNPCInteractable(targetId))
-            {
-                _npcInteractedPub.Publish(new NPCInteractedEvent(
-                    targetId, "player", GameConstants.InteractionType.Talk));
-            }
+            // Review этап 6 (P1-3): NPCInteractedEvent больше НЕ публикуется по
+            // prefix-эвристике — NPC-взаимодействия идут реальным E-путём
+            // (GameWorldController → DialogueService); квест-трекер подписан на
+            // NPCInteractedEvent от реальных событий (см. этап 7).
 
             return true;
         }
@@ -157,21 +157,6 @@ namespace CultivationGame.Modules.Interaction
             _interactablePositions.Remove(id);
         }
 
-        /// <summary>
-        /// Q13-E01 FIX: Проверяет, является ли интерактивный объект NPC.
-        /// NPC-идентификаторы содержат ключевые слова: elder_, merchant_, guard_ и т.д.
-        /// </summary>
-        private bool IsNPCInteractable(string targetId)
-        {
-            if (string.IsNullOrEmpty(targetId)) return false;
-            // NPC-объекты определяются по паттерну идентификатора
-            return targetId.StartsWith("elder_")
-                || targetId.StartsWith("merchant_")
-                || targetId.StartsWith("guard_")
-                || targetId.StartsWith("villager_")
-                || targetId.StartsWith("smith_");
-        }
-
         // === Обработчики событий ===
 
         private void OnPlayerPositionChanged(in PlayerPositionChangedEvent e)
@@ -195,16 +180,6 @@ namespace CultivationGame.Modules.Interaction
         {
             float range = _config != null ? _config.DefaultInteractionRange : 2f;
             _nearestInteractableId = GetNearestInteractableId(_playerPosition, range);
-        }
-
-        // === Тестовые данные ===
-
-        private void RegisterDefaultInteractables()
-        {
-            // Тестовые интерактивные объекты (в будущем — через события)
-            RegisterInteractable("elder_01", new Position2D((int)5f, (int)5f));
-            RegisterInteractable("merchant_01", new Position2D((int)10f, (int)3f));
-            RegisterInteractable("chest_01", new Position2D((int)3f, (int)8f));
         }
 
         public void Dispose()

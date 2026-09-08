@@ -24,6 +24,11 @@ public sealed class TileService : ITileService
     [Inject] private readonly IPublisher<ResourceHarvestedEvent> _harvestedPub = null!;
     [Inject] private readonly IPublisher<ResourceDepletedEvent> _depletedPub = null!;
     [Inject] private readonly IResourceService? _resourceService = null;
+    // Review этап 6 (P0-1): подписка на ResourceRespawnedEvent — восстановление
+    // истощённых ресурсов в grid (раньше событие публиковалось ResourceService,
+    // но НИКТО не восстанавливал тайл: дерево/камень исчезали навсегда).
+    [Inject] private readonly ISubscriber<ResourceRespawnedEvent>? _respawnedSub = null;
+    private IDisposable? _respawnedSubscription;
 
     /// <summary>Internal — grid width. Exposed on interface as MapWidth.</summary>
     public int MapWidth => _grid.GetLength(0);
@@ -102,10 +107,40 @@ public sealed class TileService : ITileService
         return _grid[x, y].IsWalkable;
     }
 
+    /// <summary>
+    /// Review этап 6 (P0-1): подписка на respawn-события. Вызывается из
+    /// TileModule.Start() (жизненным циклом владеет модуль).
+    /// </summary>
+    public void Initialize()
+    {
+        _respawnedSubscription?.Dispose();
+        _respawnedSubscription = _respawnedSub?.Subscribe(OnResourceRespawned);
+    }
+
+    /// <summary>
+    /// Review этап 6 (P0-1): восстановить истощённый тайл по сохранённым
+    /// данным (OriginalObject/ResourceId/ResourceMax из DepletedResource).
+    /// Полная пересборка через CreateWithObject (категория/флаги/разрушаемость/
+    /// проходимость), terrain/biome — от текущего тайла. SetTile публикует
+    /// TileChangedEvent → renderer обновляется.
+    /// </summary>
+    private void OnResourceRespawned(in ResourceRespawnedEvent e)
+    {
+        if (!IsInBounds(e.X, e.Y)) return;
+        var current = _grid[e.X, e.Y];
+        var restored = GameTile.CreateWithObject(e.X, e.Y, current.Terrain, e.OriginalObject,
+            e.ResourceMax, e.ResourceId, current.DestructibleMaxHP);
+        restored.Biome = current.Biome;
+        SetTile(e.X, e.Y, restored);
+        Console.WriteLine($"[TileService] Resource respawned at ({e.X},{e.Y}): " +
+                          $"{e.OriginalObject} {e.ResourceId} x{e.ResourceMax:0.#}");
+    }
+
     // === Internal helpers (not on interface) ===
 
     /// <summary>Internal — bounds check.</summary>
     public bool IsInBounds(int x, int y) => x >= 0 && y >= 0 && x < MapWidth && y < MapHeight;
+
 
     /// <summary>
     /// Internal — generate a procedural grid using value noise (fBm).

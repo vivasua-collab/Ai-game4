@@ -98,7 +98,9 @@ public sealed class TimeService : ITimeService
 public sealed class WorldService : IWorldService
 {
     [Inject] private readonly IPublisher<LocationChangedEvent> _locationChangedPub = null!;
-    [Inject] private readonly IPublisher<TravelStartedEvent> _travelStartedPub = null!;
+
+    // Review этап 6 (P1-2): IPublisher<TravelStartedEvent> удалён — публикуется
+    // только реальным travel-pipeline (будущая фаза), не заглушкой TryTravel.
 
     private readonly Dictionary<string, LocationData> _locations = new();
     private readonly Dictionary<string, FactionInfo> _factions = new();
@@ -159,10 +161,22 @@ public sealed class WorldService : IWorldService
             Console.WriteLine($"[WorldService] TryTravel('{locationId}') — unknown location");
             return false;
         }
-        var from = _current?.Id ?? string.Empty;
-        _travelStartedPub.Publish(new TravelStartedEvent(from, locationId, 1f));
-        SetActiveLocation(locationId);
-        return true;
+        if (_current != null && _current.Id == locationId)
+        {
+            Console.WriteLine($"[WorldService] TryTravel('{locationId}') — уже находимся здесь");
+            return false;
+        }
+
+        // Review этап 6 (P1-2): честный контракт. Физическое переключение мира
+        // (регенерация tile grid, респавн NPC/животных/ресурсов, перемещение
+        // игрока) НЕ реализовано — это travel-pipeline будущей фазы. Раньше
+        // метод менял CurrentLocationId и публиковал LocationChangedEvent/
+        // TravelStartedEvent, grid оставался от СТАРОЙ локации, а возвращал true —
+        // API вводил в заблуждение (первый подписчик TimeChangedEvent-типа
+        // получал бы мир, не соответствующий CurrentLocationId).
+        Console.WriteLine($"[WorldService] TryTravel('{locationId}') — отказ: физический переход " +
+                          "между локациями не реализован (travel-pipeline — будущая фаза)");
+        return false;
     }
 
     public LocationInfo GetLocation(string locationId)

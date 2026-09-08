@@ -68,7 +68,11 @@ public sealed class WorldModule : IModule
             ts.AdvanceTick();
             var t = ts.CurrentTime;
             _tickPublisher.Publish(new TimeTickEvent(ts.TickCount, t.Day, t.Hour, t.Minute));
-            _timeChangedPublisher.Publish(new TimeChangedEvent(1f / 60f, t.Day, t.Hour, t.TimeOfDay));
+            // Review этап 6 (P2-4): Delta = ITimeService.DeltaTime (1.0 — «секунды
+            // при Normal»), НЕ 1/60. Контракт TimeChangedEvent: дельта описывает
+            // изменение времени; 1/60 противоречил DeltaTime и замедлил бы первый
+            // подписчика в 60 раз (таймеры, respawn и т.п.).
+            _timeChangedPublisher.Publish(new TimeChangedEvent(ts.DeltaTime, t.Day, t.Hour, t.TimeOfDay));
 
             // Docs (MODULE_STRUCTURE §WorldContracts): Day/Month/YearChanged fire
             // when the calendar component rolls over. Consumed by quests, buffs,

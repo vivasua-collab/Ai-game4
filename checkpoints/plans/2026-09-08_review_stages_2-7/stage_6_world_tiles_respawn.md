@@ -1,8 +1,21 @@
 # Этап 6 — Мир, время, тайлы, ресурсы, путешествия, взаимодействия
 
-> Статус: ⬜ план → исполнение. Файлы: WorldService/WorldModule, TileService/TileModule/ResourceService,
-> InteractionService/DialogueService, TradeService/CurrencyService/TradeModule, GameWorldController,
-> ITimeService/IWorldService/ITileService, WorldContracts/TileContracts.
+> Статус: ✅ **ВЫПОЛНЕН** (валидация: 5/5 подтверждены; фиксы + QA + регрессия PASS).
+
+## Вердикты и фиксы
+
+| # | Находка | Вердикт | Фикс |
+|---|---|---|---|
+| P0-1 | Истощённые ресурсы не восстанавливаются | ✅ Подтверждено (ResourceRespawnedEvent публиковался, подписчика в TileService не было) | TileService.Initialize (из TileModule.Start) подписывается на ResourceRespawnedEvent; OnResourceRespawned — полная пересборка тайла через CreateWithObject (Object/ResourceId/ResourceMax/IsHarvestable/разрушаемость/проходимость), terrain/biome от текущего; SetTile → TileChangedEvent → renderer |
+| P1-2 | TryTravel меняет ID локации без переключения мира | ✅ Подтверждено (SetActiveLocation + логирование в TileModule) | Честный контракт: false без смены локации и событий (travel-pipeline — явная заглушка будущей фазы); «уже здесь» — тоже false; TravelStartedEvent-паблишер удалён |
+| P1-3 | InteractionService — статический фиктивный registry, реальные NPC в обход | ✅ Подтверждено (elder_01/merchant_01/chest_01 на выдуманных координатах + prefix-эвристика NPC) | Фиктивный registry и prefix-логика УДАЛЕНЫ; реестр — динамический (RegisterInteractable для систем-владельцев); NPCInteractedEvent по эвристике не публикуется (реальный E-путь — GameWorldController → DialogueService); неиспользуемый паблишер удалён из ctor |
+| P2-4 | TimeChangedEvent.Delta = 1/60 против DeltaTime = 1 | ✅ Подтверждено | Публикуем ts.DeltaTime (1.0); потребителей нет (FormationModule читает ITimeService напрямую — проверено), будущие подписчики получат согласованную дельту |
+| P2-5 | ResourceService.TryPickup возвращает null в out | ✅ Подтверждено (0 вызывающих) | Честная команда `RequestPickup(itemId)` (без out ItemData) — контракт асинхронной выдачи через ItemAddRequestEvent |
+
+## QA
+
+- **НОВЫЙ хук `GODOT_RESPAWN_DEBUG=1`** (RespawnSimDebug, №23): TimeChangedEvent.Delta==DeltaTime (1.0); TryTravel → False, локация не меняется; Tree_Oak 50 → истощение (9 итераций) → 7 дней → тайл восстановлен (Tree_Oak/wood_oak/50/50) + TileChangedEvent. VERDICT: PASS.
+- Регрессия: COMBAT (LOS/тайлы), DIALOGUE, GEN, REASSEMBLY, TOAST, KILLFEED, CHARGE, STORAGE, DOT — все PASS. Build 0 errors.
 
 ## Находки ревью → план валидации и фикса
 

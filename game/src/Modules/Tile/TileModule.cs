@@ -27,6 +27,11 @@ public sealed class TileModule : IModule
     {
         _locationSubToken = _locationChangedSub.Subscribe(OnLocationChanged);
 
+        // Review этап 6 (P0-1): TileService подписывается на respawn-события
+        // (восстановление истощённых ресурсов в grid).
+        if (_tileService is TileService ts)
+            ts.Initialize();
+
         // Env var override for perf testing: GODOT_MAP_SIZE=500 generates 500×500.
         // Usage: GODOT_MAP_SIZE=500 godot --headless scenes/GameWorld.tscn
         int width = _config.DefaultWidth;
@@ -59,7 +64,10 @@ public sealed class TileModule : IModule
     private void OnLocationChanged(in LocationChangedEvent e)
     {
         Console.WriteLine($"[TileModule] LocationChanged '{e.PreviousLocationId}' → '{e.NewLocationId}'");
-        // Real impl reads location seed/dims from IWorldService and calls Generate.
+        // Review этап 6 (P1-2): реальная генерация новой карты при смене локации
+        // НЕ реализована (travel-pipeline — будущая фаза). TryTravel теперь честно
+        // возвращает false БЕЗ смены активной локации, поэтому сюда мы попадаем
+        // только при реальных переходах (загрузка сейва / смена сцены).
     }
 
     public void Dispose()
