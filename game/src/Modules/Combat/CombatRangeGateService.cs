@@ -56,6 +56,9 @@ public sealed class CombatRangeGateService
     /// Расход 1 стрелы на выстрел. Игрок — из инвентаря (нет стрел →
     /// false); NPC — безлимитно (MVP: у NPC нет инвентаря; «колчан
     /// NPC» — отложенная задача). true = стрела списана, можно стрелять.
+    /// Review этап 3 (P1-3): вызывается CombatModule ТОЛЬКО после принятия
+    /// атаки CombatService (Accepted) — списание до проверки ломало
+    /// транзакцию (стрела терялась на отклонённом выстреле).
     /// </summary>
     public bool TryConsumeRangedAmmo(string attackerId)
     {
@@ -65,6 +68,17 @@ public sealed class CombatRangeGateService
 
         if (_inventory.GetItemCount(ArrowItemId) <= 0) return false;
         return _inventory.TryRemoveItem(ArrowItemId, 1);
+    }
+
+    /// <summary>
+    /// Review этап 3 (P1-3): наличие стрел БЕЗ списания — проверка ДО старта
+    /// боя/атаки. Игрок: колчан непуст; NPC: всегда true (безлимит).
+    /// </summary>
+    public bool HasRangedAmmo(string attackerId)
+    {
+        if (!PlayerIdResolver.IsPlayer(attackerId)) return true;
+        if (_inventory == null) return true;
+        return _inventory.GetItemCount(ArrowItemId) > 0;
     }
 
     /// <summary>Сколько стрел у игрока (для чит-статуса и sim-диагностики).</summary>

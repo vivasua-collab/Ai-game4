@@ -85,10 +85,16 @@ namespace CultivationGame.Modules.NPC
         // === Публичный API ===
 
         /// <summary>
-        /// NPC начинает атаку — публикует CombatStartedEvent.
-        /// Вызывается NPCAIService при переходе в Attacking.
+        /// Review этап 3 (P2-5): MarkNpcCombatStarted (было StartAttack — имя
+        /// вводило в заблуждение: метод НЕ запускает расчёт боя в CombatService,
+        /// а только помечает NPC как находящегося в бою через CombatStartedEvent
+        /// — его собственная подписка выставляет IsInCombat/TargetId обоим
+        /// участникам-NPC). Реальный удар идёт ОТДЕЛЬНЫМ путём:
+        /// NPCModule.ProcessNpcAttacks → AttackIntentEvent → CombatModule →
+        /// CombatService (первый интент и стартует CombatService-бой).
+        /// Вызывается NPCModule.OnAIStateChanged при переходе в Attacking.
         /// </summary>
-        public void StartAttack(string npcId, string targetId)
+        public void MarkNpcCombatStarted(string npcId, string targetId)
         {
             var state = _npcService.GetNPCState(npcId);
             if (state == null || !state.IsAlive) return;

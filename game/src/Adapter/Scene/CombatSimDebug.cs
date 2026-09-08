@@ -168,17 +168,25 @@ public partial class CombatSimDebug : Node
         }
 
         // 3. Серия ударов в обе стороны (как это делает NPCModule/PlayerCombatAdapter).
-        for (int round = 1; round <= 4; round++)
+        // Review этап 3 (P0-1): атаки ход-зависимы — ждём нужного владельца хода
+        // перед каждым интентом (гейт CombatService отклонит «не в свой ход»;
+        // это уже не баг, а контракт — QA обязан его соблюдать).
+        for (int round = 1; round <= 3; round++)
         {
             // NPC → игрок (P0-проверка: урон должен примениться к телу игрока).
+            // Раунд 1: боя нет → интент сам стартует бой (инициатор NPC —
+            // честная инициатива: первый ход у инициатора).
+            await WaitForStageAsync(CombatStage.EnemyTurn, 4.0f);
+            await WaitForCastClearAsync(1.0f);
             _attackIntentPub.Publish(new Core.Messaging.Contracts.AttackIntentEvent(
                 npcId, PlayerCombatId, "npc_strike", false));
-            await ToSignal(GetTree().CreateTimer(0.35), SceneTreeTimer.SignalName.Timeout);
 
-            // Игрок → NPC (Phase 8: weapon damage wiring).
+            // Игрок → NPC (Phase 8: weapon damage wiring): ждём свой ход —
+            // после резолва атаки NPC владелец переходит игроку.
+            await WaitForStageAsync(CombatStage.PlayerTurn, 4.0f);
+            await WaitForCastClearAsync(1.0f);
             _attackIntentPub.Publish(new Core.Messaging.Contracts.AttackIntentEvent(
                 PlayerCombatId, npcId, "basic_attack", false));
-            await ToSignal(GetTree().CreateTimer(0.35), SceneTreeTimer.SignalName.Timeout);
 
             GD.Print($"[CombatSim] round {round}: player HP={_bodyProvider.GetCurrentHealth("player")}, " +
                      $"npc HP={_bodyProvider.GetCurrentHealth(npcId)}");
@@ -205,6 +213,9 @@ public partial class CombatSimDebug : Node
                 GD.Print($"[CombatSim] player equipped '{weapon.NameRu}' (dmg={weapon.Damage}, pen={weapon.Penetration}) — " +
                          $"provider: dmg={_equipmentProvider.GetTotalDamage(PlayerCombatId)}, " +
                          $"pen={_equipmentProvider.GetWeaponPenetration(PlayerCombatId)}");
+                // Review этап 3: ждём ход игрока (после чужого хода/тайм-аута).
+                await WaitForStageAsync(CombatStage.PlayerTurn, 4.0f);
+                await WaitForCastClearAsync(1.0f);
                 int npcHpBeforeWeapon = _bodyProvider.GetCurrentHealth(npcId);
                 _attackIntentPub.Publish(new Core.Messaging.Contracts.AttackIntentEvent(
                     PlayerCombatId, npcId, "basic_attack", false));
@@ -274,7 +285,9 @@ public partial class CombatSimDebug : Node
 
                 // Phase 8 ч.3: детерминизм — выстрел должен пройти гейт
                 // (LOS+стрелы), а не упереться в догорающий каст (C-5).
+                // Review этап 3: + ждём ход игрока (выстрел в EnemyTurn отклонён).
                 await WaitForCastClearAsync(2.0f);
+                await WaitForStageAsync(CombatStage.PlayerTurn, 4.0f);
 
                 _attackIntentPub.Publish(new Core.Messaging.Contracts.AttackIntentEvent(
                     PlayerCombatId, npcId, "basic_attack", isRanged: true));
@@ -392,6 +405,50 @@ public partial class CombatSimDebug : Node
                 GD.Print($"[CombatSim] LOS tiles restored: {clearedLosTiles.Count}");
         }
 
+        // 3e. Review этап 3 (P0-1): ПРОВЕРКА TURN-GATE — авторитетность
+        // ходовой модели. 1) атака игрока в свой ход = Accepted;
+        // 2) атака игрока в чужой ход = Rejected + AttackRejectedEvent.
+        bool turnGateOk = true;
+        if (_combatServiceImpl != null && _playerService != null)
+        {
+            string? tgTarget = _npcService != null && _npcService.IsAlive(npcId)
+                ? npcId : FindHostileNpc();
+            if (tgTarget != null)
+            {
+                await WaitForCastClearAsync(2.0f);
+                // Ждём ход игрока (тайм-аут EnemyTurn вернёт ход при пассивном NPC).
+                await WaitForStageAsync(CombatStage.PlayerTurn, 4.0f);
+                var inTurn = _combatServiceImpl.ExecuteAttack(PlayerCombatId, "basic_attack", tgTarget, false);
+                GD.Print($"[CombatSim] turn-gate: player in PlayerTurn → {inTurn} (ожидаем Accepted)");
+                turnGateOk &= inTurn == AttackAcceptance.Accepted;
+
+                // Ждём передачи хода NPC (после резолва атаки игрока).
+                await WaitForCastClearAsync(1.5f);
+                await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+                if (_combatServiceImpl.IsInCombat)
+                {
+                    await WaitForStageAsync(CombatStage.EnemyTurn, 3.0f);
+                }
+                if (_combatServiceImpl.IsInCombat && _combatServiceImpl.CurrentStage == CombatStage.EnemyTurn)
+                {
+                    _rejectedCount = 0; _lastRejection = "";
+                    var offTurn = _combatServiceImpl.ExecuteAttack(PlayerCombatId, "basic_attack", tgTarget, false);
+                    GD.Print($"[CombatSim] turn-gate: player in EnemyTurn → {offTurn} ('{_lastRejection}')");
+                    turnGateOk &= offTurn == AttackAcceptance.Rejected && _rejectedCount > 0;
+                }
+                else
+                {
+                    // Бой завершился (NPC умер от атаки 3e-1) — off-turn проверку
+                    // пропускаем честно (WARN), ин-turn проверка выше уже валидна.
+                    GD.Print("[CombatSim] WARN — combat ended before off-turn check (NPC died?); skipped");
+                }
+            }
+            else
+            {
+                GD.Print("[CombatSim] skip turn-gate phase — no alive NPC");
+            }
+        }
+
         // 4. Итоги.
         int playerHpAfter = _bodyProvider.GetCurrentHealth("player");
         int npcHpAfter = _bodyProvider.GetCurrentHealth(npcId);
@@ -403,7 +460,7 @@ public partial class CombatSimDebug : Node
                  $"player {playerHpBefore}→{playerHpAfter} ({(playerHpBefore - playerHpAfter)} dmg), " +
                  $"npc {npcHpBefore}→{npcHpAfter}, arrows now={_inventory?.GetItemCount(CombatRangeGateService.ArrowItemId) ?? -1}");
 
-        bool pass = playerTookDamage && npcTookDamage && weaponWiringOk && rangedWiringOk && gatesOk;
+        bool pass = playerTookDamage && npcTookDamage && weaponWiringOk && rangedWiringOk && gatesOk && turnGateOk;
         if (!playerTookDamage)
             GD.Print("[CombatSim] FAIL — NPC→player damage did NOT apply (BodyService player-id mismatch?)");
         if (!npcTookDamage)
@@ -414,6 +471,8 @@ public partial class CombatSimDebug : Node
             GD.Print("[CombatSim] FAIL — ranged (bow) phase broken (Phase 8 ч.2 wiring?)");
         if (!gatesOk)
             GD.Print("[CombatSim] FAIL — LOS/ammo gates broken (Phase 8 ч.3?)");
+        if (!turnGateOk)
+            GD.Print("[CombatSim] FAIL — turn-gate broken (review-3 P0-1: ходы не авторитетны?)");
 
         PrintVerdict(pass);
     }
@@ -436,6 +495,25 @@ public partial class CombatSimDebug : Node
         GD.Print($"[CombatSim] WARN — cast still pending after {timeoutSec}s (gate phase may be C-5-rejected)");
     }
 
+    /// <summary>
+    /// Review этап 3 (P0-1): ждать нужного владельца хода (CombatStage).
+    /// Возврат: стадия достигнута ИЛИ боя нет (интент сам стартует бой с
+    /// нужным инициатором). Тайм-аут — идти дальше (вердикт ниже заметит).
+    /// </summary>
+    private async System.Threading.Tasks.Task WaitForStageAsync(CombatStage stage, float timeoutSec)
+    {
+        if (_combatServiceImpl == null) return;
+        float waited = 0f;
+        while (waited < timeoutSec)
+        {
+            if (!_combatServiceImpl.IsInCombat) return;
+            if (_combatServiceImpl.CurrentStage == stage) return;
+            await ToSignal(GetTree().CreateTimer(0.1), SceneTreeTimer.SignalName.Timeout);
+            waited += 0.1f;
+        }
+        GD.Print($"[CombatSim] WARN — stage {stage} not reached after {timeoutSec}s (now: {_combatServiceImpl.CurrentStage})");
+    }
+
     private string? FindHostileNpc()
     {
         if (_npcService == null) return null;
@@ -455,6 +533,6 @@ public partial class CombatSimDebug : Node
 
     private static void PrintVerdict(bool pass)
     {
-        GD.Print($"[CombatSim] VERDICT: {(pass ? "PASS — обе стороны боя получают урон (melee + ranged + LOS/ammo gates)" : "FAIL")}");
+        GD.Print($"[CombatSim] VERDICT: {(pass ? "PASS — обе стороны боя получают урон (melee + ranged + LOS/ammo gates + turn-gate)" : "FAIL")}");
     }
 }

@@ -38,8 +38,8 @@ public static class CombatModuleServices
         builder.Register<ISaveable, TechniqueService>(Lifetime.Singleton);
         builder.Register<TechniqueChargeService>(Lifetime.Singleton);
 
-        // AI
-        builder.Register<CombatAIService>(Lifetime.Singleton);
+        // Review этап 3 (P0-2): CombatAIService удалён — фантомный "enemy"
+        // (жёсткий ID без тела/Ци/статов) конкурировал с реальными NPC.
 
         // Лут
         builder.Register<CombatLootService>(Lifetime.Singleton);
@@ -62,9 +62,9 @@ public static class CombatModuleServices
         var defaultConfig = new CombatConfig
         {
             // C-6 (аудит-3): PlayerEntityId удалён (мёртвое поле — PlayerIdResolver)
-            EnableAI = true,
-            AITurnDelay = 1.0f,
+            // Review этап 3 (P0-2): EnableAI/AITurnDelay удалены (мёртвый конфиг фантомного AI)
             MaxCombatDuration = 0f,
+            EnemyTurnTimeoutSec = 2.5f,
             AutoLootOnVictory = true,
             PlayerDamageMultiplier = 1.0f,
             EnemyDamageMultiplier = 1.0f,

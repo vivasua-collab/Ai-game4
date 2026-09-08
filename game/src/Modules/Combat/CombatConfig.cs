@@ -13,15 +13,18 @@ namespace CultivationGame.Modules.Combat
         // C-6 FIX (аудит-3): PlayerEntityId удалён — поле не использовалось
         // после миграции на PlayerIdResolver (канонический ID игрока
         // определяется там; config-алиас "player" дрейфовал от "player_0").
-
-        /// <summary>Включить AI противников</summary>
-        public bool EnableAI = true;
-
-        /// <summary>Задержка между ходами AI (секунды)</summary>
-        public float AITurnDelay = 1.0f;
-
+        // Review этап 3 (P0-2): EnableAI/AITurnDelay удалены — конфиги
+        // фантомного CombatAIService (legacy), ничего не читали.
         /// <summary>Максимальная длительность боя (секунды, 0 = бесконечно)</summary>
         public float MaxCombatDuration = 0f;
+
+        /// <summary>
+        /// Review этап 3 (P0-1): тайм-аут ЧУЖОГО хода (сек игрового времени).
+        /// Пассивный не-игрок (не атакует) не блокирует бой навсегда: после
+        /// тайм-аута ход возвращается другой стороне. Ход игрока тайм-аута
+        /// не имеет. NPC-атака идёт кулдауном 1.6с + каст ~0.5с — 2.5с хватает.
+        /// </summary>
+        public float EnemyTurnTimeoutSec = 2.5f;
 
         /// <summary>Включить автоматический лут после боя</summary>
         public bool AutoLootOnVictory = true;

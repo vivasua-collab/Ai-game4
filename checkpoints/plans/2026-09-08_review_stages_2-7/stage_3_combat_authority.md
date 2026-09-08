@@ -1,7 +1,32 @@
 # Этап 3 — Боевой цикл, NPC-атаки, расход боеприпасов
 
-> Статус: ⬜ план → исполнение. Файлы: CombatModule/CombatService/CombatAIService/CombatRangeGateService/
-> CombatLos/DamageService, PlayerCombatAdapter, NPCModule/NPCCombatAdapter, CombatContracts.
+> Статус: ✅ **ВЫПОЛНЕН** (валидация + фиксы + QA 12/12 PASS, коммит см. git log).
+
+## Вердикты валидации (по коду)
+
+| # | Находка | Вердикт |
+|---|---|---|
+| P0-1 | Turn-based state machine не авторитетный гейт | ✅ Подтверждено (нет проверки стадии в ExecuteAttack; флип стадии как побочный эффект) |
+| P0-2 | Два NPC-AI механизма, фантомный "enemy" | ✅ Подтверждено (CombatModule.Initialize("enemy") + ExecuteAIAction хардкод "enemy" в Tick на EnemyTurn) |
+| P1-3 | Стрела списывается до валидации | ✅ Подтверждено (OnAttackIntent: LOS → TryConsumeRangedAmmo → ExecuteAttack, который мог отклонить) |
+| P1-4 | Чужой NPC переключает цель боя | ✅ Подтверждено (ExecuteAttack:345 безусловно заменяет _currentTargetId) |
+| P2-5 | NPCCombatAdapter.StartAttack — misleading legacy | ✅ Подтверждено (публикует CombatStartedEvent, на который CombatService не подписан) |
+
+## Реализованные фиксы
+
+1. **P0-1 — владение ходом (authority)**: `_currentTurnOwnerId` + `SetTurnOwner`/`IsParticipant`/`OtherSideOf`; ExecuteAttack гейтится участником+владельцем (отказ → AttackRejectedEvent только для игрока — NPC молча ретраятся); инициатива у ИНИЦИАТОРА боя (было «игрок всегда первый»); переход хода — честная передача при РЕЗОЛВЕ атаки (убран преждевременный флип на старте каста); тайм-аут чужого хода `EnemyTurnTimeoutSec=2.5с` (анти-лок: пассивный NPC не блокирует бой); ExecuteAttack возвращает `AttackAcceptance` (Accepted/Rejected).
+2. **P0-2 — фантомный AI удалён**: CombatAIService.cs + Data/AIPersonality.cs УДАЛЕНЫ (−2 файла), DI-регистрация и вызовы из CombatModule убраны; мёртвые конфиги EnableAI/AITurnDelay удалены. Единственный источник NPC-атак — NPCModule.ProcessNpcAttacks.
+3. **P1-3 — ammo-транзакция**: `HasRangedAmmo` (проверка без списания) до боя; списание `TryConsumeRangedAmmo` ТОЛЬКО после `Accepted` от CombatService (единая authoritative точка).
+4. **P1-4 — целостность цели**: переключение цели только игроком и только на НЕ-участника (реструктуризация пары боя «игрок vs новая цель»); NPC-интенты целью не управляют. QA-баг в первой итерации фикса (игрок переключал цель на инстагатора → NPC self-hit) пойман CombatSim и исправлен.
+5. **P2-5**: StartAttack → `MarkNpcCombatStarted` (честный контракт: помечает NPC, удар идёт через интенты).
+6. **Анти-спам**: PlayerCombatAdapter бэкофф 0.4с после любого отклонения атаки игрока (Space в чужой ход не спамит интенты/тосты).
+
+## QA
+
+- CombatSimDebug: переписан под ходовую модель (WaitForStageAsync перед интентами) + НОВАЯ фаза 3e turn-gate (Accepted в свой ход / Rejected+event в чужой). Раунды 4→3 (компенсация времени ожиданий).
+- ChargeSimDebug: WaitForPlayerTurnAsync перед release (выпуск ход-зависим).
+- Регрессия 12/12: COMBAT PASS (+turn-gate), CHARGE, TOAST, LOWHP, KILLFEED, HOTBAR, DAMAGEDIR, DIALOGUE, TRADEUX, TRADE smoke (buy/sell True), GEN (0 исключений), REASSEMBLY (15/15).
+- Build 0 errors, warnings 300 (как в базовой линии).
 
 ## Находки ревью → план валидации и фикса
 

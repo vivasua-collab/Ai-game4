@@ -89,6 +89,12 @@ namespace CultivationGame.Modules.Combat
         private CombatConfig _config;
         private DefenseSubtype _lastPlayerDefense = DefenseSubtype.None; // Последняя защита игрока
 
+        // Review этап 3 (P0-1): ВЛАДЕЛЕЦ ХОДА — единственный авторитетный гейт.
+        // Атаковать может ТОЛЬКО владелец хода (+ проверка участника боя P1-4).
+        // CurrentStage — производное: игрок-владелец → PlayerTurn, иначе EnemyTurn.
+        private string _currentTurnOwnerId;
+        private float _turnOwnerSetTime;
+
         // Спринт 8 C11: время каста техник
         private PendingTechnique _pendingTechnique;
         private bool _isCasting;
@@ -223,9 +229,10 @@ namespace CultivationGame.Modules.Combat
             // Подписка на QiDepletedEvent — для прерывания техник
             _qiDepletedSubscription = _qiDepletedSub.Subscribe(OnQiDepleted);
 
-            // Определяем инициативу: кто ходит первым
-            // Упрощённая версия: игрок всегда первый
-            _currentStage = CombatStage.PlayerTurn;
+            // Review этап 3 (P0-1): честная инициатива — первый ход у ИНИЦИАТОРА боя
+            // (раньше «игрок всегда первый»: NPC-инициированный бой открывался
+            // ходом игрока, что ломало порядок и QA-сценарии NPC-атаки).
+            SetTurnOwner(instigatorId);
 
             _combatStartedPub.Publish(new CombatStartedEvent(instigatorId, targetId));
         }
@@ -300,6 +307,7 @@ namespace CultivationGame.Modules.Combat
             _currentStage = CombatStage.None;
             _currentTargetId = null;
             _instigatorId = null;
+            _currentTurnOwnerId = null;
             _combatTimer = 0f;
             _lastPlayerDefense = DefenseSubtype.None;
 
@@ -308,13 +316,56 @@ namespace CultivationGame.Modules.Combat
             _qiDepletedSubscription = null;
         }
 
+        // === Review этап 3 (P0-1): хелперы ходовой модели ===
+
+        /// <summary>
+        /// Установить владельца хода (производный CurrentStage).
+        /// Единственная точка изменения владельца — кроме честной передачи
+        /// после действия (SetTurnOwner(OtherSideOf(...))) и тайм-аута
+        /// чужого хода в UpdateTimer.
+        /// </summary>
+        private void SetTurnOwner(string ownerId)
+        {
+            _currentTurnOwnerId = ownerId;
+            _currentStage = PlayerIdResolver.IsPlayer(ownerId)
+                ? CombatStage.PlayerTurn
+                : CombatStage.EnemyTurn;
+            _turnOwnerSetTime = _combatTimer;
+        }
+
+        /// <summary>Участник текущего боя (инстагатор или цель; алиасы игрока учитываются).</summary>
+        private bool IsParticipant(string entityId)
+        {
+            return PlayerIdResolver.AreSameEntity(entityId, _instigatorId)
+                || PlayerIdResolver.AreSameEntity(entityId, _currentTargetId);
+        }
+
+        /// <summary>Противоположная сторона боя относительно сущности.</summary>
+        private string OtherSideOf(string entityId)
+        {
+            return PlayerIdResolver.AreSameEntity(entityId, _instigatorId)
+                ? _currentTargetId
+                : _instigatorId;
+        }
+
+        /// <summary>
+        /// Review этап 3: публикация отклонения ТОЛЬКО для атак игрока —
+        /// NPC-отклонения не попадают в события/UI (NPC молча ретраится
+        /// со своим кулдауном; шум в AttackRejectedEvent не нужен).
+        /// </summary>
+        private void PublishRejection(string attackerId, string techniqueId, string reason)
+        {
+            if (!PlayerIdResolver.IsPlayer(attackerId)) return;
+            _attackRejectedPub.Publish(new AttackRejectedEvent(attackerId, techniqueId, reason));
+        }
+
         /// <summary>
         /// Обратная совместимость — ExecuteAttack без targetId/isRanged.
         /// Делегирует в полную сигнатуру с defaults (null, false).
         /// </summary>
-        public void ExecuteAttack(string attackerId, string techniqueId)
+        public AttackAcceptance ExecuteAttack(string attackerId, string techniqueId)
         {
-            ExecuteAttack(attackerId, techniqueId, null, false);
+            return ExecuteAttack(attackerId, techniqueId, null, false);
         }
 
         /// <summary>
@@ -327,7 +378,7 @@ namespace CultivationGame.Modules.Combat
         /// Если potencyPermil > 1000 — атака игрока после зарядки, пропуск pending-таймера
         /// (зарядка УЖЕ была временем каста). BuildAndExecuteDamageRequest применяет potency.
         /// </summary>
-        public void ExecuteAttack(string attackerId, string techniqueId, string targetId, bool isRanged, int potencyPermil = 1000, bool isCharged = false)
+        public AttackAcceptance ExecuteAttack(string attackerId, string techniqueId, string targetId, bool isRanged, int potencyPermil = 1000, bool isCharged = false)
         {
             // A3-2 FIX: Авто-начало боя при наличии цели
             if (!_isInCombat)
@@ -338,13 +389,45 @@ namespace CultivationGame.Modules.Combat
                 }
                 else
                 {
-                    return; // Вне боя без цели — ничего не делать
+                    return AttackAcceptance.Rejected; // Вне боя без цели — ничего не делать
                 }
             }
 
-            // A3-3 FIX: Переключение цели при указанном TargetId
-            if (!string.IsNullOrEmpty(targetId) && targetId != _currentTargetId)
+            // === Review этап 3 (P1-4): гейт УЧАСТНИКА боя ===
+            // Бой 1v1 (MVP, см. COMBAT_SYSTEM): принимать интенты можно только
+            // от пары участников текущего боя. Раньше любой NPC на карте мог
+            // вмешаться и перетереть цель боя (NPC B переключал бой игрока с A).
+            if (!IsParticipant(attackerId))
             {
+                PublishRejection(attackerId, techniqueId,
+                    "не участник текущего боя (бой 1v1)");
+                return AttackAcceptance.Rejected;
+            }
+
+            // === Review этап 3 (P0-1): гейт ВЛАДЕНИЯ ХОДОМ ===
+            // Атаковать может только владелец текущего хода. Раньше стадия
+            // менялась как побочный эффект каждого удара — интенты «не в свой
+            // ход» проходили и флипали стадию туда-сюда.
+            if (!PlayerIdResolver.AreSameEntity(attackerId, _currentTurnOwnerId))
+            {
+                PublishRejection(attackerId, techniqueId,
+                    "ход противника — подождите свой ход");
+                return AttackAcceptance.Rejected;
+            }
+
+            // A3-3 FIX + Review этап 3 (P1-4): переключение цели — только
+            // явное прицеливание ИГРОКА на НОВУЮ цель (не участника текущего
+            // боя): реструктурируем пару боя (игрок vs новая цель). NPC-интенты
+            // целью боя не управляют (раньше любой агрессивный NPC перетирал
+            // _currentTargetId). Если указанная цель уже участвует в бою —
+            // ничего не меняем: резолв защитника сам направит удар по врагу
+            // (инстагатору или цели — в зависимости от того, кем является игрок).
+            if (!string.IsNullOrEmpty(targetId) && PlayerIdResolver.IsPlayer(attackerId)
+                && !PlayerIdResolver.AreSameEntity(targetId, attackerId)
+                && !PlayerIdResolver.AreSameEntity(targetId, _instigatorId)
+                && !PlayerIdResolver.AreSameEntity(targetId, _currentTargetId))
+            {
+                _instigatorId = attackerId;
                 _currentTargetId = targetId;
             }
 
@@ -361,11 +444,9 @@ namespace CultivationGame.Modules.Combat
             // паттерн EquipmentBlockedEvent).
             if (_isCasting)
             {
-                _attackRejectedPub.Publish(new AttackRejectedEvent(
-                    attackerId,
-                    techniqueId,
-                    $"Каст уже идёт: {_pendingTechnique.TechniqueId}"));
-                return;
+                PublishRejection(attackerId, techniqueId,
+                    $"Каст уже идёт: {_pendingTechnique.TechniqueId}");
+                return AttackAcceptance.Rejected;
             }
 
             // Stage 0: если атака уже заряжена (isCharged или potency > 1000) —
@@ -375,7 +456,7 @@ namespace CultivationGame.Modules.Combat
                 _lastAttackPotencyPermil = potencyPermil;
                 _lastAttackIsRanged = isRanged;
                 ApplyTechniqueImmediately(attackerId, techniqueId);
-                return;
+                return AttackAcceptance.Accepted;
             }
 
             // C11: Проверка времени каста техники
@@ -425,15 +506,19 @@ namespace CultivationGame.Modules.Combat
                 // Публикация события начала каста (для UI анимации)
                 // _castStartedPub.Publish(new TechniqueCastStartedEvent(...));
 
-                // Переход хода — кастующий пропускает ход
-                if (_currentStage == CombatStage.PlayerTurn)
-                    _currentStage = CombatStage.EnemyTurn;
-                return;
+                // Review этап 3 (P0-1): переход хода НЕ здесь. Владелец хода
+                // меняется при РЕЗОЛВЕ атаки (BuildAndExecuteDamageRequest):
+                // «кастующий пропускает ход» реализуется честной передачей
+                // после завершения действия, а не преждевременным флипом
+                // (раньше флип на старте каста + флип на резолве давали
+                // бессмысленные осцилляции стадии).
+                return AttackAcceptance.Accepted;
             }
 
             // Мгновенное применение (effectiveCastTime <= 0.15с)
             // Редактировано: 2026-05-22 13:50:00 UTC — Этап 3.1: рефакторинг дублирования P1-8.1
             BuildAndExecuteDamageRequest(attackerId, techniqueId);
+            return AttackAcceptance.Accepted;
         }
 
         /// <summary>
@@ -688,15 +773,11 @@ namespace CultivationGame.Modules.Combat
                 return;
             }
 
-            // Переход хода
-            if (_currentStage == CombatStage.PlayerTurn)
-            {
-                _currentStage = CombatStage.EnemyTurn;
-            }
-            else if (_currentStage == CombatStage.EnemyTurn)
-            {
-                _currentStage = CombatStage.PlayerTurn;
-            }
+            // Review этап 3 (P0-1): переход хода — ЧЕСТНАЯ ПЕРЕДАЧА после
+            // завершённого действия: владелец = противоположная сторона
+            // АТАКУЮЩЕГО (не «флип текущей стадии»). Работает для игрока,
+            // NPC и NPC-vs-NPC (другая сторона = другой участник).
+            SetTurnOwner(OtherSideOf(attackerId));
         }
 
         public void ExecuteDefense(string defenderId, DefenseSubtype defenseType)
@@ -726,10 +807,12 @@ namespace CultivationGame.Modules.Combat
                 }
             }
 
-            // Переход хода после защиты
-            if (_currentStage == CombatStage.PlayerTurn)
+            // Переход хода после защиты — только если защита была действием
+            // ХОДА защитника (Review этап 3: обобщено с PlayerTurn-флипа на
+            // владение ходом; реакционная защита в чужой ход ход не заканчивает).
+            if (PlayerIdResolver.AreSameEntity(defenderId, _currentTurnOwnerId))
             {
-                _currentStage = CombatStage.EnemyTurn;
+                SetTurnOwner(OtherSideOf(defenderId));
             }
         }
 
@@ -770,6 +853,19 @@ namespace CultivationGame.Modules.Combat
                 _currentStage = CombatStage.Flee;
                 EndCombat();
                 return;
+            }
+
+            // Review этап 3 (P0-1): тайм-аут ЧУЖОГО хода (анти-лок).
+            // Пассивный не-игрок (не атакует: без оружия/далеко/стан) не
+            // блокирует бой навсегда — после EnemyTurnTimeoutSec ход
+            // возвращается другой стороне. Ход игрока тайм-аута не имеет
+            // (классический turn-based: противник ждёт игрока).
+            if (!_isCasting
+                && !PlayerIdResolver.IsPlayer(_currentTurnOwnerId)
+                && _config != null && _config.EnemyTurnTimeoutSec > 0f
+                && _combatTimer - _turnOwnerSetTime > _config.EnemyTurnTimeoutSec)
+            {
+                SetTurnOwner(OtherSideOf(_currentTurnOwnerId));
             }
 
             // Спринт 8 C11: Обновление таймера каста

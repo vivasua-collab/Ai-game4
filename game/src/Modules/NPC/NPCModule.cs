@@ -220,7 +220,9 @@ public class NPCModule : IModule
         {
             var targetId = _npcServiceImpl.GetNPCState(e.NpcId)?.TargetId;
             if (!string.IsNullOrEmpty(targetId))
-                _combatAdapter.StartAttack(e.NpcId, targetId);
+                // Review этап 3 (P2-5): MarkNpcCombatStarted (было StartAttack) —
+                // помечает NPC бойцом; удар пойдёт через ProcessNpcAttacks.
+                _combatAdapter.MarkNpcCombatStarted(e.NpcId, targetId);
         }
     }
 

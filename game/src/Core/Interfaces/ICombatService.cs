@@ -24,7 +24,14 @@ namespace CultivationGame.Core.Interfaces
         string CurrentTargetId { get; }
         void StartCombat(string instigatorId, string targetId);
         void EndCombat();
-        void ExecuteAttack(string attackerId, string techniqueId);
+
+        /// <summary>
+        /// Review этап 3 (P1-3): структурированный результат приёма атаки.
+        /// Accepted = атака принята (мгновенно или в pending-каст) — расходники
+        /// (стрелы) списывать ТОЛЬКО на Accepted. Rejected = отклонена
+        /// (причина опубликована в AttackRejectedEvent — для атак игрока).
+        /// </summary>
+        AttackAcceptance ExecuteAttack(string attackerId, string techniqueId);
         /// <summary>
         /// A3-5 FIX: Полная сигнатура ExecuteAttack с TargetId и IsRanged.
         /// Позволяет передать цель и тип дальности из AttackIntentEvent.
@@ -33,9 +40,24 @@ namespace CultivationGame.Core.Interfaces
         /// Stage 0 (2026-08-25, GLM-5.3): + potencyPermil + isCharged.
         /// isCharged=true → пропуск pending-таймера (зарядка была временем каста).
         /// potencyPermil>1000 → то же (Stage 2 overcharge); умножитель урона.
+        /// Review этап 3 (P0-1/P1-4): гейты участника и владения ходом — ВНУТРИ
+        /// (authority в CombatService, не в адаптерах ввода).
         /// </summary>
-        void ExecuteAttack(string attackerId, string techniqueId, string targetId = null, bool isRanged = false, int potencyPermil = 1000, bool isCharged = false);
+        AttackAcceptance ExecuteAttack(string attackerId, string techniqueId, string targetId = null, bool isRanged = false, int potencyPermil = 1000, bool isCharged = false);
         void ExecuteDefense(string defenderId, DefenseSubtype defenseType);
+    }
+
+    /// <summary>
+    /// Review этап 3 (P1-3): результат приёма атаки боевой системой.
+    /// Потребители (CombatModule) списывают стрелы только на Accepted —
+    /// стрела больше не теряется на отклонённой атаке.
+    /// </summary>
+    public enum AttackAcceptance
+    {
+        /// <summary>Атака отклонена (гейт хода/участника/каста; причина — в AttackRejectedEvent для атак игрока)</summary>
+        Rejected = 0,
+        /// <summary>Атака принята: применена мгновенно или поставлена в pending-каст</summary>
+        Accepted = 1
     }
 
     public interface IDamageService

@@ -13,13 +13,16 @@ using CultivationGame.Core.DI;
 using CultivationGame.Core.Events;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Core.Messaging.Contracts;
-using CultivationGame.Modules.Combat.Data;
 
 namespace CultivationGame.Modules.Combat;
 
 /// <summary>
 /// Точка входа модуля боя.
 /// Инициализирует сервисы конфигурацией и подписывается на события.
+///
+/// Review этап 3 (P0-2): фантомный CombatAIService (жёсткий ID "enemy" без
+/// тела/Ци/статов) УДАЛЁН из runtime-цикла. Единственный источник NPC-атак —
+/// NPCModule.ProcessNpcAttacks (реальные NPC с динамическими ID).
 /// </summary>
 public class CombatModule : IModule
 {
@@ -29,15 +32,13 @@ public class CombatModule : IModule
     [Inject] private readonly IDamageService _damageService = null!;
     [Inject] private readonly TechniqueService _techniqueService = null!;
     [Inject] private readonly TechniqueChargeService _techniqueChargeService = null!;
-    [Inject] private readonly CombatAIService _combatAIService = null!;
     [Inject] private readonly CombatLootService _combatLootService = null!;
     [Inject] private readonly ITimeService _timeService = null!;
 
-    // P2-8.3 FIX: IBodyDataProvider для обновления _cachedEnemyHpRatio
-    [Inject] private readonly IBodyDataProvider _bodyDataProvider = null!;
-
     // Phase 8 ч.3 (2026-09-03): гейт дальнего боя (LOS + расход стрел)
     // и публикация отклонений (тот же контракт C-5, что и у CombatService).
+    // Review этап 3 (P1-3): проверка наличия стрел ДО боя; списание — только
+    // ПОСЛЕ принятия атаки CombatService (см. OnAttackIntent).
     [Inject] private readonly CombatRangeGateService _rangeGate = null!;
     [Inject] private readonly IPublisher<AttackRejectedEvent> _attackRejectedPub = null!;
 
@@ -59,11 +60,7 @@ public class CombatModule : IModule
     private IDisposable? _equipmentChangedSubscription;
     private IDisposable? _buffAppliedSubscription;
     private IDisposable? _buffRemovedSubscription;
-    private IDisposable? _damageAppliedForHpSubscription;
     private IDisposable? _attackIntentSubscription;
-
-    // CMB-C01: кэш HP ratio из событий (вместо хардкода 0.5f)
-    private float _cachedEnemyHpRatio = 1.0f;
 
     public string ModuleName => "Combat";
 
@@ -75,8 +72,8 @@ public class CombatModule : IModule
         // === Конфигурация сервисов ===
         _combatServiceImpl.Configure(_config);
 
-        // Инициализация AI
-        _combatAIService.Initialize("enemy", AIPersonality.CreateBalanced());
+        // Review этап 3 (P0-2): Инициализация фантомного AI("enemy") удалена —
+        // NPC-атаки идут только через NPCModule.ProcessNpcAttacks (реальные ID).
 
         // === Подписка на кросс-модульные события ===
         _enemyKilledSubscription = _enemyKilledSub.Subscribe(OnEnemyKilled);
@@ -88,9 +85,6 @@ public class CombatModule : IModule
 
         // Спринт 8 C11: подписка CombatService на DamageAppliedEvent (прерывание каста)
         _combatServiceImpl.SubscribeToDamageApplied(_damageAppliedSub);
-
-        // P2-8.3 FIX: подписка на DamageAppliedEvent для обновления _cachedEnemyHpRatio
-        _damageAppliedForHpSubscription = _damageAppliedSub.Subscribe(OnDamageAppliedForHpRatio);
 
         // Фаза 9D: подписка на AttackIntentEvent — боевой мост
         _attackIntentSubscription = _attackIntentSub.Subscribe(OnAttackIntent);
@@ -111,35 +105,10 @@ public class CombatModule : IModule
         // (модель заполнения TECHNIQUE_SYSTEM §5.3). Зарядка тиками по проводимости.
         _techniqueChargeService.UpdateCharges(delta);
 
-        // AI-ход (только в EnemyTurn)
-        if (_combatService.IsInCombat && _combatService.CurrentStage == CombatStage.EnemyTurn)
-        {
-            var action = _combatAIService.UpdateAI(delta, _cachedEnemyHpRatio);
-            ExecuteAIAction(action);
-        }
-    }
-
-    /// <summary>
-    /// Выполнить действие AI.
-    /// </summary>
-    private void ExecuteAIAction(AIAction action)
-    {
-        switch (action)
-        {
-            case AIAction.Attack:
-                _combatService.ExecuteAttack("enemy", "basic_attack");
-                break;
-            case AIAction.UseTechnique:
-                _combatService.ExecuteAttack("enemy", "technique_npc");
-                break;
-            case AIAction.Defend:
-                var defense = _combatAIService.ChooseDefense();
-                _combatService.ExecuteDefense("enemy", defense);
-                break;
-            case AIAction.Flee:
-                // В будущих фазах: логика побега
-                break;
-        }
+        // Review этап 3 (P0-2): блок «AI-ход (только в EnemyTurn)» удалён —
+        // фантомный CombatAIService с жёстким ID "enemy" создавал атаки
+        // сущности без тела/Ци/экипировки и конкурировал с реальными NPC.
+        // Чужой ход двигается тайм-аутом EnemyTurnTimeoutSec в UpdateTimer.
     }
 
     /// <summary>
@@ -155,12 +124,11 @@ public class CombatModule : IModule
     }
 
     /// <summary>
-    /// Обработчик CombatEndedEvent — деактивация AI.
+    /// Обработчик CombatEndedEvent — сброс.
+    /// Review этап 3 (P0-2): деактивация фантомного AI удалена вместе с ним.
     /// </summary>
     private void OnCombatEnded(in CombatEndedEvent e)
     {
-        _combatAIService.Deactivate();
-        _cachedEnemyHpRatio = 1.0f;
     }
 
     /// <summary>
@@ -180,23 +148,6 @@ public class CombatModule : IModule
     }
 
     /// <summary>
-    /// P2-8.3 FIX: Обработчик DamageAppliedEvent — обновление кэша HP ratio врага.
-    /// </summary>
-    private void OnDamageAppliedForHpRatio(in DamageAppliedEvent e)
-    {
-        if (!_combatService.IsInCombat) return;
-        if (e.TargetId != _combatService.CurrentTargetId) return;
-
-        int currentHP = _bodyDataProvider.GetCurrentHealth(e.TargetId);
-        int maxHP = _bodyDataProvider.GetMaxHealth(e.TargetId);
-
-        if (maxHP > 0)
-        {
-            _cachedEnemyHpRatio = (float)currentHP / maxHP;
-        }
-    }
-
-    /// <summary>
     /// Обработчик BuffRemovedEvent — обновление модификаторов.
     /// </summary>
     private void OnBuffRemoved(in BuffRemovedEvent e)
@@ -210,6 +161,9 @@ public class CombatModule : IModule
     /// (LOS + стрелы) ДО StartCombat/ExecuteAttack: выстрел сквозь камень
     /// не должен начинать бой и тратить стрелу. Паттерн отклонения — C-5
     /// (AttackRejectedEvent, тост только для игрока — GameWorldController).
+    /// Review этап 3 (P1-3): стрела списывается ТОЛЬКО после принятия атаки
+    /// CombatService (Accepted) — раньше списывалась до гейтов ExecuteAttack
+    /// и терялась при отклонении (каст/не тот ход/не участник).
     /// </summary>
     private void OnAttackIntent(in AttackIntentEvent e)
     {
@@ -228,7 +182,8 @@ public class CombatModule : IModule
                     "нет линии огня — препятствие на пути стрелы"));
                 return;
             }
-            if (!_rangeGate.TryConsumeRangedAmmo(e.AttackerId))
+            // Review этап 3 (P1-3): проверяем НАЛИЧИЕ стрел — без списания.
+            if (!_rangeGate.HasRangedAmmo(e.AttackerId))
             {
                 _attackRejectedPub.Publish(new AttackRejectedEvent(
                     e.AttackerId, e.TechniqueId,
@@ -242,7 +197,15 @@ public class CombatModule : IModule
             _combatService.StartCombat(e.AttackerId, e.TargetId);
         }
 
-        _combatService.ExecuteAttack(e.AttackerId, e.TechniqueId, e.TargetId, e.IsRanged, e.PotencyPermil, e.IsCharged);
+        AttackAcceptance acceptance = _combatService.ExecuteAttack(
+            e.AttackerId, e.TechniqueId, e.TargetId, e.IsRanged, e.PotencyPermil, e.IsCharged);
+
+        // Review этап 3 (P1-3): списание стрелы — ТОЛЬКО после принятия атаки
+        // (единая authoritative точка; NPC — безлимит как раньше).
+        if (acceptance == AttackAcceptance.Accepted && e.IsRanged)
+        {
+            _rangeGate.TryConsumeRangedAmmo(e.AttackerId);
+        }
     }
 
     public void Dispose()
@@ -257,8 +220,6 @@ public class CombatModule : IModule
         _buffAppliedSubscription = null;
         _buffRemovedSubscription?.Dispose();
         _buffRemovedSubscription = null;
-        _damageAppliedForHpSubscription?.Dispose();
-        _damageAppliedForHpSubscription = null;
         _attackIntentSubscription?.Dispose();
         _attackIntentSubscription = null;
     }

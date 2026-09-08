@@ -42,6 +42,8 @@ public partial class ChargeSimDebug : Node
     [Inject] private IPlayerService? _playerService;
     [Inject] private INPCService? _npcService;
     [Inject] private IBodyDataProvider? _bodyProvider;
+    // Review этап 3 (P0-1): ход-зависимость выпуска (release в чужой ход отклонён).
+    [Inject] private Modules.Combat.CombatService? _combatServiceImpl;
 
     private System.IDisposable? _startedToken;
     private System.IDisposable? _progressToken;
@@ -250,6 +252,9 @@ public partial class ChargeSimDebug : Node
         }
 
         // 9. Второе нажатие Z — выпуск удержанной техники.
+        // Review этап 3 (P0-1): выпуск ход-зависим — ждём ход игрока
+        // (враждебное животное могло начать бой и владеть ходом).
+        await WaitForPlayerTurnAsync(4.0f);
         _castRequestPub.Publish(new TechniqueCastRequestedEvent(combatTechId, mouseX, mouseY));
         GD.Print("[ChargeSim] PRESS 2 (release held) — published TechniqueCastRequestedEvent");
 
@@ -279,6 +284,25 @@ public partial class ChargeSimDebug : Node
             GD.Print("[ChargeSim] FAIL — NPC did not take damage after release (combat pipeline?)");
 
         PrintVerdict(pass);
+    }
+
+    /// <summary>
+    /// Review этап 3 (P0-1): ждать ход игрока (или отсутствия боя — тогда
+    /// release-интент сам стартует бой с игроком-инициатором). Атаки
+    /// ход-зависимы: выпуск в EnemyTurn отклоняется гейтом CombatService.
+    /// </summary>
+    private async System.Threading.Tasks.Task WaitForPlayerTurnAsync(float timeoutSec)
+    {
+        if (_combatServiceImpl == null) return;
+        float waited = 0f;
+        while (waited < timeoutSec)
+        {
+            if (!_combatServiceImpl.IsInCombat) return;
+            if (_combatServiceImpl.CurrentStage == CombatStage.PlayerTurn) return;
+            await ToSignal(GetTree().CreateTimer(0.1), SceneTreeTimer.SignalName.Timeout);
+            waited += 0.1f;
+        }
+        GD.Print($"[ChargeSim] WARN — PlayerTurn not reached after {timeoutSec}s (now: {_combatServiceImpl.CurrentStage})");
     }
 
     private string? FindHostileNpc()

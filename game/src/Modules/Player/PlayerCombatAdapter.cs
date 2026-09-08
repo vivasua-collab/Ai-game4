@@ -40,6 +40,7 @@ public sealed class PlayerCombatAdapter : IDisposable
     [Inject] private readonly ITileService? _tiles = null;
     [Inject] private readonly IPublisher<AttackIntentEvent> _attackIntentPub = null!;
     [Inject] private readonly IPublisher<AttackRejectedEvent> _attackRejectedPub = null!;
+    [Inject] private readonly ISubscriber<AttackRejectedEvent> _attackRejectedSub = null!;
     [Inject] private readonly ISubscriber<CombatStartedEvent> _combatStartedSub = null!;
     [Inject] private readonly ISubscriber<CombatEndedEvent> _combatEndedSub = null!;
     [Inject] private readonly ISubscriber<DamageAppliedEvent> _damageSub = null!;
@@ -62,6 +63,13 @@ public sealed class PlayerCombatAdapter : IDisposable
     /// </summary>
     public const float LosRetryCooldownSec = 0.4f;
 
+    /// <summary>
+    /// Review этап 3 (P0-1): бэкофф после ЛЮБОГО отклонения атаки игрока
+    /// («не ваш ход» / каст идёт / не участник). Зажатый Space не шлёт
+    /// холостые интенты в чужой ход — пауза 0.4с (паттерн LosRetry).
+    /// </summary>
+    public const float AttackRejectionBackoffSec = 0.4f;
+
     private float _attackCooldownSec;
 
     // === Phase 8 ч.2 (2026-09-03): режим оружия (клавиши 1/2) ===
@@ -78,6 +86,7 @@ public sealed class PlayerCombatAdapter : IDisposable
     private IDisposable? _combatStartedToken;
     private IDisposable? _combatEndedToken;
     private IDisposable? _damageToken;
+    private IDisposable? _attackRejectedToken;
 
     /// <summary>
     /// Phase 8 ч.2: режим оружия игрока (Melee по умолчанию).
@@ -125,6 +134,23 @@ public sealed class PlayerCombatAdapter : IDisposable
         _combatStartedToken = _combatStartedSub.Subscribe(OnCombatStarted);
         _combatEndedToken = _combatEndedSub.Subscribe(OnCombatEnded);
         _damageToken = _damageSub.Subscribe(OnDamageApplied);
+        // Review этап 3 (P0-1): бэкофф-подписка на отклонения атак игрока.
+        _attackRejectedToken = _attackRejectedSub.Subscribe(OnAttackRejected);
+    }
+
+    /// <summary>
+    /// Review этап 3 (P0-1): отклонение атаки игрока (ход противника / каст /
+    /// не участник) → короткий бэкофф автоатаки. Space в чужой ход больше не
+    /// шлёт интент каждые 0.91с (тишина вместо спама тостов «не ваш ход»;
+    /// ToastStack агрегирует повторы «×N», но лучше не создавать их вовсе).
+    /// </summary>
+    private void OnAttackRejected(in AttackRejectedEvent e)
+    {
+        if (CultivationGame.Core.Helpers.PlayerIdResolver.IsPlayer(e.AttackerId)
+            && _attackCooldownSec < AttackRejectionBackoffSec)
+        {
+            _attackCooldownSec = AttackRejectionBackoffSec;
+        }
     }
 
     public void Tick(float deltaTime)
@@ -252,6 +278,8 @@ public sealed class PlayerCombatAdapter : IDisposable
         _combatStartedToken?.Dispose();
         _combatEndedToken?.Dispose();
         _damageToken?.Dispose();
+        _attackRejectedToken?.Dispose();
         _combatStartedToken = _combatEndedToken = _damageToken = null;
+        _attackRejectedToken = null;
     }
 }
