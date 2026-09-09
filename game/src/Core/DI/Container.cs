@@ -106,19 +106,37 @@ public sealed class Container : IResolver, IDisposable
 
     public IEnumerable<T> ResolveAll<T>()
     {
-        // For v1 ResolveAll returns concrete instances assignable to T.
-        // Dedupe by reference — forwarded registrations share the same
-        // Registration object across interface and concrete-type keys, so
-        // without dedup the same instance would be yielded twice.
-        var seen = new HashSet<Registration>(ReferenceEqualityComparer.Instance);
+        // R11 P0-Save (внешнее ревью 2026-09-09): инстанс-ориентированный обход.
+        //
+        // Прежняя версия резолвила по reg.ServiceType. При мульти-интерфейсных
+        // форвардах (Register<ISaveable, X> в N модулях — наш DI не умеет
+        // .As<>().AsSelf()) все форварды делят ОДИН словарный ключ
+        // typeof(ISaveable): выживала только ПОСЛЕДНЯЯ регистрация, а
+        // уцелевшие impl-ключи (ServiceType=ISaveable, Impl=X) резолвили всех
+        // через Resolve(ISaveable) в ОДИН И ТОТ ЖЕ инстанс последнего
+        // победителя — ResolveAll<ISaveable> возвращал SaveService ×7, и
+        // агрегатор сейвов записывал в файл один блок save_meta.
+        //
+        // Теперь: инстанс-регистрации отдаются напрямую, остальные резолвятся
+        // по ImplementationType (impl-ключ всегда указывает на корректную
+        // регистрацию своего типа), матчинг — по фактическому типу инстанса,
+        // дедуп — по ссылке на инстанс (не по Registration-объекту).
+        var seen = new HashSet<object>(
+            System.Collections.Generic.ReferenceEqualityComparer.Instance);
         foreach (var reg in _registrations.Values)
         {
-            if (!seen.Add(reg)) continue;
-            if (typeof(T).IsAssignableFrom(reg.ServiceType))
+            object? instance;
+            if (reg.HasInstance)
             {
-                var instance = Resolve(reg.ServiceType, depth: 0);
-                if (instance is T typed) yield return typed;
+                instance = reg.Instance;
             }
+            else
+            {
+                var resolveType = reg.ImplementationType ?? reg.ServiceType;
+                instance = Resolve(resolveType, depth: 0);
+            }
+            if (instance is T typed && seen.Add(instance))
+                yield return typed;
         }
     }
 

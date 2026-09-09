@@ -19,5 +19,13 @@ namespace CultivationGame.Core.Interfaces
         bool HasSave(SaveSlot slot);
         bool DeleteSave(SaveSlot slot);
         IReadOnlyList<SaveInfo> GetAllSaves();
+
+        /// <summary>
+        /// R11 P1-Save (review): описание последней ошибки Save/Load
+        /// (null = успех). SaveModule публикует ЭТО в SaveCompletedEvent /
+        /// LoadCompletedEvent — раньше success=true писался безусловно,
+        /// независимо от реального результата операции.
+        /// </summary>
+        string? LastError { get; }
     }
 }

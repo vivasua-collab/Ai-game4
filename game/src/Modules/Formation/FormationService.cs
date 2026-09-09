@@ -598,6 +598,9 @@ namespace CultivationGame.Modules.Formation
         /// </summary>
         public string SaveKey => "formation";
 
+        /// <summary>R11 P0-Save (review): тип state-блока для persistence round-trip.</summary>
+        public Type StateType => typeof(FormationSaveData);
+
         /// <summary>
         /// Снять состояние формации для сериализации.
         /// Сохраняет: ID активной формации, стадию, пул Ци (текущий/макс),

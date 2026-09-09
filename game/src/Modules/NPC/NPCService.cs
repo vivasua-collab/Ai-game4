@@ -332,6 +332,9 @@ namespace CultivationGame.Modules.NPC
         /// </summary>
         public string SaveKey => "npc";
 
+        /// <summary>R11 P0-Save (review): тип state-блока для persistence round-trip.</summary>
+        public Type StateType => typeof(NPCSaveData);
+
         /// <summary>
         /// Сериализовать состояние NPC в JSON.
         /// Сохраняются: количество активных NPC и упрощённый список

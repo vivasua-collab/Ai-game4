@@ -181,14 +181,40 @@ public sealed class WorldService : IWorldService
 
     public LocationInfo GetLocation(string locationId)
     {
+        // R11 P2-World (review): раньше Biome был захардкожен Plains,
+        // QiDensity передавался, DangerLevel — всегда 0. Теперь Biome
+        // выводится из реального TerrainType локации, DangerLevel — из
+        // LocationData.DangerLevel (масштабирование спавна NPC, «Задача 1.9»).
         if (_locations.TryGetValue(locationId, out var loc))
         {
             return new LocationInfo(loc.Id, loc.Name, loc.LocationType,
-                BiomeType.Plains, loc.QiDensity, 0, loc.ParentSectorId);
+                BiomeFromTerrain(loc.TerrainType), loc.QiDensity, loc.DangerLevel, loc.ParentSectorId);
         }
+        // Неизвестный id — защитный дефолт (не «подделка данных»: локации нет).
         return new LocationInfo(locationId, locationId, LocationType.Village,
-            BiomeType.Plains, 0, 0, "0_0");
+            BiomeType.Grassland, 0, 0, "0_0");
     }
+
+    /// <summary>
+    /// R11 P2-World: семантический маппинг TerrainType → BiomeType (раньше —
+    /// хардкод BiomeType.Plains для любой локации). Полный coverage TerrainType:
+    /// Grass→Grassland, Dirt/Sand→Steppe, Stone→Highlands, Water_Shallow→Coast,
+    /// Water_Deep→Ocean, Snow→Mountains, Ice/Lava→Peak, None/Void→Grassland
+    /// (нет данных — биом по умолчанию, документировано).
+    /// </summary>
+    private static BiomeType BiomeFromTerrain(TerrainType terrain) => terrain switch
+    {
+        TerrainType.Grass => BiomeType.Grassland,
+        TerrainType.Dirt => BiomeType.Steppe,
+        TerrainType.Stone => BiomeType.Highlands,
+        TerrainType.Water_Shallow => BiomeType.Coast,
+        TerrainType.Water_Deep => BiomeType.Ocean,
+        TerrainType.Sand => BiomeType.Steppe,
+        TerrainType.Snow => BiomeType.Mountains,
+        TerrainType.Ice => BiomeType.Peak,
+        TerrainType.Lava => BiomeType.Peak,
+        _ => BiomeType.Grassland, // None / Void — нет террейна, дефолт
+    };
 
     public FactionInfo GetFaction(string factionId)
     {

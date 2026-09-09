@@ -449,3 +449,67 @@ Work Log:
 Stage Summary:
 - Фича на GitHub, дважды независимо верифицирована (cron-агент + эта сессия).
 - Ловушка для будущих QA: без GODOT_NEWGAME=1 и явной сцены сим не стартует.
+
+---
+Task ID: R10-RECOVERY-0909 (ретро-запись — сессия оборвалась до записи в worklog)
+Agent: main-agent (Z.ai Code)
+Task: Внешнее ревью №1, фикс TOCTOU/SlotId-адресности инвентаря (рекавери).
+
+Work Log:
+- Коммит 756fd79 «fix(review-R10): SlotId-адресность инвентаря —
+  TOCTOU-защита кучек» существует и запушен (origin/main == HEAD),
+  но ворклог-запись и чекпоинт не были закоммичены (обрыв сессии).
+- Восстановлено: чекпоинт checkpoints/09_09_r10_slotid_toctou.md в
+  рабочем дереве; QA-хук №26 GODOT_CONTEXT_DEBUG 11/11 PASS (включая
+  stale-сценарии 9-11: выброс ровно той кучки, отказ при stale split,
+  дрейф индексов).
+
+Stage Summary:
+- R10 закрыт полностью: SlotId (Guid) в InventorySlot, слот-адресные
+  TrySplitSlot/TryRemoveFromSlot, drag-data по slot_id, деструктивный
+  фолбэк запрещён. Подробности — в чекпоинте 09_09_r10_slotid_toctou.md.
+
+---
+Task ID: R11-SAVELOAD-0909
+Agent: main-agent (Z.ai Code, второе восстановление после обрыва)
+Task: Внешнее ревью №2 (Save/Load → World → Formation): валидация + фикс.
+Финальный шаг после обрыва: дефект самого round-trip-теста, найденный
+пользователем («камни 10→10», «слот5 ''→''» — тривиальные проверки).
+
+Work Log:
+- Ревью №2 валидировано полностью (все 7 находок подтверждены кодом):
+  P0 SaveFileHandler (JsonElement ≠ XxxSaveData — восстановление не
+  работало НИ У ОДНОГО ISaveable; блоки писались «{}» из-за отсутствия
+  IncludeFields), P1 SaveModule (события успеха безусловно), P1
+  SaveDataAggregator (подавление ошибок, Load всегда true), P2
+  WorldService (Biome=Plains хардкод, DangerLevel=0), P2 Tile/World
+  (две модели карты), P2 Formation (ломался общим контрактом).
+- Реализовано: ISaveable.StateType (типизированный round-trip, 8
+  реализаторов), SaveJson (единые опции: IncludeFields/CamelCase/
+  case-insensitive), агрегатор — транзакционность Save/Load + LastErrors,
+  SaveModule — честные SaveCompletedEvent/LoadCompletedEvent, Container.
+  ResolveAll — инстанс-ориентированный обход (раньше ResolveAll<ISaveable>
+  → SaveService ×7), WorldService — Biome из TerrainType + DangerLevel,
+  TileModule — единый источник размеров карты.
+- ДЕФЕКТ ТЕСТА (пользователь): мутации TryRemoveItem(int.MaxValue)
+  (транзакционный отказ — доступно 10 < int.MaxValue → НИЧЕГО не удалено)
+  и AssignSlot(5, "qa_probe_technique") (IsLearned отклоняет) не меняли
+  состояние → проверки «восстановления» проходили вхолостую.
+- SaveLoadSimDebug v2: мутации РЕАЛЬНЫЕ (удаление ровно N камней;
+  настоящая изученная техника из GetAllTechniques()); integrity-контроль
+  — каждая мутация ОБЯЗАНА изменить наблюдаемое состояние (иначе FAIL),
+  снимки обязаны содержать маркеры мутаций (id камня/техники/формации),
+  пустые блоки «{}» → FAIL; домен post-load: 5 проверок включая зарядник.
+- QA (свежий прогон): build 0 errors; GODOT_SAVELOAD_DEBUG → VERDICT:
+  PASS (камни 5+5→10→0→10, HP 1.00→0.66→1.00→0.66, слот5
+  tech_Cultivation_Neutral_Common_L1_41FE → '' → восстановлен, зарядник
+  On→Off→On, 7 блоков round-trip OK, файл 8/8, integrity OK);
+  регрессии CONTEXT/TRASHDROP/STORAGE/QUEST — все PASS.
+- Пуш (после коммита этой записи): см. git log.
+
+Stage Summary:
+- Ревью №2 закрыто: persistence теперь реально восстанавливает состояние
+  всех 8 модулей, события честные, World отдаёт настоящие данные.
+- Тест round-trip стал доказательным: анти-тривиальность + маркеры
+  содержимого. Дефект «камни 10→10» устранён.
+- Чекпоинт: checkpoints/09_09_r11_save_load.md.

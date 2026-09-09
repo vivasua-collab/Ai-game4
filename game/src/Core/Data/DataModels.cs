@@ -158,6 +158,15 @@ public class LocationData
 
     public int QiDensity { get; set; }
     public int QiFlowRate { get; set; }
+
+    /// <summary>
+    /// R11 P2-World (review): уровень опасности локации (масштабирование
+    /// спавна NPC — NPCSpawnerService.GetLocationDangerLevel, «Задача 1.9»).
+    /// Раньше поля не было, WorldService.GetLocation() возвращал захардкоженный 0.
+    /// 0 — безопасная локация (деревня/полигон).
+    /// </summary>
+    public int DangerLevel { get; set; }
+
     public TerrainType TerrainType { get; set; }
     public LocationType LocationType { get; set; }
     public int Width { get; set; }

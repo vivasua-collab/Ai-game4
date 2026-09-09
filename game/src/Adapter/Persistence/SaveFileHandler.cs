@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text.Json;
 using Godot;
 using CultivationGame.Core.Interfaces;
+using CultivationGame.Modules.Save;
 
 namespace CultivationGame.Adapter.Persistence;
 
@@ -33,12 +34,10 @@ namespace CultivationGame.Adapter.Persistence;
 /// </summary>
 public sealed class SaveFileHandler : ISaveFileHandler
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
-    };
+    // R11 P0-Save (review): единые опции всего persistence-конвейера.
+    // Прежние локальные опции БЕЗ IncludeFields — публичные поля XxxSaveData
+    // не сериализовались (блоки писались как «{}»). См. Modules.Save.SaveJson.
+    private static readonly JsonSerializerOptions JsonOptions = SaveJson.Options;
 
     private readonly string _saveRoot;
 

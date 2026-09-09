@@ -55,6 +55,9 @@ namespace CultivationGame.Modules.Player
         // === ISaveable ===
         public string SaveKey => "technique_slots";
 
+        /// <summary>R11 P0-Save (review): тип state-блока для persistence round-trip.</summary>
+        public Type StateType => typeof(SlotState);
+
         public TechniqueSlotService()
         {
         }

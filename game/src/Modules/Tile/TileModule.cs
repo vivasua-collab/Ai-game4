@@ -19,6 +19,10 @@ public sealed class TileModule : IModule
     [Inject] private readonly ITileService _tileService = null!;
     [Inject] private readonly ISubscriber<LocationChangedEvent> _locationChangedSub = null!;
     [Inject] private readonly IPublisher<TileMapGeneratedEvent> _mapGenPublisher = null!;
+    // R11 P2-World/Tile (review): единый источник геометрии карты — АКТИВНАЯ
+    // локация WorldService (модуль World стартует первым по каноническому
+    // порядку DI_AND_EVENTBUS §1.2 — CurrentLocation уже установлен).
+    [Inject] private readonly IWorldService _worldService = null!;
 
     private IDisposable? _locationSubToken;
     private TileConfig _config = new();
@@ -32,17 +36,38 @@ public sealed class TileModule : IModule
         if (_tileService is TileService ts)
             ts.Initialize();
 
-        // Env var override for perf testing: GODOT_MAP_SIZE=500 generates 500×500.
-        // Usage: GODOT_MAP_SIZE=500 godot --headless scenes/GameWorld.tscn
+        // R11 P2-World/Tile (review): атомарная связка CurrentLocation ↔
+        // CurrentGrid. Раньше геометрия бралась из дубля констант TileConfig
+        // (совпадение с test_polygon 50×50/12345 было случайным), а
+        // GODOT_MAP_SIZE-override вообще ломал соответствие: CurrentLocation
+        // говорил об одной карте, grid — уже о другой. Теперь параметры —
+        // из данных активной локации; TileConfig — только последний fallback
+        // (активной локации нет); GODOT_MAP_SIZE — явно задокументированный
+        // perf-override для тестов.
         int width = _config.DefaultWidth;
         int height = _config.DefaultHeight;
         int seed = _config.DefaultSeed;
+        var terrain = _config.DefaultTerrain;
+
+        var active = _worldService.CurrentLocation;
+        if (active != null && active.Width > 0 && active.Height > 0)
+        {
+            width = active.Width;
+            height = active.Height;
+            seed = active.Seed;
+            terrain = active.TerrainType;
+        }
+
+        // Env var override for perf testing: GODOT_MAP_SIZE=500 generates 500×500.
+        // Usage: GODOT_MAP_SIZE=500 godot --headless scenes/GameWorld.tscn
+        // ВНИМАНИЕ: осознанно рассинхронизирует grid с активной локацией —
+        // только для замеров производительности.
         var envSize = System.Environment.GetEnvironmentVariable("GODOT_MAP_SIZE");
         if (!string.IsNullOrEmpty(envSize) && int.TryParse(envSize, out var envW))
         {
             width = height = envW;
             seed = 67890; // deterministic for large world
-            Console.WriteLine($"[TileModule] GODOT_MAP_SIZE={envW} override");
+            Console.WriteLine($"[TileModule] GODOT_MAP_SIZE={envW} override (grid ≠ активная локация — perf-тест)");
         }
 
         // Generate a default grid as fallback for direct scene loading
@@ -50,7 +75,7 @@ public sealed class TileModule : IModule
         // When NewGame() is called, TileMapGenPhase will regenerate with the
         // selected location (test_polygon 50×50 or large_world 500×500).
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        _tileService.Generate(seed, width, height, _config.DefaultTerrain);
+        _tileService.Generate(seed, width, height, terrain);
         sw.Stop();
         _mapGenPublisher.Publish(new TileMapGeneratedEvent(width, height, seed));
         Console.WriteLine($"[TileModule] Started — generated {width}x{height} grid in {sw.ElapsedMilliseconds} ms");

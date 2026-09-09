@@ -584,6 +584,9 @@ namespace CultivationGame.Modules.Body
         /// </summary>
         public string SaveKey => "body";
 
+        /// <summary>R11 P0-Save (review): тип state-блока для persistence round-trip.</summary>
+        public Type StateType => typeof(BodySaveData);
+
         /// <summary>
         /// Снять состояние тела для сериализации.
         /// Сохраняет: морфологию, материал, упрощённое состояние частей тела

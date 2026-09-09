@@ -328,6 +328,14 @@ public partial class GameWorldController : Node2D
             var contextSim = new ContextMenuSimDebug { Name = "ContextMenuSimDebug" };
             AddChild(contextSim);
         }
+        // 2026-09-09 (R11, ревью Save/Load): round-trip верификация
+        // persistence (GODOT_SAVELOAD_DEBUG=1) — 8 ISaveable-блоков,
+        // типизированный RestoreState, IncludeFields, честный success.
+        if (System.Environment.GetEnvironmentVariable("GODOT_SAVELOAD_DEBUG") == "1")
+        {
+            var saveLoadSim = new SaveLoadSimDebug { Name = "SaveLoadSimDebug" };
+            AddChild(saveLoadSim);
+        }
         // 2026-09-08 (баг-репорт пользователя): headless-верификация
         // инвентарного drag&drop в корзину (GODOT_TRASHDROP_DEBUG=1) —
         // материалы draggable, корзина выбрасывает, кукла отклоняет.

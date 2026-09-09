@@ -532,6 +532,9 @@ namespace CultivationGame.Modules.Inventory
 
         public string SaveKey => "inventory";
 
+        /// <summary>R11 P0-Save (review): тип state-блока для persistence round-trip.</summary>
+        public Type StateType => typeof(InventorySaveData);
+
         public object CaptureState()
         {
             var slotData = new InventorySlotSaveData[_slots.Count];

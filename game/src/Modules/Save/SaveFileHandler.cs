@@ -45,10 +45,9 @@ public sealed class SaveFileHandler : ISaveFileHandler
         try
         {
             var path = SlotPath(slotName);
-            var json = JsonSerializer.Serialize(data, new JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
+            // R11 P0-Save (review): единые опции конвейера — IncludeFields
+            // (поля XxxSaveData!), CamelCase, case-insensitive чтение.
+            var json = JsonSerializer.Serialize(data, SaveJson.Options);
             File.WriteAllText(path, json);
             Console.WriteLine($"[SaveFileHandler] Wrote {path} ({data.Count} sections)");
             return true;
@@ -67,7 +66,7 @@ public sealed class SaveFileHandler : ISaveFileHandler
             var path = SlotPath(slotName);
             if (!File.Exists(path)) return null;
             var json = File.ReadAllText(path);
-            var data = JsonSerializer.Deserialize<Dictionary<string, object>>(json);
+            var data = JsonSerializer.Deserialize<Dictionary<string, object>>(json, SaveJson.Options);
             Console.WriteLine($"[SaveFileHandler] Read {path} ({data?.Count ?? 0} sections)");
             return data;
         }

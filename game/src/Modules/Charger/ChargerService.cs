@@ -428,6 +428,9 @@ namespace CultivationGame.Modules.Charger
         /// </summary>
         public string SaveKey => "charger";
 
+        /// <summary>R11 P0-Save (review): тип state-блока для persistence round-trip.</summary>
+        public Type StateType => typeof(ChargerSaveData);
+
         /// <summary>
         /// Сериализовать состояние зарядника.
         /// Сохраняем: режим (On/Off), состояние буфера (Qi),

@@ -25,6 +25,15 @@ namespace CultivationGame.Core.Interfaces
         string CurrentSectorId { get; }
 
         /// <summary>
+        /// R11 P2-World/Tile (review): полные данные АКТИВНОЙ локации —
+        /// единый источник геометрии/сида/террейна карты. TileModule берёт
+        /// отсюда параметры генерации grid'а (раньше — дубль констант
+        /// TileConfig, связка CurrentLocation ↔ CurrentGrid была неатомарной:
+        /// локация говорила об одной карте, grid — о другой).
+        /// </summary>
+        LocationData? CurrentLocation { get; }
+
+        /// <summary>
         /// Попытка путешествия в указанную локацию.
         /// Возвращает true, если путешествие началось успешно.
         /// Публикует TravelStartedEvent и (позже) LocationChangedEvent.

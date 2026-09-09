@@ -26,9 +26,19 @@ public sealed class SaveService : ISaveService, ISaveable
     // ISaveable
     public string SaveKey => "save_meta";
 
+    /// <summary>R11 P0: типизированный state-блок меты (был анонимный тип).</summary>
+    private sealed class SaveMetaState
+    {
+        public long SavedAt;
+        public int Version;
+    }
+
+    /// <summary>R11 P0-Save: конкретный тип для round-trip десериализации.</summary>
+    public Type StateType => typeof(SaveMetaState);
+
     public object CaptureState()
     {
-        return new { savedAt = DateTime.UtcNow.Ticks, version = 1 };
+        return new SaveMetaState { SavedAt = DateTime.UtcNow.Ticks, Version = 1 };
     }
 
     public void RestoreState(object state)
@@ -49,15 +59,27 @@ public sealed class SaveService : ISaveService, ISaveable
         _saveStartedPub?.Publish(new SaveStartedEvent(slot.Name, slot.Type));
 
         bool ok = _aggregator.Save(slot.Name);
-        Console.WriteLine($"[SaveService] Save('{slot}') → {(ok ? "OK" : "FAILED")}");
+        LastError = ok ? null : DescribeErrors("Save", slot);
+        Console.WriteLine($"[SaveService] Save('{slot}') → {(ok ? "OK" : "FAILED")}{(ok ? "" : $" — {LastError}")}");
         return ok;
     }
 
     public bool Load(SaveSlot slot)
     {
         bool ok = _aggregator.Load(slot.Name);
-        Console.WriteLine($"[SaveService] Load('{slot}') → {(ok ? "OK" : "FAILED")}");
+        LastError = ok ? null : DescribeErrors("Load", slot);
+        Console.WriteLine($"[SaveService] Load('{slot}') → {(ok ? "OK" : "FAILED")}{(ok ? "" : $" — {LastError}")}");
         return ok;
+    }
+
+    /// <summary>R11 P1-Save: детализованное описание ошибки для событий/UI.</summary>
+    public string? LastError { get; private set; }
+
+    private string? DescribeErrors(string op, SaveSlot slot)
+    {
+        var errs = _aggregator.LastErrors;
+        if (errs.Count == 0) return $"{op}('{slot}') failed (file I/O)";
+        return $"{op}('{slot}') failed: {string.Join("; ", errs)}";
     }
 
     public bool HasSave(SaveSlot slot) => _aggregator.HasSave(slot.Name);

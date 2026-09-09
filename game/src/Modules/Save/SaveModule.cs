@@ -63,19 +63,26 @@ public sealed class SaveModule : IModule
         if (_config.AutoSaveIntervalMinutes <= 0) return;
 
         var slot = new SaveSlot($"autosave_{(tickCount / 60):D4}", SaveSlotType.AutoSave);
-        _saveService.Save(slot);
+        // R11 P1-Save: результат автосейва не глотаем — лог при провале.
+        if (!_saveService.Save(slot))
+            Console.WriteLine($"[SaveModule] Autosave FAILED: {_saveService.LastError}");
     }
 
     private void OnSaveRequested(in SaveRequestedEvent e)
     {
-        _saveService.Save(new SaveSlot(e.SlotName, e.SlotType));
-        _saveCompletedPublisher.Publish(new SaveCompletedEvent(true, e.SlotName, null));
+        // R11 P1-Save (review): публикуем РЕАЛЬНЫЙ результат операции —
+        // раньше SaveCompletedEvent(true, …) писался безусловно, и UI/
+        // автоматика получали ложный успех при упавшем файле/блоке.
+        bool ok = _saveService.Save(new SaveSlot(e.SlotName, e.SlotType));
+        _saveCompletedPublisher.Publish(new SaveCompletedEvent(
+            ok, e.SlotName, ok ? null : _saveService.LastError ?? "save failed"));
     }
 
     private void OnLoadRequested(in LoadRequestedEvent e)
     {
-        _saveService.Load(new SaveSlot(e.SlotName, e.SlotType));
-        _loadCompletedPublisher.Publish(new LoadCompletedEvent(true, e.SlotName, null));
+        // R11 P1-Save (review): честный LoadCompletedEvent.
+        bool ok = _saveService.Load(new SaveSlot(e.SlotName, e.SlotType));
+        _loadCompletedPublisher.Publish(new LoadCompletedEvent(ok, e.SlotName));
     }
 
     public void Dispose()

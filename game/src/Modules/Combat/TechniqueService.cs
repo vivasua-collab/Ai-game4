@@ -630,6 +630,9 @@ namespace CultivationGame.Modules.Combat
 
         public string SaveKey => "techniques";
 
+        /// <summary>R11 P0-Save (review): тип state-блока для persistence round-trip.</summary>
+        public Type StateType => typeof(TechniqueServiceState);
+
         public object CaptureState()
         {
             var state = new TechniqueServiceState
