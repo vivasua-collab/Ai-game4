@@ -432,3 +432,20 @@ Stage Summary:
   кучки, слот-адресный выброс) ТЕПЕРЬ НА GITHUB (b17f859).
 - Расхождений кода нет; дерево чистое; все задачи цикла закрыты.
 - Пользователю: в своём окружении выполнить git pull для получения фичи.
+
+---
+Task ID: R9-VERIFY-0909 (main worklog → /home/z/my-project/worklog.md — дублирующая запись)
+Agent: main-agent (Z.ai Code, сессия пользователя 06:05 UTC)
+Task: Прямой запрос: сверка кода (GitHub = истина) + верификация/пуш фичи деления стаков.
+
+Work Log:
+- Сверка: behind=0/ahead=2 (b17f859+7c5b672); параллельно в 06:13 UTC дежурный
+  cron-агент 370424 запушил их же + f1d1419. Финал: origin/main=HEAD=f1d1419,
+  дерево чистое, расхождений нет.
+- Независимая верификация этой сессией: build 0 errors; GODOT_CONTEXT_DEBUG
+  8/8 PASS (запуск ТОЛЬКО с GODOT_NEWGAME=1 + scenes/MainMenu.tscn); регрессия
+  TRASHDROP/STORAGE/QUEST — PASS.
+
+Stage Summary:
+- Фича на GitHub, дважды независимо верифицирована (cron-агент + эта сессия).
+- Ловушка для будущих QA: без GODOT_NEWGAME=1 и явной сцены сим не стартует.
