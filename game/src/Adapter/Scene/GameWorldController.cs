@@ -320,6 +320,14 @@ public partial class GameWorldController : Node2D
             var questSim = new QuestSimDebug { Name = "QuestSimDebug" };
             AddChild(questSim);
         }
+        // 2026-09-09: контекстное меню/диалог разделения стака инвентаря
+        // (GODOT_CONTEXT_DEBUG=1) — ПКМ-свойства, слайдер деления кучек,
+        // слот-адресный выброс в корзину.
+        if (System.Environment.GetEnvironmentVariable("GODOT_CONTEXT_DEBUG") == "1")
+        {
+            var contextSim = new ContextMenuSimDebug { Name = "ContextMenuSimDebug" };
+            AddChild(contextSim);
+        }
         // 2026-09-08 (баг-репорт пользователя): headless-верификация
         // инвентарного drag&drop в корзину (GODOT_TRASHDROP_DEBUG=1) —
         // материалы draggable, корзина выбрасывает, кукла отклоняет.
@@ -1338,12 +1346,21 @@ public partial class GameWorldController : Node2D
             GD.Print($"[GameWorld] Pause toggled: {Time.IsPaused}");
         }
         // If inventory is open and Esc pressed, close it instead of pausing.
+        // 2026-09-09: Esc сначала закрывает верхний попап (диалог разделения
+        // стака → контекстное меню), и только потом — само окно инвентаря.
         else if (PlayerInput.IsPausePressed && _inventoryWindow != null && _inventoryWindow.Visible)
         {
-            _inventoryWindow.Toggle();
-            // Resume game time when closing inventory via Esc (same as B-close path).
-            if (!_wasPausedBeforeInventory && Time != null && Time.IsPaused)
-                Time.Resume();
+            if (_inventoryWindow.CloseTopmostPopup())
+            {
+                GD.Print("[GameWorld] Esc закрыл попап инвентаря (меню/диалог)");
+            }
+            else
+            {
+                _inventoryWindow.Toggle();
+                // Resume game time when closing inventory via Esc (same as B-close path).
+                if (!_wasPausedBeforeInventory && Time != null && Time.IsPaused)
+                    Time.Resume();
+            }
         }
 
         if (PlayerInput.IsInventoryPressed)

@@ -24,6 +24,26 @@ namespace CultivationGame.Core.Interfaces
         int TotalSlots { get; }
         int UsedSlots { get; }
 
+        // === Кучки: работа с отдельными слотами (2026-09-09) ===
+
+        /// <summary>
+        /// Разделить слот на два стака («кучки»): перенести moveCount предметов
+        /// из слота slotIndex в НОВЫЙ слот того же типа.
+        /// Условия: предмет стакается; 1 ≤ moveCount ≤ slot.Count−1 (оба стака ≥ 1).
+        /// Тотал по ItemId не меняется — события не публикуются.
+        /// Задача: отделить часть стака (выбросить/отложить под алхимию).
+        /// </summary>
+        bool TrySplitSlot(int slotIndex, int moveCount);
+
+        /// <summary>
+        /// Удалить ровно count предметов из КОНКРЕТНОГО слота slotIndex
+        /// (а не со всех слотов, как TryRemoveItem). Слот либо уменьшается,
+        /// либо удаляется целиком. Публикует ItemRemovedEvent.
+        /// Используется drop-ом кучки в корзину: выбрасывается только
+        /// перетащенный стак, остальные кучки того же предмета остаются.
+        /// </summary>
+        bool TryRemoveFromSlot(int slotIndex, int count);
+
         // === STR-MODEL: методы для работы с весом и объёмом ===
 
         /// <summary>

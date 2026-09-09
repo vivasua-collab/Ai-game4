@@ -331,6 +331,17 @@ public partial class CharacterDollPanel : Control
         return dict;
     }
 
+    /// <summary>
+    /// 2026-09-09: drag-data с адресом слота инвентаря («кучка»).
+    /// Приёмники (корзина) выбрасывают КОНКРЕТНЫЙ стак, а не весь предмет.
+    /// </summary>
+    internal static Godot.Collections.Dictionary CreateDragData(ItemData item, string source, int slotIndex)
+    {
+        var dict = CreateDragData(item, source);
+        dict["slot_index"] = slotIndex;
+        return dict;
+    }
+
     internal static bool TryParseDragData(Variant data, out string itemId, out string source)
     {
         itemId = string.Empty;
@@ -340,6 +351,23 @@ public partial class CharacterDollPanel : Control
         itemId = dict.ContainsKey("item_id") ? dict["item_id"].AsString() : string.Empty;
         source = dict.ContainsKey("source") ? dict["source"].AsString() : string.Empty;
         return !string.IsNullOrEmpty(itemId);
+    }
+
+    /// <summary>
+    /// 2026-09-09: разбор drag-data с опциональным адресом слота инвентаря.
+    /// slotIndex = −1, если источник не инвентарная строка (легаси-данные).
+    /// </summary>
+    internal static bool TryParseDragData(Variant data, out string itemId, out string source, out int slotIndex)
+    {
+        slotIndex = -1;
+        if (!TryParseDragData(data, out itemId, out source)) return false;
+        if (data.VariantType == Variant.Type.Dictionary)
+        {
+            var dict = data.As<Godot.Collections.Dictionary>();
+            if (dict.ContainsKey("slot_index"))
+                slotIndex = dict["slot_index"].AsInt32();
+        }
+        return true;
     }
 
     /// <summary>Build a drag preview label (shown next to cursor while dragging).</summary>

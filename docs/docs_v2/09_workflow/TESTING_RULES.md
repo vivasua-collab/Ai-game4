@@ -41,6 +41,7 @@
 | `GODOT_RESPAWN_DEBUG=1` | RespawnSimDebug | Ревью-этап-6: respawn ресурсов (истощение→7 дней→восстановление тайла), честный TryTravel, TimeChangedEvent.Delta == DeltaTime |
 | `GODOT_QUEST_DEBUG=1` | QuestSimDebug | Ревью-этап-7: полный цикл квестов — accept (через реальный диалог старейшины) → событие → complete → reward; гейт RequiredCultivationLevel |
 | `GODOT_TRASHDROP_DEBUG=1` | TrashDropSimDebug | Баг-репорт 09-08: инвентарный drag&drop в корзину — материалы draggable (раньше пустой Variant), корзина выбрасывает весь стек, кукла отклоняет не-экипировку, чужой source отвергается |
+| `GODOT_CONTEXT_DEBUG=1` | ContextMenuSimDebug | Запрос 09-09: ПКМ-контекстное меню — окно свойств, «Разделить стак…» (слайдер −/+ с двумя числами), множественные кучки одного ItemId, слот-адресный выброс кучки в корзину, Esc-приоритет попапов (8/8) |
 | `GODOT_SCREENSHOT=<путь>` | GameBoot | Скриншот в файл (VLM-верификация) |
 | `GODOT_SCREENSHOT_DELAY=<сек>` | GameBoot | Задержка кадра для скриншота |
 

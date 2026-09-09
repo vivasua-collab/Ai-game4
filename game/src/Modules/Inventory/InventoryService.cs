@@ -286,6 +286,78 @@ namespace CultivationGame.Modules.Inventory
             return _slots.AsReadOnly();
         }
 
+        // === Кучки: работа с отдельными слотами (2026-09-09) ===
+
+        /// <summary>
+        /// Разделить слот на два стака («кучки»): moveCount предметов переезжают
+        /// в НОВЫЙ слот того же ItemId. Оба стака остаются ≥ 1.
+        /// Множественные стаки одного типа — легальное состояние инвентаря
+        /// (TryAddItem и так создаёт второй стак при переполнении MaxStack).
+        /// ИНВАРИАНТЫ: тотал по ItemId не меняется (кэш актуален); события
+        /// ItemAdded/ItemRemoved НЕ публикуются (предмет не покидал инвентарь);
+        /// вес/объём не меняются (сумма неизменна — объёмный лимит не проверяем).
+        /// </summary>
+        public bool TrySplitSlot(int slotIndex, int moveCount)
+        {
+            if (!_isConfigured) Configure(new InventoryConfig());
+            if (slotIndex < 0 || slotIndex >= _slots.Count) return false;
+            var src = _slots[slotIndex];
+            if (src.IsEmpty || string.IsNullOrEmpty(src.ItemId)) return false;
+            if (moveCount < 1 || moveCount >= src.Count) return false; // оба стака ≥ 1
+
+            // Кучки имеют смысл только для стакающихся предметов.
+            if (_itemDatabase != null
+                && _itemDatabase.TryGetItem(src.ItemId, out var item)
+                && item != null && !item.Stackable)
+                return false;
+
+            _slots[slotIndex] = new InventorySlot(src.ItemId, src.Count - moveCount, src.Category, src.Rarity);
+            _slots.Add(new InventorySlot(src.ItemId, moveCount, src.Category, src.Rarity));
+            // Кэш не трогаем: GetItemCount(itemId) суммарно не изменился.
+            Console.WriteLine($"[Inventory] Split slot {slotIndex}: {src.ItemId} ×{src.Count} → ×{src.Count - moveCount} + ×{moveCount}");
+            return true;
+        }
+
+        /// <summary>
+        /// Удалить ровно count предметов из КОНКРЕТНОГО слота.
+        /// В отличие от TryRemoveItem (который собирает сумму со всех слотов),
+        /// метод трогает только указанный слот — остальные кучки того же
+        /// предмета остаются в инвентаре. Публикует ItemRemovedEvent.
+        /// </summary>
+        public bool TryRemoveFromSlot(int slotIndex, int count)
+        {
+            if (!_isConfigured) Configure(new InventoryConfig());
+            if (slotIndex < 0 || slotIndex >= _slots.Count) return false;
+            if (count <= 0) return false;
+            var src = _slots[slotIndex];
+            if (src.IsEmpty || string.IsNullOrEmpty(src.ItemId)) return false;
+            if (count > src.Count) return false;
+
+            if (count == src.Count)
+            {
+                _slots.RemoveAt(slotIndex);
+            }
+            else
+            {
+                _slots[slotIndex] = new InventorySlot(src.ItemId, src.Count - count, src.Category, src.Rarity);
+            }
+
+            // Пересчитать кэш тотала (могли остаться другие кучки).
+            int newTotal = 0;
+            for (int i = 0; i < _slots.Count; i++)
+            {
+                if (_slots[i].ItemId == src.ItemId)
+                    newTotal += _slots[i].Count;
+            }
+            if (newTotal > 0)
+                _itemCountCache[src.ItemId] = newTotal;
+            else
+                _itemCountCache.Remove(src.ItemId);
+
+            _itemRemovedPub.Publish(new ItemRemovedEvent(src.ItemId, count));
+            return true;
+        }
+
         // === STR-MODEL: методы строчной модели ===
 
         /// <summary>

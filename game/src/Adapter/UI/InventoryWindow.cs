@@ -53,6 +53,13 @@ public partial class InventoryWindow : Control
     private CharacterDollPanel _dollPanel = null!;
     private HBoxContainer _contentRow = null!;
 
+    // === ПКМ-контекстное меню и разделение стака (2026-09-09) ===
+    private ItemContextMenu? _contextMenu;
+    private SplitStackDialog? _splitDialog;
+
+    /// <summary>Локальная позиция последнего ПКМ (позиционирование меню).</summary>
+    public Vector2 LastContextMenuPosition { get; private set; }
+
 
     public override void _Ready()
     {
@@ -208,7 +215,7 @@ public partial class InventoryWindow : Control
         // в футере остаётся только небытовая механика без клавиш.
         var footer = new Label
         {
-            Text = "Двойной клик — надеть | Перетащи на 🗑 — выбросить",
+            Text = "ПКМ — свойства · ✂ разделение стака | Двойной клик — надеть | Перетащи на 🗑 — выбросить кучку",
             HorizontalAlignment = HorizontalAlignment.Center,
         };
         footer.AddThemeFontSizeOverride("font_size", 12);
@@ -242,6 +249,9 @@ public partial class InventoryWindow : Control
         }
         else
         {
+            // Закрываем попапы вместе с окном (меню/диалог не живут в скрытом окне).
+            CloseSplitDialog();
+            CloseContextMenu();
             GD.Print("[Inventory] Closed");
         }
     }
@@ -351,7 +361,7 @@ public partial class InventoryWindow : Control
         ToastPub?.Publish(new CultivationGame.Core.Messaging.Contracts.ToastShownEvent(message, 2.5f));
     }
 
-    // === QA-аксессоры (GODOT_TRASHDROP_DEBUG, №25) ===
+    // === QA-аксессоры (GODOT_TRASHDROP_DEBUG, №25; GODOT_CONTEXT_DEBUG, №26) ===
 
     /// <summary>Найти строку предмета по ItemId (для TrashDropSimDebug).</summary>
     public InventoryItemRow? FindRowForQA(string itemId)
@@ -362,6 +372,18 @@ public partial class InventoryWindow : Control
                 return row;
         }
         return null;
+    }
+
+    /// <summary>Все строки предметов (для ContextMenuSimDebug — кучки одного ItemId).</summary>
+    public System.Collections.Generic.List<InventoryItemRow> GetRowsForQA()
+    {
+        var rows = new System.Collections.Generic.List<InventoryItemRow>();
+        foreach (var child in _itemList.GetChildren())
+        {
+            if (child is InventoryItemRow row)
+                rows.Add(row);
+        }
+        return rows;
     }
 
     /// <summary>Найти зону «Выбросить» (для TrashDropSimDebug).</summary>
@@ -382,29 +404,52 @@ public partial class InventoryWindow : Control
     }
 
     /// <summary>
-    /// Drop an item from inventory onto the ground near the player.
-    /// Called by TrashDropZone when item is dragged to trash basket.
-    /// Removes ALL count of the item from inventory, drops as ground item.
+    /// Drop a item-slot (кучка) from inventory onto the ground near the player.
+    /// 2026-09-09: слот-адресный выброс — при множественных кучках одного
+    /// ItemId выбрасывается ТОЛЬКО перетащенный стак (запрос пользователя:
+     /// «отделить какую-то часть стака и выбросить»). Легаси-путь
+    /// DropItemOnGround (все слоты предмета) остаётся фолбэком для
+    /// drag-data без slot_index.
     /// </summary>
-    public void DropItemOnGround(string itemId)
+    public void DropSlotOnGround(int slotIndex, string itemId)
     {
         if (string.IsNullOrEmpty(itemId)) return;
 
-        // Get current count of this item in inventory.
-        int count = InventoryService.GetItemCount(itemId);
-        if (count <= 0)
+        var slots = InventoryService?.GetAllSlots();
+        if (slots == null || slotIndex < 0 || slotIndex >= slots.Count)
         {
-            GD.Print($"[Inventory] Cannot drop {itemId} — not in inventory");
+            GD.Print($"[Inventory] Cannot drop slot {slotIndex} — out of range");
             return;
         }
 
-        // Remove from inventory.
-        if (!InventoryService.TryRemoveItem(itemId, count))
+        var slot = slots[slotIndex];
+        if (slot.IsEmpty)
         {
-            GD.Print($"[Inventory] Failed to remove {itemId}×{count} from inventory");
+            GD.Print($"[Inventory] Cannot drop slot {slotIndex} — empty");
             return;
         }
 
+        // Индекс устарел (инвентарь менялся после старта drag) — фолбэк на старый путь.
+        if (slot.ItemId != itemId)
+        {
+            GD.Print($"[Inventory] Slot {slotIndex} drifted ({slot.ItemId} != {itemId}) — fallback to full drop");
+            DropItemOnGround(itemId);
+            return;
+        }
+
+        int count = slot.Count;
+        if (!InventoryService.TryRemoveFromSlot(slotIndex, count))
+        {
+            GD.Print($"[Inventory] Failed to remove slot {slotIndex} ({itemId}×{count})");
+            return;
+        }
+
+        DropOnGround(itemId, count);
+    }
+
+    /// <summary>Общий путь выброса: снять count шт. уже сделано вызывающим.</summary>
+    private void DropOnGround(string itemId, int count)
+    {
         // Get player position (tile → pixel).
         var playerPos = PlayerService.Position;
         float pixelX = playerPos.X * GameConstants.TILE_PIXELS + GameConstants.TILE_PIXELS / 2f;
@@ -425,6 +470,147 @@ public partial class InventoryWindow : Control
 
         GD.Print($"[Inventory] Dropped {displayName}×{count} on ground (dropId={dropId})");
         RefreshExternally();
+    }
+
+    /// <summary>
+    /// Drop an item from inventory onto the ground near the player (ЛЕНЕАСИ:
+    /// ВСЕ слоты этого itemId). Основной путь — слот-адресный DropSlotOnGround.
+    /// </summary>
+    public void DropItemOnGround(string itemId)
+    {
+        if (string.IsNullOrEmpty(itemId)) return;
+
+        // Get current count of this item in inventory.
+        int count = InventoryService.GetItemCount(itemId);
+        if (count <= 0)
+        {
+            GD.Print($"[Inventory] Cannot drop {itemId} — not in inventory");
+            return;
+        }
+
+        // Remove from inventory.
+        if (!InventoryService.TryRemoveItem(itemId, count))
+        {
+            GD.Print($"[Inventory] Failed to remove {itemId}×{count} from inventory");
+            return;
+        }
+
+        DropOnGround(itemId, count);
+    }
+
+    // === ПКМ-контекстное меню и разделение стака (2026-09-09) ===
+
+    /// <summary>
+    /// Открыть контекстное меню свойств предмета (ПКМ на строке инвентаря).
+    /// Позиция — возле курсора (в локальных координатах окна).
+    /// </summary>
+    public void OpenContextMenu(int slotIndex)
+    {
+        var slots = InventoryService?.GetAllSlots();
+        if (slots == null || slotIndex < 0 || slotIndex >= slots.Count) return;
+        var slot = slots[slotIndex];
+        if (slot.IsEmpty) return;
+        if (!ItemDatabase.TryGetItem(slot.ItemId, out var item) || item == null) return;
+
+        CloseSplitDialog();
+        CloseContextMenu();
+
+        LastContextMenuPosition = GetLocalMousePosition();
+        _contextMenu = new ItemContextMenu(this, slotIndex, slot, item);
+        AddChild(_contextMenu);
+        GD.Print($"[Inventory] Context menu opened: {item.NameRu} ×{slot.Count} (slot {slotIndex})");
+    }
+
+    /// <summary>Закрыть контекстное меню (если открыто).</summary>
+    public void CloseContextMenu()
+    {
+        if (_contextMenu == null) return;
+        _contextMenu.QueueFree();
+        _contextMenu = null;
+    }
+
+    /// <summary>Открыть диалог «Разделить стак» для слота.</summary>
+    public void OpenSplitDialog(int slotIndex)
+    {
+        var slots = InventoryService?.GetAllSlots();
+        if (slots == null || slotIndex < 0 || slotIndex >= slots.Count) return;
+        var slot = slots[slotIndex];
+        if (slot.IsEmpty || slot.Count < 2) return;
+        if (!ItemDatabase.TryGetItem(slot.ItemId, out var item) || item == null || !item.Stackable) return;
+
+        CloseSplitDialog();
+        CloseContextMenu();
+
+        _splitDialog = new SplitStackDialog(this, slotIndex, slot, item);
+        AddChild(_splitDialog);
+        GD.Print($"[Inventory] Split dialog opened: {item.NameRu} ×{slot.Count} (slot {slotIndex})");
+    }
+
+    /// <summary>Закрыть диалог разделения (если открыт).</summary>
+    public void CloseSplitDialog()
+    {
+        if (_splitDialog == null) return;
+        _splitDialog.QueueFree();
+        _splitDialog = null;
+    }
+
+    /// <summary>
+    /// Esc-приоритет: сначала закрывается верхний попап (диалог → меню),
+    /// и только если попапов нет — окно инвентаря закрывает сам контроллер.
+    /// Возвращает true, если что-то закрыл (значит, Esc «потреблён»).
+    /// </summary>
+    public bool CloseTopmostPopup()
+    {
+        if (_splitDialog != null)
+        {
+            CloseSplitDialog();
+            return true;
+        }
+        if (_contextMenu != null)
+        {
+            CloseContextMenu();
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>Контекстное меню открыто? (QA + Esc-логика контроллера).</summary>
+    public bool IsContextMenuOpenForQA => _contextMenu != null;
+
+    /// <summary>Диалог разделения открыт? (QA).</summary>
+    public bool IsSplitDialogOpenForQA => _splitDialog != null;
+
+    /// <summary>Текущий диалог разделения (QA-аксессор).</summary>
+    public SplitStackDialog? SplitDialogForQA => _splitDialog;
+
+    /// <summary>Текущее контекстное меню (QA-аксессор).</summary>
+    public ItemContextMenu? ContextMenuForQA => _contextMenu;
+
+    /// <summary>
+    /// Подтверждение из SplitStackDialog: разделить слот и обновить список.
+    /// </summary>
+    public bool TrySplitSlotForDialog(int slotIndex, int moveCount)
+    {
+        if (!InventoryService.TrySplitSlot(slotIndex, moveCount))
+        {
+            PublishToast("Не удалось разделить стак");
+            GD.Print($"[Inventory] Split failed: slot {slotIndex}, move {moveCount}");
+            return false;
+        }
+
+        int left = 0, right = 0;
+        var slots = InventoryService.GetAllSlots();
+        if (slotIndex >= 0 && slotIndex < slots.Count && slots[slotIndex].ItemId == slots[slots.Count - 1].ItemId)
+        {
+            // Стек не менялся при разъединении: слот уменьшился, кучка добавлена в конец.
+            left = slots[slotIndex].Count;
+            right = slots[slots.Count - 1].Count;
+        }
+
+        PublishToast($"✂ Разделено: {left} + {right}");
+        RefreshExternally();
+        GD.Print($"[Inventory] Split confirmed: slot {slotIndex} ×{left + right} → ×{left} + ×{right}");
+        return true;
     }
 
     private void RefreshItems()
@@ -450,9 +636,9 @@ public partial class InventoryWindow : Control
         }
         else
         {
-            foreach (var slot in slots)
+            for (int i = 0; i < slots.Count; i++)
             {
-                var row = CreateItemRow(slot);
+                var row = CreateItemRow(slots[i], i);
                 _itemList.AddChild(row);
             }
         }
@@ -482,10 +668,10 @@ public partial class InventoryWindow : Control
         _weightLabel.AddThemeColorOverride("font_color", weightColor);
     }
 
-    /// <summary>Create a single draggable item row.</summary>
-    private InventoryItemRow CreateItemRow(InventorySlot slot)
+    /// <summary>Create a single draggable item row (знает свой индекс слота).</summary>
+    private InventoryItemRow CreateItemRow(InventorySlot slot, int slotIndex)
     {
-        var row = new InventoryItemRow(slot, this, ItemDatabase);
+        var row = new InventoryItemRow(slot, slotIndex, this, ItemDatabase);
         return row;
     }
 }
@@ -498,9 +684,13 @@ public partial class InventoryItemRow : HBoxContainer
 {
     private readonly InventorySlot _slot;
     private readonly InventoryWindow _parent;
+    private readonly int _slotIndex;
 
     /// <summary>ItemId строки (QA-аксессор для TrashDropSimDebug).</summary>
     public string ItemIdForQA => _slot.ItemId;
+
+    /// <summary>Индекс слота в InventoryService.GetAllSlots() (кучка-адресность).</summary>
+    public int SlotIndexForQA => _slotIndex;
 
     private readonly IItemDatabaseService _itemDb;
 
@@ -509,9 +699,10 @@ public partial class InventoryItemRow : HBoxContainer
     private Label _qtyLabel = null!;
     private Label _weightLabel = null!;
 
-    public InventoryItemRow(InventorySlot slot, InventoryWindow parent, IItemDatabaseService db)
+    public InventoryItemRow(InventorySlot slot, int slotIndex, InventoryWindow parent, IItemDatabaseService db)
     {
         _slot = slot;
+        _slotIndex = slotIndex;
         _parent = parent;
         _itemDb = db;
         Name = $"Item_{slot.ItemId}";
@@ -603,6 +794,8 @@ public partial class InventoryItemRow : HBoxContainer
         // была недостижима (баг: «не могу перетащить камень в корзину»).
         // Кукла сама отклоняет не-экипировку (HandleDropOnSlot), корзина
         // принимает любой drag из инвентаря (source == "inventory").
+        // 2026-09-09: drag-data несёт slot_index — корзина выбрасывает
+        // КОНКРЕТНУЮ кучку, а не все предметы этого типа.
         if (!_itemDb.TryGetItem(_slot.ItemId, out var itemData))
             return new Variant();
 
@@ -610,7 +803,7 @@ public partial class InventoryItemRow : HBoxContainer
                         || itemData.Category == ItemCategory.Armor
                         || itemData.Category == ItemCategory.Accessory;
 
-        var dragData = CharacterDollPanel.CreateDragData(itemData, "inventory");
+        var dragData = CharacterDollPanel.CreateDragData(itemData, "inventory", _slotIndex);
         SetDragPreview(isEquipment
             ? CharacterDollPanel.BuildDragPreview(itemData.NameRu,
                 CharacterDollPanel.GetRarityColor(itemData.Rarity))
@@ -640,19 +833,10 @@ public partial class InventoryItemRow : HBoxContainer
         {
             if (mb.ButtonIndex == MouseButton.Right)
             {
-                // RMB: Этап 7 — для камня Ци: использовать (мгновенное поглощение).
-                // Для остальных категорий: только лог-инфо.
-                if (_itemDb.TryGetItem(_slot.ItemId, out var itemData))
-                {
-                    if (itemData.Category == ItemCategory.QiStone)
-                    {
-                        _parent.TryUseQiStone(_slot.ItemId);
-                    }
-                    else
-                    {
-                        GD.Print($"[Inventory] RMB on {itemData.NameRu} (category={itemData.Category}, rarity={itemData.Rarity})");
-                    }
-                }
+                // RMB (2026-09-09): контекстное окно свойств предмета.
+                // Для камней Ци кнопка «Использовать» живёт внутри меню
+                // (прямое поглощение этапа 7 сохранено как действие меню).
+                _parent.OpenContextMenu(_slotIndex);
             }
             else if (mb.ButtonIndex == MouseButton.Left)
             {
@@ -776,14 +960,19 @@ public partial class TrashDropZone : Panel
 
     public override void _DropData(Vector2 atPosition, Variant data)
     {
-        if (!CharacterDollPanel.TryParseDragData(data, out var itemId, out _))
+        // 2026-09-09: drag-data инвентаря несёт slot_index — выбрасывается
+        // конкретная кучка. Без индекса (легаси) — весь предмет (все слоты).
+        if (!CharacterDollPanel.TryParseDragData(data, out var itemId, out _, out int slotIndex))
             return;
 
         // Find InventoryWindow parent to access services.
         var inventoryWindow = FindParentInventoryWindow();
         if (inventoryWindow == null) return;
 
-        inventoryWindow.DropItemOnGround(itemId);
+        if (slotIndex >= 0)
+            inventoryWindow.DropSlotOnGround(slotIndex, itemId);
+        else
+            inventoryWindow.DropItemOnGround(itemId);
     }
 
     private InventoryWindow? FindParentInventoryWindow()
