@@ -411,3 +411,24 @@ Stage Summary:
   /home/z/my-project/.auth/github.token, затем `git push origin main`).
 - Репо публичный: клон/пул работают без токена; обновление локального
   репо пользователя — git pull (после пуша).
+
+---
+Task ID: R8-PUSH-0909
+Agent: main-agent (Z.ai Code, прямое указание пользователя)
+Task: Обязательная сверка кода с GitHub (GitHub = источник истины) и выгрузка фичи деления стаков. Пользователь предоставил токен.
+
+Work Log:
+- 06:09 UTC: дата/время получены; окружение живо (.NET 9, godot_flat, клон Ai-game4).
+- Токен пользователя сохранён в /home/z/my-project/.auth/github.token (chmod 600).
+- Сверка: git fetch + behind=0 (GitHub НЕТ коммитов, отсутствующих локально —
+  локаль НЕ отставала), ahead=2 (b17f859 фича + 7c5b672 worklog не запушены).
+- Санити: build CultivationGame.csproj — 0 errors / 0 warnings (0.9s).
+- PUSH выполнен: a87e54b..7c5b672 main -> main (токен x-access-token).
+- Контрольная сверка после push: behind=0 ahead=0 — локаль == origin/main,
+  вершина origin/main = 7c5b672.
+
+Stage Summary:
+- Фича деления стаков (ПКМ-свойства, SplitStackDialog [−] слайдер [+],
+  кучки, слот-адресный выброс) ТЕПЕРЬ НА GITHUB (b17f859).
+- Расхождений кода нет; дерево чистое; все задачи цикла закрыты.
+- Пользователю: в своём окружении выполнить git pull для получения фичи.
