@@ -204,8 +204,20 @@ public readonly struct WorldTime : IEquatable<WorldTime>
 // as a [Serializable] class with { string StatName; float Value; bool IsPercentage; }.
 
 // ── InventorySlot ───────────────────────────────────────────────────────
+/// <summary>
+/// 2026-09-09 (review R10, P1-SlotId): стабильная идентичность кучки.
+/// SlotId — Guid, уникальный в рамках сессии: индекс списка нестабилен
+/// (TOCTOU — инвентарь может мутировать между захватом индекса и действием),
+/// а SlotId переживает изменения количества/перестановки. Кучка, уменьшенная
+/// до 0, удаляется из списка — SlotId перестаёт существовать (это и есть
+/// «стак исчез» → UI обязан ОТКАЗАТЬСЯ от операции, а не фолбэчить).
+/// Семантика конструкторов: без SlotId — СОЗДАНИЕ новой кучки (новый Guid);
+/// со SlotId — модификация существующей (идентичность сохраняется).
+/// В Equals/GetHashCode SlotId НЕ участвует (сравнение — по содержимому).
+/// </summary>
 public readonly struct InventorySlot : IEquatable<InventorySlot>
 {
+    public readonly Guid SlotId;
     public readonly string ItemId;
     public readonly int Count;
     public readonly float Weight;
@@ -215,6 +227,7 @@ public readonly struct InventorySlot : IEquatable<InventorySlot>
 
     public InventorySlot(string itemId, int count, float weight, float volume)
     {
+        SlotId = Guid.NewGuid();
         ItemId = itemId;
         Count = count;
         Weight = weight;
@@ -225,6 +238,7 @@ public readonly struct InventorySlot : IEquatable<InventorySlot>
 
     public InventorySlot(string itemId, int count, ItemCategory category, ItemRarity rarity)
     {
+        SlotId = Guid.NewGuid();
         ItemId = itemId;
         Count = count;
         Weight = 0f;
@@ -232,6 +246,25 @@ public readonly struct InventorySlot : IEquatable<InventorySlot>
         Category = category;
         Rarity = rarity;
     }
+
+    /// <summary>
+    /// Identity-preserving: модификация существующей кучки — SlotId, ItemId,
+    /// Category, Rarity наследуются, меняется только Count.
+    /// </summary>
+    public InventorySlot(Guid slotId, string itemId, int count, ItemCategory category, ItemRarity rarity)
+    {
+        SlotId = slotId;
+        ItemId = itemId;
+        Count = count;
+        Weight = 0f;
+        Volume = 0f;
+        Category = category;
+        Rarity = rarity;
+    }
+
+    /// <summary>Та же кучка с другим количеством (SlotId сохраняется).</summary>
+    public InventorySlot WithCount(int newCount)
+        => new(SlotId, ItemId, newCount, Category, Rarity);
 
     public bool IsEmpty => Count <= 0 || string.IsNullOrEmpty(ItemId);
 

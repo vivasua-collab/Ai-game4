@@ -1,5 +1,6 @@
 #nullable enable
 using Godot;
+using System;
 using System.Collections.Generic;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.DI;
@@ -405,42 +406,46 @@ public partial class InventoryWindow : Control
 
     /// <summary>
     /// Drop a item-slot (кучка) from inventory onto the ground near the player.
-    /// 2026-09-09: слот-адресный выброс — при множественных кучках одного
-    /// ItemId выбрасывается ТОЛЬКО перетащенный стак (запрос пользователя:
-     /// «отделить какую-то часть стака и выбросить»). Легаси-путь
-    /// DropItemOnGround (все слоты предмета) остаётся фолбэком для
-    /// drag-data без slot_index.
+    /// 2026-09-09 (review R10, P1-SlotId): слот-адресный выброс по
+    /// СТАБИЛЬНОЙ идентичности кучки (SlotId), а не по индексу списка.
+    /// Индекс дрейфует при мутациях между стартом drag и drop (TOCTOU):
+    /// старый код при «дрейфе» фолбэчил на DropItemOnGround (УДАЛЯЛ ВСЕ
+    /// кучки предмета) — деструктивный сценарий закрыт. Теперь: кучка
+    /// исчезла / ItemId не совпал → ОТКАЗ с тостом (инвентарь не тронут).
     /// </summary>
-    public void DropSlotOnGround(int slotIndex, string itemId)
+    public void DropSlotOnGround(Guid slotId, string itemId)
     {
-        if (string.IsNullOrEmpty(itemId)) return;
+        if (string.IsNullOrEmpty(itemId) || slotId == Guid.Empty) return;
 
-        var slots = InventoryService?.GetAllSlots();
-        if (slots == null || slotIndex < 0 || slotIndex >= slots.Count)
+        int slotIndex = InventoryService.FindSlotIndexBySlotId(slotId);
+        if (slotIndex < 0)
         {
-            GD.Print($"[Inventory] Cannot drop slot {slotIndex} — out of range");
+            // Стак исчез (удалён/слит) между захватом и действием — ОТКАЗ.
+            PublishToast("Стак изменился — выброс отменён");
+            GD.Print($"[Inventory] Drop refused: slotId {slotId} not found (stale)");
             return;
         }
 
+        var slots = InventoryService.GetAllSlots();
         var slot = slots[slotIndex];
         if (slot.IsEmpty)
         {
-            GD.Print($"[Inventory] Cannot drop slot {slotIndex} — empty");
+            GD.Print($"[Inventory] Drop refused: slot {slotIndex} empty");
             return;
         }
 
-        // Индекс устарел (инвентарь менялся после старта drag) — фолбэк на старый путь.
+        // Подмена: slot_id нашёлся, но это уже другой предмет — ОТКАЗ.
         if (slot.ItemId != itemId)
         {
-            GD.Print($"[Inventory] Slot {slotIndex} drifted ({slot.ItemId} != {itemId}) — fallback to full drop");
-            DropItemOnGround(itemId);
+            PublishToast("Стак изменился — выброс отменён");
+            GD.Print($"[Inventory] Drop refused: slotId {slotId} drifted ({slot.ItemId} != {itemId})");
             return;
         }
 
         int count = slot.Count;
-        if (!InventoryService.TryRemoveFromSlot(slotIndex, count))
+        if (!InventoryService.TryRemoveFromSlot(slotId, itemId, count))
         {
-            GD.Print($"[Inventory] Failed to remove slot {slotIndex} ({itemId}×{count})");
+            GD.Print($"[Inventory] Failed to remove slot (slotId {slotId}, {itemId}×{count})");
             return;
         }
 
@@ -516,9 +521,11 @@ public partial class InventoryWindow : Control
         CloseContextMenu();
 
         LastContextMenuPosition = GetLocalMousePosition();
-        _contextMenu = new ItemContextMenu(this, slotIndex, slot, item);
+        // R10 P1-SlotId: меню получает снапшот слота (внутри — стабильный
+        // SlotId); все действия меню (разделить/выбросить) действуют по нему.
+        _contextMenu = new ItemContextMenu(this, slot, item);
         AddChild(_contextMenu);
-        GD.Print($"[Inventory] Context menu opened: {item.NameRu} ×{slot.Count} (slot {slotIndex})");
+        GD.Print($"[Inventory] Context menu opened: {item.NameRu} ×{slot.Count} (slotId {slot.SlotId})");
     }
 
     /// <summary>Закрыть контекстное меню (если открыто).</summary>
@@ -529,11 +536,17 @@ public partial class InventoryWindow : Control
         _contextMenu = null;
     }
 
-    /// <summary>Открыть диалог «Разделить стак» для слота.</summary>
-    public void OpenSplitDialog(int slotIndex)
+    /// <summary>
+    /// Открыть диалог «Разделить стак» для кучки. R10 P1-SlotId: адрес —
+    /// стабильный SlotId; при открытии слот разрешается ЗАНОВО (не индекс
+    /// из прошлого рендера). Диалог хранит SlotId+ItemId и при подтверждении
+    /// действует ТОЛЬКО по ним: кучка исчезла → отказ с тостом.
+    /// </summary>
+    public void OpenSplitDialog(Guid slotId)
     {
-        var slots = InventoryService?.GetAllSlots();
-        if (slots == null || slotIndex < 0 || slotIndex >= slots.Count) return;
+        int slotIndex = InventoryService.FindSlotIndexBySlotId(slotId);
+        if (slotIndex < 0) return;
+        var slots = InventoryService.GetAllSlots();
         var slot = slots[slotIndex];
         if (slot.IsEmpty || slot.Count < 2) return;
         if (!ItemDatabase.TryGetItem(slot.ItemId, out var item) || item == null || !item.Stackable) return;
@@ -541,9 +554,9 @@ public partial class InventoryWindow : Control
         CloseSplitDialog();
         CloseContextMenu();
 
-        _splitDialog = new SplitStackDialog(this, slotIndex, slot, item);
+        _splitDialog = new SplitStackDialog(this, slot, item);
         AddChild(_splitDialog);
-        GD.Print($"[Inventory] Split dialog opened: {item.NameRu} ×{slot.Count} (slot {slotIndex})");
+        GD.Print($"[Inventory] Split dialog opened: {item.NameRu} ×{slot.Count} (slotId {slot.SlotId})");
     }
 
     /// <summary>Закрыть диалог разделения (если открыт).</summary>
@@ -587,18 +600,23 @@ public partial class InventoryWindow : Control
     public ItemContextMenu? ContextMenuForQA => _contextMenu;
 
     /// <summary>
-    /// Подтверждение из SplitStackDialog: разделить слот и обновить список.
+    /// Подтверждение из SplitStackDialog: разделить кучку по SlotId и
+    /// обновить список. R10 P1-SlotId: действие применяется ТОЛЬКО к
+    /// исходной кучке (SlotId+expectedItemId) — если между открытием
+    /// диалога и подтверждением инвентарь мутировал и кучка исчезла,
+    /// операция ОТКАЗЫВАЕТСЯ (не применяется к «слоту по индексу»).
     /// </summary>
-    public bool TrySplitSlotForDialog(int slotIndex, int moveCount)
+    public bool TrySplitSlotForDialog(Guid slotId, string expectedItemId, int moveCount)
     {
-        if (!InventoryService.TrySplitSlot(slotIndex, moveCount))
+        if (!InventoryService.TrySplitSlot(slotId, expectedItemId, moveCount))
         {
-            PublishToast("Не удалось разделить стак");
-            GD.Print($"[Inventory] Split failed: slot {slotIndex}, move {moveCount}");
+            PublishToast("Стак изменился — разделение отменено");
+            GD.Print($"[Inventory] Split refused: slotId {slotId} stale or item mismatch");
             return false;
         }
 
         int left = 0, right = 0;
+        int slotIndex = InventoryService.FindSlotIndexBySlotId(slotId);
         var slots = InventoryService.GetAllSlots();
         if (slotIndex >= 0 && slotIndex < slots.Count && slots[slotIndex].ItemId == slots[slots.Count - 1].ItemId)
         {
@@ -609,7 +627,7 @@ public partial class InventoryWindow : Control
 
         PublishToast($"✂ Разделено: {left} + {right}");
         RefreshExternally();
-        GD.Print($"[Inventory] Split confirmed: slot {slotIndex} ×{left + right} → ×{left} + ×{right}");
+        GD.Print($"[Inventory] Split confirmed: slotId {slotId} ×{left + right} → ×{left} + ×{right}");
         return true;
     }
 
@@ -689,8 +707,15 @@ public partial class InventoryItemRow : HBoxContainer
     /// <summary>ItemId строки (QA-аксессор для TrashDropSimDebug).</summary>
     public string ItemIdForQA => _slot.ItemId;
 
-    /// <summary>Индекс слота в InventoryService.GetAllSlots() (кучка-адресность).</summary>
+    /// <summary>Индекс слота на момент рендера (только QA/отладка).</summary>
     public int SlotIndexForQA => _slotIndex;
+
+    /// <summary>
+    /// R10 P1-SlotId: стабильная идентичность кучки на момент рендера.
+    /// Все отложенные действия (drag&drop, ПКМ-меню) действуют ПО НЕЙ —
+    /// индекс _slotIndex к моменту действия может дрейфовать (TOCTOU).
+    /// </summary>
+    public Guid SlotIdForQA => _slot.SlotId;
 
     private readonly IItemDatabaseService _itemDb;
 
@@ -794,8 +819,9 @@ public partial class InventoryItemRow : HBoxContainer
         // была недостижима (баг: «не могу перетащить камень в корзину»).
         // Кукла сама отклоняет не-экипировку (HandleDropOnSlot), корзина
         // принимает любой drag из инвентаря (source == "inventory").
-        // 2026-09-09: drag-data несёт slot_index — корзина выбрасывает
-        // КОНКРЕТНУЮ кучку, а не все предметы этого типа.
+        // 2026-09-09 (review R10): drag-data несёт СТАБИЛЬНЫЙ slot_id —
+        // корзина выбрасывает КОНКРЕТНУЮ кучку, разрешая адрес по Guid;
+        // при stale-адресе — ОТКАЗ, а не деструктивный фолбэк.
         if (!_itemDb.TryGetItem(_slot.ItemId, out var itemData))
             return new Variant();
 
@@ -803,7 +829,7 @@ public partial class InventoryItemRow : HBoxContainer
                         || itemData.Category == ItemCategory.Armor
                         || itemData.Category == ItemCategory.Accessory;
 
-        var dragData = CharacterDollPanel.CreateDragData(itemData, "inventory", _slotIndex);
+        var dragData = CharacterDollPanel.CreateDragData(itemData, "inventory", _slot.SlotId);
         SetDragPreview(isEquipment
             ? CharacterDollPanel.BuildDragPreview(itemData.NameRu,
                 CharacterDollPanel.GetRarityColor(itemData.Rarity))
@@ -960,19 +986,23 @@ public partial class TrashDropZone : Panel
 
     public override void _DropData(Vector2 atPosition, Variant data)
     {
-        // 2026-09-09: drag-data инвентаря несёт slot_index — выбрасывается
-        // конкретная кучка. Без индекса (легаси) — весь предмет (все слоты).
-        if (!CharacterDollPanel.TryParseDragData(data, out var itemId, out _, out int slotIndex))
+        // 2026-09-09 (review R10, P1-SlotId): drag-data инвентаря несёт
+        // стабильный slot_id — выбрасывается КОНКРЕТНАЯ кучка, адрес
+        // разрешается по Guid. Без slot_id (легаси/mutation) — ОТКАЗ:
+        // деструктивный фолбэк «выбросить все слоты предмета» со стороны
+        // drop-приёмника запрещён (review: stale-index не должен
+        // превращаться в потерю ВСЕХ кучек).
+        if (!CharacterDollPanel.TryParseDragData(data, out var itemId, out _, out Guid slotId))
             return;
 
         // Find InventoryWindow parent to access services.
         var inventoryWindow = FindParentInventoryWindow();
         if (inventoryWindow == null) return;
 
-        if (slotIndex >= 0)
-            inventoryWindow.DropSlotOnGround(slotIndex, itemId);
+        if (slotId != Guid.Empty)
+            inventoryWindow.DropSlotOnGround(slotId, itemId);
         else
-            inventoryWindow.DropItemOnGround(itemId);
+            GD.Print($"[Inventory] Trash drop refused: drag-data without slot_id ({itemId}) — stale/legacy, no destructive fallback");
     }
 
     private InventoryWindow? FindParentInventoryWindow()

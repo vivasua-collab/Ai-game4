@@ -10,6 +10,7 @@
 //     предметы типа (важно при множественных кучках одного ItemId).
 //   • Будущее (планы): алхимия — точные количества вещества из кучки.
 using Godot;
+using System;
 using System.Collections.Generic;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.Interfaces;
@@ -24,7 +25,6 @@ namespace CultivationGame.Adapter.UI;
 public partial class ItemContextMenu : Control
 {
     private readonly InventoryWindow _parent;
-    private readonly int _slotIndex;
     private readonly InventorySlot _slot;
     private readonly ItemData _item;
 
@@ -34,13 +34,13 @@ public partial class ItemContextMenu : Control
     public Button? UseButtonForQA { get; private set; }
     public Button? SplitButtonForQA { get; private set; }
     public Button? DropButtonForQA { get; private set; }
-    public int SlotIndexForQA => _slotIndex;
+    /// <summary>R10 P1-SlotId: стабильная идентичность кучки (действия меню).</summary>
+    public Guid SlotIdForQA => _slot.SlotId;
     public int PropertyCountForQA { get; private set; }
 
-    public ItemContextMenu(InventoryWindow parent, int slotIndex, InventorySlot slot, ItemData item)
+    public ItemContextMenu(InventoryWindow parent, InventorySlot slot, ItemData item)
     {
         _parent = parent;
-        _slotIndex = slotIndex;
         _slot = slot;
         _item = item;
         Name = "ItemContextMenu";
@@ -188,7 +188,8 @@ public partial class ItemContextMenu : Control
             splitBtn.Pressed += () =>
             {
                 _parent.CloseContextMenu();
-                _parent.OpenSplitDialog(_slotIndex);
+                // R10 P1-SlotId: открытие по стабильной идентичности кучки.
+                _parent.OpenSplitDialog(_slot.SlotId);
             };
             buttons.AddChild(splitBtn);
             SplitButtonForQA = splitBtn;
@@ -205,7 +206,9 @@ public partial class ItemContextMenu : Control
         dropBtn.Pressed += () =>
         {
             _parent.CloseContextMenu();
-            _parent.DropSlotOnGround(_slotIndex, _item.ItemId);
+            // R10 P1-SlotId: выброс ТОЛЬКО этой кучки по стабильному Guid;
+            // при stale — отказ внутри DropSlotOnGround (не «весь предмет»).
+            _parent.DropSlotOnGround(_slot.SlotId, _item.ItemId);
         };
         buttons.AddChild(dropBtn);
         DropButtonForQA = dropBtn;
@@ -392,7 +395,6 @@ public partial class ItemContextMenu : Control
 public partial class SplitStackDialog : Control
 {
     private readonly InventoryWindow _parent;
-    private readonly int _slotIndex;
     private readonly InventorySlot _slot;
     private readonly ItemData _item;
     private readonly int _total;
@@ -412,11 +414,12 @@ public partial class SplitStackDialog : Control
     /// <summary>Сколько предметов уйдёт в новую кучку (текущее значение слайдера).</summary>
     public int CurrentMoveForQA => (int)_slider.Value;
     public int TotalForQA => _total;
+    /// <summary>R10 P1-SlotId: стабильная идентичность исходной кучки.</summary>
+    public Guid SlotIdForQA => _slot.SlotId;
 
-    public SplitStackDialog(InventoryWindow parent, int slotIndex, InventorySlot slot, ItemData item)
+    public SplitStackDialog(InventoryWindow parent, InventorySlot slot, ItemData item)
     {
         _parent = parent;
-        _slotIndex = slotIndex;
         _slot = slot;
         _item = item;
         _total = slot.Count;
@@ -634,7 +637,12 @@ public partial class SplitStackDialog : Control
     private void OnConfirm()
     {
         int move = (int)_slider.Value;
-        if (_parent.TrySplitSlotForDialog(_slotIndex, move))
+        // R10 P1-SlotId: действие ТОЛЬКО по стабильной идентичности кучки
+        // (SlotId + expectedItemId). Если инвентарь мутировал с момента
+        // открытия диалога и кучка исчезла/подменена — операция отклонена
+        // внутри TrySplitSlotForDialog (тост «Стак изменился»), диалог
+        // остаётся открытым для осознанного решения игрока.
+        if (_parent.TrySplitSlotForDialog(_slot.SlotId, _item.ItemId, move))
         {
             _parent.CloseSplitDialog();
         }

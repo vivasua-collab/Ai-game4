@@ -5,6 +5,7 @@
 // Редактировано: 2026-05-18 18:39:47 UTC — STR-MODEL: CanFitItem, HowManyCanFit,
 //   GetCurrentWeight, GetCurrentVolume, GetEffectiveMaxWeight/Volume
 // Интерфейс инвентаря игрока (строчная модель: вес + объём).
+using System;
 using System.Collections.Generic;
 using CultivationGame.Core.Data;
 
@@ -43,6 +44,33 @@ namespace CultivationGame.Core.Interfaces
         /// перетащенный стак, остальные кучки того же предмета остаются.
         /// </summary>
         bool TryRemoveFromSlot(int slotIndex, int count);
+
+        // === SlotId-адресность (review R10, 2026-09-09): TOCTOU-защита ===
+
+        /// <summary>
+        /// Индекс слота по стабильной идентичности кучки; −1 — SlotId не
+        /// найден (кучка исчезла: удалена/слита/инвентарь перезагружен).
+        /// UI-действия (drag&drop, split) обязаны разрешать адрес ТОЛЬКО
+        /// так — индекс списка дрейфует при мутациях между захватом и
+        /// действием.
+        /// </summary>
+        int FindSlotIndexBySlotId(Guid slotId);
+
+        /// <summary>
+        /// SlotId-адресное разделение стака: находит кучку по SlotId,
+        /// сверяет expectedItemId (защита от подмены) и делит её.
+        /// Отказ (false), если кучка исчезла или ItemId не совпал —
+        /// вызывающий НЕ должен применять операцию к другому слоту.
+        /// </summary>
+        bool TrySplitSlot(Guid slotId, string expectedItemId, int moveCount);
+
+        /// <summary>
+        /// SlotId-адресное удаление: находит кучку по SlotId, сверяет
+        /// expectedItemId, удаляет ровно count шт. из ЭТОЙ кучки.
+        /// Отказ (false) при исчезновении/несовпадении — деструктивный
+        /// фолбэк «удалить все слоты предмета» со стороны UI запрещён.
+        /// </summary>
+        bool TryRemoveFromSlot(Guid slotId, string expectedItemId, int count);
 
         // === STR-MODEL: методы для работы с весом и объёмом ===
 

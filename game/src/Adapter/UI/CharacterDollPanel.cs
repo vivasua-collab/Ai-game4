@@ -1,5 +1,6 @@
 #nullable enable
 using Godot;
+using System;
 using System.Collections.Generic;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.DI;
@@ -332,13 +333,15 @@ public partial class CharacterDollPanel : Control
     }
 
     /// <summary>
-    /// 2026-09-09: drag-data с адресом слота инвентаря («кучка»).
-    /// Приёмники (корзина) выбрасывают КОНКРЕТНЫЙ стак, а не весь предмет.
+    /// 2026-09-09 (review R10, P1-SlotId): drag-data со СТАБИЛЬНОЙ
+    /// идентичностью кучки (slot_id). Индекс (slot_index) нестабилен —
+    /// инвентарь мутирует между стартом drag и drop, и приёмник обязан
+    /// действовать по SlotId: не найден → ОТКАЗ (не фолбэк на весь предмет).
     /// </summary>
-    internal static Godot.Collections.Dictionary CreateDragData(ItemData item, string source, int slotIndex)
+    internal static Godot.Collections.Dictionary CreateDragData(ItemData item, string source, Guid slotId)
     {
         var dict = CreateDragData(item, source);
-        dict["slot_index"] = slotIndex;
+        dict["slot_id"] = slotId.ToString();
         return dict;
     }
 
@@ -354,18 +357,21 @@ public partial class CharacterDollPanel : Control
     }
 
     /// <summary>
-    /// 2026-09-09: разбор drag-data с опциональным адресом слота инвентаря.
-    /// slotIndex = −1, если источник не инвентарная строка (легаси-данные).
+    /// 2026-09-09 (review R10): разбор drag-data со стабильной
+    /// идентичностью кучки. slotId = Guid.Empty, если drag-data не несёт
+    /// slot_id (легаси/не-инвентарный источник) — приёмник инвентарных
+    /// дропов обязан в этом случае ОТКАЗАТЬСЯ (не деструктивный фолбэк).
     /// </summary>
-    internal static bool TryParseDragData(Variant data, out string itemId, out string source, out int slotIndex)
+    internal static bool TryParseDragData(Variant data, out string itemId, out string source, out Guid slotId)
     {
-        slotIndex = -1;
+        slotId = Guid.Empty;
         if (!TryParseDragData(data, out itemId, out source)) return false;
         if (data.VariantType == Variant.Type.Dictionary)
         {
             var dict = data.As<Godot.Collections.Dictionary>();
-            if (dict.ContainsKey("slot_index"))
-                slotIndex = dict["slot_index"].AsInt32();
+            if (dict.ContainsKey("slot_id")
+                && System.Guid.TryParse(dict["slot_id"].AsString(), out var parsed))
+                slotId = parsed;
         }
         return true;
     }

@@ -16,6 +16,7 @@
 //   8. Esc-приоритет: CloseTopmostPopup закрывает верхний попап, не окно.
 // Запуск: GODOT_NEWGAME=1 GODOT_CONTEXT_DEBUG=1 godot --headless --path . scenes/MainMenu.tscn
 using Godot;
+using System;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.Interfaces;
@@ -114,7 +115,9 @@ public partial class ContextMenuSimDebug : Node
         pass &= qiUseButton;
 
         // === 3. Диалог разделения: слайдер и числа ==================
-        win.OpenSplitDialog(stoneSlot);
+        // R10 P1-SlotId: открытие по стабильному идентичности кучки.
+        Guid stoneSlotId = _inventory.GetAllSlots()[stoneSlot].SlotId;
+        win.OpenSplitDialog(stoneSlotId);
         var dlg = win.SplitDialogForQA;
         bool dlgOpened = dlg != null && win.IsSplitDialogOpenForQA;
         bool sliderBounds = dlg != null
@@ -204,9 +207,10 @@ public partial class ContextMenuSimDebug : Node
         bool pileDropOk = false;
         if (pileRow != null)
         {
+            // R10 P1-SlotId: слот-адресность по Guid (индекс — только QA).
             Variant dragData = pileRow._GetDragData(Vector2.Zero);
-            bool hasSlotIndex = CharacterDollPanel.TryParseDragData(dragData, out var draggedId, out var src, out int dragSlot)
-                && draggedId == StoneId && src == "inventory" && dragSlot == pileRow.SlotIndexForQA;
+            bool hasSlotId = CharacterDollPanel.TryParseDragData(dragData, out var draggedId, out var src, out Guid dragSlotId)
+                && draggedId == StoneId && src == "inventory" && dragSlotId == pileRow.SlotIdForQA;
 
             int groundBefore = _groundItems.Count;
             trashZone._DropData(Vector2.Zero, dragData);
@@ -214,8 +218,8 @@ public partial class ContextMenuSimDebug : Node
 
             int totalAfterDrop = _inventory.GetItemCount(StoneId);
             int groundAfter = _groundItems.Count;
-            pileDropOk = hasSlotIndex && totalAfterDrop == total - 3 && groundAfter == groundBefore + 1;
-            GD.Print($"[ContextSim] 7. drag-data с slot_index={hasSlotIndex}, корзина выбросила кучку ×3: инвентарь {total}→{totalAfterDrop} (ожидали {total - 3}, НЕ 0), ground {groundBefore}→{groundAfter}");
+            pileDropOk = hasSlotId && totalAfterDrop == total - 3 && groundAfter == groundBefore + 1;
+            GD.Print($"[ContextSim] 7. drag-data с slot_id={hasSlotId}, корзина выбросила кучку ×3: инвентарь {total}→{totalAfterDrop} (ожидали {total - 3}, НЕ 0), ground {groundBefore}→{groundAfter}");
         }
         else
         {
@@ -226,11 +230,191 @@ public partial class ContextMenuSimDebug : Node
         // === 8. Esc-приоритет попапов ==============================
         win.OpenContextMenu(stoneSlot);
         bool escMenu = win.CloseTopmostPopup() && !win.IsContextMenuOpenForQA;
-        win.OpenSplitDialog(stoneSlot < 0 ? 0 : stoneSlot);
+        win.OpenSplitDialog(stoneSlotId);
         bool escDlg = win.CloseTopmostPopup() && !win.IsSplitDialogOpenForQA && !win.IsContextMenuOpenForQA;
         bool escNothing = !win.CloseTopmostPopup(); // попапов нет → false (окно закрывает контроллер)
         GD.Print($"[ContextSim] 8. Esc-приоритет: меню закрылось={escMenu}, диалог закрылся={escDlg}, без попапов → false={escNothing}");
         pass &= escMenu && escDlg && escNothing;
+
+        // === 9. R10 P1-SlotId: stale DROP при мутации между drag и drop ===
+        // Сценарий ревью: start drag кучки B → между start/end удалена другая
+        // кучка A (индексы сдвинулись!) → drop. По SlotId выбросится ИМЕННО B,
+        // а не «другая кучка по старому индексу» и НЕ все кучки (старый
+        // деструктивный фолбэк DropItemOnGround).
+        {
+            // Подготовка: одна кучка ×7 → детерминированный СЕРВИСНЫЙ сплит
+            // ×7 → ×3 + ×4. (TryAddItem не годится: maxStack камня = 20 —
+            // добавка 4 сливается в ОДНУ кучку ×11, двух кучек не будет;
+            // первая версия шага именно на этом и падала.)
+            {
+                int idxPrep = FindSlotIndex(_inventory, StoneId);
+                if (idxPrep >= 0 && _inventory.GetAllSlots()[idxPrep].Count >= 3)
+                    _inventory.TrySplitSlot(idxPrep, 4); // ×7 → ×3 + ×4
+            }
+            win.RefreshExternally();
+            await ToSignal(GetTree().CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
+
+            var slotsNow = _inventory.GetAllSlots();
+            // B — ВТОРАЯ кучка (новая, ×4 — большая); A — первая (×3).
+            int idxA = -1, idxB = -1;
+            for (int i = 0; i < slotsNow.Count; i++)
+            {
+                if (slotsNow[i].ItemId != StoneId) continue;
+                if (idxA < 0) idxA = i; else idxB = i;
+            }
+            bool staleDropOk = false;
+            if (idxA >= 0 && idxB >= 0)
+            {
+                Guid idA = slotsNow[idxA].SlotId, idB = slotsNow[idxB].SlotId;
+                int cntA = slotsNow[idxA].Count, cntB = slotsNow[idxB].Count;
+                int totalBefore = _inventory.GetItemCount(StoneId);
+
+                // Захват drag-data для B (кучка больше) — как это делает UI.
+                var rowsNow = win.GetRowsForQA();
+                InventoryItemRow? rowB = null;
+                foreach (var r in rowsNow)
+                    if (r.ItemIdForQA == StoneId && r.SlotIdForQA == idB) rowB = r;
+                if (rowB != null)
+                {
+                    Variant staleDrag = rowB._GetDragData(Vector2.Zero);
+
+                    // МУТАЦИЯ между drag и drop: удаляем A → индексы сдвинулись.
+                    _inventory.TryRemoveFromSlot(idA, StoneId, cntA);
+
+                    int groundBefore2 = _groundItems.Count;
+                    trashZone._DropData(Vector2.Zero, staleDrag);
+                    await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+
+                    int totalAfter2 = _inventory.GetItemCount(StoneId);
+                    int groundAfter2 = _groundItems.Count;
+                    // B (cntB) выброшена; A уже удалена мутацией → осталось 0 камня;
+                    // ключевой инвариант: удалено ровно cntB (не «все кучки», не «не та»).
+                    staleDropOk = totalAfter2 == totalBefore - cntA - cntB
+                        && groundAfter2 == groundBefore2 + 1;
+                    GD.Print($"[ContextSim] 9. stale drop: кучка B×{cntB} захвачена, A×{cntA} удалена в полёте → выброшено ровно B (инвентарь {totalBefore}→{totalAfter2}, ожидали {totalBefore - cntA - cntB}), ground +1 = {groundAfter2 == groundBefore2 + 1}");
+                }
+                else
+                {
+                    GD.Print("[ContextSim] 9. FAIL — строка кучки B не найдена");
+                }
+            }
+            else
+            {
+                GD.Print("[ContextSim] 9. FAIL — подготовка двух кучек не удалась");
+            }
+            pass &= staleDropOk;
+        }
+
+        // === 10. R10 P1-SlotId: stale SPLIT — исходная кучка исчезла → ОТКАЗ ===
+        // Сценарий ревью: открыть Split для кучки → мутация удалила ЕЁ →
+        // подтвердить → операция отклонена (не применена к чужому слоту).
+        {
+            if (_itemDb.TryGetItem(StoneId, out var stoneItem3) && stoneItem3 != null)
+                _inventory.TryAddItem(stoneItem3, 6); // одна кучка ×6
+            win.RefreshExternally();
+            await ToSignal(GetTree().CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
+
+            int idxS = FindSlotIndex(_inventory, StoneId);
+            bool staleSplitRefused = false;
+            if (idxS >= 0)
+            {
+                var slotS = _inventory.GetAllSlots()[idxS];
+                Guid idS = slotS.SlotId;
+                int cntS = slotS.Count;
+                int totalBeforeS = _inventory.GetItemCount(StoneId);
+
+                win.OpenSplitDialog(idS);
+                var dlgS = win.SplitDialogForQA;
+                bool dlgSOpened = dlgS != null;
+
+                if (dlgSOpened)
+                {
+                    // МУТАЦИЯ: исходная кучка удалена ДО подтверждения.
+                    _inventory.TryRemoveFromSlot(idS, StoneId, cntS);
+
+                    int pilesBefore = 0;
+                    foreach (var s in _inventory.GetAllSlots())
+                        if (s.ItemId == StoneId) pilesBefore++;
+
+                    // Подтверждение по stale SlotId → ОТКАЗ.
+                    bool applied = win.TrySplitSlotForDialog(idS, StoneId, 2);
+
+                    int pilesAfter = 0;
+                    foreach (var s in _inventory.GetAllSlots())
+                        if (s.ItemId == StoneId) pilesAfter++;
+                    int totalAfterS = _inventory.GetItemCount(StoneId);
+
+                    staleSplitRefused = !applied
+                        && dlgSOpened
+                        && pilesAfter == pilesBefore
+                        && totalAfterS == totalBeforeS - cntS; // только мутация, не сплит
+                    win.CloseSplitDialog();
+                    GD.Print($"[ContextSim] 10. stale split (кучка исчезла): подтверждение отклонено={(!applied)}, кучек {pilesBefore}→{pilesAfter} (не изменилось), тотал {totalBeforeS}→{totalAfterS} (сплит не применён к чужому слоту)");
+                }
+                else
+                {
+                    GD.Print("[ContextSim] 10. FAIL — диалог не открылся");
+                }
+            }
+            else
+            {
+                GD.Print("[ContextSim] 10. FAIL — подготовка кучки не удалась");
+            }
+            pass &= staleSplitRefused;
+        }
+
+        // === 11. R10 P1-SlotId: split применяется к ИСХОДНОЙ кучке при сдвиге индексов ===
+        // Сценарий: диалог для кучки B → удалена ДРУГАЯ кучка A (индексы
+        // сдвинулись) → подтвердить → разделена именно B (по SlotId).
+        {
+            if (_itemDb.TryGetItem(StoneId, out var stoneItem4) && stoneItem4 != null)
+                _inventory.TryAddItem(stoneItem4, 9); // ×9 одной кучкой (других кучек камня нет)
+            // Вторая кучка ДРУГОГО предмета — Qi-пыль (для сдвига индексов).
+            win.RefreshExternally();
+            await ToSignal(GetTree().CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
+
+            int idxT = FindSlotIndex(_inventory, StoneId);
+            bool splitTargetOk = false;
+            if (idxT >= 0)
+            {
+                var slotT = _inventory.GetAllSlots()[idxT];
+                Guid idT = slotT.SlotId;
+                int cntT = slotT.Count;
+
+                win.OpenSplitDialog(idT);
+                var dlgT = win.SplitDialogForQA;
+                if (dlgT != null)
+                {
+                    // Мутация: удаляем другую кучку (Qi-пыль) — индексы дрейфуют.
+                    int qiIdx = FindSlotIndex(_inventory, QiDustId);
+                    int qiCnt = qiIdx >= 0 ? _inventory.GetAllSlots()[qiIdx].Count : 0;
+                    if (qiIdx >= 0)
+                        _inventory.TryRemoveFromSlot(_inventory.GetAllSlots()[qiIdx].SlotId, QiDustId, qiCnt);
+
+                    // Подтверждение: разделить 9 → 4+5 — должно примениться к idT.
+                    bool appliedT = win.TrySplitSlotForDialog(idT, StoneId, 4);
+                    int idxAfter = _inventory.FindSlotIndexBySlotId(idT);
+                    int cntAfter = idxAfter >= 0 ? _inventory.GetAllSlots()[idxAfter].Count : 0;
+                    int pilesT = 0;
+                    foreach (var s in _inventory.GetAllSlots())
+                        if (s.ItemId == StoneId) pilesT++;
+
+                    splitTargetOk = appliedT && cntAfter == cntT - 4 && pilesT == 2
+                        && _inventory.GetItemCount(StoneId) == cntT;
+                    win.CloseSplitDialog();
+                    GD.Print($"[ContextSim] 11. split при дрейфе индексов: применён к исходной кучке={appliedT} (×{cntT}→×{cntAfter} + ×4), кучек={pilesT} (2), тотал={_inventory.GetItemCount(StoneId)} (не изменился)");
+                }
+                else
+                {
+                    GD.Print("[ContextSim] 11. FAIL — диалог не открылся");
+                }
+            }
+            else
+            {
+                GD.Print("[ContextSim] 11. FAIL — подготовка кучки не удалась");
+            }
+            pass &= splitTargetOk;
+        }
 
         // === HOLD для VLM-скриншота (GODOT_CONTEXT_HOLD=1) ==========
         if (System.Environment.GetEnvironmentVariable("GODOT_CONTEXT_HOLD") == "1")
@@ -252,7 +436,9 @@ public partial class ContextMenuSimDebug : Node
             if (!string.IsNullOrEmpty(shotSplit))
             {
                 win.CloseContextMenu();
-                win.OpenSplitDialog(FindSlotIndex(_inventory, StoneId));
+                int shotSlot = FindSlotIndex(_inventory, StoneId);
+                if (shotSlot >= 0)
+                    win.OpenSplitDialog(_inventory.GetAllSlots()[shotSlot].SlotId);
                 await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
                 var img2 = GetViewport().GetTexture().GetImage();
                 img2.SavePng(shotSplit);
@@ -262,6 +448,11 @@ public partial class ContextMenuSimDebug : Node
         }
 
         GD.Print($"[ContextSim] VERDICT: {(pass ? "PASS — ПКМ-свойства, слайдер деления, кучки, слот-адресный выброс работают" : "FAIL")}");
+
+        // QA-режим без HOLD: сим терминален — завершаем процесс сразу,
+        // не греем таймаут обертки (раньше выход был только по SIGTERM).
+        if (System.Environment.GetEnvironmentVariable("GODOT_CONTEXT_HOLD") != "1")
+            GetTree().Quit();
     }
 
     private static int FindSlotIndex(IInventoryService inv, string itemId)

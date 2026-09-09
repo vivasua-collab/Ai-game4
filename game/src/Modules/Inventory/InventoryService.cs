@@ -141,7 +141,9 @@ namespace CultivationGame.Modules.Inventory
                             int canAdd = item.MaxStack - _slots[i].Count;
                             if (canAdd <= 0) continue;
 
-                            _slots[i] = new InventorySlot(item.ItemId, item.MaxStack, item.Category, item.Rarity);
+                            // R10 P1-SlotId: заполнение существующего стака —
+                            // идентичность кучки сохраняется (WithCount).
+                            _slots[i] = _slots[i].WithCount(item.MaxStack);
                             _itemCountCache[item.ItemId] = _itemCountCache.TryGetValue(item.ItemId, out var cached)
                                 ? cached + canAdd : canAdd;
                             _itemAddedPub.Publish(new ItemAddedEvent(item.ItemId, canAdd));
@@ -164,7 +166,9 @@ namespace CultivationGame.Modules.Inventory
                             return true;
                         }
 
-                        _slots[i] = new InventorySlot(item.ItemId, newCount, item.Category, item.Rarity);
+                        // R10 P1-SlotId: увеличение существующего стака —
+                        // идентичность кучки сохраняется (WithCount).
+                        _slots[i] = _slots[i].WithCount(newCount);
                         _itemCountCache[item.ItemId] = newCount;
                         _itemAddedPub.Publish(new ItemAddedEvent(item.ItemId, count));
                         return true;
@@ -238,11 +242,8 @@ namespace CultivationGame.Modules.Inventory
                 }
                 else
                 {
-                    _slots[i] = new InventorySlot(
-                        itemId,
-                        _slots[i].Count - remaining,
-                        _slots[i].Category,
-                        _slots[i].Rarity);
+                    // R10 P1-SlotId: частичное изъятие — идентичность сохраняется.
+                    _slots[i] = _slots[i].WithCount(_slots[i].Count - remaining);
                     remaining = 0;
                 }
             }
@@ -311,10 +312,12 @@ namespace CultivationGame.Modules.Inventory
                 && item != null && !item.Stackable)
                 return false;
 
-            _slots[slotIndex] = new InventorySlot(src.ItemId, src.Count - moveCount, src.Category, src.Rarity);
+            // R10 P1-SlotId: исходная кучка СОХРАНЯЕТ идентичность (у неё
+            // меняется только Count), новая кучка получает свежий Guid.
+            _slots[slotIndex] = src.WithCount(src.Count - moveCount);
             _slots.Add(new InventorySlot(src.ItemId, moveCount, src.Category, src.Rarity));
             // Кэш не трогаем: GetItemCount(itemId) суммарно не изменился.
-            Console.WriteLine($"[Inventory] Split slot {slotIndex}: {src.ItemId} ×{src.Count} → ×{src.Count - moveCount} + ×{moveCount}");
+            Console.WriteLine($"[Inventory] Split slot {slotIndex} (slotId={src.SlotId}): {src.ItemId} ×{src.Count} → ×{src.Count - moveCount} + ×{moveCount}");
             return true;
         }
 
@@ -339,7 +342,8 @@ namespace CultivationGame.Modules.Inventory
             }
             else
             {
-                _slots[slotIndex] = new InventorySlot(src.ItemId, src.Count - count, src.Category, src.Rarity);
+                // R10 P1-SlotId: частичное изъятие — идентичность сохраняется.
+                _slots[slotIndex] = src.WithCount(src.Count - count);
             }
 
             // Пересчитать кэш тотала (могли остаться другие кучки).
@@ -356,6 +360,55 @@ namespace CultivationGame.Modules.Inventory
 
             _itemRemovedPub.Publish(new ItemRemovedEvent(src.ItemId, count));
             return true;
+        }
+
+        // === SlotId-адресность (review R10, 2026-09-09): TOCTOU-защита ===
+
+        /// <summary>
+        /// Индекс слота по стабильной идентичности кучки; −1 — не найден
+        /// (кучка удалена/слита/инвентарь перезагружен). UI обязан
+        /// разрешать адрес действия ТОЛЬКО через этот метод: индекс,
+        /// захваченный при рендере строки, к моменту действия мог
+        /// указывать уже на ДРУГУЮ кучку (TOCTOU).
+        /// </summary>
+        public int FindSlotIndexBySlotId(Guid slotId)
+        {
+            for (int i = 0; i < _slots.Count; i++)
+            {
+                if (_slots[i].SlotId == slotId && !_slots[i].IsEmpty)
+                    return i;
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// SlotId-адресное разделение стака. Находит кучку по стабильной
+        /// идентичности, сверяет expectedItemId и делит ИМЕННО её.
+        /// false = кучка исчезла или ItemId не совпал → вызывающий обязан
+        /// отказаться от операции (НЕ применять к слоту по индексу и НЕ
+        /// фолбэчить на «весь предмет»).
+        /// </summary>
+        public bool TrySplitSlot(Guid slotId, string expectedItemId, int moveCount)
+        {
+            int idx = FindSlotIndexBySlotId(slotId);
+            if (idx < 0) return false;
+            var src = _slots[idx];
+            if (src.ItemId != expectedItemId) return false;
+            return TrySplitSlot(idx, moveCount);
+        }
+
+        /// <summary>
+        /// SlotId-адресное удаление из КОНКРЕТНОЙ кучки с проверкой
+        /// expectedItemId. false = кучка исчезла/несовпадение → отказ без
+        /// деструктивного фолбэка.
+        /// </summary>
+        public bool TryRemoveFromSlot(Guid slotId, string expectedItemId, int count)
+        {
+            int idx = FindSlotIndexBySlotId(slotId);
+            if (idx < 0) return false;
+            var src = _slots[idx];
+            if (src.ItemId != expectedItemId) return false;
+            return TryRemoveFromSlot(idx, count);
         }
 
         // === STR-MODEL: методы строчной модели ===
