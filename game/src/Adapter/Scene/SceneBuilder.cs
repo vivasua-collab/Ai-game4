@@ -62,6 +62,8 @@ public partial class SceneBuilder : Node
         SetupDamageNumbers();
         // Phase 8 ч.3 (2026-09-03): трассер стрел (полёт + вспышка попадания).
         SetupProjectiles();
+        // R16 (2026-09-10): анимация удара — дуги-слэши/искры (melee).
+        SetupStrikeFx();
     }
 
     /// <summary>
@@ -226,6 +228,19 @@ public partial class SceneBuilder : Node
     {
         _projectileRenderer = new ProjectileRenderer();
         _worldRoot.AddChild(_projectileRenderer);
+    }
+
+    /// <summary>
+    /// R16 (2026-09-10): анимация удара — дуги-слэши по AttackIntentEvent/
+    /// DamageAppliedEvent (melee), процедурно _Draw (паттерн
+    /// DamageNumberRenderer; крит — золотой). ZIndex Objects+2 — под цифрами.
+    /// </summary>
+    private StrikeFxRenderer? _strikeFxRenderer;
+
+    private void SetupStrikeFx()
+    {
+        _strikeFxRenderer = new StrikeFxRenderer();
+        _worldRoot.AddChild(_strikeFxRenderer);
     }
 
     /// <summary>

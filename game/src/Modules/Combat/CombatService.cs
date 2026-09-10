@@ -129,6 +129,31 @@ namespace CultivationGame.Modules.Combat
         /// </summary>
         public bool IsCasting => _isCasting;
 
+        // === R16 (2026-09-10): доработка боевой системы ===
+
+        /// <summary>
+        /// R16: QA-геттер стойки защиты игрока (заполняется ExecuteDefense,
+        /// читается CombatAISimDebug по DefenseIntentEvent). Публичное
+        /// состояние без мутации — тот же паттерн, что IsInCombat/CurrentStage.
+        /// </summary>
+        public DefenseSubtype CurrentPlayerDefense => _lastPlayerDefense;
+
+        /// <summary>
+        /// R16: NPC покидает бой по своей инициативе (бегство HP&lt;20% /
+        /// leash — NPCAIService публикует CombatDisengageEvent, CombatModule
+        /// вызывает этот метод). Бой завершается стадией Flee («никто не
+        /// победил» — семантика EndCombat), CombatEndedEvent очищает
+        /// участников. Молчит, если сущность не участник текущего боя.
+        /// </summary>
+        public void AbandonCombat(string entityId)
+        {
+            if (!_isInCombat) return;
+            if (string.IsNullOrEmpty(entityId) || !IsParticipant(entityId)) return;
+
+            _currentStage = CombatStage.Flee;
+            EndCombat();
+        }
+
         // === Конструктор (VContainer) ===
 
         public CombatService(
@@ -709,6 +734,30 @@ namespace CultivationGame.Modules.Combat
             // не по инстагатору (инстагатором может быть NPC).
             bool isPlayerTarget = PlayerIdResolver.IsPlayer(defenderId);
 
+            // R16 (2026-09-10): активная защита защитника (COMBAT_SYSTEM §7).
+            // Раньше: isPlayerAttacker ? None : _lastPlayerDefense — т.е.
+            // NPC-защитник НИКОГДА не защищался (слои Dodge/Parry/Block
+            // мертвы), а в NPC-vs-NPC защитник-NPC получал стойку ИГРОКА.
+            // Теперь: игрок — своя стойка (ExecuteDefense, клавиша G);
+            // NPC — выбор NPCDefenseSelector (щит→Block, силовик→Parry,
+            // прочие→Dodge; детерминизм без RNG).
+            DefenseSubtype defenderDefense;
+            if (isPlayerTarget)
+            {
+                defenderDefense = _lastPlayerDefense;
+            }
+            else
+            {
+                bool defenderHasShield =
+                    _equipmentDataProvider.GetEquipped(defenderId, EquipmentSlot.WeaponOff) != null;
+                bool defenderHasWeapon =
+                    _equipmentDataProvider.GetEquipped(defenderId, EquipmentSlot.WeaponMain) != null;
+                defenderDefense = NPCDefenseSelector.PickDefense(
+                    defenderHasShield, defenderHasWeapon,
+                    _statProvider.GetStat(defenderId, StatType.Agility),
+                    _statProvider.GetStat(defenderId, StatType.Strength));
+            }
+
             // P2-7.3 FIX: передаём подтип атаки для различения slashing/piercing от blunt
             // M2 (2026-09-03): basic_attack с оружием в главной руке теперь MeleeWeapon
             // (раньше всегда MeleeStrike — вооружённый удар шёл как «безоружный»:
@@ -729,7 +778,7 @@ namespace CultivationGame.Modules.Combat
                 baseDamage, damageType, element, defenderElement,
                 attackType, grade, potencyPermil, // CRIT-1: промилле вместо float
                 attackerLevel, defenderLevel,
-                isPlayerAttacker ? DefenseSubtype.None : _lastPlayerDefense,
+                defenderDefense,                                  // R16: стойка защитника (игрок/NPC)
                 defenderMaterial,
                 attackerSTR, attackerAGI, attackerINT, defenderAGI, // B1
                 armorDodgePenalty, attackerLuck, techniqueCritBonus, // C1/C2
@@ -782,17 +831,16 @@ namespace CultivationGame.Modules.Combat
 
         public void ExecuteDefense(string defenderId, DefenseSubtype defenseType)
         {
-            if (!_isInCombat) return;
-
-            // Запоминаем выбранную защиту для использования в пайплайне урона
-            // 2026-08-26 (аудит-3 C-1): PlayerIdResolver вместо
-            // «defenderId == _instigatorId || == _config?.PlayerEntityId»
-            // (config-алиас "player" не покрывал канонический "player_0",
-            // которым атакует NPC AI).
+            // R16: стойка запоминается и ВНЕ боя (ранний return блокировал
+            // DefenseIntentEvent между боями/при паузе обмена — CurrentPlayerDefense
+            // не обновлялся, тест 6 QA падал). Поворот хода и Ци-щит — только
+            // в активном бою (ниже).
             if (PlayerIdResolver.IsPlayer(defenderId))
             {
                 _lastPlayerDefense = defenseType;
             }
+
+            if (!_isInCombat) return;
 
             // CMB-A04: активация QiBuffer в режиме щита (если Shield)
             if (defenseType == DefenseSubtype.Shield)

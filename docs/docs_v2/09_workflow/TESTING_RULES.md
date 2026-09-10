@@ -14,7 +14,7 @@
 печатают вердикт `VERDICT: PASS/FAIL` (строка ищется в логе). Регрессия = полный
 прогон всех хуков + `dotnet build` с 0 errors.
 
-### 0.1. Реестр env-хуков (31)
+### 0.1. Реестр env-хуков (33)
 
 | Хук | Сцена/файл | Что проверяет |
 |---|---|---|
@@ -45,6 +45,8 @@
 | `GODOT_SAVELOAD_DEBUG=1` | SaveLoadSimDebug | Ревью-R11: Save/Load round-trip — типизация (IncludeFields), честный success, РЕАЛЬНЫЕ мутации до/после (анти-тривиальность), 8 блоков, домен 5/5, integrity |
 | `GODOT_LOOT_DEBUG=1` | LootSimDebug | R13 full-loot: генерация состава населения (12 NPC/6 ролей/детерминизм), труп-контейнер, окно обыска, SlotId-взятие, double-take отказ, full loot, TTL; R14: популяция в сессии НЕ восполняется (выбитая — остаётся выбитой) + ивент-спаун TrySpawnEventNpc(Caravan) работает |
 | `GODOT_WEAPONVIS_DEBUG=1` | WeaponVisSimDebug | R15 «оружие в руках»: WeaponClassId у генерации (7/7), fallback-парсинг ItemId/unknown→sword, спрайты icon(32)/hand(48) + различимость классов/тиров/редкости, композит игрока (стартовый кинжал→копьё→анэкип→меч), иконки хотбара 1-2, overlay NPC (12 NPC), facing-зеркалирование |
+| `GODOT_COMBATAI_DEBUG=1` | CombatAISimDebug | R16 боевой ИИ: месть NPC на атаку игрока (Attacking/Fleeing по личности), двусторонний урон, селектор защит NPC (щит→Block/силовик→Parry/прочие→Dodge — детерминированные кейсы), бегство HP<20% в бою (CombatDisengageEvent), leash AggroRadius×3, стойка игрока (DefenseIntentEvent→CurrentPlayerDefense), счётчики StrikeFX (swipes/strikes) |
+| `GODOT_STRIKEFX_HOLD=1` | CombatAISimDebug | R16 визуальный HOLD: живая драка у игрока для Xvfb-скриншотов (свипы/замахи/цифры непрерывно) — без сценария |
 | `GODOT_SCREENSHOT=<путь>` | GameBoot | Скриншот в файл (VLM-верификация) |
 | `GODOT_SCREENSHOT_DELAY=<сек>` | GameBoot | Задержка кадра для скриншота |
 | `GODOT_CONTEXT_HOLD=1` | ContextMenuSimDebug | Держать ПКМ-меню (скриншоты) — без HOLD сим сам завершает процесс |

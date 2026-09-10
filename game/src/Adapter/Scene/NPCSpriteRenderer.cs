@@ -14,7 +14,9 @@ using Godot;
 using System.Collections.Generic;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.DI;
+using CultivationGame.Core.Events;
 using CultivationGame.Core.Interfaces;
+using CultivationGame.Core.Messaging.Contracts;
 using CultivationGame.Adapter.Di;
 
 namespace CultivationGame.Adapter.Scene;
@@ -25,6 +27,8 @@ namespace CultivationGame.Adapter.Scene;
 /// ZIndex = RenderLayer.Objects (3) — same as animals, below the player (4).
 /// Phase 7: рисует HP-бар над раненым NPC (текущий/полный RedHP).
 /// R15: рисует overlay оружия в основной руке (WeaponVisualCatalog).
+/// R16: замах оружия NPC — AttackIntentEvent (melee, attacker=NPC) →
+/// выпад hand-спрайта к цели (sin-кривая ~0.42с, зеркалирование учтено).
 /// </summary>
 public partial class NPCSpriteRenderer : Node2D
 {
@@ -32,6 +36,10 @@ public partial class NPCSpriteRenderer : Node2D
     [Inject] private IBodyDataProvider? _bodyProvider;
     // R15: экипировка NPC (per-entity провайдер; SetEquipment — NPCAssemblyService).
     [Inject] private IEquipmentDataProvider? _equipmentProvider;
+    // R16: позиция игрока (резолв цели NPC-замаха) + интенты атак NPC.
+    [Inject] private IPlayerService? _playerService;
+    [Inject] private ISubscriber<AttackIntentEvent>? _attackIntentSub;
+    private System.IDisposable? _attackIntentToken;
 
     private int _tilePixels;
     private readonly List<string> _idSnapshot = new();
@@ -50,6 +58,23 @@ public partial class NPCSpriteRenderer : Node2D
     private readonly Dictionary<string, float> _npcLastX = new();
     private float _weaponRescanCooldown;
 
+    // === R16 (2026-09-10): замах оружия NPC (анимация удара) ===
+    // AttackIntentEvent (melee, attacker=NPC) → пер-NPC запись с направлением
+    // к цели; в _PhysicsProcess тикает возраст; в DrawNpcWeapon — выпад
+    // hand-спрайта (sin-кривая, зеркалирование при facingLeft — см. ниже).
+    private readonly Dictionary<string, NpcSwing> _npcSwings = new();
+
+    /// <summary>Замах NPC: направление к цели (пиксели, нормализованное) + возраст.</summary>
+    private struct NpcSwing
+    {
+        public float DirX;
+        public float DirY;
+        public float Age;
+    }
+
+    private const float NpcSwingSec = 0.42f;   // ≈ каст npc_strike
+    private const float NpcSwingLungePx = 10f;  // амплитуда выпада
+
     private static readonly Color OutlineColour = new(0.05f, 0.04f, 0.02f, 0.85f);
     private static readonly Color ShadowColour = new(0f, 0f, 0f, 0.30f);
 
@@ -62,7 +87,17 @@ public partial class NPCSpriteRenderer : Node2D
         }
         _tilePixels = GameConstants.TILE_PIXELS;
         ZIndex = (int)RenderLayer.Objects;
+
+        // R16: интенты атак NPC → замах оружия (melee; ranged — трассер).
+        _attackIntentToken = _attackIntentSub?.Subscribe(OnAttackIntentForSwing);
+
         GD.Print("[NPCSpriteRenderer] Ready");
+    }
+
+    public override void _ExitTree()
+    {
+        _attackIntentToken?.Dispose();
+        _attackIntentToken = null;
     }
 
     public override void _PhysicsProcess(double delta)
@@ -74,7 +109,63 @@ public partial class NPCSpriteRenderer : Node2D
             _weaponRescanCooldown = 0.5f;
             RescanNpcWeapons();
         }
+
+        // R16: тик замахов NPC (возраст; удаление по истечении).
+        if (_npcSwings.Count > 0)
+        {
+            var expired = new List<string>();
+            foreach (var kvp in _npcSwings)
+            {
+                var s = kvp.Value;
+                s.Age += (float)delta;
+                if (s.Age >= NpcSwingSec) expired.Add(kvp.Key);
+                else _npcSwings[kvp.Key] = s;
+            }
+            foreach (var id in expired) _npcSwings.Remove(id);
+        }
+
         QueueRedraw();
+    }
+
+    /// <summary>
+    /// R16: замах NPC — AttackIntentEvent (melee, attacker=NPC). Направление
+    /// выпада: позиция NPC → позиция цели (NPC или игрок), пиксели.
+    /// </summary>
+    private void OnAttackIntentForSwing(in AttackIntentEvent e)
+    {
+        if (e.IsRanged) return;
+
+        // Атакующий — NPC? (игрока анимирует GameWorldController сам.)
+        var attacker = _npcService?.GetNPC(e.AttackerId);
+        if (attacker == null) return;
+
+        // Цель: NPC или игрок — в пиксели (центр тайла).
+        float tile = GameConstants.TILE_PIXELS;
+        Vector2 from = new(
+            attacker.Position.X * tile + tile / 2f,
+            attacker.Position.Y * tile + tile / 2f);
+
+        Vector2 to;
+        var targetNpc = _npcService?.GetNPC(e.TargetId);
+        if (targetNpc != null)
+        {
+            to = new Vector2(
+                targetNpc.Position.X * tile + tile / 2f,
+                targetNpc.Position.Y * tile + tile / 2f);
+        }
+        else if (e.TargetId is "player" or "player_0" && _playerService != null)
+        {
+            to = new Vector2(
+                _playerService.Position.X * tile + tile / 2f,
+                _playerService.Position.Y * tile + tile / 2f);
+        }
+        else return;
+
+        var dir = to - from;
+        if (dir.LengthSquared() < 1f) return;
+        dir = dir.Normalized();
+
+        _npcSwings[e.AttackerId] = new NpcSwing { DirX = dir.X, DirY = dir.Y, Age = 0f };
     }
 
     /// <summary>
@@ -206,7 +297,23 @@ public partial class NPCSpriteRenderer : Node2D
         var offWeapon = _equipmentProvider.GetEquipped(npcId, EquipmentSlot.WeaponMain);
         string classId = offWeapon != null ? WeaponVisualCatalog.WeaponClassOf(offWeapon) : WeaponVisualCatalog.DefaultClass;
         var off = WeaponVisualCatalog.HandOffset(classId);
-        var topLeft = new Vector2(cx - spriteSize / 2f + off.X, cy - spriteSize / 2f + off.Y);
+
+        // R16: замах оружия — выпад к цели. Зеркалирование: при facingLeft
+        // mirror-трансформация (x' = 2cx − x) инвертирует нарисованный сдвиг —
+        // чтобы ВИДИМОЕ движение совпало с мировым направлением к цели,
+        // нарисованный dx инвертируется (dxDrawn = −dxWorld при зеркале).
+        float lungeDx = 0f, lungeDy = 0f;
+        if (_npcSwings.TryGetValue(npcId, out var swing))
+        {
+            float k = swing.Age / NpcSwingSec;
+            float lunge = Mathf.Sin(k * Mathf.Pi) * NpcSwingLungePx;
+            lungeDx = (facingLeft ? -swing.DirX : swing.DirX) * lunge;
+            lungeDy = swing.DirY * lunge * 0.6f; // вертикаль мягче
+        }
+
+        var topLeft = new Vector2(
+            cx - spriteSize / 2f + off.X + lungeDx,
+            cy - spriteSize / 2f + off.Y + lungeDy);
 
         if (facingLeft)
         {

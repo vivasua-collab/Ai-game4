@@ -248,6 +248,11 @@ namespace CultivationGame.Modules.NPC
         /// </summary>
         public NPCState GetNPCState(string npcId)
         {
+            // R16: null-гвард (паттерн GetNPC) — CombatEndedEvent при Flee
+            // несёт WinnerId/LoserId = null: OnCombatEnded падал
+            // ArgumentNullException'ом (Dictionary.TryGetValue с null-ключом),
+            // убивая NPCModule.Tick (AI-тик всей карты) каждый игровой тик.
+            if (string.IsNullOrEmpty(npcId)) return null;
             _npcStates.TryGetValue(npcId, out var state);
             return state;
         }

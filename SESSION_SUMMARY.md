@@ -1,15 +1,42 @@
 # Сводка сессий (обновляется при завершении каждой сессии)
 
-Обновлено: 2026-09-10 10:30 UTC (облачный агент Z.ai Code)
+Обновлено: 2026-09-10 10:55 UTC (облачный агент Z.ai Code)
 
 ## Проект
 Cultivation World Simulator (Ai-game4), Godot 4.7.1 .NET, C#
 Репозиторий: https://github.com/vivasua-collab/Ai-game4 (публичный)
-HEAD: см. `git ls-remote origin main` (R15 запушена)
+HEAD: см. `git ls-remote origin main` (R16 запушена)
 
 ---
 
 ## Последние сессии
+
+### 2026-09-10 №5 (R16: боевой ИИ NPC + рабочий бой + анимация удара)
+- **Аудит D1–D8:** NPC не отвечал на атаку игрока («манекен» — гейт
+  IsInCombat в EvaluateAndDecide глотал переходы; месть не доходила до
+  ProcessNpcAttacks), не бежал при HP<20% в бою, вечное преследование,
+  ActiveDefense=None для NPC, клавиша defend без ввода, фантомный
+  CombatStartedEvent, лучники лезли в melee, нет анимации удара.
+- **ИИ (NPCAIService):** переходы ДО гейта боя — месть
+  (Attacking/Fleeing по личности: роли-бойцы/Aggressive дерутся,
+  Pacifist/Cautious бегут), бегство HP≤20% в бою + leash AggroRadius×3
+  (CombatDisengageEvent → AbandonCombat → Flee-финал), анти-flip-flop
+  (раненый не пере-агрится).
+- **Механики:** NPCDefenseSelector (щит→Block/силовик→Parry/прочие→
+  Dodge) — слой активной защиты для NPC-защитников; стойка игрока **G**
+  (цикл None→Dodge→Parry→Shield, DefenseIntentEvent); ExecuteDefense
+  работает и вне боя; AbandonCombat в ICombatService.
+- **Анимация удара:** StrikeFxRenderer (свип по AttackIntent, слэш+
+  искры по DamageApplied, крит золотой) + замахи оружия игрока/NPC
+  (sin-выпад 0.42с, зеркалирование учтено) — всё процедурно _Draw.
+- **Попутно:** kiting лучников (NPCMovementService); null-гварды
+  GetNPCState/OnCombatEnded (спящий баг Flee-финала валил весь AI-тик
+  ArgumentNullException'ом); стек в логе исключений GameEntryPoint.
+- QA: GODOT_COMBATAI_DEBUG=1 PASS (7 тестов); 12 регрессий PASS;
+  build 0 err; Xvfb+VLM (слэш-дуга/искры/−27/выпады подтверждены).
+  docs_v2: COMBAT_SYSTEM §1.4.1-2/§7, NPC_AI_SYSTEM шапка,
+  MODULE_STRUCTURE §2.4/§2.7, TESTING_RULES (33), SPRITE_CATALOG §22.
+  Чекпоинт: checkpoints/09_10_r16_combat_ai.md.
 
 ### 2026-09-10 №4 (R15: оружие в руках — фазы A+B)
 - **План одобрен** (дефолты §6; статичные спрайты; PNG — отдельный план;
@@ -80,6 +107,10 @@ HEAD: см. `git ls-remote origin main` (R15 запушена)
 ### Что работает
 - ✅ Мир/биомы/harvest/ground items; инвентарь+кукла+пояс+ПКМ-меню
 - ✅ Бой: melee+ranged+LOS+ammo, turn-gate, визуал (цифры/HP/kill-feed)
+- ✅ **Боевой ИИ R16:** NPC отвечает на атаку (Attacking/Fleeing по
+  личности), бежит при HP<20% (даже в бою), leash 15 тайлов, защищается
+  (Dodge/Parry/Block), лучники кайтят; стойка игрока G; анимация удара
+  (слэш/искры/замахи)
 - ✅ **Full loot R13 + R14:** генерация населения, трупы, обыск;
   восполнение населения — только вне сессии (ивенты — TrySpawnEventNpc)
 - ✅ **Оружие в руках R15:** hand-спрайты игрока+NPC (7 классов × 5
@@ -89,10 +120,12 @@ HEAD: см. `git ls-remote origin main` (R15 запушена)
 
 ### Что НЕ работает (отложено)
 - ❌ Визуал R13/R15 живьём на ПК (Xvfb подтвердил игрока; NPC — QA);
-  баланс камней в трупах
-- ❌ R15 фаза C: замах-анимация, off-hand щит, иконки лут-окна/ground
+  баланс камней в трупах; тонкая настройка амплитуд R16-анимации
+- ❌ Авто-замедление времени в бою (§1.2 superSuperSlow — кандидат)
+- ❌ PNG-ассеты (план пользователя); броня-слои (архитектура R15)
 - ❌ Лут с животных (материалы TODO — только камни); faction port
-- ❌ Per-attacker pending; обыск трупов ИИ; состав для 500×500
+- ❌ Per-attacker pending; обыск трупов ИИ; состав для 500×500;
+  спинальный AI/Brain (NPC_AI_SYSTEM §2)
 
 ---
 
@@ -106,10 +139,11 @@ HEAD: см. `git ls-remote origin main` (R15 запушена)
 ---
 
 ## Следующие шаги
-1. P0: живой QA R13+R14+R15 на ПК (вечером): оружие у игрока/NPC разных
-   классов, зеркалирование, НЕ-восполнение после зачистки
-2. R15 фаза C (замах/щит/иконки лута) или PNG-ассеты (план пользователя)
-3. Лут с животных (материалы по видам)
+1. P0: живой QA R13+R14+R15+R16 на ПК (вечером): бой с NPC (Space →
+   обмен ударами), G-стойки, бегство/leash, слэш/искры/замахи,
+   НЕ-восполнение после зачистки
+2. Авто-замедление времени в бою (§1.2) или PNG-ассеты (план)
+3. Броня-слои (архитектура R15); лут с животных (материалы)
 4. Обыск трупов ИИ-NPC; faction port; 500×500 состав
 
 ---
@@ -117,6 +151,6 @@ HEAD: см. `git ls-remote origin main` (R15 запушена)
 ## Предупреждения
 - Godot: **/home/z/godot_flat/godot** (flat, не старый вложенный путь)
 - QA-хуки поштучно, timeout ≥90с, вердикт grep 'VERDICT' (реестр —
-  TESTING_RULES §0.1, 31 хук)
+  TESTING_RULES §0.1, 33 хука)
 - Токен: /home/z/my-project/.auth/github.token (не запрашивать, если есть)
 - После сброса песочницы: recover_sandbox.sh; сверять git ls-remote

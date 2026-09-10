@@ -86,6 +86,12 @@ public static class InputMapInitializer
         // Attack (Space)
         AddKeyAction("attack", Key.Space);
 
+        // R16 (2026-09-10): стойка защиты — клавиша G (была «мёртвая проводка»:
+        // PlayerInputService читал "defend", но действие нигде не было
+        // зарегистрировано и не имело клавиши). G — свободна в WASD-кластере
+        // (E/F/R/T/X/Z/V/C заняты).
+        AddKeyAction("defend", Key.G);
+
         // Mouse click action — Left Mouse Button for movement/interaction.
         AddMouseButtonAction("mouse_click", MouseButton.Left);
 

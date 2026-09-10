@@ -77,6 +77,10 @@ public partial class GameWorldController : Node2D
     [Inject] private ISubscriber<Core.Messaging.Contracts.CorpseRemovedEvent> CorpseRemovedSub { get; set; } = null!;
     // R15 (2026-09-10): экипировка оружия → обновить спрайт в руке игрока.
     [Inject] private ISubscriber<Core.Messaging.Contracts.EquipmentChangedEvent> EquipmentChangedSub { get; set; } = null!;
+    // R16 (2026-09-10): замах оружия игрока (AttackIntentEvent, melee) +
+    // тост стойки защиты (DefenseIntentEvent, клавиша G).
+    [Inject] private ISubscriber<Core.Messaging.Contracts.AttackIntentEvent> AttackIntentSub { get; set; } = null!;
+    [Inject] private ISubscriber<Core.Messaging.Contracts.DefenseIntentEvent> DefenseIntentSub { get; set; } = null!;
 
     private Node2D        _worldRoot     = null!;
     private Camera2D      _camera        = null!;
@@ -89,6 +93,16 @@ public partial class GameWorldController : Node2D
     private bool          _facingLeft;              // R15: направление взгляда
     private string?       _mainHandCacheItemId;     // R15: кэш синхронизации
     private float         _mainHandSyncCooldown;    // R15: страховка 0.5с (событие до _Ready)
+
+    // === R16 (2026-09-10): замах оружия игрока (анимация удара) ===
+    // AttackIntentEvent (melee, attacker=player) → таймер 0.42с → выпад
+    // PlayerMainHand к цели (sin-кривая: разгон-удар-возврат). Статичные
+    // спрайты: «замах» = смещение позиции + Scale-пульс, без поворота
+    // (Rotation конфликтует с FlipH-зеркалированием R15).
+    private Vector2       _mainHandSwingDir = Vector2.Zero;
+    private float         _mainHandSwingAge = -1f;   // <0 = нет анимации
+    private const float   MainHandSwingSec = 0.42f;  // ≈ каст базовой атаки
+    private const float   MainHandSwingLungePx = 12f;
     private InputAdapter  _inputAdapter  = null!;
     private SceneBuilder  _sceneBuilder  = null!;
     private TechniqueEffectRenderer _techniqueEffectRenderer = null!;
@@ -133,6 +147,9 @@ public partial class GameWorldController : Node2D
     private System.IDisposable? _corpseRemovedToken; // R13: закрытие LootWindow по CorpseRemovedEvent
     private System.IDisposable? _attackRejectedToken; // M2: тост причины отклонения атаки
     private System.IDisposable? _equipmentChangedToken; // R15: оружие в руке
+    // R16: замах оружия + тост стойки защиты.
+    private System.IDisposable? _attackIntentToken;
+    private System.IDisposable? _defenseIntentToken;
     private CanvasLayer   _hudCanvas     = null!;
     private Label         _timeLabel     = null!;
     private Label         _hudLabel      = null!;
@@ -302,6 +319,9 @@ public partial class GameWorldController : Node2D
         // Страховка на случай экипировки ДО _Ready (фазы сборки) — поллинг 0.5с
         // в _PhysicsProcess (сравнение по ItemId, дёшево).
         _equipmentChangedToken = EquipmentChangedSub?.Subscribe(OnEquipmentChanged);
+        // R16: замах оружия игрока + тост стойки защиты (G).
+        _attackIntentToken = AttackIntentSub?.Subscribe(OnAttackIntentForSwing);
+        _defenseIntentToken = DefenseIntentSub?.Subscribe(OnDefenseIntent);
         // Этап 7: тосты от модулей (InventoryWindow.TryUseQiStone и др.)
         _toastShownToken = ToastShownSub?.Subscribe(OnToastShown);
         // Phase 2 fix: dialogue can end from MANY paths (E advance, Esc, choice
@@ -464,6 +484,17 @@ public partial class GameWorldController : Node2D
         {
             var weaponVisSim = new WeaponVisSimDebug { Name = "WeaponVisSimDebug" };
             AddChild(weaponVisSim);
+        }
+        // R16 (2026-09-10): headless-верификация ИИ NPC в бою
+        // (GODOT_COMBATAI_DEBUG=1) — месть на атаку игрока, урон в обе
+        // стороны, селектор защит NPC, бегство HP<20%, leash, стойка
+        // игрока (G), счётчики StrikeFX. GODOT_STRIKEFX_HOLD=1 — визуальный
+        // режим (живая драка для Xvfb-скриншотов).
+        if (System.Environment.GetEnvironmentVariable("GODOT_COMBATAI_DEBUG") == "1"
+            || System.Environment.GetEnvironmentVariable("GODOT_STRIKEFX_HOLD") == "1")
+        {
+            var combatAiSim = new CombatAISimDebug { Name = "CombatAISimDebug" };
+            AddChild(combatAiSim);
         }
         GD.Print("[GameWorldController] Ready");
     }
@@ -929,9 +960,31 @@ public partial class GameWorldController : Node2D
         if (_playerMainHand != null)
         {
             var off = _mainHandOffset;
+
+            // R16: анимация замаха — выпад к цели (sin-кривая) + Scale-пульс.
+            float swingDx = 0f, swingDy = 0f;
+            float scalePulse = 0f;
+            if (_mainHandSwingAge >= 0f)
+            {
+                _mainHandSwingAge += (float)delta;
+                if (_mainHandSwingAge >= MainHandSwingSec)
+                {
+                    _mainHandSwingAge = -1f; // анимация закончена
+                }
+                else
+                {
+                    float k = _mainHandSwingAge / MainHandSwingSec;
+                    float lunge = Mathf.Sin(k * Mathf.Pi) * MainHandSwingLungePx;
+                    swingDx = _mainHandSwingDir.X * lunge;
+                    swingDy = _mainHandSwingDir.Y * lunge * 0.6f; // вертикаль мягче
+                    scalePulse = Mathf.Sin(k * Mathf.Pi) * 0.18f;
+                }
+            }
+
             _playerMainHand.Position = new Vector2(
-                _visualPosition.X + (_facingLeft ? -off.X : off.X),
-                _visualPosition.Y + off.Y);
+                _visualPosition.X + (_facingLeft ? -off.X : off.X) + swingDx,
+                _visualPosition.Y + off.Y + swingDy);
+            _playerMainHand.Scale = new Vector2(1f + scalePulse, 1f + scalePulse * 0.5f);
             _playerMainHand.FlipH = _facingLeft;
             _playerSprite.FlipH = _facingLeft;
 
@@ -1990,6 +2043,55 @@ public partial class GameWorldController : Node2D
     }
 
     /// <summary>
+    /// R16: замах оружия игрока — AttackIntentEvent (melee, attacker=player)
+    /// запускает выпад MainHand к ЦЕЛИ (направление = визуальная позиция
+    /// игрока → тайл NPC). Дальний бой не анимируем (натяжение лука —
+    /// будущий этап). Выпад и слэш-дуга (StrikeFxRenderer) — синхронно с
+    /// началом атаки (интент → замах ~0.4с → резолв урона).
+    /// </summary>
+    private void OnAttackIntentForSwing(in Core.Messaging.Contracts.AttackIntentEvent e)
+    {
+        if (e.IsRanged) return;
+        if (!Core.Helpers.PlayerIdResolver.IsPlayer(e.AttackerId)) return;
+        if (_playerMainHand == null || !PlayerIdResolverProxy()) return;
+
+        var target = Npcs?.GetNPC(e.TargetId);
+        if (target == null) return;
+
+        float tile = GameConstants.TILE_PIXELS;
+        var to = new Vector2(
+            target.Position.X * tile + tile / 2f,
+            target.Position.Y * tile + tile / 2f);
+        var dir = to - _visualPosition;
+        if (dir.LengthSquared() < 1f)
+            dir = _facingLeft ? new Vector2(-1f, 0f) : new Vector2(1f, 0f);
+
+        _mainHandSwingDir = dir.Normalized();
+        _mainHandSwingAge = 0f;
+    }
+
+    /// <summary>Игрок заспавнен (позиция доступна для направления замаха).</summary>
+    private bool PlayerIdResolverProxy() => _positionInitialized && Player != null;
+
+    /// <summary>
+    /// R16: тост стойки защиты игрока (клавиша G, цикл в PlayerCombatAdapter).
+    /// </summary>
+    private void OnDefenseIntent(in Core.Messaging.Contracts.DefenseIntentEvent e)
+    {
+        if (!Core.Helpers.PlayerIdResolver.IsPlayer(e.EntityId)) return;
+
+        string stanceName = e.Defense switch
+        {
+            DefenseSubtype.Dodge => "уклонение",
+            DefenseSubtype.Parry => "парирование",
+            DefenseSubtype.Block => "блок",
+            DefenseSubtype.Shield => "щит Ци",
+            _ => "без защиты",
+        };
+        ShowToast($"🛡 Стойка: {stanceName}");
+    }
+
+    /// <summary>
     /// R13 FULL-LOOT: E рядом с трупом → окно обыска. Приоритет: труп ближе
     /// живого NPC (или живого рядом нет) → обыск; иначе — диалог (HandleNpcTalk).
     /// Мёртвый NPC не говорит, поэтому при равных дистанциях труп выигрывает.
@@ -2358,6 +2460,13 @@ public partial class GameWorldController : Node2D
         // Lazy-подписка отклонений атак (первое нажатие Space, M2/C-5).
         _attackRejectedToken?.Dispose();
         _attackRejectedToken = null;
+        // R15: экипировка → MainHand. R16: замах оружия + стойка защиты.
+        _equipmentChangedToken?.Dispose();
+        _equipmentChangedToken = null;
+        _attackIntentToken?.Dispose();
+        _attackIntentToken = null;
+        _defenseIntentToken?.Dispose();
+        _defenseIntentToken = null;
     }
 
     public Node2D WorldRoot => _worldRoot;

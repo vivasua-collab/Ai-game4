@@ -1,13 +1,44 @@
 # SESSION_CONTEXT — Передача контекста агенту
 
 **Дата создания:** 2026-08-22
-**Обновлено:** 2026-09-10 10:20 UTC (R15 внедрена: оружие в руках игрока+NPC; QA 11/11 PASS)
+**Обновлено:** 2026-09-10 10:55 UTC (R16 внедрена: боевой ИИ NPC + рабочий бой игрок↔NPC + анимация удара; QA 13/13 PASS + VLM)
 **Назначение:** Полный контекст для продолжения разработки
 **Инструкция:** Прочитай START_PROMPT.md ПЕРВЫМ, затем этот файл.
 
 ---
 
 ## 0. ЧТО СДЕЛАЛОСЬ ЗА СЕССИИ 2026-09-08…10 (коммиты 3e41927…HEAD)
+
+### Сессия 2026-09-10 №5: R16 — доработка боевой системы (боевой ИИ NPC)
+1. **Диагноз D1–D8** (почему бой «не рабочий»): NPC не отвечал на атаку
+   игрока (манекен — гейт IsInCombat глотал переходы), не бежал при
+   HP<20% в бою, не имел leash, не защищался (ActiveDefense=None),
+   клавиша защиты — мёртвая проводка, фантомный CombatStartedEvent,
+   лучники лезли в melee, не было анимации удара.
+2. **ИИ NPC:** NPCAIService — боевые переходы ДО гейта IsInCombat:
+   месть (Attacking/Fleeing по личности §5.2), бегство в бою +
+   CombatDisengageEvent, leash AggroRadius×3, анти-flip-flop (раненый
+   не пере-агрится). NPCCombatAdapter: MarkNpcCombatStarted — прямая
+   пометка (без фантома), OnCombatDisengage сброс участников.
+   NPCMovementService: kiting лучников.
+3. **Механики:** NPCDefenseSelector (щит→Block/силовик→Parry/прочие→
+   Dodge — детерминизм) в CombatService для NPC-защитников; стойка
+   игрока клавишей G (DefenseIntentEvent → ExecuteDefense, цикл
+   None→Dodge→Parry→Shield); CombatService.AbandonCombat (Flee-финал).
+4. **Анимация удара:** StrikeFxRenderer (свип-дуги по интентам, слэш+
+   искры по DamageApplied, крит — золотой) + замах оружия игрока
+   (MainHand sin-выпад 12px) + замах NPC (NPCSpriteRenderer, инверсия
+   dx при зеркале). Всё процедурно _Draw, без PNG.
+5. **Попутные фиксы:** NPCService.GetNPCState null-гвард +
+   OnCombatEnded null-безопасность (спящий баг Flee-финала валил
+   NPCModule.Tick ArgumentNullException'ом); ExecuteDefense запоминает
+   стойку и вне боя; GameEntryPoint логирует стек исключений.
+6. QA: GODOT_COMBATAI_DEBUG=1 → PASS (месть/двусторонний урон/селектор/
+   бегство/leash/стойка/анимация); 12 регрессий PASS; build 0 errors;
+   Xvfb+VLM: слэш-дуга, искры, цифры −27, выпады оружия подтверждены.
+7. docs_v2: COMBAT_SYSTEM §1.4.1/§1.4.2/§7, NPC_AI_SYSTEM (статус
+   реализации), MODULE_STRUCTURE §2.4/§2.7, TESTING_RULES §0.1 (33),
+   SPRITE_CATALOG §22. Чекпоинт: 09_10_r16_combat_ai.md.
 
 ### Сессия 2026-09-10 №4: R15 — «оружие в руках» (фазы A+B внедрены)
 1. **План одобрен пользователем** (дефолтные ответы §6; статичные
@@ -155,6 +186,11 @@ env GODOT_NEWGAME=1 GODOT_SAVELOAD_DEBUG=1 timeout 90 "$GODOT" --headless --path
 - ✅ Бой: Space-атака, урон по частям тела, HP-бары, цифры урона,
       kill-feed, стрелка атакующего, ranged+LOS+ammo, turn-gate,
       смерть→респавн
+- ✅ **Боевой ИИ NPC (R16):** месть на атаку игрока (Attacking/
+      Fleeing по личности), бегство HP<20% В БОЮ, leash 15 тайлов
+      (побег работает), активная защита NPC (Dodge/Parry/Block),
+      kiting лучников, стойка защиты игрока (G), анимация удара
+      (слэш-дуги + искры + замахи оружия игрока/NPC)
 - ✅ **Full loot (R13) + правило населения (R14):** спаун NPC через
       генерацию состава, трупы-контейнеры (снапшот экипировки/инвентаря/
       камней), обыск E, «Забрать всё», TTL трупов; восполнение населения
@@ -178,7 +214,12 @@ env GODOT_NEWGAME=1 GODOT_SAVELOAD_DEBUG=1 timeout 90 "$GODOT" --headless --path
 - ⚠ Визуал R15: позиционирование/размеры оружия у NPC (композит игрока
       подтверждён VLM-скриншотом; NPC — только QA-ключи, камера не видела
       NPC в кадре) — вечером у пользователя
-- ⚡ Баланс: камни в трупах по таблице 4.1 могут быть щедрыми
+- ⚠ Визуал R16: слэш/искры/замахи подтверждены Xvfb+VLM-скриншотом
+      (весь боевой скрин в кадре); тонкая настройка кривых/амплитуд
+      (MainHandSwingLungePx 12/10, sin-профиль) — на живом QA
+- ⚡ Баланс: камни в трупах по таблице 4.1 могут быть щедрыми;
+      частота DefensiveResult у NPC (селектор всегда активен —
+      Dodge-шанс 5%+AGI на каждую атаку по NPC)
 
 ### Что НЕ работает (отложено)
 - ❌ Faction system (порт из Ai-game3-ref)
@@ -232,18 +273,22 @@ game/src/
 2. Визуал R15: оружие в руке игрока/на разных NPC (кинжал/меч/копьё/
    двуручник/лук/посох), хотбар-иконки, зеркалирование при движении
    влево/вправо; вылеты за тайл 2H-оружия
-3. Баланс камней в трупах (таблица 4.1 vs ощущение)
+3. Бой R16 живьём: Space по NPC → месть/обмен ударами; G-стойки
+   (тосты, эффекты защиты); убить NPC до <20% → бегство + выход из
+   боя; убежать на >15 тайлов → leash; слэш/искры/замахи
+4. Баланс камней в трупах (таблица 4.1 vs ощущение)
 
 ### P1 — кандидаты следующей сессии
-4. R15 фаза C: замах-анимация (sprite-swap §17), off-hand щит, иконки
-   в лут-окне трупов / ground items
-5. PNG-ассеты: генерация и привязка к объектам (отдельный план
+5. R16+: авто-замедление времени в бою (COMBAT_SYSTEM §1.2
+   superSuperSlow — не реализовано)
+6. PNG-ассеты: генерация и привязка к объектам (отдельный план
    пользователя; сейчас процедурные рецепты)
-6. Броня-слои на теле (R16-кандидат — та же архитектура R15)
-7. Лут с животных: материалы по видам (шкура/клыки/мясо) в CorpseService
-8. Обыск трупов ИИ-NPC (приоритет лута для AI)
-9. Faction port (Ai-game3-ref, ~400 LOC)
-10. Генерация состава для 500×500 (мульти-локации)
+7. Броня-слои на теле (та же архитектура R15)
+8. Лут с животных: материалы по видам (шкура/клыки/мясо) в CorpseService
+9. Обыск трупов ИИ-NPC (приоритет лута для AI)
+10. Faction port (Ai-game3-ref, ~400 LOC)
+11. Генерация состава для 500×500 (мульти-локации)
+12. Спинальный AI (рефлексы) / Neural Router / Brain (NPC_AI_SYSTEM §2)
 
 ### P2 — долг
 7. Per-attacker pending technique
@@ -261,8 +306,9 @@ GODOT='/home/z/godot_flat/godot'
 
 dotnet build                                                     # 0 errors
 
-# Ключевые хуки (полный список 31 шт — TESTING_RULES §0.1):
+# Ключевые хуки (полный список 33 шт — TESTING_RULES §0.1):
 env GODOT_NEWGAME=1 timeout 90 "$GODOT" --headless --path "$PWD" scenes/MainMenu.tscn
+env GODOT_NEWGAME=1 GODOT_COMBATAI_DEBUG=1 timeout 90 "$GODOT" --headless --path "$PWD" scenes/MainMenu.tscn
 env GODOT_NEWGAME=1 GODOT_LOOT_DEBUG=1 timeout 90 "$GODOT" --headless --path "$PWD" scenes/MainMenu.tscn
 env GODOT_NEWGAME=1 GODOT_WEAPONVIS_DEBUG=1 timeout 90 "$GODOT" --headless --path "$PWD" scenes/MainMenu.tscn
 env GODOT_NEWGAME=1 GODOT_COMBAT_SIM=1 timeout 90 "$GODOT" --headless --path "$PWD" scenes/MainMenu.tscn
@@ -285,11 +331,17 @@ DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 GODOT_NEWGAME=1 \
 | `SESSION_SUMMARY.md` | Сводка сессий + состояние |
 | `checkpoints/09_10_r14_population_rule.md` | Чекпоинт R14 (правило населения) |
 | `checkpoints/09_10_r15_weapon_visuals.md` | Чекпоинт R15 (оружие в руках) |
+| `checkpoints/09_10_r16_combat_ai.md` | Чекпоинт R16 (боевой ИИ + план + аудит D1–D8) |
 | `checkpoints/plans/2026-09-10_r15_weapon_visualization_plan.md` | R15 план (фазы A+B реализованы) |
 | `checkpoints/09_10_r13_full_loot.md` | Чекпоинт R13 (фичи) |
+| `docs/docs_v2/02_systems/COMBAT_SYSTEM.md` | Бой: §1.4.1 ИИ NPC + §1.4.2 стойка G (R16) |
+| `docs/docs_v2/04_entities/NPC_AI_SYSTEM.md` | ИИ NPC: статус реализации R16 в шапке |
 | `docs/docs_v2/04_entities/DEATH_AND_LOOT.md` | Спецификация смерти/лута (§2.4 R14) |
-| `docs/docs_v2/07_ui/SPRITE_CATALOG.md` | Спрайты: §7 equipped-оружие (R15) |
-| `docs/docs_v2/09_workflow/TESTING_RULES.md` | Реестр 31 QA-хуков |
+| `docs/docs_v2/07_ui/SPRITE_CATALOG.md` | Спрайты: §7 оружие (R15), §22 StrikeFX (R16) |
+| `docs/docs_v2/09_workflow/TESTING_RULES.md` | Реестр 33 QA-хуков |
+| `game/src/Modules/Combat/NPCDefenseSelector.cs` | R16: выбор защиты NPC (pure-C#) |
+| `game/src/Adapter/Scene/StrikeFxRenderer.cs` | R16: анимация удара (свип/слэш/искры) |
+| `game/src/Adapter/Scene/CombatAISimDebug.cs` | QA боевого ИИ (GODOT_COMBATAI_DEBUG) |
 | `game/src/Adapter/Scene/WeaponVisualCatalog.cs` | R15: кэш/резолв спрайтов оружия |
 | `game/src/Adapter/Scene/WeaponVisSimDebug.cs` | QA оружия (GODOT_WEAPONVIS_DEBUG) |
 | `game/src/Modules/NPC/CorpseService.cs` | Трупы-контейнеры |

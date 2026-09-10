@@ -102,7 +102,14 @@ public sealed class GameEntryPoint : IStartable, ITickable
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[GameEntryPoint] Tickable {_tickables[i].GetType().Name} threw at tick {tickCount}: {ex.GetType().Name}: {ex.Message}");
+                    // R16: +StackTrace (первые 3 кадра) — диагностика источников
+                    // (ArgumentNullException 'key' без стека не локализовался).
+                    var frames = ex.StackTrace?.Split('\n');
+                    string top = "";
+                    if (frames != null)
+                        for (int f = 0; f < System.Math.Min(6, frames.Length); f++)
+                            top += "\n      " + frames[f].Trim();
+                    Console.WriteLine($"[GameEntryPoint] Tickable {_tickables[i].GetType().Name} threw at tick {tickCount}: {ex.GetType().Name}: {ex.Message}{top}");
                 }
             }
         }

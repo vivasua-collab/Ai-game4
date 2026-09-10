@@ -45,6 +45,22 @@ namespace CultivationGame.Core.Interfaces
         /// </summary>
         AttackAcceptance ExecuteAttack(string attackerId, string techniqueId, string targetId = null, bool isRanged = false, int potencyPermil = 1000, bool isCharged = false);
         void ExecuteDefense(string defenderId, DefenseSubtype defenseType);
+
+        // === R16 (2026-09-10): доработка боевой системы ===
+
+        /// <summary>
+        /// R16: стойка защиты игрока (заполняется ExecuteDefense — клавиша G
+        /// через DefenseIntentEvent). QA-геттер; NPC-защитники выбирают стойку
+        /// сами (NPCDefenseSelector), это поле — только про игрока.
+        /// </summary>
+        DefenseSubtype CurrentPlayerDefense { get; }
+
+        /// <summary>
+        /// R16: NPC покидает бой по своей инициативе (бегство HP&lt;20% / leash —
+        /// CombatDisengageEvent из NPCAIService). Завершает бой стадией Flee.
+        /// Молчит для не-участников и вне боя.
+        /// </summary>
+        void AbandonCombat(string entityId);
     }
 
     /// <summary>

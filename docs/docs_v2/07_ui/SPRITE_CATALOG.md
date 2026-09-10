@@ -532,7 +532,31 @@ sprites/
 
 ---
 
-## 22. Связанные документы
+## 22. Анимация удара (R16, 2026-09-10) — StrikeFX
+
+> Процедурные эффекты (Node2D + _Draw, паттерн DamageNumberRenderer);
+> PNG не используется. Этап «внедрение анимаций» — будущий; пока
+> статичные спрайты + параметрические движения (sin-кривые).
+
+### 22.1. Состав
+
+| Компонент | Триггер | Описание |
+|---|---|---|
+| **Свип** (swipe) | `AttackIntentEvent` (melee, обе стороны) | Бледная дуга-замах у ЦЕЛИ по направлению атака→цель; 0.25с; α=0.45 |
+| **Слэш** (strike) | `DamageAppliedEvent` (Melee-подтипы, Hit/Crit/Parry/Block) | Яркая дуга + искры (5–7 лучей) у цели; 0.22с; крит — золотой, радиус 20 |
+| **Замах оружия игрока** | `AttackIntentEvent` (attacker=player, melee) | Выпад PlayerMainHand к цели: sin-кривая, 12px, 0.42с + Scale-пульс (Rotation исключён — конфликт с FlipH-зеркалированием R15) |
+| **Замах оружия NPC** | `AttackIntentEvent` (attacker=NPC, melee) | Выпад hand-спрайта NPC к цели: sin-кривая, 10px, 0.42с; при facingLeft нарисованный dx инвертируется (зеркало 2cx−x) |
+
+### 22.2. Параметры (константы)
+
+- `StrikeFxRenderer`: MaxConcurrent=32, SwipeLifetime=0.25с, StrikeLifetime=0.22с; ZIndex=Objects+2 (под цифрами урона +3).
+- Замахи: MainHandSwingSec=0.42с (≈ каст базовой атаки), LungePx 12/10.
+- Ranged не рисуется — трассер стрел у ProjectileRenderer (фаза 8 ч.3).
+- QA: статические счётчики `TotalSwipes/TotalStrikes` (инкремент в обработчиках — headless-совместимо, GODOT_COMBATAI_DEBUG).
+
+---
+
+## 23. Связанные документы
 
 - `RENDER_LAYERS.md` — слои рендеринга, где размещаются спрайты.
 - `UI_DESIGN.md` — UI-тема, Unicode-глифы, иконки.

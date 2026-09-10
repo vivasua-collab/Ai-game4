@@ -22,12 +22,19 @@ namespace CultivationGame.Modules.NPC
     /// - Wandering: случайное блуждание в радиусе патруля
     /// - Patrolling: движение между точками патруля
     /// - Fleeing: движение от цели
-    /// - Attacking: движение к цели
+    /// - Attacking: движение к цели (R16: дальнобойные — kiting, см. ниже)
     /// - Following: движение к цели с поддержкой дистанции
     ///
     /// BD-42: Использует ITimeService.DeltaTime.
     /// NPC-B05: Кэширует позицию игрока через PlayerPositionChangedEvent
     /// для движения к/от игрока (TargetId может быть не-NPC).
+    ///
+    /// R16 (2026-09-10): KITTING ДЛЯ ДАЛЬНОБОЙНЫХ NPC — санкционированная
+    /// инъекция IEquipmentDataProvider (паттерн NPCModule.ProcessNpcAttacks/
+    /// NPCSpriteRenderer: чтение оружия NPC без событий). Лучник не лезет
+    /// в melee: dist < KiteMinRange → отход, dist ≤ AttackRange оружия →
+    /// стоит и стреляет, дальше — сближается (раньше ВСЕГДА сближался до 1.5,
+    /// дальнее оружие не имело смысла в ИИ).
     /// </summary>
     public class NPCMovementService : IDisposable
     {
@@ -39,6 +46,9 @@ namespace CultivationGame.Modules.NPC
         // Если NPC состоит в активной группе с CurrentGroupTarget, движение
         // к этой цели имеет приоритет над wander/patrol/attack индивидуального AI.
         private readonly INPCGroupService? _groupService;
+        // R16: экипировка NPC — дальность оружия для кайтинга (санкционированная
+        // инъекция чтения, тот же паттерн что NPCModule._equipmentDataProvider).
+        private readonly IEquipmentDataProvider? _equipmentProvider;
 
         // === MessagePipe: подписки ===
         private readonly ISubscriber<PlayerPositionChangedEvent> _playerPosChangedSub;
@@ -64,13 +74,17 @@ namespace CultivationGame.Modules.NPC
             ISubscriber<PlayerPositionChangedEvent> playerPosChangedSub,
             // GROUP-SPAWN: опциональная зависимость (null-tolerant для тестов).
             // DI регистрирует INPCGroupService как singleton в NPCModuleServices.
-            INPCGroupService? groupService = null)
+            INPCGroupService? groupService = null,
+            // R16: экипировка для кайтинга лучников (опционально — тот же
+            // null-tolerant паттерн, DI подставит зарегистрированный провайдер).
+            IEquipmentDataProvider? equipmentProvider = null)
         {
             _npcService = npcService;
             _config = config;
             _timeService = timeService;
             _playerPosChangedSub = playerPosChangedSub;
             _groupService = groupService;
+            _equipmentProvider = equipmentProvider;
         }
 
         /// <summary>
@@ -249,9 +263,17 @@ namespace CultivationGame.Modules.NPC
         }
 
         /// <summary>
+        /// R16: минимальная дистанция кайтинга — ближе лучник отходит
+        /// (melee-зона: 3 тайла — вне досягаемости ближнего удара).
+        /// </summary>
+        private const float KiteMinRange = 3f;
+
+        /// <summary>
         /// Атака — движение к цели (TargetId).
         /// NPC-B05: Цель может быть игроком (не NPC) — используем кэш позиции.
-        /// Остановка при достижении AttackRadius.
+        /// R16: KITING — дальнобойное оружие (AttackRange > 2, фаза 9A)
+        /// держит дистанцию: отход от melee-зоны, стрельба с дистанции оружия.
+        /// Ближнее оружие — как раньше: сближение до AttackRadius.
         /// </summary>
         private void ProcessAttacking(NPCState state, float deltaTime)
         {
@@ -263,7 +285,28 @@ namespace CultivationGame.Modules.NPC
 
             float distance = Vector2.Distance(state.Position, targetPos);
 
-            // Уже в радиусе атаки — не двигаемся
+            // R16: дальнобойный NPC — kiting (см. комментарий класса).
+            var weapon = _equipmentProvider?.GetEquipped(state.NpcId, EquipmentSlot.WeaponMain);
+            if (weapon != null && weapon.AttackRange > 2)
+            {
+                if (distance < KiteMinRange)
+                {
+                    // Слишком близко — отход от цели (стрелять в упор нельзя,
+                    // melee-противник бьёт).
+                    Vector2 pos = state.Position;
+                    Vector2 dir = (pos - targetPos).normalized;
+                    if (dir == Vector2.zero) dir = RandomDirection();
+                    Vector2 retreatTarget = pos + dir * 2f;
+                    MoveToward(state, retreatTarget, _config.DefaultMoveSpeed, deltaTime);
+                    return;
+                }
+                if (distance <= weapon.AttackRange) return; // в зоне обстрела — стоим
+                // Дальше дальности оружия — сближаемся (в зону обстрела).
+                MoveToward(state, targetPos, _config.DefaultMoveSpeed * 1.2f, deltaTime);
+                return;
+            }
+
+            // Ближний бой: уже в радиусе атаки — не двигаемся
             if (distance <= _config.AttackRadius) return;
 
             // Движение к цели

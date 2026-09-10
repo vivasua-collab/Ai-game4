@@ -42,6 +42,46 @@
 - **NPC-атаки идут через реальных сущностей** (`NPCModule.ProcessNpcAttacks`); отдельного «AI противника» (`CombatAIService`) больше нет — удалён как фантомная сущность.
 - **Расход стрел (ammo) — транзакция:** списание только после принятой атаки (`Accepted`), проверка наличия — до начала боя.
 
+#### 1.4.1. Боевой ИИ NPC (R16, 2026-09-10)
+
+Реализация «рабочего боя игрок↔NPC» — переходы ИИ ДО гейта `IsInCombat` в
+`NPCAIService.EvaluateAndDecide` (раньше NPC в бою не менял состояние вообще):
+
+- **Месть/ответ:** удар по NPC или старт боя → `Attacking` (боец) или
+  `Fleeing` (миролюбивый: Pacifist/Cautious-гражданский). Эвристика
+  `ShouldFleeInsteadOfFight`: роли Guard/Enemy/Monster и черты
+  Aggressive/Vengeful дерутся всегда; остальные гражданские — по чертам.
+  ДО R16 NPC, атакованный игроком, оставался «манекеном» (IsInCombat без
+  Attacking → ProcessNpcAttacks не видел цели).
+- **Бегство в бою (§4.2 NPC_AI_SYSTEM):** HP ≤ `FleeHealthRatio` (20%)
+  работает и В БОЮ → `Fleeing` + `CombatDisengageEvent` → бой завершается
+  стадией Flee («никто не победил»). Раненый NPC не пере-агрится
+  (гейт healthRatio на пути угроз — иначе flip-flop агро↔бегство).
+- **Leash (aggro-drop):** цель-игрок дальше `AggroRadius×3` (15 тайлов) →
+  NPC выходит из боя (`CombatDisengageEvent`) → игрок может спастись
+  бегством. Раньше преследование было вечным.
+- **Активная защита NPC:** `NPCDefenseSelector` (pure-C#, детерминизм) —
+  щит (WeaponOff) → `Block`; оружие и STR>AGI+4 → `Parry`; прочие →
+  `Dodge`. CombatService подставляет выбор в слой §7 для каждой атаки по
+  NPC (заодно чинит NPC-vs-NPC: защитник-NPC раньше получал стойку игрока).
+- **Kiting лучников:** дальнобойное NPC (AttackRange>2) держит дистанцию:
+  dist<3 → отход, dist≤AttackRange → стоит и стреляет (ближний бой — как
+  раньше, сближение до AttackRadius).
+- **Единственный источник `CombatStartedEvent`** — `CombatService.StartCombat`
+  (первый принятый интент). `MarkNpcCombatStarted` помечает состояния
+  напрямую, БЕЗ фантомного publish (раньше — двойное событие при реальном
+  старте).
+
+#### 1.4.2. Стойка защиты игрока (R16)
+
+Клавиша **G** циклирует стойку: `None → Dodge → Parry (WeaponMain) →
+Shield (WeaponOff) → None` (`PlayerCombatAdapter.TickDefenseStance`,
+анти-спам 0.3с). Публикуется `DefenseIntentEvent` → `CombatModule` →
+`ICombatService.ExecuteDefense` — стойка применяется слоем §7 к СЛЕДУЮЩЕЙ
+входящей атаке. Выбор работает и вне боя (подготовка); в свой ход защита
+действует как действие хода (переход хода — семантика ExecuteDefense).
+Тост «🛡 Стойка: …» — GameWorldController.
+
 ---
 
 ## 2. 11-слойный конвейер прохождения урона
@@ -244,6 +284,11 @@ rawDamage += bonusDamage
 ---
 
 ## 7. Система попадания
+
+> **R16:** выбор активной защиты (слой 4): игрок — клавиша G (стойка,
+> §1.4.2); NPC — `NPCDefenseSelector` (§1.4.1). Визуальная обратная связь
+> удара — слэш-дуги/искры `StrikeFxRenderer` + замах оружия (R15-спрайты,
+> sin-выпад 0.42с) — см. SPRITE_CATALOG §22.
 
 ### 7.1. Уклонение (Dodge)
 

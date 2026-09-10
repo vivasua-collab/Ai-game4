@@ -42,6 +42,11 @@ public class CombatModule : IModule
     [Inject] private readonly CombatRangeGateService _rangeGate = null!;
     [Inject] private readonly IPublisher<AttackRejectedEvent> _attackRejectedPub = null!;
 
+    // R16 (2026-09-10): стойка защиты игрока (клавиша G → DefenseIntentEvent)
+    // и выход NPC из боя (бегство/leash → CombatDisengageEvent).
+    [Inject] private readonly ISubscriber<DefenseIntentEvent> _defenseIntentSub = null!;
+    [Inject] private readonly ISubscriber<CombatDisengageEvent> _combatDisengageSub = null!;
+
     // Подписка на события
     [Inject] private readonly ISubscriber<EnemyKilledEvent> _enemyKilledSub = null!;
     [Inject] private readonly ISubscriber<CombatEndedEvent> _combatEndedSub = null!;
@@ -61,6 +66,9 @@ public class CombatModule : IModule
     private IDisposable? _buffAppliedSubscription;
     private IDisposable? _buffRemovedSubscription;
     private IDisposable? _attackIntentSubscription;
+    // R16: подписки Defense/Disengage.
+    private IDisposable? _defenseIntentSubscription;
+    private IDisposable? _combatDisengageSubscription;
 
     public string ModuleName => "Combat";
 
@@ -88,6 +96,10 @@ public class CombatModule : IModule
 
         // Фаза 9D: подписка на AttackIntentEvent — боевой мост
         _attackIntentSubscription = _attackIntentSub.Subscribe(OnAttackIntent);
+
+        // R16: стойка защиты игрока (G) и выход NPC из боя (бегство/leash).
+        _defenseIntentSubscription = _defenseIntentSub.Subscribe(OnDefenseIntent);
+        _combatDisengageSubscription = _combatDisengageSub.Subscribe(OnCombatDisengage);
     }
 
     public void Tick(int tickCount)
@@ -208,6 +220,31 @@ public class CombatModule : IModule
         }
     }
 
+    /// <summary>
+    /// R16: игрок выбрал стойку защиты (клавиша G → PlayerCombatAdapter →
+    /// DefenseIntentEvent). Дёшево делегирует в CombatService.ExecuteDefense:
+    /// стойка запоминается и применяется пайплайном урона к СЛЕДУЮЩЕЙ атаке
+    /// по игроку (слой активной защиты §7); при владении ходом защита
+    /// действует как действие хода (переход хода — семантика ExecuteDefense).
+    /// </summary>
+    private void OnDefenseIntent(in DefenseIntentEvent e)
+    {
+        if (!_isConfigured) return;
+        _combatService.ExecuteDefense(e.EntityId, e.Defense);
+    }
+
+    /// <summary>
+    /// R16: NPC покинул бой по своей инициативе (NPCAIService: бегство
+    /// HP&lt;20% / leash). Авторитетное завершение CombatService-боя стадией
+    /// Flee (победителя нет) — CombatEndedEvent очистит участников, состояния
+    /// NPC уже сброшены NPCCombatAdapter.OnCombatDisengage.
+    /// </summary>
+    private void OnCombatDisengage(in CombatDisengageEvent e)
+    {
+        if (!_isConfigured) return;
+        _combatServiceImpl.AbandonCombat(e.NpcId);
+    }
+
     public void Dispose()
     {
         _enemyKilledSubscription?.Dispose();
@@ -222,5 +259,9 @@ public class CombatModule : IModule
         _buffRemovedSubscription = null;
         _attackIntentSubscription?.Dispose();
         _attackIntentSubscription = null;
+        _defenseIntentSubscription?.Dispose();
+        _defenseIntentSubscription = null;
+        _combatDisengageSubscription?.Dispose();
+        _combatDisengageSubscription = null;
     }
 }

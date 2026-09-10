@@ -37,7 +37,6 @@ namespace CultivationGame.Modules.NPC
         private readonly IBodyDataProvider _bodyDataProvider; // Волна 2.3: для обновления CurrentHealth
 
         // === MessagePipe: паблишеры ===
-        private readonly IPublisher<CombatStartedEvent> _combatStartedPub;
         private readonly IPublisher<NPCDamagedEvent> _npcDamagedPub;
         private readonly IPublisher<NPCDeathEvent> _npcDeathPub;
 
@@ -45,31 +44,35 @@ namespace CultivationGame.Modules.NPC
         private readonly ISubscriber<CombatStartedEvent> _combatStartedSub;
         private readonly ISubscriber<CombatEndedEvent> _combatEndedSub;
         private readonly ISubscriber<DamageAppliedEvent> _damageAppliedSub;
+        // R16: выход NPC из боя по своей инициативе (бегство/leash).
+        private readonly ISubscriber<CombatDisengageEvent> _combatDisengageSub;
         private IDisposable _combatStartedSubscription;
         private IDisposable _combatEndedSubscription;
         private IDisposable _damageAppliedSubscription;
+        private IDisposable _combatDisengageSubscription;
 
         // === Конструктор (VContainer) ===
         public NPCCombatAdapter(
             NPCService npcService,
             NPCConfig config,
             IBodyDataProvider bodyDataProvider,
-            IPublisher<CombatStartedEvent> combatStartedPub,
             IPublisher<NPCDamagedEvent> npcDamagedPub,
             IPublisher<NPCDeathEvent> npcDeathPub,
             ISubscriber<CombatStartedEvent> combatStartedSub,
             ISubscriber<CombatEndedEvent> combatEndedSub,
-            ISubscriber<DamageAppliedEvent> damageAppliedSub)
+            ISubscriber<DamageAppliedEvent> damageAppliedSub,
+            // R16: disengage-подписка.
+            ISubscriber<CombatDisengageEvent> combatDisengageSub)
         {
             _npcService = npcService;
             _config = config;
             _bodyDataProvider = bodyDataProvider;
-            _combatStartedPub = combatStartedPub;
             _npcDamagedPub = npcDamagedPub;
             _npcDeathPub = npcDeathPub;
             _combatStartedSub = combatStartedSub;
             _combatEndedSub = combatEndedSub;
             _damageAppliedSub = damageAppliedSub;
+            _combatDisengageSub = combatDisengageSub;
         }
 
         /// <summary>
@@ -80,6 +83,8 @@ namespace CultivationGame.Modules.NPC
             _combatStartedSubscription = _combatStartedSub.Subscribe(OnCombatStarted);
             _combatEndedSubscription = _combatEndedSub.Subscribe(OnCombatEnded);
             _damageAppliedSubscription = _damageAppliedSub.Subscribe(OnDamageApplied);
+            // R16: сброс состояния при выходе NPC из боя.
+            _combatDisengageSubscription = _combatDisengageSub.Subscribe(OnCombatDisengage);
         }
 
         // === Публичный API ===
@@ -87,21 +92,37 @@ namespace CultivationGame.Modules.NPC
         /// <summary>
         /// Review этап 3 (P2-5): MarkNpcCombatStarted (было StartAttack — имя
         /// вводило в заблуждение: метод НЕ запускает расчёт боя в CombatService,
-        /// а только помечает NPC как находящегося в бою через CombatStartedEvent
-        /// — его собственная подписка выставляет IsInCombat/TargetId обоим
-        /// участникам-NPC). Реальный удар идёт ОТДЕЛЬНЫМ путём:
-        /// NPCModule.ProcessNpcAttacks → AttackIntentEvent → CombatModule →
-        /// CombatService (первый интент и стартует CombatService-бой).
+        /// а только помечает NPC как находящегося в бою). Реальный удар идёт
+        /// ОТДЕЛЬНЫМ путём: NPCModule.ProcessNpcAttacks → AttackIntentEvent →
+        /// CombatModule → CombatService (первый интент и стартует
+        /// CombatService-бой).
         /// Вызывается NPCModule.OnAIStateChanged при переходе в Attacking.
+        ///
+        /// R16 (2026-09-10): фантомный publish CombatStartedEvent УДАЛЁН —
+        /// событие публикует ТОЛЬКО CombatService.StartCombat (при первом
+        /// принятом интенте). Раньше адаптер публиковал событие напрямую
+        /// (двойной publish при реальном старте; «бой» в UI до фактического
+        /// боя). Теперь — прямая пометка состояний обоим NPC-участникам.
+        /// Ответ NPC на начало боя — NPCAIService.OnCombatStartedForRetaliation
+        /// (подписан на НАСТОЯЩЕЕ событие CombatService).
         /// </summary>
         public void MarkNpcCombatStarted(string npcId, string targetId)
         {
             var state = _npcService.GetNPCState(npcId);
             if (state == null || !state.IsAlive) return;
-            if (state.IsInCombat) return;
+            if (!state.IsInCombat)
+            {
+                state.IsInCombat = true;
+                state.TargetId = targetId;
+            }
 
-            // Публикуем событие начала боя
-            _combatStartedPub.Publish(new CombatStartedEvent(npcId, targetId));
+            // NPC-vs-NPC: пометить и цель (если она NPC).
+            var targetState = _npcService.GetNPCState(targetId);
+            if (targetState != null && targetState.IsAlive && !targetState.IsInCombat)
+            {
+                targetState.IsInCombat = true;
+                targetState.TargetId = npcId;
+            }
         }
 
         /// <summary>
@@ -158,11 +179,15 @@ namespace CultivationGame.Modules.NPC
 
         /// <summary>
         /// Обработчик CombatEndedEvent — очистить IsInCombat, обновить отношение.
+        /// R16: null-гварды Winner/Loser — Flee-окончание (бегство/leash NPC)
+        /// публикует CombatEndedEvent(null, null) — раньше падало
+        /// ArgumentNullException'ом в GetNPCState (спящий баг: Flee-стадия
+        /// была недостижима при MaxCombatDuration=0).
         /// </summary>
         private void OnCombatEnded(in CombatEndedEvent e)
         {
             // Победитель
-            var winnerState = _npcService.GetNPCState(e.WinnerId);
+            var winnerState = e.WinnerId != null ? _npcService.GetNPCState(e.WinnerId) : null;
             if (winnerState != null)
             {
                 winnerState.IsInCombat = false;
@@ -170,11 +195,11 @@ namespace CultivationGame.Modules.NPC
 
                 // Ухудшение отношения к проигравшему
                 if (e.LoserId != null)
-                    _npcService.ModifyAttitude(e.WinnerId, e.LoserId, -10);
+                    _npcService.ModifyAttitude(e.WinnerId!, e.LoserId, -10);
             }
 
             // Проигравший
-            var loserState = _npcService.GetNPCState(e.LoserId);
+            var loserState = e.LoserId != null ? _npcService.GetNPCState(e.LoserId) : null;
             if (loserState != null)
             {
                 loserState.IsInCombat = false;
@@ -182,7 +207,32 @@ namespace CultivationGame.Modules.NPC
 
                 // Сильное ухудшение отношения к победителю
                 if (e.WinnerId != null)
-                    _npcService.ModifyAttitude(e.LoserId, e.WinnerId, -20);
+                    _npcService.ModifyAttitude(e.LoserId!, e.WinnerId, -20);
+            }
+        }
+
+        /// <summary>
+        /// R16: NPC покинул бой по своей инициативе (бегство HP&lt;20% / leash).
+        /// CombatService-бой завершается CombatModule-ом (AbandonCombat →
+        /// CombatEndedEvent(Flee) несёт null победителя — по нему адаптер
+        /// никого не чистит), поэтому сброс IsInCombat/TargetId делаем здесь,
+        /// для обеих NPC-сторон (дисэнгейджер + его оппонент-NPC).
+        /// </summary>
+        private void OnCombatDisengage(in CombatDisengageEvent e)
+        {
+            var state = _npcService.GetNPCState(e.NpcId);
+            if (state == null) return;
+
+            string? opponentId = state.TargetId;
+            state.IsInCombat = false;
+            state.TargetId = null;
+
+            // NPC-vs-NPC: оппонент тоже выходит из навязанного боя.
+            var opponentState = opponentId != null ? _npcService.GetNPCState(opponentId) : null;
+            if (opponentState != null && opponentState.IsAlive)
+            {
+                opponentState.IsInCombat = false;
+                opponentState.TargetId = null;
             }
         }
 
@@ -227,6 +277,8 @@ namespace CultivationGame.Modules.NPC
             _combatEndedSubscription = null;
             _damageAppliedSubscription?.Dispose();
             _damageAppliedSubscription = null;
+            _combatDisengageSubscription?.Dispose();
+            _combatDisengageSubscription = null;
         }
     }
 }

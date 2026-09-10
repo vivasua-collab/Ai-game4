@@ -148,13 +148,13 @@ Modules/Xxx/
 | Свойство | Значение |
 |----------|----------|
 | Главные интерфейсы | `ICombatService`, `IDamageService` |
-| Контракты | `CombatContracts` — CombatStarted/Ended, DamageApplied, TechniqueUsed, EnemyKilled |
+| Контракты | `CombatContracts` — CombatStarted/Ended, DamageApplied, TechniqueUsed, EnemyKilled, AttackIntent, AttackRejected, DefenseIntent (R16), CombatDisengage (R16) |
 | Tick | Да |
 | Зависимости Core | IQiService, IQiBufferService, IEquipmentService, IInventoryService |
-| Подписки на события | EnemyKilled, CombatEnded, EquipmentChanged, BuffApplied, BuffRemoved |
+| Подписки на события | EnemyKilled, CombatEnded, EquipmentChanged, BuffApplied, BuffRemoved, AttackIntent, DefenseIntent (R16), CombatDisengage (R16) |
 
 **Ключевые методы:**
-- ICombatService: `IsInCombat`, `CurrentStage`, `CurrentTargetId`, `StartCombat`, `EndCombat`, `ExecuteAttack`, `ExecuteDefense`
+- ICombatService: `IsInCombat`, `CurrentStage`, `CurrentTargetId`, `StartCombat`, `EndCombat`, `ExecuteAttack`, `ExecuteDefense`, `CurrentPlayerDefense` (R16), `AbandonCombat` (R16)
 - IDamageService: `CalculateDamage`, `ApplyDefense`
 
 **Ключевые сервисы:**
@@ -167,12 +167,18 @@ Modules/Xxx/
 - CombatLootService — добыча после боя
 - TechniqueChargeService — заряд техник
 - TechniqueService — управление техниками
+- NPCDefenseSelector (R16) — выбор активной защиты NPC-защитника (щит→Block, силовик→Parry, прочие→Dodge; pure-функция, детерминизм без RNG) — вызывается CombatService для каждой атаки по NPC
 
 > 2026-09-08 (review-3): CombatAIService УДАЛЁН (фантомный "enemy" без тела/Ци
 > конкурировал с реальными NPC из NPCModule.ProcessNpcAttacks). Ходовая модель:
 > CombatService — единственный authority (владение ходом `_currentTurnOwnerId`,
 > гейт участника/хода в ExecuteAttack → AttackAcceptance, инициатива у
 > инициатора боя, тайм-аут чужого хода EnemyTurnTimeoutSec).
+>
+> R16 (2026-09-10): AbandonCombat — авторитетное завершение при выходе NPC
+> из боя (бегство/leash через CombatDisengageEvent из NPC-модуля); ExecuteDefense
+> запоминает стойку игрока и ВНЕ боя (клавиша G, DefenseIntentEvent); для
+> NPC-защитника слой активной защиты наполняется NPCDefenseSelector-ом.
 
 **Особенности:**
 - Полная реализация 11-слойного пайплайна урона (см. `09_workflow/ALGORITHMS.md` §5).
@@ -251,7 +257,7 @@ Modules/Xxx/
 | Контракты | `NPCContracts` — NPCSpawned/Despawned/Death/Interacted/AIStateChanged/Damaged, AttitudeChanged; `CorpseContracts` (R13) — CorpseCreated/Removed/Looted |
 | Tick | Да |
 | Зависимости Core | ITimeService |
-| Подписки на события | QiChanged, DamageApplied, BodyPartSevered, PlayerPositionChanged, CombatStarted, CombatEnded, DayChanged |
+| Подписки на события | QiChanged, DamageApplied, BodyPartSevered, PlayerPositionChanged, CombatStarted (R16: месть), CombatEnded, DayChanged, CombatDisengage (R16) |
 
 **Ключевые методы:**
 - INPCService: `GetNPC`, `GetNearbyNPCIds`, `GetAttitude`, `ModifyAttitude`, `IsAlive`, `GetAIState`, `GetAllNPCIds`, `SetAIState`, `UpdatePosition`
@@ -263,14 +269,16 @@ Modules/Xxx/
 - NPCSpawnCompositionService (R13; R14) — процедурная генерация состава населения локации (тип локации + DangerLevel + сид → список SpawnRequest; детерминизм, кап 12). R14: внутрисессионное восполнение удалено (ReinforcementTick) — пока игрок в локации, новых NPC нет; единственная точка входа ивентов — TrySpawnEventNpc(Caravan/Raid/Event); естественное восстановление — при (пере)сборке локации (TRANSITION_SYSTEM §5.3)
 - CorpseService (R13) — трупы-контейнеры: снапшот экипировки/инвентаря/камней при смерти, TTL 1 игровой день, SlotId-адресное взятие (см. DEATH_AND_LOOT.md §2)
 - NPCRelationshipService — отношения (Attitude + затухание по `DayChangedEvent`)
-- NPCAIService — упрощённый Behaviour Tree
-- NPCCombatAdapter — адаптер боя через шину (НЕ прямая ссылка на CombatService)
-- NPCMovementService — упрощённая навигация (grid pathfinding, без NavMesh)
+- NPCAIService — упрощённый Behaviour Tree; R16: боевые переходы ДО гейта IsInCombat — месть на агрессию (Attacking/Fleeing по личности), бегство HP≤20% в активном бою, leash AggroRadius×3 (aggro-drop), публикация CombatDisengageEvent; раненый NPC не пере-агрится (гейт healthRatio на пути угроз — анти-flip-flop)
+- NPCCombatAdapter — адаптер боя через шину (НЕ прямая ссылка на CombatService); R16: MarkNpcCombatStarted помечает состояния напрямую (фантомный publish CombatStartedEvent удалён — единственный источник события теперь CombatService), OnCombatDisengage сбрасывает IsInCombat/TargetId участников, OnCombatEnded null-безопасен для Flee-финала
+- NPCMovementService — упрощённая навигация (grid pathfinding, без NavMesh); R16: kiting дальнобойных NPC (AttackRange>2: dist<3 → отход, в зоне обстрела — стоит)
 
 **Визуал (Adapter/Scene, R15):** NPCSpriteRenderer рисует overlay оружия
 в основной руке (hand-спрайты WeaponVisualCatalog: 7 классов × 5 тиров
 материала × редкость; кэш npcId→itemId, перескан 0.5с — NPC-экип не
 публикует события; flip по направлению движения с гистерезисом).
+R16: замах оружия NPC — AttackIntentEvent (melee, attacker=NPC) → выпад
+hand-спрайта к цели (sin-кривая 0.42с, инверсия dx при facingLeft-зеркале).
 
 **Особенности:**
 - Трёхуровневая нервная система: Spinal AI (1–10 мс) / Neural Router (10–50 мс) / Brain Controller (100–500 мс).

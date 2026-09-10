@@ -747,3 +747,80 @@ Stage Summary:
 - Осталось: живой визуальный QA (P0, ПК); фаза C (анимация замаха,
   щит, иконки лут-окна/ground); PNG-ассеты (план пользователя);
   броня-слои (R16-кандидат); тонкая настройка HandOffset по фидбеку.
+
+---
+Task ID: R16-COMBAT-AI-0910
+Agent: main-agent (Z.ai Code, сессия 2026-09-10 №5, 09:39–11:05 UTC)
+Task: Доработка боевой системы (запрос пользователя): ИИ NPC для боевой
+системы, рабочая реализация боёв игрок↔NPC, простая анимация нанесения
+удара. Процесс: изучение документации → изучение кода → план → реализация.
+
+Work Log:
+- Изучены docs_v2 (COMBAT_SYSTEM полностью, NPC_AI_SYSTEM полностью) и
+  код (CombatService/CombatModule/NPCModule/NPCAIService/NPCCombatAdapter/
+  NPCMovementService/PlayerCombatAdapter/InputAdapter/NPCSpriteRenderer/
+  GameWorldController/DamageCalculator/DefenseProcessor/CombatSimDebug).
+- Аудит D1–D8: NPC не отвечает на атаку игрока (гейт IsInCombat в
+  EvaluateAndDecide глотал боевые переходы — «манекен»); бегство HP<20%
+  мертво в бою; нет leash (вечное преследование); ActiveDefense=None для
+  NPC (слои Dodge/Parry/Block мертвы); IsDefendPressed — мёртвая
+  проводка (нет клавиши/потребителя); фантомный CombatStartedEvent из
+  MarkNpcCombatStarted (двойной publish); лучники лезли в melee; нет
+  анимации удара. План: checkpoints/09_10_r16_combat_ai.md (§1–2).
+- Контракты: DefenseIntentEvent (стойка игрока) + CombatDisengageEvent
+  (выход NPC из боя) в CombatContracts.
+- NPCAIService: боевые переходы ДО гейта IsInCombat — месть
+  (RetaliateOrFlee: Guard/Enemy/Monster|Aggressive|Vengeful → Attacking,
+  Pacifist|Cautious → Fleeing), бегство HP≤FleeHealthRatio в активном
+  бою (+PublishDisengage), leash AggroRadius×3, анти-flip-flop (гейт
+  healthRatio на пути угроз); подписка CombatStartedEvent → месть.
+- NPCCombatAdapter: MarkNpcCombatStarted — прямая пометка обоим
+  NPC-участникам (фантомный publish удалён); OnCombatDisengage — сброс
+  IsInCombat/TargetId дизэнгейджера + оппонента-NPC; OnCombatEnded —
+  null-гварды Winner/Loser (спящий баг Flee-финала).
+- CombatService: NPCDefenseSelector для NPC-защитников (щит→Block,
+  STR>AGI+4→Parry, прочие→Dodge — детерминизм; чинит и NPC-vs-NPC,
+  где защитник-NPC получал стойку ИГРОКА); AbandonCombat (Flee-стадия);
+  CurrentPlayerDefense; ExecuteDefense запоминает стойку и вне боя.
+- CombatModule: мосты DefenseIntentEvent → ExecuteDefense и
+  CombatDisengageEvent → AbandonCombat.
+- PlayerCombatAdapter: стойка клавишей G (цикл None→Dodge→Parry(Weapon)
+  →Shield(WeaponOff), анти-спам 0.3с); InputMapInitializer+InputAdapter:
+  "defend"=G (мёртвая проводка D5 закрыта); GWC тост «🛡 Стойка: …»;
+  HotkeysWindow (F1) — строка G.
+- NPCMovementService: kiting дальнобойных NPC (dist<3 → отход,
+  в зоне обстрела — стоять; санкционированная инъекция IEquipmentDataProvider).
+- Анимация удара: StrikeFxRenderer (новый, _Draw: свип 0.25с по
+  AttackIntentEvent melee, слэш+искры 0.22с по DamageApplied, крит —
+  золотой/крупнее; QA-счётчики TotalSwipes/TotalStrikes); замах оружия
+  игрока в GWC (MainHand sin-выпад 12px + Scale-пульс, Rotation исключён
+  — конфликт FlipH); замах NPC в NPCSpriteRenderer (пер-NPC swing,
+  инверсия dx при facingLeft-зеркале 2cx−x).
+- QA: CombatAISimDebug (GODOT_COMBATAI_DEBUG=1) — 7 тестов; визуальный
+  HOLD (GODOT_STRIKEFX_HOLD=1). GameEntryPoint теперь логирует стек
+  исключений (диагностика).
+- Попутные баги (найдены QA): GetNPCState(null) → ArgumentNullException
+  убивал NPCModule.Tick КАЖДЫЙ тик (CombatEndedEvent Flee-финал с null
+  Winner/Loser); QA-счётчик урона по NPC не считался. Исправлены.
+- QA итог: build 0 errors; GODOT_COMBATAI_DEBUG → VERDICT: PASS (месть/
+  двусторонний урон/селектор защит/бегство в бою/leash/стойка G/анимация);
+  12 регрессий PASS (COMBAT_SIM/KILLFEED/TRASHDROP/SAVELOAD/LOOT/
+  WEAPONVIS/REASSEMBLY/CONTEXT/STORAGE/QUEST/HOTBAR/DOT/CHARGE);
+  Xvfb+VLM: слэш-дуга между персонажами, искры, цифры «−27», выпад
+  оружия NPC, HP игрока 482/500 — живой бой подтверждён визуально.
+- docs_v2 sync: COMBAT_SYSTEM §1.4.1/§1.4.2/§7, NPC_AI_SYSTEM (шапка —
+  статус реализации R16), MODULE_STRUCTURE §2.4/§2.7, TESTING_RULES
+  §0.1 (реестр 31→33), SPRITE_CATALOG §22 (StrikeFX); SESSION_CONTEXT/
+  SESSION_SUMMARY (сессия №5); чекпоинт 09_10_r16_combat_ai.md.
+
+Stage Summary:
+- Бой игрок↔NPC стал «рабочим» в обе стороны: NPC мстит за атаку,
+  обменивается ударами (честная turn-модель), защищается (Dodge/Parry/
+  Block по селектору), бежит при HP<20%, отпускает убежавшего игрока
+  (leash 15); игрок получает стойку защиты (G) и анимацию удара
+  (слэш/искры/замахи). Весь флоу headless-QA + VLM-верифицирован.
+- Спящий P0-баг класса «Flee-финал» (null Winner/Loser) закрыт
+  null-гвардами — до R16 Flee-путь был недостижим, баг молчал.
+- Next: живой QA на ПК (P0: бой/G-стойки/бегство/leash/анимация);
+  авто-замедление времени в бою (§1.2); PNG-ассеты (план пользователя);
+  броня-слои; спинальный AI/Brain (NPC_AI_SYSTEM §2).

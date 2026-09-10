@@ -237,3 +237,46 @@ public readonly struct AttackRejectedEvent
     public AttackRejectedEvent(string attackerId, string techniqueId, string reason)
         { AttackerId = attackerId; TechniqueId = techniqueId; Reason = reason; }
 }
+
+// === R16 (2026-09-10): доработка боевой системы — новые контракты ===
+
+/// <summary>
+/// R16: игрок запросил смену защитной стойки (клавиша G).
+/// Публикуется PlayerCombatAdapter (цикл стойок). Потребители:
+/// CombatModule → ICombatService.ExecuteDefense (запоминает стойку для
+/// пайплайна урона — слой активной защиты COMBAT_SYSTEM §7);
+/// GameWorldController — тост «Стойка: …».
+/// Паттерн: command-событие, как TechniqueCastRequestedEvent.
+/// </summary>
+public readonly struct DefenseIntentEvent
+{
+    /// <summary>Сущность, выбравшая защиту (игрок)</summary>
+    public readonly string EntityId;
+
+    /// <summary>Выбранная стойка (Dodge/Parry/Shield/…)</summary>
+    public readonly DefenseSubtype Defense;
+
+    public DefenseIntentEvent(string entityId, DefenseSubtype defense)
+        { EntityId = entityId; Defense = defense; }
+}
+
+/// <summary>
+/// R16: NPC покидает бой по своей инициативе (не смерть):
+/// бегство при HP&lt;20% (NPC_AI_SYSTEM §4.2) или leash — цель-игрок
+/// дальше AggroRadius×3 (aggro-drop). Публикуется NPCAIService.
+/// Потребители: CombatModule → CombatService.AbandonCombat (бой
+/// завершается стадией Flee); NPCCombatAdapter — сброс IsInCombat/
+/// TargetId участников-NPC (CombatEndedEvent при Flee несёт null
+/// победителя/проигравшего — адаптер сам по нему никого не чистит).
+/// </summary>
+public readonly struct CombatDisengageEvent
+{
+    /// <summary>NPC, покидающий бой</summary>
+    public readonly string NpcId;
+
+    /// <summary>Причина (логирование/UI)</summary>
+    public readonly string Reason;
+
+    public CombatDisengageEvent(string npcId, string reason)
+        { NpcId = npcId; Reason = reason; }
+}

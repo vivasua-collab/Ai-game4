@@ -40,6 +40,9 @@ public sealed class PlayerCombatAdapter : IDisposable
     [Inject] private readonly ITileService? _tiles = null;
     [Inject] private readonly IPublisher<AttackIntentEvent> _attackIntentPub = null!;
     [Inject] private readonly IPublisher<AttackRejectedEvent> _attackRejectedPub = null!;
+    // R16: публикация стойки защиты (клавиша G → DefenseIntentEvent →
+    // CombatModule → ICombatService.ExecuteDefense).
+    [Inject] private readonly IPublisher<DefenseIntentEvent> _defenseIntentPub = null!;
     [Inject] private readonly ISubscriber<AttackRejectedEvent> _attackRejectedSub = null!;
     [Inject] private readonly ISubscriber<CombatStartedEvent> _combatStartedSub = null!;
     [Inject] private readonly ISubscriber<CombatEndedEvent> _combatEndedSub = null!;
@@ -70,7 +73,26 @@ public sealed class PlayerCombatAdapter : IDisposable
     /// </summary>
     public const float AttackRejectionBackoffSec = 0.4f;
 
+    /// <summary>
+    /// R16: анти-спам смены стойки (клавиша G) — повторы не чаще 0.3с
+    /// (защита от автоповторов клавиатуры; каждая смена — событие + тост).
+    /// </summary>
+    public const float DefenseSwitchCooldownSec = 0.3f;
+
     private float _attackCooldownSec;
+
+    // === R16 (2026-09-10): стойка защиты игрока (клавиша G) ===
+
+    /// <summary>
+    /// R16: текущая защитная стойка игрока (D5 «мёртвая проводка» —
+    /// IsDefendPressed существовал, но не имел ни клавиши, ни потребителя).
+    /// Цикл: None → Dodge → Parry (если оружие) → Shield (если щит) → None.
+    /// Публикуется DefenseIntentEvent; CombatService применяет стойку к
+    /// СЛЕДУЮЩЕЙ входящей атаке (слой активной защиты §7).
+    /// </summary>
+    public DefenseSubtype CurrentDefenseStance { get; private set; } = DefenseSubtype.None;
+
+    private float _defenseSwitchCooldownSec;
 
     // === Phase 8 ч.2 (2026-09-03): режим оружия (клавиши 1/2) ===
 
@@ -155,12 +177,18 @@ public sealed class PlayerCombatAdapter : IDisposable
 
     public void Tick(float deltaTime)
     {
+        // R16: смена стойки защиты (G) — до кулдауна атаки: защита не
+        // блокируется замахом (клавиши независимы; ранний return ниже
+        // не должен глотать защитный ввод).
+        TickDefenseStance(deltaTime);
+
         // §8.1: тикт кулдауна базовой атаки (секунды на Normal).
         if (_attackCooldownSec > 0f)
         {
             _attackCooldownSec -= deltaTime;
             if (_attackCooldownSec > 0f) return;
         }
+
         if (!_input.IsAttackPressed) return;
 
         // Phase 8 ч.2: резолв режима — Ranged требует экипированный лук;
@@ -199,6 +227,45 @@ public sealed class PlayerCombatAdapter : IDisposable
         // Кулдаун ставится только на УСПЕШНЫЙ интент (цель найдена) —
         // атака «вхолостую» не блокирует следующий замах.
         _attackCooldownSec = AttackCooldownSeconds();
+    }
+
+    // === R16: стойка защиты (клавиша G) ===
+
+    /// <summary>
+    /// R16: тик смены стойки. Клавиша G циклирует доступные стойки:
+    /// None → Dodge → Parry (WeaponMain) → Shield (WeaponOff-щит) → None.
+    /// Стойка публикуется DefenseIntentEvent → CombatModule →
+    /// ExecuteDefense; применяется к СЛЕДУЮЩЕЙ атаке по игроку.
+    /// Позиция в цикле вычисляется от ТЕКУЩЕЙ экипировки (снял оружие —
+    /// Parry исчезнет из цикла, стойка сбросится на следующее нажатие).
+    /// </summary>
+    private void TickDefenseStance(float deltaTime)
+    {
+        if (_defenseSwitchCooldownSec > 0f)
+        {
+            _defenseSwitchCooldownSec -= deltaTime;
+            if (_defenseSwitchCooldownSec > 0f) return;
+        }
+        if (!_input.IsDefendPressed) return;
+
+        _defenseSwitchCooldownSec = DefenseSwitchCooldownSec;
+
+        // Доступные стойки: Dodge — всегда; Parry — с оружием;
+        // Shield — со щитом (WeaponOff). None — начало цикла.
+        bool hasWeapon = _equipment?.GetEquipped(_player.PlayerId, EquipmentSlot.WeaponMain) != null;
+        bool hasShield = _equipment?.GetEquipped(_player.PlayerId, EquipmentSlot.WeaponOff) != null;
+
+        DefenseSubtype next = CurrentDefenseStance switch
+        {
+            DefenseSubtype.None => DefenseSubtype.Dodge,
+            DefenseSubtype.Dodge => hasWeapon ? DefenseSubtype.Parry
+                                   : (hasShield ? DefenseSubtype.Shield : DefenseSubtype.None),
+            DefenseSubtype.Parry => hasShield ? DefenseSubtype.Shield : DefenseSubtype.None,
+            _ => DefenseSubtype.None,
+        };
+        CurrentDefenseStance = next;
+
+        _defenseIntentPub.Publish(new DefenseIntentEvent(_player.PlayerId, next));
     }
 
     /// <summary>

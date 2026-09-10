@@ -32,6 +32,14 @@ namespace CultivationGame.Modules.NPC
     /// - DamageAppliedEvent → добавление угрозы, потенциально Flee
     /// - BodyPartSeveredEvent → принудительное бегство
     /// - PlayerPositionChangedEvent → обновление осведомлённости
+    /// - R16: CombatStartedEvent → ответ NPC на бой (Attacking/Fleeing)
+    ///
+    /// R16 (2026-09-10) «доработка боевой системы»: боевые переходы ДО гейта
+    /// IsInCombat (раньше NPC в бою не менял состояние вообще):
+    /// - месть: удар/начало боя → Attacking (или Fleeing по личности);
+    /// - бегство: HP ≤ FleeHealthRatio работает и В БОЮ (NPC_AI_SYSTEM §4.2)
+    ///   с публикацией CombatDisengageEvent (бой завершается стадией Flee);
+    /// - leash: цель-игрок дальше AggroRadius×3 → выход из боя (aggro-drop).
     /// </summary>
     public class NPCAIService : IDisposable
     {
@@ -44,15 +52,27 @@ namespace CultivationGame.Modules.NPC
         private readonly ISubscriber<DamageAppliedEvent> _damageAppliedSub;
         private readonly ISubscriber<BodyPartSeveredEvent> _bodyPartSeveredSub;
         private readonly ISubscriber<PlayerPositionChangedEvent> _playerPosChangedSub;
+        // R16: старт боя → месть участника-NPC.
+        private readonly ISubscriber<CombatStartedEvent> _combatStartedSub;
+        // R16: публикация выхода NPC из боя (бегство/leash).
+        private readonly IPublisher<CombatDisengageEvent> _combatDisengagePub;
         private IDisposable _damageAppliedSubscription;
         private IDisposable _bodyPartSeveredSubscription;
         private IDisposable _playerPosChangedSubscription;
+        private IDisposable _combatStartedSubscription;
 
         // === Состояние ===
         private Vector2 _playerPosition;
 
         // NPC-A07/NPC-C01: переиспользуемый буфер для затухания угроз (устранение GC-аллокации)
         private readonly List<string> _threatKeysBuffer = new List<string>();
+
+        /// <summary>
+        /// R16: радиус привязи (leash) — дистанция до цели-игрока, после которой
+        /// NPC выходит из боя (aggro-drop). AggroRadius × 3 = 15 тайлов по умолчанию
+        /// (5 агро + запас на преследование; убежать от NPC — реальная стратегия).
+        /// </summary>
+        private float LeashRadius => _config.AggroRadius * 3f;
 
         // === Конструктор (VContainer) ===
         public NPCAIService(
@@ -61,7 +81,10 @@ namespace CultivationGame.Modules.NPC
             ITimeService timeService,
             ISubscriber<DamageAppliedEvent> damageAppliedSub,
             ISubscriber<BodyPartSeveredEvent> bodyPartSeveredSub,
-            ISubscriber<PlayerPositionChangedEvent> playerPosChangedSub)
+            ISubscriber<PlayerPositionChangedEvent> playerPosChangedSub,
+            // R16: месть на старт боя + публикация disengage.
+            ISubscriber<CombatStartedEvent> combatStartedSub,
+            IPublisher<CombatDisengageEvent> combatDisengagePub)
         {
             _npcService = npcService;
             _config = config;
@@ -69,6 +92,8 @@ namespace CultivationGame.Modules.NPC
             _damageAppliedSub = damageAppliedSub;
             _bodyPartSeveredSub = bodyPartSeveredSub;
             _playerPosChangedSub = playerPosChangedSub;
+            _combatStartedSub = combatStartedSub;
+            _combatDisengagePub = combatDisengagePub;
         }
 
         /// <summary>
@@ -79,6 +104,8 @@ namespace CultivationGame.Modules.NPC
             _damageAppliedSubscription = _damageAppliedSub.Subscribe(OnDamageApplied);
             _bodyPartSeveredSubscription = _bodyPartSeveredSub.Subscribe(OnBodyPartSevered);
             _playerPosChangedSubscription = _playerPosChangedSub.Subscribe(OnPlayerPositionChanged);
+            // R16: старт боя → участник-NPC отвечает (Attacking/Fleeing).
+            _combatStartedSubscription = _combatStartedSub.Subscribe(OnCombatStartedForRetaliation);
         }
 
         /// <summary>
@@ -177,10 +204,47 @@ namespace CultivationGame.Modules.NPC
         /// <summary>
         /// Оценить ситуацию и принять решение о следующем AI-состоянии.
         /// Упрощённый Behaviour Tree с весами на основе PersonalityTrait.
+        ///
+        /// R16: ПОРЯДОК ПРОВЕРОК ИЗМЕНЁН — боевые переходы ДО гейта IsInCombat.
+        /// Раньше гейт `if (IsInCombat) return` стоял первым: NPC в бою не
+        /// менял состояние ВООБЩЕ — не бежал при HP<20% (спека §4.2), не
+        /// выпускал игрока из боя (leash), а ответ на АТАКУ ИГРОКА не работал
+        /// вовсе (CombatStartedEvent ставил IsInCombat, но AIState оставался
+        /// Idle → ProcessNpcAttacks не видел Attacking → «манекен»).
         /// </summary>
         private void EvaluateAndDecide(NPCState state)
         {
-            // В бою — не меняем AIState (управляет CombatAdapter)
+            // === R16: бегство при малом HP — ДО гейта боя (§4.2: работает и в бою) ===
+            float healthRatio = state.MaxHealth > 0
+                ? (float)state.CurrentHealth / state.MaxHealth
+                : 0f;
+
+            if (healthRatio <= _config.FleeHealthRatio && state.AIState != NPCAIState.Fleeing)
+            {
+                // В активном боя — сообщить CombatService (бой завершится Flee).
+                if (state.IsInCombat) PublishDisengage(state, "бегство: HP ниже порога");
+                _npcService.SetAIState(state.NpcId, NPCAIState.Fleeing);
+                return;
+            }
+
+            // === R16: leash (aggro-drop) — цель-игрок слишком далеко ===
+            // NPC в бою с игроком, дистанция > LeashRadius → выход из боя:
+            // игрок может спастись бегством (раньше преследование было вечным).
+            if (state.IsInCombat
+                && !string.IsNullOrEmpty(state.TargetId)
+                && Core.Helpers.PlayerIdResolver.IsPlayer(state.TargetId))
+            {
+                float distToPlayer = Vector2.Distance(state.Position, _playerPosition);
+                if (distToPlayer > LeashRadius)
+                {
+                    PublishDisengage(state, "leash: цель вне радиуса привязи");
+                    _npcService.SetAIState(state.NpcId, NPCAIState.Wandering);
+                    return;
+                }
+            }
+
+            // В бою — не меняем AIState (боевое поведение управляется парой
+            // Attacking + ProcessNpcAttacks; месть/бегство/leash выше уже отработали).
             if (state.IsInCombat) return;
 
             // === Диспозиционный ИИ (2026-08-22, физический прототип) ===
@@ -196,20 +260,17 @@ namespace CultivationGame.Modules.NPC
                 return;
             }
 
-            // Проверка: нужно ли сбежать (мало здоровья)
-            float healthRatio = state.MaxHealth > 0
-                ? (float)state.CurrentHealth / state.MaxHealth
-                : 0f;
-
-            if (healthRatio <= _config.FleeHealthRatio && state.AIState != NPCAIState.Fleeing)
-            {
-                _npcService.SetAIState(state.NpcId, NPCAIState.Fleeing);
-                return;
-            }
+            // (R16: проверка бегства при малом HP перенесена ВЫШЕ гейта боя —
+            // см. начало EvaluateAndDecide; здесь оставлена только атака.)
 
             // Проверка: высокая угроза → атака
+            // R16: НИЗКОЕ HP — не пере-агримся (раньше: раненый NPC выходил из
+            // боя по бегству, тут же входил через угрозу, снова бежал…
+            // flip-flop «агро↔бегство» каждые ~1.5с, вечный цикл стартов боя).
             float maxThreat = GetMaxThreat(state);
-            if (maxThreat >= _config.ThreatThreshold && state.AIState != NPCAIState.Attacking)
+            if (maxThreat >= _config.ThreatThreshold
+                && state.AIState != NPCAIState.Attacking
+                && healthRatio > _config.FleeHealthRatio)
             {
                 // Назначаем цель = источник максимальной угрозы (до этого
                 // TargetId никто не заполнял — Attacking двигался в никуда).
@@ -416,6 +477,9 @@ namespace CultivationGame.Modules.NPC
 
         /// <summary>
         /// Обработчик DamageAppliedEvent — добавить угрозу, потенциально Flee.
+        /// R16: + МЕСТЬ — получает урон вне Attacking → переходит в Attacking
+        /// (или Fleeing по личности). Раньше цель запоминалась, но AIState не
+        /// менялся: NPC «запоминал обидчика», но никогда не атаковал его.
         /// </summary>
         private void OnDamageApplied(in DamageAppliedEvent e)
         {
@@ -429,8 +493,87 @@ namespace CultivationGame.Modules.NPC
             else
                 state.Threats[e.SourceId] = threatLevel;
 
-            // Обновляем целевой идентификатор
-            state.TargetId = e.SourceId;
+            // R16: месть — удар по NPC = мгновенный ответ (Attacking) или
+            // бегство (миролюбивый). Порог угроз не нужен: сам факт удара.
+            RetaliateOrFlee(state, e.SourceId);
+        }
+
+        // === R16: боевые переходы (месть/бегство/leash) ===
+
+        /// <summary>
+        /// R16: старт боя → участник-NPC отвечает (NPC_AI_SYSTEM §4.2).
+        /// Покрывает ГЛАВНЫЙ дефект: игрок начинает бой (Space) →
+        /// CombatStartedEvent → NPCCombatAdapter ставит IsInCombat, но AIState
+        /// оставался Idle → NPC не отвечал («манекен»). Теперь каждый
+        /// участник-NPC решает: Attacking (боец) или Fleeing (миролюбивый).
+        /// </summary>
+        private void OnCombatStartedForRetaliation(in CombatStartedEvent e)
+        {
+            var target = _npcService.GetNPCState(e.TargetId);
+            if (target != null && target.IsAlive)
+                RetaliateOrFlee(target, e.InstigatorId);
+
+            // Инициатор-NPC и так в Attacking (путь угрозы), но при
+            // программном старте боя (QA/будущие системы) — тоже решает.
+            var instigator = _npcService.GetNPCState(e.InstigatorId);
+            if (instigator != null && instigator.IsAlive)
+                RetaliateOrFlee(instigator, e.TargetId);
+        }
+
+        /// <summary>
+        /// R16: месть или бегство при агрессии против NPC.
+        /// Эвристика личности (NPC_AI_SYSTEM §5.2):
+        /// - низкое HP (≤ FleeHealthRatio) → сразу бегство (иначе входил в бой,
+        ///   чтобы тут же выйти — flip-flop со стартами боя);
+        /// - боец по роли (Guard/Enemy/Monster) или Aggressive/Vengeful → Attacking;
+        /// - Pacifist/Cautious (не боец по роли) → Fleeing;
+        /// - прочие (пассиры/культиваторы) → защищаются (Attacking).
+        /// Не трогает уже Attacking/Fleeing (идемпотентность повторных ударов).
+        /// </summary>
+        private void RetaliateOrFlee(NPCState state, string sourceId)
+        {
+            if (state.AIState is NPCAIState.Attacking or NPCAIState.Fleeing) return;
+
+            float healthRatio = state.MaxHealth > 0
+                ? (float)state.CurrentHealth / state.MaxHealth
+                : 0f;
+
+            if (healthRatio <= _config.FleeHealthRatio || ShouldFleeInsteadOfFight(state))
+            {
+                _npcService.SetAIState(state.NpcId, NPCAIState.Fleeing);
+            }
+            else
+            {
+                state.TargetId = sourceId;
+                _npcService.SetAIState(state.NpcId, NPCAIState.Attacking);
+            }
+        }
+
+        /// <summary>
+        /// R16: миролюбивый ли NPC (убегает вместо ответа).
+        /// Роли-бойцы дерутся всегда; Aggressive/Vengeful — тоже; Pacifist/
+        /// Cautious гражданские — бегут (RimWorld-подобное поведение).
+        /// </summary>
+        private static bool ShouldFleeInsteadOfFight(NPCState state)
+        {
+            if (state.Role is NPCRole.Guard or NPCRole.Enemy or NPCRole.Monster) return false;
+            if ((state.Personality & PersonalityTrait.Aggressive) != 0) return false;
+            if ((state.Personality & PersonalityTrait.Vengeful) != 0) return false;
+            if ((state.Personality & PersonalityTrait.Pacifist) != 0) return true;
+            if ((state.Personality & PersonalityTrait.Cautious) != 0) return true;
+            return false; // по умолчанию — защищается
+        }
+
+        /// <summary>
+        /// R16: публикация выхода NPC из боя. Очистка угроз + событие →
+        /// CombatModule завершает CombatService-бой (Flee), NPCCombatAdapter
+        /// сбрасывает IsInCombat/TargetId участникам.
+        /// </summary>
+        private void PublishDisengage(NPCState state, string reason)
+        {
+            state.Threats.Clear();
+            _combatDisengagePub.Publish(new CombatDisengageEvent(state.NpcId, reason));
+            Console.WriteLine($"[NPCAIService] {state.NpcId} покидает бой: {reason}");
         }
 
         /// <summary>
@@ -462,6 +605,8 @@ namespace CultivationGame.Modules.NPC
             _bodyPartSeveredSubscription = null;
             _playerPosChangedSubscription?.Dispose();
             _playerPosChangedSubscription = null;
+            _combatStartedSubscription?.Dispose();
+            _combatStartedSubscription = null;
         }
     }
 }
