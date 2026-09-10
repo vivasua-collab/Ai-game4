@@ -28,6 +28,15 @@ public class EquipmentData : ItemData
     /// <summary>Тип хвата (одноручное/двуручное)</summary>
     public WeaponHandType HandType = WeaponHandType.OneHand;
 
+    /// <summary>
+    /// R15 (2026-09-10): класс оружия для ВИЗУАЛА — ключ кэша спрайтов
+    /// (icon 32×32 + hand 48×48) в WeaponVisualCatalog. Пишется
+    /// EquipmentGenerator'ом ("sword", "spear", "bow", ...). Пусто (старые
+    /// сейвы R11, предметы до R15) → fallback-парсинг префикса ItemId
+    /// `eq_wep_{subtype}_…`; нераспознано → generic "sword" (не краш).
+    /// </summary>
+    public string WeaponClassId = string.Empty;
+
     // === Stats ===
 
     /// <summary>Урон (для оружия)</summary>

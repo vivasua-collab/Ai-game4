@@ -16,6 +16,10 @@
 //   • недостаток Ци — строка «Ци N» красная (иначе зелёная);
 //   • TooltipText: полное описание (урон/дальность/мастерство);
 //   • клик = каст (аналог клавиши 3-9, позиция курсора как у Z).
+// Редактировано: 2026-09-10 R15 — слоты 1-2 оружия: ИКОНКА (32×32,
+// WeaponVisualCatalog) в центре слота + короткая подпись снизу (дефолт
+// ответа §6.3 плана R15: «иконка + короткая подпись под ней»); пустой
+// слот — цифра, иконки нет. Подпись по-прежнему из NameRu.
 using Godot;
 using System.Collections.Generic;
 using CultivationGame.Core.DI;
@@ -64,6 +68,9 @@ public partial class HotbarPanel : Panel
     private readonly Label?[] _cdLabels = new Label?[9];
     private readonly StyleBoxFlat[] _slotStyles = new StyleBoxFlat[9];
     private readonly Label[] _weaponQiLabels = new Label[2];   // 0-1: не используется (оружие), зарезервировано
+    // R15: иконки оружия в слотах 1-2 (WeaponVisualCatalog).
+    private readonly TextureRect?[] _weaponIcons = new TextureRect?[2];
+    private readonly string?[] _weaponIconKeys = new string?[2]; // QA-ключи
 
     // === Belt row (7 slots) ===
     private readonly Panel[] _beltPanels = new Panel[BeltService.SlotCount];
@@ -239,8 +246,38 @@ public partial class HotbarPanel : Panel
             };
             label.AddThemeFontSizeOverride("font_size", 11);
             label.AddThemeColorOverride("font_color", new Color(0.9f, 0.86f, 0.78f));
-            label.SetAnchorsAndOffsetsPreset(LayoutPreset.Center);
+            if (isWeapon)
+            {
+                // R15: оружие — иконка в центре, подпись снизу (§6.3 плана).
+                label.VerticalAlignment = VerticalAlignment.Bottom;
+                label.AddThemeFontSizeOverride("font_size", 8);
+                label.SetAnchorsAndOffsetsPreset(LayoutPreset.BottomWide);
+                label.OffsetTop = -13; label.OffsetBottom = -1;
+            }
+            else
+            {
+                label.SetAnchorsAndOffsetsPreset(LayoutPreset.Center);
+            }
             slotPanel.AddChild(label);
+
+            // R15: иконка оружия (слоты 1-2, 32×32 по центру).
+            if (isWeapon)
+            {
+                var icon = new TextureRect
+                {
+                    CustomMinimumSize = new Vector2(32, 32),
+                    StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+                    ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+                    MouseFilter = MouseFilterEnum.Ignore,
+                    TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
+                    Visible = false,
+                };
+                icon.SetAnchorsAndOffsetsPreset(LayoutPreset.Center);
+                icon.OffsetLeft = -16; icon.OffsetRight = 16;
+                icon.OffsetTop = -19; icon.OffsetBottom = 13;
+                slotPanel.AddChild(icon);
+                _weaponIcons[i] = icon;
+            }
 
             // Цифра клавиши (верхний правый угол) — для техник и оружия.
             var keyLabel = new Label
@@ -406,8 +443,13 @@ public partial class HotbarPanel : Panel
 
     private void OnEquipChanged(in Core.Messaging.Contracts.EquipmentChangedEvent e)
     {
-        if (e.Slot != Core.Data.EquipmentSlot.Belt) return;
-        RefreshAll();
+        if (e.Slot == Core.Data.EquipmentSlot.Belt) { RefreshAll(); return; }
+        // R15: смена оружия → иконки слотов 1-2.
+        if (e.Slot is Core.Data.EquipmentSlot.WeaponMain or Core.Data.EquipmentSlot.WeaponOff)
+        {
+            RefreshWeapon(0, Core.Data.EquipmentSlot.WeaponMain);
+            RefreshWeapon(1, Core.Data.EquipmentSlot.WeaponOff);
+        }
     }
 
     // === Обновление ===
@@ -480,9 +522,25 @@ public partial class HotbarPanel : Panel
     private void RefreshWeapon(int idx, Core.Data.EquipmentSlot slot)
     {
         var equipped = Equipment?.GetEquipped(slot);
-        _slotLabels[idx].Text = equipped != null
-            ? ShortName(equipped.NameRu, 6)
-            : (idx + 1).ToString();
+        var icon = _weaponIcons[idx];
+        if (equipped != null)
+        {
+            _slotLabels[idx].Text = ShortName(equipped.NameRu, 6);
+            // R15: иконка из каталога (класс+тир+редкость).
+            var visuals = CultivationGame.Adapter.Scene.WeaponVisualCatalog.Resolve(equipped);
+            if (icon != null)
+            {
+                icon.Texture = visuals?.Icon;
+                icon.Visible = visuals != null;
+            }
+            _weaponIconKeys[idx] = visuals?.Key;
+        }
+        else
+        {
+            _slotLabels[idx].Text = (idx + 1).ToString();
+            if (icon != null) { icon.Texture = null; icon.Visible = false; }
+            _weaponIconKeys[idx] = null;
+        }
         _slotPanels[idx].TooltipText = equipped != null
             ? $"{equipped.NameRu} (слот {idx + 1})\n1/2 — выбор режима атаки"
             : $"Оружие не экипировано (слот {idx + 1})\n1/2 — выбор режима атаки";
@@ -576,6 +634,15 @@ public partial class HotbarPanel : Panel
 
     /// <summary>Видимость ряда пояса (гейт по наличию пояса).</summary>
     public bool BeltRowVisible => _beltRow?.Visible ?? false;
+
+    // === R15: QA-доступ (GODOT_WEAPONVIS_DEBUG) ===
+
+    /// <summary>Ключ иконки оружия в слоте 1-2 (null — пусто; hotbarSlot 1..2).</summary>
+    public string? WeaponIconTextureId(int hotbarSlot)
+    {
+        int i = hotbarSlot - 1;
+        return i is >= 0 and <= 1 ? _weaponIconKeys[i] : null;
+    }
 
     /// <summary>Текст слота пояса (beltIndex 0..6).</summary>
     public string? BeltSlotText(int beltIndex)

@@ -267,6 +267,11 @@ Modules/Xxx/
 - NPCCombatAdapter — адаптер боя через шину (НЕ прямая ссылка на CombatService)
 - NPCMovementService — упрощённая навигация (grid pathfinding, без NavMesh)
 
+**Визуал (Adapter/Scene, R15):** NPCSpriteRenderer рисует overlay оружия
+в основной руке (hand-спрайты WeaponVisualCatalog: 7 классов × 5 тиров
+материала × редкость; кэш npcId→itemId, перескан 0.5с — NPC-экип не
+публикует события; flip по направлению движения с гистерезисом).
+
 **Особенности:**
 - Трёхуровневая нервная система: Spinal AI (1–10 мс) / Neural Router (10–50 мс) / Brain Controller (100–500 мс).
 - Behavior Tree (Selector → Sequence → Condition → Action).
@@ -590,7 +595,7 @@ Modules/Xxx/
 | `CultivationBreakthroughEvent` | Qi | UI, Save |
 | `BuffApplied/Removed/Expired/Ticked` | Buff | UI |
 | `ItemAdded/Removed` | Inventory/Storage | UI |
-| `EquipmentChanged/Blocked` | Equipment | UI |
+| `EquipmentChanged/Blocked` | Equipment | UI (хотбар/кукла), GameWorldController (R15: MainHand-спрайт оружия в руке игрока) |
 | `CraftCompleted/Failed` | Crafting | UI |
 | `NPCSpawned/Despawned` | NPCSpawner | UI |
 | `NPCDeath` | NPCCombatAdapter | CorpseService (труп-контейнер), UI, Save |

@@ -407,6 +407,9 @@ public partial class DollSlotRow : HBoxContainer
     private ColorRect _rarityIndicator = null!;
     private Label _slotLabel = null!;
     private Label _itemLabel = null!;
+    // R15: иконка оружия (WeaponMain/WeaponOff — WeaponVisualCatalog).
+    private TextureRect? _weaponIcon;
+    private bool _isWeaponSlot;
 
     public DollSlotRow(EquipmentSlot slot, CharacterDollPanel parent)
     {
@@ -414,6 +417,7 @@ public partial class DollSlotRow : HBoxContainer
         _parent = parent;
         Name = $"Slot_{slot}";
         MouseFilter = MouseFilterEnum.Pass;
+        _isWeaponSlot = slot is EquipmentSlot.WeaponMain or EquipmentSlot.WeaponOff;
     }
 
     public override void _Ready()
@@ -448,6 +452,21 @@ public partial class DollSlotRow : HBoxContainer
         _itemLabel.AddThemeFontSizeOverride("font_size", 13);
         _itemLabel.AddThemeColorOverride("font_color", ParchmentTheme.InkFaded);
         AddChild(_itemLabel);
+
+        // R15: иконка оружия после метки слота (24×24, только WeaponMain/Off).
+        if (_isWeaponSlot)
+        {
+            _weaponIcon = new TextureRect
+            {
+                CustomMinimumSize = new Vector2(24, 24),
+                StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+                ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+                MouseFilter = MouseFilterEnum.Ignore,
+                TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
+                Visible = false,
+            };
+            AddChild(_weaponIcon);
+        }
     }
 
     /// <summary>Refresh slot display from equipment service.</summary>
@@ -459,6 +478,7 @@ public partial class DollSlotRow : HBoxContainer
             _itemLabel.Text = "—пусто—";
             _itemLabel.AddThemeColorOverride("font_color", ParchmentTheme.InkFaded);
             _rarityIndicator.Color = new Color(0.3f, 0.25f, 0.2f, 0.4f);
+            if (_weaponIcon != null) { _weaponIcon.Texture = null; _weaponIcon.Visible = false; }
         }
         else
         {
@@ -466,6 +486,13 @@ public partial class DollSlotRow : HBoxContainer
             var rarityColor = CharacterDollPanel.GetRarityColor(item.Rarity);
             _itemLabel.AddThemeColorOverride("font_color", rarityColor);
             _rarityIndicator.Color = rarityColor;
+            // R15: иконка оружия (класс+тир+редкость → каталог).
+            if (_weaponIcon != null)
+            {
+                var visuals = CultivationGame.Adapter.Scene.WeaponVisualCatalog.Resolve(item);
+                _weaponIcon.Texture = visuals?.Icon;
+                _weaponIcon.Visible = visuals != null;
+            }
         }
     }
 

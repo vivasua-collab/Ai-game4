@@ -75,11 +75,20 @@ public partial class GameWorldController : Node2D
     // R13 FULL-LOOT (2026-09-10): труп удалён (обыскан/TTL) → закрыть LootWindow,
     // если он открыт для этого трупа (авторитетная точка закрытия, как у диалогов).
     [Inject] private ISubscriber<Core.Messaging.Contracts.CorpseRemovedEvent> CorpseRemovedSub { get; set; } = null!;
+    // R15 (2026-09-10): экипировка оружия → обновить спрайт в руке игрока.
+    [Inject] private ISubscriber<Core.Messaging.Contracts.EquipmentChangedEvent> EquipmentChangedSub { get; set; } = null!;
 
     private Node2D        _worldRoot     = null!;
     private Camera2D      _camera        = null!;
     private Sprite2D      _playerSprite  = null!;
     private Sprite2D      _playerShadow  = null!;
+    // R15: композит игрока — overlay оружия в основной руке поверх тела
+    // (RimWorld-слои; тело остаётся _playerSprite, MainHand — отдельный Sprite2D
+    // с offset из WeaponVisualCatalog и зеркалированием по facing).
+    private Sprite2D      _playerMainHand = null!;
+    private bool          _facingLeft;              // R15: направление взгляда
+    private string?       _mainHandCacheItemId;     // R15: кэш синхронизации
+    private float         _mainHandSyncCooldown;    // R15: страховка 0.5с (событие до _Ready)
     private InputAdapter  _inputAdapter  = null!;
     private SceneBuilder  _sceneBuilder  = null!;
     private TechniqueEffectRenderer _techniqueEffectRenderer = null!;
@@ -123,6 +132,7 @@ public partial class GameWorldController : Node2D
     private System.IDisposable? _npcDeathToken; // 2026-09-04 S3: kill-feed
     private System.IDisposable? _corpseRemovedToken; // R13: закрытие LootWindow по CorpseRemovedEvent
     private System.IDisposable? _attackRejectedToken; // M2: тост причины отклонения атаки
+    private System.IDisposable? _equipmentChangedToken; // R15: оружие в руке
     private CanvasLayer   _hudCanvas     = null!;
     private Label         _timeLabel     = null!;
     private Label         _hudLabel      = null!;
@@ -180,6 +190,23 @@ public partial class GameWorldController : Node2D
 
     /// <summary>Торговое окно (GODOT_TRADEUX_DEBUG).</summary>
     public UI.TradeWindow? TradeWindowForQA => _tradeWindow;
+
+    // === R15: QA-доступ (GODOT_WEAPONVIS_DEBUG) ===
+
+    /// <summary>Ключ текстуры hand-спрайта игрока (null — рука пуста).</summary>
+    private string? _mainHandTextureKey;
+
+    /// <summary>Ключ текущего hand-спрайта "class|tier|rarity" (QA).</summary>
+    public string? MainHandTextureId => _mainHandTextureKey;
+
+    /// <summary>Видимость hand-спрайта (QA: экип/анэкип).</summary>
+    public bool MainHandVisible => _playerMainHand?.Visible ?? false;
+
+    /// <summary>Направление взгляда игрока (QA: зеркалирование).</summary>
+    public bool PlayerFacingLeft => _facingLeft;
+
+    /// <summary>QA: принудительный facing (headless — ввода нет).</summary>
+    public void DEBUG_SetFacingLeft(bool left) => _facingLeft = left;
 
     // === R13 FULL-LOOT: QA-доступ (GODOT_LOOT_DEBUG) ===
 
@@ -271,6 +298,10 @@ public partial class GameWorldController : Node2D
         _npcDeathToken = NpcDeathSub?.Subscribe(OnNpcDied);
         // R13 FULL-LOOT: труп удалён → закрыть окно обыска (авторитетная точка).
         _corpseRemovedToken = CorpseRemovedSub?.Subscribe(OnCorpseRemoved);
+        // R15: смена оружия (WeaponMain/Off) → обновить hand-спрайт игрока.
+        // Страховка на случай экипировки ДО _Ready (фазы сборки) — поллинг 0.5с
+        // в _PhysicsProcess (сравнение по ItemId, дёшево).
+        _equipmentChangedToken = EquipmentChangedSub?.Subscribe(OnEquipmentChanged);
         // Этап 7: тосты от модулей (InventoryWindow.TryUseQiStone и др.)
         _toastShownToken = ToastShownSub?.Subscribe(OnToastShown);
         // Phase 2 fix: dialogue can end from MANY paths (E advance, Esc, choice
@@ -425,6 +456,15 @@ public partial class GameWorldController : Node2D
             var lootSim = new LootSimDebug { Name = "LootSimDebug" };
             AddChild(lootSim);
         }
+        // R15 (2026-09-10): headless-верификация «оружие в руках»
+        // (GODOT_WEAPONVIS_DEBUG=1) — WeaponClassId у генерации, спрайты
+        // icon/hand по классам/тирам, композит игрока (экип/анэкип/фейсинг),
+        // иконки хотбара, overlay NPC.
+        if (System.Environment.GetEnvironmentVariable("GODOT_WEAPONVIS_DEBUG") == "1")
+        {
+            var weaponVisSim = new WeaponVisSimDebug { Name = "WeaponVisSimDebug" };
+            AddChild(weaponVisSim);
+        }
         GD.Print("[GameWorldController] Ready");
     }
 
@@ -540,6 +580,18 @@ public partial class GameWorldController : Node2D
             TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
         };
         _worldRoot.AddChild(_playerSprite);
+
+        // R15: MainHand — hand-спрайт оружия (48×48, диагональ) поверх тела.
+        // Texture/Visible управляются RefreshMainHand(); позиция и FlipH —
+        // в _PhysicsProcess по _visualPosition и _facingLeft.
+        _playerMainHand = new Sprite2D
+        {
+            Name = "PlayerMainHand",
+            ZIndex = (int)RenderLayer.Player + 1,
+            TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
+            Visible = false,
+        };
+        _worldRoot.AddChild(_playerMainHand);
 
         // Render decorative border around the polygon to make bounds visible.
         RenderBorder();
@@ -869,6 +921,29 @@ public partial class GameWorldController : Node2D
             _playerSprite.Position = _visualPosition;
             if (_playerShadow != null)
                 _playerShadow.Position = new Vector2(_visualPosition.X, _visualPosition.Y + 8f);
+        }
+
+        // R15: композит — оружие в руке. Позиция = тело + HandOffset
+        // (зеркалирование ТОЛЬКО по X: offset → (-X, Y)); FlipH зеркалит
+        // содержимое текстуры вокруг центра спрайта (SPRITE_CATALOG §16).
+        if (_playerMainHand != null)
+        {
+            var off = _mainHandOffset;
+            _playerMainHand.Position = new Vector2(
+                _visualPosition.X + (_facingLeft ? -off.X : off.X),
+                _visualPosition.Y + off.Y);
+            _playerMainHand.FlipH = _facingLeft;
+            _playerSprite.FlipH = _facingLeft;
+
+            // Страховка синхронизации: экип мог произойти до подписки
+            // (фазы сборки/загрузка сейва) → сверяем ItemId раз в 0.5с.
+            _mainHandSyncCooldown -= (float)delta;
+            if (_mainHandSyncCooldown <= 0f)
+            {
+                _mainHandSyncCooldown = 0.5f;
+                string? currentId = Equipment?.GetEquipped(EquipmentSlot.WeaponMain)?.ItemId;
+                if (currentId != _mainHandCacheItemId) RefreshMainHand();
+            }
         }
 
         // Camera follows player.
@@ -1216,6 +1291,10 @@ public partial class GameWorldController : Node2D
             _mouseTarget = null;
             _visualPosition += moveVec * MoveSpeedPixels * speedMult * (float)delta;
 
+            // R15: направление взгляда по горизонтальной компоненте ввода.
+            if (moveVec.X > 0.15f) _facingLeft = false;
+            else if (moveVec.X < -0.15f) _facingLeft = true;
+
             // Clamp to world bounds. Use TileService dimensions when available,
             // falling back to GameConstants.DEFAULT_MAP_* (audit issue #15).
             int mapW = Tiles != null && Tiles.MapWidth > 0 ? Tiles.MapWidth : GameConstants.DEFAULT_MAP_WIDTH;
@@ -1242,6 +1321,8 @@ public partial class GameWorldController : Node2D
             {
                 var dir = diff.Normalized();
                 _visualPosition += dir * MoveSpeedPixels * speedMult * (float)delta;
+                // R15: клик-движение — взгляд по направлению к цели.
+                if (Mathf.Abs(diff.X) > 8f) _facingLeft = diff.X < 0f;
             }
         }
 
@@ -1863,6 +1944,49 @@ public partial class GameWorldController : Node2D
         if (!_wasPausedBeforeInventory && Time is { IsPaused: true })
             Time.Resume();
         GD.Print($"[GameWorld] Corpse removed ({e.Reason}) — loot window closed, ticks resumed");
+    }
+
+    // === R15: оружие в руке игрока (WeaponVisualCatalog) ===
+
+    /// <summary>Offset текущего hand-спрайта (зависит от класса оружия).</summary>
+    private Vector2 _mainHandOffset = new(14f, -6f);
+
+    /// <summary>R15: смена экипировки → обновить hand-спрайт (только игрок).</summary>
+    private void OnEquipmentChanged(in Core.Messaging.Contracts.EquipmentChangedEvent e)
+    {
+        // Игрок публикует под ID "player" (InventoryModule.Initialize);
+        // фильтр — алиасы игрока (B1: PlayerIdResolver).
+        if (!Core.Helpers.PlayerIdResolver.IsPlayer(e.EntityId)
+            && !string.IsNullOrEmpty(e.EntityId)) return;
+        if (e.Slot is not (EquipmentSlot.WeaponMain or EquipmentSlot.WeaponOff)) return;
+        RefreshMainHand();
+    }
+
+    /// <summary>
+    /// R15: перечитать WeaponMain → текстура hand-спрайта / скрытие.
+    /// Вызывается: EquipmentChangedEvent + страховка 0.5с в _PhysicsProcess.
+    /// </summary>
+    private void RefreshMainHand()
+    {
+        if (_playerMainHand == null) return;
+
+        var weapon = Equipment?.GetEquipped(EquipmentSlot.WeaponMain);
+        var visuals = WeaponVisualCatalog.Resolve(weapon);
+        if (visuals == null)
+        {
+            _playerMainHand.Texture = null;
+            _playerMainHand.Visible = false;
+            _mainHandCacheItemId = null;
+            _mainHandTextureKey = null;
+            return;
+        }
+
+        string classId = WeaponVisualCatalog.WeaponClassOf(weapon!);
+        _playerMainHand.Texture = visuals.Hand;
+        _playerMainHand.Visible = true;
+        _mainHandOffset = WeaponVisualCatalog.HandOffset(classId);
+        _mainHandCacheItemId = weapon!.ItemId;
+        _mainHandTextureKey = visuals.Key;
     }
 
     /// <summary>

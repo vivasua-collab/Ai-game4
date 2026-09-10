@@ -1,13 +1,36 @@
 # SESSION_CONTEXT — Передача контекста агенту
 
 **Дата создания:** 2026-08-22
-**Обновлено:** 2026-09-10 09:50 UTC (R14: восполнение населения только вне сессии; R15-план «оружие в руках» на согласовании)
+**Обновлено:** 2026-09-10 10:20 UTC (R15 внедрена: оружие в руках игрока+NPC; QA 11/11 PASS)
 **Назначение:** Полный контекст для продолжения разработки
 **Инструкция:** Прочитай START_PROMPT.md ПЕРВЫМ, затем этот файл.
 
 ---
 
-## 0. ЧТО СДЕЛАЛОСЬ ЗА СЕССИИ 2026-09-08…10 (коммиты 3e41927…c07427c)
+## 0. ЧТО СДЕЛАЛОСЬ ЗА СЕССИИ 2026-09-08…10 (коммиты 3e41927…HEAD)
+
+### Сессия 2026-09-10 №4: R15 — «оружие в руках» (фазы A+B внедрены)
+1. **План одобрен пользователем** (дефолтные ответы §6; статичные
+   спрайты; PNG-ассеты — отдельный будущий план; анимация — фаза C).
+2. **WeaponClassId** в EquipmentData + EquipmentGenerator пишет
+   (7 классов); fallback: парсинг ItemId `eq_wep_*` → generic sword.
+3. **Спрайты:** ProceduralSpriteGenerator.CreateWeaponIcon (32×32) +
+   CreateWeaponHandSprite (48×48) — 7 рецептов × 5 тиров материала ×
+   редкость; Legendary+ — золотая обводка (ApplyGoldenOutline).
+4. **WeaponVisualCatalog** (Adapter/Scene): кэш (class|tier|rarity) →
+   (icon+hand+key), Resolve с fallback, HandOffset по классам
+   (1H (+14,-6); 2H (+2,-2); лук (-2,+4)).
+5. **Композит игрока:** GameWorldController MainHand Sprite2D +
+   EquipmentChangedEvent + страховка 0.5с; facing-wiring (клавиши +
+   мышь) → FlipH + offset-зеркалирование ТОЛЬКО по X.
+6. **Хотбар 1-2:** иконки 32×32 + короткая подпись; **кукла:** иконки
+   в DollSlotRow (WeaponMain/Off).
+7. **NPC:** NPCSpriteRenderer overlay + кэш npcId→itemId (перескан
+   0.5с) + facing-гистерезис + DrawSetTransform-зеркалирование.
+8. QA: GODOT_WEAPONVIS_DEBUG=1 PASS; 10 регрессий PASS; build 0 err;
+   Xvfb-скриншот + VLM: кинжал в руке игрока и иконка в хотбаре видны.
+9. docs_v2: SPRITE_CATALOG §7/§18/§20/§21, MODULE_STRUCTURE §2.7/§4,
+   TESTING_RULES §0.1 (31 хук). Чекпоинт: 09_10_r15_weapon_visuals.md.
 
 ### Сессия 2026-09-10 №3: R14 — правило восполнения населения (коммит c07427c)
 1. **§2.4 DEATH_AND_LOOT исправлен по запросу пользователя:** пока
@@ -22,11 +45,6 @@
 4. docs_v2 sync: DEATH_AND_LOOT §2.4, MODULE_STRUCTURE §2.7,
    TESTING_RULES §0.1. QA 9/9 PASS (LOOT step7 перевёрнут: население
    ниже floor НЕ восполняется; ивент-спаун работает).
-5. **R15 КОНЦЕПЦИЯ+ПЛАН** (на согласовании с пользователем, внедрение
-   после одобрения): отображение оружия в руках игрока и NPC —
-   checkpoints/plans/2026-09-10_r15_weapon_visualization_plan.md
-   (RimWorld-слои: 7 классов оружия, icon+hand спрайты, facing-wiring,
-   фазы A/B/C, вопросы-дефолты в §6).
 
 ### Сессия 2026-09-10 №2: верификация R13 + синхронизация docs_v2
 1. **R13 full-loot верифицирован** по правилам docs_v2 (запрос пользователя):
@@ -97,7 +115,7 @@ bash /home/z/my-project/automation/restore_env.sh
 **Проверенное окружение 2026-09-10:**
 - .NET SDK 9.0.318 → /home/z/.dotnet (DOTNET_ROOT)
 - Godot 4.7.1 mono → **/home/z/godot_flat/godot** (flat-структура! не старый путь)
-- Репо: /home/z/my-project/Ai-game4 (HEAD 7347bc1 == origin/main)
+- Репо: /home/z/my-project/Ai-game4 (HEAD == origin/main)
 - Токен: /home/z/my-project/.auth/github.token (вне git, переживает сбросы)
 - Симлинк: /home/z/my-project/Ai-game4-repo → Ai-game4 (в git окружения)
 
@@ -126,7 +144,7 @@ env GODOT_NEWGAME=1 GODOT_SAVELOAD_DEBUG=1 timeout 90 "$GODOT" --headless --path
 
 ---
 
-## 2. ТЕКУЩЕЕ СОСТОЯНИЕ (HEAD c07427c — synced с origin/main)
+## 2. ТЕКУЩЕЕ СОСТОЯНИЕ (R15 внедрена — см. git log origin/main)
 
 ### Что работает
 - ✅ Main Menu → New Game (50×50) / Large World (500×500)
@@ -142,6 +160,9 @@ env GODOT_NEWGAME=1 GODOT_SAVELOAD_DEBUG=1 timeout 90 "$GODOT" --headless --path
       камней), обыск E, «Забрать всё», TTL трупов; восполнение населения
       — ТОЛЬКО вне сессии (R14), ивенты (караван/набег) — через
       TrySpawnEventNpc
+- ✅ **Оружие в руках (R15):** hand-спрайты на теле игрока и NPC
+      (7 классов × 5 тиров, Legendary-обводка), иконки в хотбаре 1-2 и
+      кукле, facing-зеркалирование игрока и NPC
 - ✅ Save/Load (R11): типизированный round-trip, 8 ISaveable-блоков,
       IncludeFields, честные события
 - ✅ Торговля: диалог → лавка → buy/sell за духовные камни
@@ -154,6 +175,9 @@ env GODOT_NEWGAME=1 GODOT_SAVELOAD_DEBUG=1 timeout 90 "$GODOT" --headless --path
 ### НЕ проверено живьём (в редакторе на ПК)
 - ⚠ Визуал R13: маркеры трупов/LootWindow в реальном рендере
       (headless не рисует; нужен Xvfb-скриншот или ПК)
+- ⚠ Визуал R15: позиционирование/размеры оружия у NPC (композит игрока
+      подтверждён VLM-скриншотом; NPC — только QA-ключи, камера не видела
+      NPC в кадре) — вечером у пользователя
 - ⚡ Баланс: камни в трупах по таблице 4.1 могут быть щедрыми
 
 ### Что НЕ работает (отложено)
@@ -205,16 +229,21 @@ game/src/
 ### P0 — живая проверка в редакторе (ПК)
 1. Визуал R13 + правило R14: маркеры трупов, LootWindow, «Забрать всё",
    НЕ-восполнение населения после зачистки (вечером у пользователя)
-2. Баланс камней в трупах (таблица 4.1 vs ощущение)
+2. Визуал R15: оружие в руке игрока/на разных NPC (кинжал/меч/копьё/
+   двуручник/лук/посох), хотбар-иконки, зеркалирование при движении
+   влево/вправо; вылеты за тайл 2H-оружия
+3. Баланс камней в трупах (таблица 4.1 vs ощущение)
 
 ### P1 — кандидаты следующей сессии
-3. **R15 «оружие в руках»** — план ГОТОВ, ждёт согласования пользователя:
-   checkpoints/plans/2026-09-10_r15_weapon_visualization_plan.md
-   (фаза A: игрок+хотбар; B: NPC; C: анимация/щит)
-4. Лут с животных: материалы по видам (шкура/клыки/мясо) в CorpseService
-5. Обыск трупов ИИ-NPC (приоритет лута для AI)
-6. Faction port (Ai-game3-ref, ~400 LOC)
-7. Генерация состава для 500×500 (мульти-локации)
+4. R15 фаза C: замах-анимация (sprite-swap §17), off-hand щит, иконки
+   в лут-окне трупов / ground items
+5. PNG-ассеты: генерация и привязка к объектам (отдельный план
+   пользователя; сейчас процедурные рецепты)
+6. Броня-слои на теле (R16-кандидат — та же архитектура R15)
+7. Лут с животных: материалы по видам (шкура/клыки/мясо) в CorpseService
+8. Обыск трупов ИИ-NPC (приоритет лута для AI)
+9. Faction port (Ai-game3-ref, ~400 LOC)
+10. Генерация состава для 500×500 (мульти-локации)
 
 ### P2 — долг
 7. Per-attacker pending technique
@@ -232,9 +261,10 @@ GODOT='/home/z/godot_flat/godot'
 
 dotnet build                                                     # 0 errors
 
-# Ключевые хуки (полный список 30 шт — TESTING_RULES §0.1):
+# Ключевые хуки (полный список 31 шт — TESTING_RULES §0.1):
 env GODOT_NEWGAME=1 timeout 90 "$GODOT" --headless --path "$PWD" scenes/MainMenu.tscn
 env GODOT_NEWGAME=1 GODOT_LOOT_DEBUG=1 timeout 90 "$GODOT" --headless --path "$PWD" scenes/MainMenu.tscn
+env GODOT_NEWGAME=1 GODOT_WEAPONVIS_DEBUG=1 timeout 90 "$GODOT" --headless --path "$PWD" scenes/MainMenu.tscn
 env GODOT_NEWGAME=1 GODOT_COMBAT_SIM=1 timeout 90 "$GODOT" --headless --path "$PWD" scenes/MainMenu.tscn
 env GODOT_NEWGAME=1 GODOT_SAVELOAD_DEBUG=1 timeout 90 "$GODOT" --headless --path "$PWD" scenes/MainMenu.tscn
 
@@ -254,10 +284,14 @@ DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 GODOT_NEWGAME=1 \
 | `SESSION_CONTEXT.md` | ЭТОТ ФАЙЛ |
 | `SESSION_SUMMARY.md` | Сводка сессий + состояние |
 | `checkpoints/09_10_r14_population_rule.md` | Чекпоинт R14 (правило населения) |
-| `checkpoints/plans/2026-09-10_r15_weapon_visualization_plan.md` | R15 концепция+план «оружие в руках» (на согласовании) |
+| `checkpoints/09_10_r15_weapon_visuals.md` | Чекпоинт R15 (оружие в руках) |
+| `checkpoints/plans/2026-09-10_r15_weapon_visualization_plan.md` | R15 план (фазы A+B реализованы) |
 | `checkpoints/09_10_r13_full_loot.md` | Чекпоинт R13 (фичи) |
 | `docs/docs_v2/04_entities/DEATH_AND_LOOT.md` | Спецификация смерти/лута (§2.4 R14) |
-| `docs/docs_v2/09_workflow/TESTING_RULES.md` | Реестр 30 QA-хуков |
+| `docs/docs_v2/07_ui/SPRITE_CATALOG.md` | Спрайты: §7 equipped-оружие (R15) |
+| `docs/docs_v2/09_workflow/TESTING_RULES.md` | Реестр 31 QA-хуков |
+| `game/src/Adapter/Scene/WeaponVisualCatalog.cs` | R15: кэш/резолв спрайтов оружия |
+| `game/src/Adapter/Scene/WeaponVisSimDebug.cs` | QA оружия (GODOT_WEAPONVIS_DEBUG) |
 | `game/src/Modules/NPC/CorpseService.cs` | Трупы-контейнеры |
 | `game/src/Modules/NPC/NPCSpawnCompositionService.cs` | Генерация населения + TrySpawnEventNpc |
 | `game/src/Adapter/UI/LootWindow.cs` | Окно обыска |

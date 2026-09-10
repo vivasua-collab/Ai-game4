@@ -118,6 +118,8 @@ public sealed class EquipmentGenerator : IEquipmentGenerator
                 ? EquipmentSlot.WeaponMain
                 : EquipmentSlot.WeaponMain,
             HandType = @class.HandType,
+            // R15: класс для визуальных спрайтов (WeaponVisualCatalog).
+            WeaponClassId = @class.Id,
 
             // §2: Эффективность = Base × Grade × (1 + MaterialDamage).
             // Скорость-класс модулирует урон: быстрое — легче, медленное — больнее.

@@ -203,6 +203,218 @@ public static class ProceduralSpriteGenerator
 
     // === Equipment icon sprites ===
 
+    // === R15 (2026-09-10): weapon visuals — icon + hand orientations ===
+    //
+    // 7 классов (EquipmentGenerationTables.Weapons §10.2) × 5 тиров
+    // материала. Одна «форма» — две ориентации:
+    //   • Icon 32×32 — вертикально «как предмет»: хотбар (слоты 1-2),
+    //     кукла (WeaponMain/WeaponOff).
+    //   • Hand  48×48 — диагональ 45°, рукоять у нижне-левого угла:
+    //     overlay на тело игрока (MainHand Sprite2D) и NPC (_Draw).
+    //     Лук — вертикально (в левой руке), 2H — диагональ через корпус.
+    // Легендарки+ (Legendary/Mythic) — тонкая золотая обводка свечения.
+    // Цвет = материал тира (см. WeaponMaterialPalette). План:
+    // checkpoints/plans/2026-09-10_r15_weapon_visualization_plan.md §1.
+
+    /// <summary>Палитра материала по тиру (R15 §1.2): iron→steel→spirit→star→void.</summary>
+    private static (Color main, Color dark, Color edge) WeaponMaterialPalette(int tier)
+    {
+        return tier switch
+        {
+            1 => (new Color(0.55f, 0.55f, 0.58f), new Color(0.32f, 0.32f, 0.35f), new Color(0.72f, 0.72f, 0.75f)), // iron
+            2 => (new Color(0.74f, 0.76f, 0.80f), new Color(0.45f, 0.47f, 0.52f), new Color(0.88f, 0.89f, 0.92f)), // steel
+            3 => (new Color(0.42f, 0.66f, 0.52f), new Color(0.22f, 0.40f, 0.30f), new Color(0.62f, 0.84f, 0.68f)), // spirit iron / jade
+            4 => (new Color(0.62f, 0.74f, 0.95f), new Color(0.35f, 0.45f, 0.68f), new Color(0.80f, 0.88f, 1.00f)), // star metal
+            5 => (new Color(0.34f, 0.24f, 0.50f), new Color(0.16f, 0.10f, 0.28f), new Color(0.55f, 0.42f, 0.78f)), // void
+            _ => (new Color(0.55f, 0.55f, 0.58f), new Color(0.32f, 0.32f, 0.35f), new Color(0.72f, 0.72f, 0.75f)),
+        };
+    }
+
+    private static readonly Color WeaponWood = new(0.45f, 0.32f, 0.18f);
+    private static readonly Color WeaponWoodDark = new(0.28f, 0.19f, 0.10f);
+
+    /// <summary>
+    /// R15: icon-спрайт оружия (32×32, вертикально) — для хотбара и куклы.
+    /// Класс unknown → generic sword (не краш).
+    /// </summary>
+    public static Texture2D CreateWeaponIcon(string weaponClass, int materialTier, ItemRarity rarity)
+    {
+        int size = 32;
+        var image = Image.CreateEmpty(size, size, false, Image.Format.Rgba8);
+        image.Fill(new Color(0, 0, 0, 0));
+
+        var (main, dark, edge) = WeaponMaterialPalette(materialTier);
+        int cx = size / 2;
+
+        switch (weaponClass)
+        {
+            case "dagger":
+                FillRect(image, cx - 1, 6, 2, 8, main);                     // короткий клинок
+                DrawLine(image, cx, 7, cx, 13, edge, 1);                     // грань
+                FillRect(image, cx - 4, 14, 8, 1, dark);                     // гарда
+                FillRect(image, cx - 1, 15, 2, 6, WeaponWoodDark);           // рукоять
+                FillRect(image, cx - 2, 21, 4, 2, dark);                     // навершие
+                break;
+            case "axe":
+                DrawLine(image, cx, 26, cx, 6, WeaponWood, 2);               // древко
+                FillTriangle(image, cx - 1, 5, cx + 7, 9, cx - 1, 13, main); // лезвие-полумесяц
+                DrawLine(image, cx - 1, 6, cx + 6, 9, edge, 1);              // грань лезвия
+                FillRect(image, cx - 2, 10, 4, 3, dark);                     // обмотка
+                break;
+            case "spear":
+                DrawLine(image, cx, 28, cx, 8, WeaponWood, 2);               // древко
+                FillTriangle(image, cx, 2, cx + 2, 6, cx - 2, 6, main);      // наконечник
+                FillRect(image, cx - 1, 6, 2, 3, main);                      // втулка
+                FillRect(image, cx - 2, 9, 4, 2, dark);                      // обмотка
+                break;
+            case "greatsword":
+                FillRect(image, cx - 2, 2, 4, 14, main);                     // широкий клинок
+                DrawLine(image, cx, 3, cx, 15, edge, 1);                     // дол
+                FillRect(image, cx - 7, 16, 14, 2, dark);                    // длинная гарда
+                FillRect(image, cx - 1, 18, 2, 6, WeaponWoodDark);           // рукоять
+                FillCircle(image, cx, 25, 2, dark);                          // навершие
+                break;
+            case "bow":
+                DrawArc(image, cx + 3, 16, 7, 12, 90, 270, WeaponWood, 2);   // дуга (левая половина)
+                DrawLine(image, cx + 3, 4, cx + 3, 28, edge, 1);             // тетива
+                FillRect(image, cx + 1, 12, 3, 8, WeaponWoodDark);           // обмотка-хват
+                break;
+            case "staff":
+                DrawLine(image, cx, 28, cx, 10, WeaponWood, 2);              // древко
+                FillCircle(image, cx, 6, 4, main);                           // навершие-кристалл
+                DrawCircleOutline(image, cx, 6, 4, dark);
+                FillCircle(image, cx - 1, 5, 1, edge);                       // блик
+                FillRect(image, cx - 2, 10, 4, 2, dark);                     // обмотка
+                break;
+            default: // "sword" + unknown → generic
+                FillRect(image, cx - 1, 3, 2, 12, main);                     // клинок
+                DrawLine(image, cx, 4, cx, 14, edge, 1);                     // грань
+                FillRect(image, cx - 5, 15, 10, 2, dark);                    // гарда
+                FillRect(image, cx - 1, 17, 2, 6, WeaponWoodDark);           // рукоять
+                FillRect(image, cx - 2, 23, 4, 2, dark);                     // навершие
+                break;
+        }
+
+        if (rarity is ItemRarity.Legendary or ItemRarity.Mythic)
+            ApplyGoldenOutline(image);
+
+        return ImageTexture.CreateFromImage(image);
+    }
+
+    /// <summary>
+    /// R15: hand-спрайт оружия (48×48, диагональ 45°) — overlay на тело
+    /// игрока/NPC. Рукоять у G=(16,36) для 1H; 2H — диагональ через корпус;
+    /// лук — вертикально. Позиционирование — WeaponVisualCatalog.HandOffset.
+    /// </summary>
+    public static Texture2D CreateWeaponHandSprite(string weaponClass, int materialTier, ItemRarity rarity)
+    {
+        int size = 48;
+        var image = Image.CreateEmpty(size, size, false, Image.Format.Rgba8);
+        image.Fill(new Color(0, 0, 0, 0));
+
+        var (main, dark, edge) = WeaponMaterialPalette(materialTier);
+
+        switch (weaponClass)
+        {
+            case "dagger": // 1H: короткий клинок
+                DrawLine(image, 18, 34, 28, 24, main, 2);
+                DrawLine(image, 19, 33, 28, 24, edge, 1);
+                DrawLine(image, 15, 31, 21, 37, dark, 1);      // гарда (перпенд.)
+                DrawLine(image, 16, 36, 11, 41, WeaponWoodDark, 2);
+                FillCircle(image, 10, 42, 1, dark);            // навершие
+                break;
+            case "axe": // 1H: древко + лезвие
+                DrawLine(image, 10, 42, 28, 24, WeaponWood, 2);
+                FillTriangle(image, 26, 16, 35, 25, 26, 26, main);   // лезвие
+                DrawLine(image, 26, 17, 34, 25, edge, 1);            // грань
+                FillRect(image, 25, 22, 4, 4, WeaponWoodDark);       // обмотка
+                break;
+            case "spear": // 2H: диагональ через корпус
+                DrawLine(image, 6, 42, 40, 8, WeaponWood, 2);
+                DrawLine(image, 40, 8, 45, 3, main, 2);              // наконечник
+                FillTriangle(image, 40, 8, 44, 2, 43, 10, main);
+                FillRect(image, 38, 7, 4, 4, dark);                  // втулка
+                DrawLine(image, 14, 34, 20, 28, WeaponWoodDark, 2);  // хват
+                break;
+            case "greatsword": // 2H: широкий клинок по диагонали
+                DrawLine(image, 14, 36, 38, 12, main, 5);
+                DrawLine(image, 16, 34, 38, 12, edge, 1);            // дол
+                DrawLine(image, 11, 29, 23, 41, dark, 3);            // длинная гарда
+                DrawLine(image, 15, 37, 10, 42, WeaponWoodDark, 3);  // рукоять
+                FillCircle(image, 9, 43, 2, dark);                   // навершие
+                break;
+            case "bow": // 2H: вертикально (левая рука)
+                DrawArc(image, 26, 24, 9, 18, 90, 270, WeaponWood, 2); // дуга
+                DrawLine(image, 26, 6, 26, 42, edge, 1);               // тетива
+                FillRect(image, 18, 20, 3, 8, WeaponWoodDark);         // обмотка-хват
+                break;
+            case "staff": // 2H: диагональ + кристалл
+                DrawLine(image, 6, 42, 40, 8, WeaponWood, 2);
+                FillCircle(image, 41, 7, 4, main);                     // кристалл
+                DrawCircleOutline(image, 41, 7, 4, dark);
+                FillCircle(image, 40, 6, 1, edge);                     // блик
+                FillRect(image, 37, 10, 3, 3, dark);                   // обмотка
+                break;
+            default: // "sword" + unknown → generic
+                DrawLine(image, 18, 34, 36, 16, main, 3);
+                DrawLine(image, 19, 33, 36, 16, edge, 1);
+                FillTriangle(image, 35, 17, 38, 14, 35, 14, edge);     // остриё
+                DrawLine(image, 14, 30, 22, 38, dark, 2);              // гарда
+                DrawLine(image, 15, 37, 10, 42, WeaponWoodDark, 2);    // рукоять
+                FillCircle(image, 9, 43, 2, dark);                     // навершие
+                break;
+        }
+
+        if (rarity is ItemRarity.Legendary or ItemRarity.Mythic)
+            ApplyGoldenOutline(image);
+
+        return ImageTexture.CreateFromImage(image);
+    }
+
+    /// <summary>
+    /// R15: тонкая золотая обводка вокруг непрозрачных пикселей (свечение
+    /// легендарки). 4-соседний проход: прозрачный пиксель рядом с
+    /// непрозрачным → золотой полупрозрачный.
+    /// </summary>
+    private static void ApplyGoldenOutline(Image image)
+    {
+        var gold = new Color(1.0f, 0.84f, 0.33f, 0.85f);
+        int w = image.GetWidth(), h = image.GetHeight();
+        // Снимок альфы ДО прохода, чтобы обводка не росла сама на себя.
+        var alpha = new bool[w * h];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+                alpha[y * w + x] = image.GetPixel(x, y).A > 0.01f;
+
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                if (alpha[y * w + x]) continue;
+                bool near = (x > 0 && alpha[y * w + x - 1])
+                         || (x < w - 1 && alpha[y * w + x + 1])
+                         || (y > 0 && alpha[(y - 1) * w + x])
+                         || (y < h - 1 && alpha[(y + 1) * w + x]);
+                if (near) image.SetPixel(x, y, gold);
+            }
+    }
+
+    /// <summary>R15: дуга эллипса (для лука) — толстые точки по углам [from°, to°].</summary>
+    private static void DrawArc(Image image, int cx, int cy, int rx, int ry,
+        int angleFrom, int angleTo, Color color, int thickness)
+    {
+        for (int angle = angleFrom; angle <= angleTo; angle += 3)
+        {
+            float rad = Mathf.DegToRad(angle);
+            int px = cx + (int)Mathf.Round(rx * Mathf.Cos(rad));
+            int py = cy + (int)Mathf.Round(ry * Mathf.Sin(rad));
+            if (px >= 0 && px < image.GetWidth() && py >= 0 && py < image.GetHeight())
+            {
+                if (thickness > 1) FillCircle(image, px, py, thickness / 2, color);
+                else image.SetPixel(px, py, color);
+            }
+        }
+    }
+
     /// <summary>Generate equipment icon based on category + slot (32×32).</summary>
     public static Texture2D CreateEquipmentIcon(ItemCategory category, EquipmentSlot slot, ItemRarity rarity)
     {

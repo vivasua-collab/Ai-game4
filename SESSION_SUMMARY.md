@@ -1,15 +1,34 @@
 # Сводка сессий (обновляется при завершении каждой сессии)
 
-Обновлено: 2026-09-10 09:50 UTC (облачный агент Z.ai Code)
+Обновлено: 2026-09-10 10:30 UTC (облачный агент Z.ai Code)
 
 ## Проект
 Cultivation World Simulator (Ai-game4), Godot 4.7.1 .NET, C#
 Репозиторий: https://github.com/vivasua-collab/Ai-game4 (публичный)
-HEAD: c07427c == origin/main
+HEAD: см. `git ls-remote origin main` (R15 запушена)
 
 ---
 
 ## Последние сессии
+
+### 2026-09-10 №4 (R15: оружие в руках — фазы A+B)
+- **План одобрен** (дефолты §6; статичные спрайты; PNG — отдельный план;
+  анимация — фаза C). Внедрено:
+- **WeaponClassId** (EquipmentData + генератор) с fallback-парсингом
+  ItemId (сейвы R11) → generic sword.
+- **Спрайты:** CreateWeaponIcon(32×32) + CreateWeaponHandSprite(48×48),
+  7 рецептов × 5 тиров материала × редкость, Legendary+ золотая обводка.
+- **WeaponVisualCatalog:** кэш (class|tier|rarity)→(icon+hand+key),
+  HandOffset (1H/2H/лук), ResetCache для QA.
+- **Игрок:** MainHand Sprite2D (EquipmentChangedEvent + страховка 0.5с),
+  facing-wiring (клавиши/мышь) → FlipH + offset-зеркало только X.
+- **Хотбар 1-2** (иконки+подпись) и **кукла** (DollSlotRow иконки).
+- **NPC:** NPCSpriteRenderer overlay (кэш npcId→itemId, перескан 0.5с,
+  facing-гистерезис, DrawSetTransform-зеркало).
+- QA: GODOT_WEAPONVIS_DEBUG=1 PASS (7/7); 10 регрессий PASS; build
+  0 err; Xvfb-скриншот+VLM (кинжал в руке + иконка хотбара подтверждены).
+  docs_v2: SPRITE_CATALOG/MODULE_STRUCTURE/TESTING_RULES (31 хук).
+  Чекпоинт: checkpoints/09_10_r15_weapon_visuals.md.
 
 ### 2026-09-10 №3 (R14: правило населения + R15-план)
 - **R14 (c07427c):** восполнение населения НЕ работает в рамках сессии
@@ -63,11 +82,15 @@ HEAD: c07427c == origin/main
 - ✅ Бой: melee+ranged+LOS+ammo, turn-gate, визуал (цифры/HP/kill-feed)
 - ✅ **Full loot R13 + R14:** генерация населения, трупы, обыск;
   восполнение населения — только вне сессии (ивенты — TrySpawnEventNpc)
+- ✅ **Оружие в руках R15:** hand-спрайты игрока+NPC (7 классов × 5
+  тиров), иконки хотбара/куклы, facing-зеркалирование
 - ✅ Save/Load; торговля; Qi/техники/формации/зарядники; квесты
 - ✅ Генераторы + легендарки + верификация/дедуп
 
 ### Что НЕ работает (отложено)
-- ❌ Визуал R13 живьём (Xvfb-скриншот/ПК); баланс камней в трупах
+- ❌ Визуал R13/R15 живьём на ПК (Xvfb подтвердил игрока; NPC — QA);
+  баланс камней в трупах
+- ❌ R15 фаза C: замах-анимация, off-hand щит, иконки лут-окна/ground
 - ❌ Лут с животных (материалы TODO — только камни); faction port
 - ❌ Per-attacker pending; обыск трупов ИИ; состав для 500×500
 
@@ -83,8 +106,9 @@ HEAD: c07427c == origin/main
 ---
 
 ## Следующие шаги
-1. P0: живой QA R13+R14 на ПК (вечером): НЕ-восполнение после зачистки
-2. **R15 «оружие в руках»: согласовать план (§6-вопросы) → фаза A**
+1. P0: живой QA R13+R14+R15 на ПК (вечером): оружие у игрока/NPC разных
+   классов, зеркалирование, НЕ-восполнение после зачистки
+2. R15 фаза C (замах/щит/иконки лута) или PNG-ассеты (план пользователя)
 3. Лут с животных (материалы по видам)
 4. Обыск трупов ИИ-NPC; faction port; 500×500 состав
 
@@ -93,6 +117,6 @@ HEAD: c07427c == origin/main
 ## Предупреждения
 - Godot: **/home/z/godot_flat/godot** (flat, не старый вложенный путь)
 - QA-хуки поштучно, timeout ≥90с, вердикт grep 'VERDICT' (реестр —
-  TESTING_RULES §0.1, 30 хуков)
+  TESTING_RULES §0.1, 31 хук)
 - Токен: /home/z/my-project/.auth/github.token (не запрашивать, если есть)
 - После сброса песочницы: recover_sandbox.sh; сверять git ls-remote

@@ -688,3 +688,62 @@ Work Log:
 Stage Summary:
 - План передан пользователю на согласование (вопросы с дефолтами — §6
   плана). Внедрение фазы A/B — после одобрения. Коммит: docs-only.
+
+---
+Task ID: R15-WEAPON-VISUALS-0910
+Agent: main-agent (Z.ai Code, сессия 2026-09-10 №4)
+Task: Внедрение R15 «Отображение оружия в руках героя и NPC» (фазы A+B)
+по одобренному плану (дефолты §6; статичные спрайты; процедурные
+текстуры; анимация — фаза C; PNG-ассеты — отдельный будущий план).
+
+Work Log:
+- Core: EquipmentData.WeaponClassId (R15) + EquipmentGenerator пишет
+  @class.Id при генерации оружия (7 классов, §10.2).
+- ProceduralSpriteGenerator: CreateWeaponIcon(32×32) +
+  CreateWeaponHandSprite(48×48) — рецепты 7 классов × 5 тиров материала
+  (iron/steel/spirit/star/void) × редкость; Legendary/Mythic — золотая
+  обводка ApplyGoldenOutline; DrawArc для лука; 1H рукоять G=(16,36),
+  2H — диагональ через корпус, лук — вертикально.
+- WeaponVisualCatalog (новый, Adapter/Scene): кэш
+  (class|tier|rarity)→{Icon,Hand,Key}; Resolve с fallback (поле →
+  парсинг eq_wep_* из ItemId → generic sword); HandOffset по классам;
+  IsTwoHanded; ResetCache.
+- GameWorldController: PlayerMainHand Sprite2D (ZIndex Player+1) +
+  EquipmentChangedEvent-подписка (WeaponMain/Off; PlayerIdResolver
+  фильтр) → RefreshMainHand; страховка 0.5с в _PhysicsProcess (экип
+  до _Ready); facing-wiring в HandleFreeMovement (клавиши/мышь) →
+  FlipH тела+руки, offset-зеркалирование ТОЛЬКО по X; QA-API
+  (MainHandTextureId/MainHandVisible/PlayerFacingLeft/DEBUG_SetFacing).
+- HotbarPanel: слоты 1-2 — TextureRect 32×32 + подпись снизу
+  (дефолт §6.3); OnEquipChanged расширен на оружие; QA
+  WeaponIconTextureId. CharacterDollPanel/DollSlotRow: иконки 24×24
+  (WeaponMain/Off).
+- NPCSpriteRenderer: [Inject] IEquipmentDataProvider; перескан
+  WeaponMain живых NPC раз в 0.5с → кэш npcId→itemId; кэш itemId→
+  texture/key (+negative); facing-гистерезис |Δx|≥0.05; зеркалирование
+  DrawSetTransform((-1,1) вокруг оси через cx); QA NPCWeaponTextureIdOf/
+  NPCWeaponVisibleCount.
+- WeaponVisSimDebug (новый): 7 шагов верификации; зарегистрирован в
+  GameWorldController (GODOT_WEAPONVIS_DEBUG=1).
+- QA: build 0 errors (354 warnings — базовый уровень, в новых файлах
+  чисто); GODOT_WEAPONVIS_DEBUG → VERDICT: PASS (генерация 7/7,
+  fallback, размеры/различимость ключей, композит: кинжал→копьё→
+  анэкип→меч, хотбар, 12 NPC, facing); регрессии 10/10 PASS
+  (HOTBAR/LOOT/COMBAT/SAVELOAD/TRASHDROP/KILLFEED/CONTEXT/
+  REASSEMBLY/STORAGE/QUEST).
+- Визуально: Xvfb-скриншот (opengl3) + VLM — «у игрока серый
+  диагональный кинжал в правой руке; в слоте 1 хотбара иконка кинжала
+  с подписью "Кинжал"». NPC в кадр не попали (камера 3x, спаун по
+  всей карте) — рендер NPC верифицирован QA-ключами (тот же путь
+  текстур/офсетов); живая проверка — P0 вечером.
+- docs_v2 sync: SPRITE_CATALOG §7/§18/§20/§21, MODULE_STRUCTURE §2.7/§4,
+  TESTING_RULES §0.1 (реестр 30→31); SESSION_CONTEXT/SESSION_SUMMARY
+  (сессия №4); чекпоинт checkpoints/09_10_r15_weapon_visuals.md.
+
+Stage Summary:
+- R15 фазы A+B выполнены полностью: оружие видно в руке игрока, в
+  хотбаре (иконка+подпись), в кукле, у NPC (overlay+flip); все ключи
+  QA PASS; docs синхронизированы.
+- Осталось: живой визуальный QA (P0, ПК); фаза C (анимация замаха,
+  щит, иконки лут-окна/ground); PNG-ассеты (план пользователя);
+  броня-слои (R16-кандидат); тонкая настройка HandOffset по фидбеку.

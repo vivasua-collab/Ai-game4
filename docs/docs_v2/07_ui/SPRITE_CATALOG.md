@@ -195,15 +195,35 @@ Point-фильтрация даёт чёткие пиксельные грани
 | 9 | armor_greaves_iron | Поножи железные |
 | 10 | armor_torso_iron | Нагрудник железный |
 
-### Equipped-спрайты (планируется)
+### Equipped-спрайты оружия (реализовано — R15, 2026-09-10)
 
-Помимо icon-спрайтов (для инвентаря и дропа), планируется система **equipped-спрайтов** — визуальных слоёв, накладываемых поверх базового спрайта персонажа при надевании экипировки.
+Система **equipped-спрайтов** для оружия реализована (план
+`checkpoints/plans/2026-09-10_r15_weapon_visualization_plan.md`,
+RimWorld-подобные overlay-слои). Броня — по-прежнему планируется (R16-кандидат).
 
-**Принцип:** 1 слот = 1 предмет = 1 equipped-спрайт (упрощённая модель, без слоёв экипировки).
+**Модель:** ключ = `(WeaponClassId, MaterialTier, Rarity)` → пара спрайтов:
 
-- Equipped-спрайты хранятся отдельно от icon-спрайтов.
-- Накладываются как overlay на базовый спрайт персонажа.
-- Зеркалируются вместе с базовым спрайтом (см. §11).
+| Спрайт | Размер | Ориентация | Потребители |
+|---|---|---|---|
+| Icon | 32×32 | вертикально («предмет») | хотбар (слоты 1-2), кукла (WeaponMain/Off) |
+| Hand | 48×48 | диагональ 45° (лук — вертикально) | тело игрока (MainHand Sprite2D), NPC (`_Draw` overlay) |
+
+- **7 классов** (§10.2 EQUIPMENT_SYSTEM): dagger, sword, axe, spear,
+  greatsword, bow, staff. 1H — у правой кисти (рукоять G=(16,36) →
+  offset (+14,-6)); 2H — диагональ через корпус (+2,-2); лук — вертикально
+  у левой кисти (-2,+4).
+- **Цвет = материал тира** (1-5): iron (серо-сталь) → steel (светлее) →
+  spirit iron/нефрит (зелёный) → star metal (сине-белый) → void (тёмно-фиолетовый).
+- **Legendary/Mythic** — тонкая золотая обводка-свечение.
+- **Резолв/кэш:** `WeaponVisualCatalog` (Adapter/Scene) — генерация один
+  раз, кэш по ключу; fallback: поле `EquipmentData.WeaponClassId` →
+  парсинг префикса ItemId `eq_wep_{subtype}_…` (сейвы до R15) → generic
+  sword (не краш, §19).
+- **Зеркалирование** (facing-left): offset → (−X, +Y) (только по X);
+  игрок — `Sprite2D.FlipH`, NPC — `DrawSetTransform(-1,1)` (§16).
+- **Документация кода:** ProceduralSpriteGenerator (`CreateWeaponIcon` /
+  `CreateWeaponHandSprite`), GameWorldController (MainHand-композит),
+  NPCSpriteRenderer (overlay + facing-гистерезис), HotbarPanel (иконки).
 
 ---
 
@@ -453,6 +473,7 @@ Player (Node)
 | CultivationLevelData | 9 | 9 | 10 (Ascension планируется) | ✅ Полное |
 | TechniqueType | 11 | 11 | 11 | ✅ Полное |
 | NPCRole | 8 | 8 | 18 (с вариациями) | ✅ Полное |
+| WeaponBaseClass (R15) | 7 | 7 | 7×2 (icon+hand)×5 тиров | ✅ Полное |
 
 ---
 
@@ -481,7 +502,7 @@ sprites/
 │   └── npc/           # npc_*
 ├── equipment/         # weapon_*, armor_*
 │   ├── icons/         # 128×128 для инвентаря/дропа
-│   └── equipped/      # overlay-спрайты (планируется)
+│   └── equipped/      # оружие — процедурные R15 (WeaponVisualCatalog); PNG — план
 ├── items/             # consumable_*, material_*
 ├── elements/          # element_*
 ├── techniques/        # technique_*
@@ -502,10 +523,12 @@ sprites/
 
 ## 21. Открытые вопросы
 
-1. **Equipped-спрайты** — детальная спецификация overlay-слоёв (см. §7). План: 1 equipped-спрайт на слот экипировки.
+1. **Equipped-спрайты** — оружие РЕАЛИЗОВАНО процедурно (R15, §7);
+   открыто: броня-слои (robe/helmet overlays — R16-кандидат), замена
+   процедурных рецептов на PNG-ассеты (генерация/привязка — отдельный план).
 2. **Расширение object-tiles** — добавление Tree_Pine, Tree_Birch, Bush_Berry, Grass_Tall, Flower, Rock_Large, Boulder, Pond, Well, Wall_Wood, Wall_Stone, Door, Window, Shrine, Altar.
 3. **Атласы спрайтов** — объединять ли спрайты в атласы для производительности? (Пока: индивидуальные файлы, проще для AI-цикла.)
-4. **Ходьба/покой анимация** — нужны ли покадровые спрайты для персонажа? (Пока: статичный спрайт + зеркалирование.)
+4. **Ходьба/покой анимация** — нужны ли покадровые спрайты для персонажа? (Пока: статичный спрайт + зеркалирование; замах оружия — фаза C плана R15.)
 
 ---
 
