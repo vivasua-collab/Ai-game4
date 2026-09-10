@@ -26,9 +26,6 @@ namespace CultivationGame.Modules.Combat
         /// </summary>
         public float EnemyTurnTimeoutSec = 2.5f;
 
-        /// <summary>Включить автоматический лут после боя</summary>
-        public bool AutoLootOnVictory = true;
-
         /// <summary>Множитель урона игрока (для баланса)</summary>
         public float PlayerDamageMultiplier = 1.0f;
 

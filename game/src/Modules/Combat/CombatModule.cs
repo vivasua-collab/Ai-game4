@@ -32,7 +32,6 @@ public class CombatModule : IModule
     [Inject] private readonly IDamageService _damageService = null!;
     [Inject] private readonly TechniqueService _techniqueService = null!;
     [Inject] private readonly TechniqueChargeService _techniqueChargeService = null!;
-    [Inject] private readonly CombatLootService _combatLootService = null!;
     [Inject] private readonly ITimeService _timeService = null!;
 
     // Phase 8 ч.3 (2026-09-03): гейт дальнего боя (LOS + расход стрел)
@@ -48,7 +47,9 @@ public class CombatModule : IModule
     [Inject] private readonly ISubscriber<CombatDisengageEvent> _combatDisengageSub = null!;
 
     // Подписка на события
-    [Inject] private readonly ISubscriber<EnemyKilledEvent> _enemyKilledSub = null!;
+    // R13-audit (P1-3): подписка на EnemyKilledEvent УДАЛЕНА — авто-грант
+    // 1–3 случайных предметов поверх трупа-контейнера = двойной лут
+    // (полный лут — только через CorpseService, DEATH_AND_LOOT §2).
     [Inject] private readonly ISubscriber<CombatEndedEvent> _combatEndedSub = null!;
     [Inject] private readonly ISubscriber<EquipmentChangedEvent> _equipmentChangedSub = null!;
     [Inject] private readonly ISubscriber<BuffAppliedEvent> _buffAppliedSub = null!;
@@ -60,7 +61,6 @@ public class CombatModule : IModule
     // IMPL-3: Config injected via DI (replaces obsolete SetConfig()).
     [Inject] private readonly CombatConfig _config = null!;
     private bool _isConfigured;
-    private IDisposable? _enemyKilledSubscription;
     private IDisposable? _combatEndedSubscription;
     private IDisposable? _equipmentChangedSubscription;
     private IDisposable? _buffAppliedSubscription;
@@ -84,7 +84,7 @@ public class CombatModule : IModule
         // NPC-атаки идут только через NPCModule.ProcessNpcAttacks (реальные ID).
 
         // === Подписка на кросс-модульные события ===
-        _enemyKilledSubscription = _enemyKilledSub.Subscribe(OnEnemyKilled);
+        // R13-audit (P1-3): OnEnemyKilled-подписка удалена (двойной лут).
         _combatEndedSubscription = _combatEndedSub.Subscribe(OnCombatEnded);
 
         _equipmentChangedSubscription = _equipmentChangedSub.Subscribe(OnEquipmentChanged);
@@ -124,20 +124,12 @@ public class CombatModule : IModule
     }
 
     /// <summary>
-    /// Обработчик EnemyKilledEvent — генерация лута.
-    /// EventBus handler signature: void OnXxx(in XxxEvent e).
-    /// </summary>
-    private void OnEnemyKilled(in EnemyKilledEvent e)
-    {
-        if (!_isConfigured || _config == null || !_config.AutoLootOnVictory) return;
-
-        var loot = _combatLootService.GenerateLoot(e.EnemyId, 1);
-        _combatLootService.GrantLoot(loot);
-    }
-
-    /// <summary>
     /// Обработчик CombatEndedEvent — сброс.
     /// Review этап 3 (P0-2): деактивация фантомного AI удалена вместе с ним.
+    /// R13-audit (P1-3): OnEnemyKilled (авто-грант случайного лута) УДАЛЁН —
+    /// при убийстве игроком CorpseService уже создаёт труп-контейнер со
+    /// ВСЕМ содержимым NPC (честный full loot); двойная выдача ломала
+    /// экономику (задвоение лута с одного убийства).
     /// </summary>
     private void OnCombatEnded(in CombatEndedEvent e)
     {
@@ -247,8 +239,7 @@ public class CombatModule : IModule
 
     public void Dispose()
     {
-        _enemyKilledSubscription?.Dispose();
-        _enemyKilledSubscription = null;
+        // R13-audit (P1-3): _enemyKilledSubscription удалён вместе с OnEnemyKilled.
         _combatEndedSubscription?.Dispose();
         _combatEndedSubscription = null;
         _equipmentChangedSubscription?.Dispose();

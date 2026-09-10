@@ -57,6 +57,20 @@ public partial class LootWindow : Control
     /// <summary>Окно открыто (modalOpen-гарды GameWorldController).</summary>
     public bool IsOpen => Visible;
 
+    /// <summary>
+    /// R13-audit (P1-1): ID трупа, открытого в окне (пустая строка — окно
+    /// закрыто). Авторитетная проверка GameWorldController.OnCorpseRemoved
+    /// — по этому полю, НЕ по имени Godot-узла (имя окна константа).
+    /// </summary>
+    public string CurrentCorpseId => _corpseId;
+
+    /// <summary>
+    /// R13-audit (P1-2): закрыто ЛЮБЫМ путём (Esc / кнопка «Уйти» /
+    /// CorpseRemovedEvent) — единая точка для авторитетного резюма тиков
+    /// в GameWorldController (паттерн TradeClosedEvent лавки).
+    /// </summary>
+    public event System.Action? Closed;
+
     // === Диагностика (internal: headless-QA GODOT_LOOT_DEBUG=1) ===
 
     /// <summary>Число строк содержимого трупа (QA).</summary>
@@ -279,7 +293,8 @@ public partial class LootWindow : Control
         }
 
         _corpseId = corpseId;
-        _panel.Name = $"LootPanel_{corpseId}";
+        // R13-audit (P1-1): идентификация открытого трупа — по CurrentCorpseId
+        // (имя панели-узла ни кем не читается и вводило в заблуждение).
         // Шапка: имя погибшего (QA: проверка DebugHeaderText) + уровень в скобках.
         _headerLabel.Text = corpse.NpcLevel > 0
             ? $"☠ Обыск: {corpse.DisplayName} (L{corpse.NpcLevel})"
@@ -290,13 +305,16 @@ public partial class LootWindow : Control
         GD.Print($"[LootWindow] Opened — обыск '{corpseId}'");
     }
 
-    /// <summary>Закрыть окно (Esc/кнопка «Уйти» — вызывает GameWorldController).</summary>
+    /// <summary>Закрыть окно (Esc/кнопка «Уйти»/CorpseRemovedEvent — резюм тиков в GameWorldController по Closed).</summary>
     public void Close()
     {
         if (!Visible) return;
         Visible = false;
         MouseFilter = MouseFilterEnum.Ignore;
         _corpseId = string.Empty;
+        // R13-audit (P1-2): уведомить контроллер — он авторитетно снимает паузу
+        // (если пауза ставилась ради обыска). Единая точка для всех путей.
+        Closed?.Invoke();
         GD.Print("[LootWindow] Closed");
     }
 

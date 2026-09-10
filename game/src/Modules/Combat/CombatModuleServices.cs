@@ -41,8 +41,8 @@ public static class CombatModuleServices
         // Review этап 3 (P0-2): CombatAIService удалён — фантомный "enemy"
         // (жёсткий ID без тела/Ци/статов) конкурировал с реальными NPC.
 
-        // Лут
-        builder.Register<CombatLootService>(Lifetime.Singleton);
+        // R13-audit (P1-3): CombatLootService удалён — двойной лут поверх
+        // труп-контейнера CorpseService (DEATH_AND_LOOT §2 — единственный путь).
 
         // Спринт 7 C7: CombatConsequencesService
         builder.Register<CombatConsequencesService>(Lifetime.Singleton);
@@ -65,7 +65,7 @@ public static class CombatModuleServices
             // Review этап 3 (P0-2): EnableAI/AITurnDelay удалены (мёртвый конфиг фантомного AI)
             MaxCombatDuration = 0f,
             EnemyTurnTimeoutSec = 2.5f,
-            AutoLootOnVictory = true,
+            // R13-audit (P1-3): AutoLootOnVictory удалён вместе с CombatLootService.
             PlayerDamageMultiplier = 1.0f,
             EnemyDamageMultiplier = 1.0f,
         };

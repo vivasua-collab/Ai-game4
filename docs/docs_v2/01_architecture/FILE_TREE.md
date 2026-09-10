@@ -249,11 +249,12 @@ CultivationGame.Modules/
 │   ├── LevelSuppression.cs           # Подавление по разнице уровней
 │   ├── DefenseProcessor.cs           # Уклонение, парирование, блок
 │   ├── TechniqueCapacity.cs          # Ёмкость техник
-│   ├── CombatLootService.cs          # Добыча после боя
 │   ├── TechniqueChargeService.cs     # Заряд техник
 │   └── TechniqueService.cs           # Управление техниками
 │   # (2026-09-08, review-3 P0-2: CombatAIService.cs + Data/AIPersonality.cs УДАЛЕНЫ —
 │   #  фантомный "enemy" без тела/Ци; NPC-атаки идут через NPCModule.ProcessNpcAttacks)
+│   # (2026-09-10, R13-аудит P1-3: CombatLootService.cs УДАЛЁН — двойной лут
+│   #  поверх труп-контейнера; лут после боя — только NPC/CorpseService)
 │
 ├── Formation/                        # ✅ Модуль формаций
 │   ├── FormationModule.cs            # IStartable, ITickable, IDisposable

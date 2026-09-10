@@ -58,7 +58,8 @@ public readonly struct EquipmentBlockedEvent
 
 /// <summary>
 /// Команда: запрос на добавление предмета в инвентарь.
-/// Публикуется модулями-потребителями (Tile/ResourceService, Combat/CombatLootService).
+/// Публикуется модулями-потребителями (Tile/ResourceService, NPC/CorpseService).
+/// R13-audit (P1-3): Combat/CombatLootService удалён из списка publishers.
 /// InventoryService подписывается и вызывает TryAddItem() внутренне.
 /// </summary>
 public readonly struct ItemAddRequestEvent

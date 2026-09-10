@@ -884,7 +884,10 @@ public partial class GameWorldController : Node2D
         // R13 FULL-LOOT: окно обыска трупа. Открывается по E рядом с трупом
         // (HandleCorpseSearchOrNpcTalk ниже), закрывается Esc/кнопкой «Уйти»/
         // CorpseRemovedEvent. Пауза тиков — при открытии (обыск = планирование).
+        // R13-audit (P1-1/P1-2): Closed-событие — единая авторитетная точка
+        // резюма тиков (все пути закрытия проходят через Close()).
         _lootWindow = new UI.LootWindow { Name = "LootWindow" };
+        _lootWindow.Closed += OnLootWindowClosed;
         _hudCanvas.AddChild(_lootWindow);
 
         // Hotbar (2026-08-22): 9 quick slots bottom-center; belt slots 3-9
@@ -1130,7 +1133,12 @@ public partial class GameWorldController : Node2D
 
         // 2026-08-28: T — Книга Техник (модальное окно с паузой, как инвентарь:
         // планирование арсенала — Old School). X — следующая техника, Z — каст.
-        if (PlayerInput is { IsTechniquesPressed: true } && _techniqueBook != null && Time != null)
+        // R13-audit (P2-2): при открытом окне обыска T/F1/J/Q/B/C ЗАПРЕЩЕНЫ —
+        // они перезаписывали бы общий флаг паузы _wasPausedBeforeInventory
+        // (пауза «залипала» после закрытия окон). Обыск — полная модальность
+        // (как E); сначала закрыть окно обыска (Esc/«Уйти»).
+        if (PlayerInput is { IsTechniquesPressed: true } && _techniqueBook != null && Time != null
+            && _lootWindow is not { IsOpen: true })
         {
             _techniqueBook.Toggle();
             if (_techniqueBook.Visible)
@@ -1421,7 +1429,9 @@ public partial class GameWorldController : Node2D
 #endif
 
         // 2026-08-28: F1 — окно-справка горячих клавиш (с паузой — чтение).
-        if (PlayerInput.IsHelpHotkeysPressed && _hotkeysWindow != null && Time != null)
+        // R13-audit (P2-2): гвард модальности обыска (см. комментарий у T).
+        if (PlayerInput.IsHelpHotkeysPressed && _hotkeysWindow != null && Time != null
+            && _lootWindow is not { IsOpen: true })
         {
             _hotkeysWindow.Toggle();
             if (_hotkeysWindow.Visible)
@@ -1436,7 +1446,9 @@ public partial class GameWorldController : Node2D
         }
 
         // 2026-09-04 S1: J — Журнал событий (модальное окно, пауза как F1).
-        if (PlayerInput.IsJournalPressed && _eventLogWindow != null && Time != null)
+        // R13-audit (P2-2): гвард модальности обыска (см. комментарий у T).
+        if (PlayerInput.IsJournalPressed && _eventLogWindow != null && Time != null
+            && _lootWindow is not { IsOpen: true })
         {
             _eventLogWindow.Toggle();
             if (_eventLogWindow.Visible)
@@ -1451,7 +1463,9 @@ public partial class GameWorldController : Node2D
         }
 
         // 2026-09-04 S1: Q — Журнал заданий (модальное окно, пауза как F1).
-        if (PlayerInput.IsQuestLogPressed && _questWindow != null && Time != null)
+        // R13-audit (P2-2): гвард модальности обыска (см. комментарий у T).
+        if (PlayerInput.IsQuestLogPressed && _questWindow != null && Time != null
+            && _lootWindow is not { IsOpen: true })
         {
             _questWindow.Toggle();
             if (_questWindow.Visible)
@@ -1504,12 +1518,11 @@ public partial class GameWorldController : Node2D
         {
             _tradeWindow.Close();
         }
-        // R13 FULL-LOOT: Esc при открытом окне обыска → закрыть + резюм тиков.
+        // R13 FULL-LOOT: Esc при открытом окне обыска → закрыть (резюм тиков —
+        // в OnLootWindowClosed по Closed-событию, единая точка для всех путей).
         else if (PlayerInput.IsPausePressed && _lootWindow is { IsOpen: true })
         {
             _lootWindow.Close();
-            if (!_wasPausedBeforeInventory && Time is { IsPaused: true })
-                Time.Resume();
         }
         // Esc while a dialogue is open → close it and resume ticks (Phase 2).
         else if (PlayerInput.IsPausePressed && _dialogueWindow is { IsOpen: true })
@@ -1543,7 +1556,10 @@ public partial class GameWorldController : Node2D
             }
         }
 
-        if (PlayerInput.IsInventoryPressed)
+        // R13-audit (P2-2): гвард модальности обыска (см. комментарий у T) —
+        // B при открытом LootWindow съедается: иначе общий флаг паузы
+        // перезаписывается и мир остаётся заморожен после закрытия окон.
+        if (PlayerInput.IsInventoryPressed && _lootWindow is not { IsOpen: true })
         {
             _inventoryWindow?.Toggle();
             // Pause game time when inventory opens, resume when closes.
@@ -1573,7 +1589,8 @@ public partial class GameWorldController : Node2D
         }
 
         // C key: toggle Character Sheet (body status + stats).
-        if (PlayerInput.IsCharacterSheetPressed)
+        // R13-audit (P2-2): гвард модальности обыска (см. комментарий у T).
+        if (PlayerInput.IsCharacterSheetPressed && _lootWindow is not { IsOpen: true })
         {
             _characterSheetWindow?.Toggle();
             // Pause game when character sheet opens (same as inventory).
@@ -1983,20 +2000,32 @@ public partial class GameWorldController : Node2D
 
     /// <summary>
     /// R13 FULL-LOOT: труп удалён (обыскан дочиста / TTL / вручную) → если
-    /// окно обыска открыто именно для этого трупа — закрыть и резюмить тики.
-    /// Авторитетная точка закрытия (как TradeClosedEvent для лавки): окно
-    /// может опустеть из ЛЮБОГО пути — кнопка «Забрать всё», последний
-    /// ЛКМ-взятый предмет, TTL в другом кадре.
+    /// окно обыска открыто именно для этого трупа — закрыть (резюм тиков —
+    /// в OnLootWindowClosed). Авторитетная точка закрытия (как TradeClosedEvent
+    /// для лавки): окно может опустеть из ЛЮБОГО пути — кнопка «Забрать всё»,
+    /// последний ЛКМ-взятый предмет, TTL в другом кадре.
+    /// R13-audit (P1-1): сравнение — по CurrentCorpseId (имя узла-окна всегда
+    /// "LootWindow" — старая проверка по Name НЕ срабатывала никогда).
     /// </summary>
     private void OnCorpseRemoved(in Core.Messaging.Contracts.CorpseRemovedEvent e)
     {
         if (_lootWindow is not { IsOpen: true }) return;
-        if (_lootWindow.Name != $"LootPanel_{e.CorpseId}") return;
+        if (_lootWindow.CurrentCorpseId != e.CorpseId) return;
 
         _lootWindow.Close();
+        GD.Print($"[GameWorld] Corpse removed ({e.Reason}) — loot window closed, ticks resumed");
+    }
+
+    /// <summary>
+    /// R13-audit (P1-2): LootWindow закрыт ЛЮБЫМ путём (Esc / кнопка «Уйти» /
+    /// CorpseRemovedEvent — все проходят через Close()) → авторитетно снять
+    /// паузу тиков, если она ставилась ради обыска (E-flow ставит паузу только
+    /// при незапаузенной игре — тем же флагом, что и инвентарь).
+    /// </summary>
+    private void OnLootWindowClosed()
+    {
         if (!_wasPausedBeforeInventory && Time is { IsPaused: true })
             Time.Resume();
-        GD.Print($"[GameWorld] Corpse removed ({e.Reason}) — loot window closed, ticks resumed");
     }
 
     // === R15: оружие в руке игрока (WeaponVisualCatalog) ===

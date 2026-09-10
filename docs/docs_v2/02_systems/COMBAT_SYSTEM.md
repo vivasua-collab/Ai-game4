@@ -556,10 +556,13 @@ DamageResult:
 - `DamageService` — расчёт урона, криты, проки эффектов.
 - `ElementalEffectService` — шанс наложения стихийных эффектов (burn, slow, stun, chain...).
 - `CombatConsequencesService` — кровотечение, оглушение, шок (слой 10).
-- `CombatLootService` — генерация лута с убитого NPC (см. [DEATH_AND_LOOT.md §2](../04_entities/DEATH_AND_LOOT.md)).
 
 > 2026-09-08 (review-3): CombatAIService удалён из списка — сервис УДАЛЁН
 > (фантомный "enemy"); решения NPC принимаются в NPCModule (реальные сущности).
+>
+> 2026-09-10 (R13-аудит P1-3): CombatLootService удалён из списка — сервис УДАЛЁН
+> (авто-грант случайных предметов поверх труп-контейнера = двойной лут).
+> Лут после боя — только CorpseService (NPC-модуль, DEATH_AND_LOOT §2).
 
 > См. также [DI_AND_EVENTBUS.md §1](../01_architecture/DI_AND_EVENTBUS.md) — общие принципы DI.
 

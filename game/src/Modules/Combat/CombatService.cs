@@ -22,7 +22,10 @@
 // Редактировано: 2026-05-22 13:55:00 UTC — Этап 3.5: P2-4.1 FIX: IsPlayerTarget + P2-7.3 FIX: AttackSubtype в DamageRequest
 // Реализация ICombatService — управление ходом боя.
 // Заменяет legacy CombatManager.cs (925 LOC) — God Object разделён.
-// CombatManager → CombatService + DamageService + CombatAIService + TechniqueService + CombatLootService.
+// CombatManager → CombatService + DamageService + CombatAIService + TechniqueService.
+// R13-audit (P1-3): CombatLootService исключён из модуля — лут после боя
+// выдаёт CorpseService (труп-контейнер, DEATH_AND_LOOT §2), случайный дроп
+// поверх трупа был двойным лутом.
 using System;
 using CultivationGame.Core;
 using CultivationGame.Core.Helpers;

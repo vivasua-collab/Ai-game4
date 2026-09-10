@@ -859,3 +859,58 @@ Stage Summary:
   последняя внедрённая фича; P0-кандидаты следующей сессии — живой QA
   на ПК, авто-замедление времени в бою (§1.2), PNG-ассеты, броня-слои.
 - Агент ожидает указаний пользователя.
+
+---
+Task ID: R13-AUDIT-0910
+Agent: main-agent (Z.ai Code, сессия 2026-09-10 №6, 17:00–18:30 UTC)
+Task: Аудит R13 (full-loot: спаун-генерация, трупы-контейнеры, обыск E) по
+заданию пользователя «аудит задач r13–r16 по очереди, исправить найденные
+ошибки». Сессия была прервана на середине P1-3 — восстановлена по незаком-
+миченному диффу (P1-1/P1-2/P2-2 уже применены, P1-3 применён наполовину,
+дерево не компилировалось — мёртвые ссылки в CombatModule.Dispose).
+
+Work Log:
+- Прочитаны чекпоинты за 09-10: 09_10_r13_verification.md, 09_10_r14_population_rule.md,
+  09_10_r15_weapon_visuals.md, 09_10_r16_combat_ai.md; сверка claims ↔ код.
+- НАЙДЕНО (P1-1): OnCorpseRemoved сравнивал _lootWindow.Name с
+  "LootPanel_{corpseId}", но имя окна — константа "LootWindow" → проверка НЕ
+  срабатывала НИКОГДА: TTL/полный обыск не закрывали окно. ФИКС: LootWindow.
+  CurrentCorpseId (реальный _corpseId), присвоение _panel.Name удалено.
+- НАЙДЕНО (P1-2): резюм тиков дублировался в трёх путях закрытия (Esc /
+  CorpseRemoved / кнопка «Уйти») — рассинхрон при рефакторинге = «залипшая»
+  пауза. ФИКС: event LootWindow.Closed → единая точка OnLootWindowClosed в
+  GWC (паттерн TradeClosedEvent); Esc-ветка упрощена.
+- НАЙДЕНО (P1-3): чекпоинт r13_verification заявлял «старая схема
+  CombatLootService → случайный дроп удалена», но удалена она была ТОЛЬКО в
+  docs (DEATH_AND_LOOT); в коде CombatModule.OnEnemyKilled по-прежнему
+  выдавал 1–3 случайных предмета ПОВЕРХ труп-контейнера CorpseService =
+  ДВОЙНОЙ ЛУТ с одного убийства. ФИКС (завершён в этой сессии): удалены
+  OnEnemyKilled + подписка EnemyKilledEvent + CombatLootService (файл, DI-
+  регистрация, конфиг-флаг AutoLootOnVictory) — лут только через трупы
+  (DEATH_AND_LOOT §2). EnemyKilledEvent жив (публикатор CombatService,
+  читатели EventLogWindow/QuestProgressTracker).
+- НАЙДЕНО (P2-2): при открытом LootWindow клавиши T/F1/J/Q/B/C открывали
+  свои окна и ПЕРЕЗАПИСЫВАЛИ общий флаг паузы _wasPausedBeforeInventory →
+  «залипшая» пауза после закрытия. ФИКС: гварды модальности обыска
+  (LootWindow — полная модальность, как диалоги по E).
+- Комментарии-синхронизация: CorpseService (истор. ссылка на таблицу 4.1),
+  CombatService (шапка архитектуры), InventoryContracts (publishers
+  ItemAddRequestEvent).
+- docs_v2 sync: MODULE_STRUCTURE §2.4 (список сервисов −CombatLootService,
+  подписки −EnemyKilled, note R13-аудита), FILE_TREE (строка удалена +
+  note по прецеденту CombatAIService), COMBAT_SYSTEM §7 (список −строка +
+  note).
+- QA: dotnet build 0 errors; реимпорт ресурсов Godot (свежий клон —
+  .godot/imported отсутствовал); регрессии VERDICT: PASS — LOOT (full-loot/
+  TTL/R14-часть), COMBAT_SIM, KILLFEED, QUEST, SAVELOAD. Исключений в
+  логах нет.
+
+Stage Summary:
+- R13-аудит закрыт: 3 бага P1 (окно не закрывалось при удалении трупа;
+  рассинхрон резюма тиков; двойной лут) + 1 P2 (залипание паузы) исправлены.
+- Ключевой вывод аудита: чекпоинт-verification R13 синхронизировал доки, но
+  код при этом не тронул — «удалено» в чекпоинте относилось к документации.
+  Аудит «по чекпоинтам» обязан сверять claims с кодом — что и сделано.
+- CombatLootService (последний legacy-осколок лут-пайплайна Unity-эпохи)
+  удалён полностью: файл, DI, конфиг, доки.
+- Далее: аудит R14 → R15 → R16 (по очереди, субагентами flash-класса).

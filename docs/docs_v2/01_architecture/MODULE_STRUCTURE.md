@@ -151,7 +151,7 @@ Modules/Xxx/
 | Контракты | `CombatContracts` — CombatStarted/Ended, DamageApplied, TechniqueUsed, EnemyKilled, AttackIntent, AttackRejected, DefenseIntent (R16), CombatDisengage (R16) |
 | Tick | Да |
 | Зависимости Core | IQiService, IQiBufferService, IEquipmentService, IInventoryService |
-| Подписки на события | EnemyKilled, CombatEnded, EquipmentChanged, BuffApplied, BuffRemoved, AttackIntent, DefenseIntent (R16), CombatDisengage (R16) |
+| Подписки на события | CombatEnded, EquipmentChanged, BuffApplied, BuffRemoved, AttackIntent, DefenseIntent (R16), CombatDisengage (R16) — R13-аудит: подписка EnemyKilled удалена (двойной лут) |
 
 **Ключевые методы:**
 - ICombatService: `IsInCombat`, `CurrentStage`, `CurrentTargetId`, `StartCombat`, `EndCombat`, `ExecuteAttack`, `ExecuteDefense`, `CurrentPlayerDefense` (R16), `AbandonCombat` (R16)
@@ -164,7 +164,6 @@ Modules/Xxx/
 - LevelSuppression — подавление по разнице уровней
 - DefenseProcessor — обработка уклонения, парирования, блокирования
 - TechniqueCapacity — расчёт ёмкости техник
-- CombatLootService — добыча после боя
 - TechniqueChargeService — заряд техник
 - TechniqueService — управление техниками
 - NPCDefenseSelector (R16) — выбор активной защиты NPC-защитника (щит→Block, силовик→Parry, прочие→Dodge; pure-функция, детерминизм без RNG) — вызывается CombatService для каждой атаки по NPC
@@ -179,6 +178,12 @@ Modules/Xxx/
 > из боя (бегство/leash через CombatDisengageEvent из NPC-модуля); ExecuteDefense
 > запоминает стойку игрока и ВНЕ боя (клавиша G, DefenseIntentEvent); для
 > NPC-защитника слой активной защиты наполняется NPCDefenseSelector-ом.
+>
+> R13-аудит (2026-09-10, P1-3): CombatLootService УДАЛЁН — его авто-грант
+> 1–3 случайных предметов поверх труп-контейнера CorpseService выдавал
+> ДВОЙНОЙ лут с одного убийства. Лут после боя — только CorpseService
+> (DEATH_AND_LOOT §2); подписка CombatModule на EnemyKilledEvent удалена
+> (самивент жив: публикует CombatService, читают EventLogWindow/Quest).
 
 **Особенности:**
 - Полная реализация 11-слойного пайплайна урона (см. `09_workflow/ALGORITHMS.md` §5).
