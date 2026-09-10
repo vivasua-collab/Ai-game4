@@ -41,14 +41,21 @@ public class NPCModule : IModule
 
     [Inject] private readonly ISubscriber<YearChangedEvent> _yearChangedSub = null!;
     [Inject] private readonly IPublisher<AttackIntentEvent> _attackIntentPub = null!;
-    [Inject] private readonly ISubscriber<NPCDeathEvent> _npcDeathSub = null!;
-    private IDisposable? _npcDeathSubscription;
-    [Inject] private readonly IEquipmentGenerator _equipmentGenerator = null!;
-    [Inject] private readonly IGroundItemService _groundItems = null!;
     [Inject] private readonly ITimeService _timeService = null!;
     private IDisposable? _yearChangedSubscription;
 
     [Inject] private readonly IPublisher<NPCDeathEvent> _npcDeathPub = null!;
+
+    // R13 FULL-LOOT (2026-09-10): трупы-контейнеры лута. CorpseService
+    // подписан на NPCDeathEvent сам (Initialize ниже) — снапшот экипировки/
+    // инвентаря/камней в CorpseData на месте смерти. Замена Этапа 3: раньше
+    // OnNPCDeathForLoot ронял 1-2 СЛУЧАЙНЫХ предмета (нечестно — реальный
+    // инвентарь NPC исчезал); теперь полный лут лежит в трупе до обыска (E).
+    [Inject] private readonly CorpseService _corpseService = null!;
+
+    // R13 «NPC спаун через генерацию»: ReinforcementTick поддерживает
+    // население — если игрок выбивает NPC (full-loot цикл), мир восполняется.
+    [Inject] private readonly NPCSpawnCompositionService _spawnComposition = null!;
 
     // IMPL-3: Config injected via DI (replaces obsolete SetConfig()).
     [Inject] private readonly NPCConfig _config = null!;
@@ -85,7 +92,8 @@ public class NPCModule : IModule
 
         _aiStateChangedSubscription = _aiStateChangedSub.Subscribe(OnAIStateChanged);
         _yearChangedSubscription = _yearChangedSub.Subscribe(OnYearChanged);
-        _npcDeathSubscription = _npcDeathSub.Subscribe(OnNPCDeathForLoot);
+        // R13: подписка CorpseService на NPCDeathEvent (трупы-контейнеры).
+        _corpseService?.Initialize();
         // M2: позиция игрока → кэш (дистанция атаки NPC→игрок).
         _playerPosSubscription = _playerPosSub.Subscribe(OnPlayerPositionChanged);
     }
@@ -109,7 +117,18 @@ public class NPCModule : IModule
         _movementService.ProcessMovement();
         _visualService.UpdateVisualPositions();
         ProcessNpcAttacks();
+
+        // R13 «NPC спаун через генерацию»: поддержание населения — мир
+        // восполняет потери (полный full-loot цикл: убил → обыскал → новый
+        // сгенерированный NPC со временем приходит на замену).
+        _spawnComposition?.ReinforcementTick();
+
+        // R13: TTL-очистка трупов (старые тела исчезают через 1 игровой день).
+        _corpseService?.RemoveOldCorpses(CorpseTtlGameSeconds);
     }
+
+    /// <summary>Время жизни трупа (игровые секунды) до естественного исчезновения.</summary>
+    private const float CorpseTtlGameSeconds = 1440f; // 1 игровой день (тик = 1 мин → 1440 тиков)
 
     private void ProcessNpcAttacks()
     {
@@ -169,9 +188,8 @@ public class NPCModule : IModule
         _spawnerService?.Dispose();
         _qiRegenService?.Dispose();
         _visualService?.Dispose();
+        _corpseService?.Dispose();
 
-        _npcDeathSubscription?.Dispose();
-        _npcDeathSubscription = null;
         _aiStateChangedSubscription?.Dispose();
         _aiStateChangedSubscription = null;
         _yearChangedSubscription?.Dispose();
@@ -183,32 +201,12 @@ public class NPCModule : IModule
     /// <summary>
     /// Этап 3 (2026-08-22): смерть NPC → лут из EquipmentGenerator падает
     /// на землю у места смерти (1-2 предмета, подбор — E).
+    /// ЗАМЕНЕНО (R13, 2026-09-10): CorpseService создаёт на месте смерти
+    /// труп-контейнер с ПОЛНЫМ содержимым NPC (экипировка + инвентарь +
+    /// духовные камни) — обыск через E (LootWindow), full loot — кнопкой
+    /// «Забрать всё». Честная полнота лута вместо случайных 1-2 предметов.
+    /// Метод удалён; событие NPCDeathEvent обрабатывает CorpseService.
     /// </summary>
-    private void OnNPCDeathForLoot(in NPCDeathEvent e)
-    {
-        if (_equipmentGenerator == null || _groundItems == null) return;
-
-        var state = _npcServiceImpl.GetNPCState(e.NpcId);
-        float px = (state?.Position.X ?? 25) * GameConstants.TILE_PIXELS + GameConstants.TILE_PIXELS / 2f;
-        float py = (state?.Position.Y ?? 25) * GameConstants.TILE_PIXELS + GameConstants.TILE_PIXELS / 2f;
-
-        int level = 1 + (int)(state?.SubLevel ?? 0);
-        try
-        {
-            int drops = (e.NpcId.GetHashCode() & 1) == 0 ? 1 : 2;
-            for (int i = 0; i < drops; i++)
-            {
-                var item = _equipmentGenerator.GenerateRandom(
-                    System.Math.Clamp(level + i, 1, 9), seed: e.NpcId.GetHashCode() + i);
-                _groundItems.DropItem(item.ItemId, 1, px + i * 20f - 10f, py + i * 12f - 6f);
-            }
-            Console.WriteLine($"[NPCLoot] {e.NpcId} dropped {drops} item(s) at ({px:F0},{py:F0})");
-        }
-        catch (System.Exception ex)
-        {
-            Console.WriteLine($"[NPCLoot] failed for {e.NpcId}: {ex.Message}");
-        }
-    }
 
     /// <summary>
     /// NPC-E01 FIX: Обработка смены AI-состояния.

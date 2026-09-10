@@ -50,6 +50,10 @@ public partial class SceneBuilder : Node
         SetupGroundItems();
         // Phase C: wandering animals (wolf/deer/rabbit) — drawn as coloured circles.
         SetupAnimals();
+        // R13 FULL-LOOT: трупы NPC (маркеры-саваны + лут-бейдж). Добавляются
+        // ДО NPC-рендерера: одинаковый ZIndex (Objects=3) — кто раньше в
+        // дереве, тот рисуется ниже → трупы под живыми NPC.
+        SetupCorpses();
         // NPC_COMBAT_PREP Phase 1: human NPCs — coloured circles per role.
         SetupNPCs();
         // Qi Stage 6: formation visual renderer (contour + runes + progress arc).
@@ -169,6 +173,19 @@ public partial class SceneBuilder : Node
     {
         _animalRenderer = new AnimalSpriteRenderer();
         _worldRoot.AddChild(_animalRenderer);
+    }
+
+    /// <summary>
+    /// R13 FULL-LOOT: трупы NPC. Renderer queries ICorpseService each frame
+    /// and draws shroud markers with loot badge. Corpses created by
+    /// CorpseService on NPCDeathEvent; обычск — E (LootWindow).
+    /// </summary>
+    private CorpseSpriteRenderer? _corpseRenderer;
+
+    private void SetupCorpses()
+    {
+        _corpseRenderer = new CorpseSpriteRenderer();
+        _worldRoot.AddChild(_corpseRenderer);
     }
 
     /// <summary>

@@ -41,12 +41,15 @@ public partial class EventLogWindow : Control
     // 2026-09-04 S3: kill-feed физического боя (NPCCombatAdapter → NPCDeathEvent);
     // EnemyKilledEvent покрывает только stage-бой (CombatService поединки).
     [Inject] private readonly ISubscriber<NPCDeathEvent> _npcDeathSub = null!;
+    // R13 FULL-LOOT (2026-09-10): трупы — появление и обыск.
+    [Inject] private readonly ISubscriber<CorpseCreatedEvent> _corpseCreatedSub = null!;
+    [Inject] private readonly ISubscriber<CorpseLootedEvent> _corpseLootedSub = null!;
 
     private readonly List<(string Time, string Text, Godot.Color Colour)> _entries = new();
     private VBoxContainer? _list;
     private ScrollContainer? _scroll;
     private Label? _countLabel;
-    private System.IDisposable? _t1, _t2, _t3, _t4, _t5, _t6, _t7, _t8;
+    private System.IDisposable? _t1, _t2, _t3, _t4, _t5, _t6, _t7, _t8, _t9, _t10;
 
     /// <summary>2026-09-04 S3: QA-доступ (GODOT_KILLFEED_DEBUG) — последний лог.</summary>
     public string? LastEntryText => _entries is { Count: > 0 } ? _entries[^1].Text : null;
@@ -69,6 +72,9 @@ public partial class EventLogWindow : Control
         _t7 = _levelSub?.Subscribe(OnLevelChanged);
         // 2026-09-04 S3: kill-feed физического боя.
         _t8 = _npcDeathSub?.Subscribe(OnNpcDeathFeed);
+        // R13 FULL-LOOT: трупы — «можно обыскать» и «обыскано».
+        _t9 = _corpseCreatedSub?.Subscribe(OnCorpseCreated);
+        _t10 = _corpseLootedSub?.Subscribe(OnCorpseLooted);
 
         GD.Print("[EventLogWindow] Ready");
     }
@@ -77,6 +83,7 @@ public partial class EventLogWindow : Control
     {
         _t1?.Dispose(); _t2?.Dispose(); _t3?.Dispose(); _t4?.Dispose();
         _t5?.Dispose(); _t6?.Dispose(); _t7?.Dispose(); _t8?.Dispose();
+        _t9?.Dispose(); _t10?.Dispose();
     }
 
     public void Toggle()
@@ -151,6 +158,28 @@ public partial class EventLogWindow : Control
     }
 
     private (string Name, System.DateTime At)? _lastKillLog;
+
+    // === R13 FULL-LOOT: трупы (2026-09-10) ===
+
+    /// <summary>Труп появился — подсказка игроку: лут доступен (E).</summary>
+    private void OnCorpseCreated(in CorpseCreatedEvent e)
+    {
+        // Дедуп против kill-feed «повержен»: тот же NPC < 2с — уже залогирован,
+        // но подсказку «N записей — обыск (E)» всё равно полезна: информативность.
+        Add($"☠ {e.DisplayName}: можно обыскать ({e.ItemCount} поз., E)",
+            new Godot.Color(0.6f, 0.55f, 0.4f));
+    }
+
+    /// <summary>Труп обыскан — итог взятия.</summary>
+    private void OnCorpseLooted(in CorpseLootedEvent e)
+    {
+        var corpse = _corpsesForLog?.GetCorpse(e.CorpseId);
+        if (e.TakenEntries <= 0) return;
+        Add($"☠ Обыскано: {corpse?.DisplayName ?? e.CorpseId} — {e.TakenEntries} поз. взято",
+            new Godot.Color(0.75f, 0.7f, 0.45f));
+    }
+
+    [Inject] private readonly ICorpseService? _corpsesForLog = null;
 
     private void OnHarvest(in ResourceHarvestedEvent e)
     {

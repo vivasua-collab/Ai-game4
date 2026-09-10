@@ -3,6 +3,11 @@
 // Phase 6 — spawns 4 human NPCs (Merchant / Cultivator / Guard / Passerby)
 // through the full NPCAssemblyService pipeline via NPCSpawnerService.
 // Источник: docs/docs_v2/09_workflow/NPC_COMBAT_PREP.md §Phase 1
+// РЕДАКТИРОВАНО (R13, 2026-09-10): состав населения — ГЕНЕРАЦИЯ вместо
+// хардкод-массива. NPCSpawnCompositionService.GenerateStartup(loc) выводит
+// роли/уровни из типа локации + DangerLevel + сида (детерминированно);
+// поддержание популяции (респаун при выбивании) — ReinforcementTick из
+// NPCModule.Tick.
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,10 +19,12 @@ using CultivationGame.Modules.NPC;
 namespace CultivationGame.Entry.Phases;
 
 /// <summary>
-/// Phase 6 — spawns human NPCs at deterministic walkable positions on the
+/// Phase 7 — spawns human NPCs at deterministic walkable positions on the
 /// active location. Delegates to <see cref="INPCSpawnerService.SpawnNPC"/>
 /// (full assembly pipeline: soul → body → qi → equipment → personality).
 /// Seeds derive from the location seed so spawns are deterministic.
+/// R13: состав (роли/уровни/число) генерируется NPCSpawnCompositionService
+/// по типу локации и уровню опасности — вместо фиксированного массива.
 /// </summary>
 public sealed class HumanNPCSpawnPhase : AbstractSceneAssemblyPhase
 {
@@ -29,61 +36,54 @@ public sealed class HumanNPCSpawnPhase : AbstractSceneAssemblyPhase
     [Inject] private readonly ITileService _tiles = null!;
     [Inject] private readonly IGameSession _session = null!;
     [Inject] private readonly CultivationGame.Modules.Interaction.DialogueService _dialogues = null!;
+    // R13: генератор состава населения («NPC спаун через генерацию»).
+    [Inject] private readonly NPCSpawnCompositionService _composition = null!;
 
     // Prime offset — independent RNG stream from animals (7919) and terrain.
     private const int NpcSeedOffset = 104729;
     private const int MaxSpawnAttempts = 200;
     private const int MinDistanceFromPlayer = 5;
 
-    // Этап 5 (2026-08-22): играбельный состав малой локации —
-    // враги, союзник, нейтралы, торговец. Диспозиции назначает
-    // NPCSpawnerService.RoleToDisposition (Hostile/Friendly/Neutral/Merchant).
-    // Review этап 7 (P0-1): +Elder — старейшина (квест «Совет старейшины»
-    // и диалог «Мне нужны задания» связывают нарратив с контрактами).
-    private static readonly (NPCRole Role, int Level)[] SpawnRoles =
-    {
-        (NPCRole.Enemy,    1),  // бандит #1 — Hostile
-        (NPCRole.Enemy,    2),  // бандит #2 — Hostile
-        (NPCRole.Guard,    2),  // страж — Friendly (вступается за игрока)
-        (NPCRole.Passerby, 0),  // нейтрал #1
-        (NPCRole.Passerby, 1),  // нейтрал #2
-        (NPCRole.Merchant, 1),  // торговец (E → диалог, стоит на месте)
-        (NPCRole.Elder,    2),  // Review этап 7: старейшина (E → dialogue_elder, квесты)
-    };
-
     public override Task ExecuteAsync()
     {
         var locId = _session.Data?.WorldId ?? LocationCatalog.TestPolygon.Id;
         var loc = LocationCatalog.Find(locId) ?? LocationCatalog.TestPolygon;
 
+        // R13: Reset (re-assembly safety) + генерация состава населения.
+        // ДЕТЕРМИНИЗМ: один сид локации → один состав (QA-воспроизводимость).
+        _composition?.Reset();
+        var requests = _composition?.GenerateStartup(loc)
+            ?? new System.Collections.Generic.List<SpawnRequest>();
+
         var rng = new SeededRandom(loc.Seed + NpcSeedOffset);
         int spawned = 0;
 
-        foreach (var (role, level) in SpawnRoles)
+        foreach (var request in requests)
         {
             var pos = FindWalkablePosition(rng, loc.Width, loc.Height);
             if (pos is null)
             {
-                Console.WriteLine($"[HumanNPCSpawn] No walkable tile for {role} — skipped");
+                Console.WriteLine($"[HumanNPCSpawn] No walkable tile for {request.Role} — skipped");
                 continue;
             }
 
-            long seed = loc.Seed + NpcSeedOffset + (long)role + spawned;
-            string npcId = _spawner.SpawnNPC("human", role, level, pos.Value, seed);
+            long seed = loc.Seed + NpcSeedOffset + (long)request.Role * 31 + spawned;
+            string npcId = _spawner.SpawnNPC(request.SpeciesId, request.Role, request.Level, pos.Value, seed);
             if (!string.IsNullOrEmpty(npcId))
             {
                 spawned++;
                 // Phase 2: bind a role dialogue so E-key interaction opens chat.
                 // Enemy (бандиты) — без диалога: только бой.
-                string? dialogueId = DialogueIdForRole(role);
+                string? dialogueId = DialogueIdForRole(request.Role);
                 if (dialogueId != null)
                     _dialogues?.MapNpcDialogue(npcId, dialogueId);
-                Console.WriteLine($"[HumanNPCSpawn] Spawned {role} #{npcId} at ({pos.Value.X}, {pos.Value.Y})");
+                Console.WriteLine($"[HumanNPCSpawn] Spawned {request.Role} L{request.Level} " +
+                          $"#{npcId} at ({pos.Value.X}, {pos.Value.Y})");
             }
         }
 
         Console.WriteLine(
-            $"[Phase {PhaseOrder}] {PhaseName} complete — {spawned}/{SpawnRoles.Length} NPCs on '{loc.Id}'");
+            $"[Phase {PhaseOrder}] {PhaseName} complete — {spawned}/{requests.Count} generated NPCs on '{loc.Id}'");
         return Task.CompletedTask;
     }
 

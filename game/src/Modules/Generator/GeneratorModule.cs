@@ -37,6 +37,10 @@ public class GeneratorModule : IModule
             Console.WriteLine("[GeneratorModule] IItemDatabaseService не является ItemDatabaseService — Initialize() пропущен");
         }
 
+        // R13 FULL-LOOT (2026-09-10): классические предметы лута (материалы +
+        // духовные камни) — фиксы «фантомных» ID из инвентаря NPC/лут-сервисов.
+        ClassicLootSeeder.Seed(_itemDatabase);
+
         Console.WriteLine($"[GeneratorModule] Модуль запущен. Зарегистрировано предметов: {_itemDatabase.Count}");
 
         // Debug mode: GODOT_GEN_DEBUG=1 generates sample items + techniques, prints to log.

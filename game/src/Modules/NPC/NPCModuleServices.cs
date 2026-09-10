@@ -2,6 +2,8 @@
 // Создано: 2026-05-10 — Phase 17B: делегат регистрации модуля
 // Migrated from Ai-game3 (Unity+VContainer+MessagePipe) to Ai-game4 (Godot+DI+EventBus) 2026-08-15.
 // Редактировано: 2026-08-22 — Phase C: регистрация AnimalService (простые животные).
+// Редактировано: 2026-09-10 — R13 FULL-LOOT: регистрация CorpseService
+//   (трупы-контейнеры лута) и NPCSpawnCompositionService (генерация состава).
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Modules.Inventory;
@@ -59,6 +61,19 @@ public static class NPCModuleServices
         // _groupService.Tick(tickCount) после _aiService.Tick(). NPCMovementService
         // читает CurrentGroupTarget как overlay над индивидуальным AI.
         builder.Register<INPCGroupService, NPCGroupService>(Lifetime.Singleton);
+
+        // === R13 FULL-LOOT (2026-09-10): трупы NPC — контейнеры лута ===
+        // CorpseService подписан на NPCDeathEvent (Initialize из NPCModule.Start):
+        // снапшот экипировки/инвентаря/камней в CorpseData на месте смерти.
+        // Обыск — SlotId-адресно (TryTakeItem) или «забрать всё» (LootAll);
+        // выдача — ItemAddRequestEvent (EVT-02 command-паттерн).
+        builder.Register<ICorpseService, CorpseService>(Lifetime.Singleton);
+
+        // === R13 «NPC спаун через генерацию» (2026-09-10) ===
+        // NPCSpawnCompositionService — процедурный состав населения локации
+        // (тип локации + DangerLevel + сид) вместо хардкод-массива ролей;
+        // ReinforcementTick поддерживает популяцию (мир восполняется).
+        builder.Register<NPCSpawnCompositionService>(Lifetime.Singleton);
 
         // === Точка входа модуля ===
         builder.Register<NPCModule>(Lifetime.Singleton);

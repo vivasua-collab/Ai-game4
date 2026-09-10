@@ -41,6 +41,8 @@ public partial class GameWorldController : Node2D
     [Inject] private IGroundItemService  GroundItems { get; set; } = null!;
     [Inject] private IEquipmentService   Equipment   { get; set; } = null!;
     [Inject] private INPCService         Npcs        { get; set; } = null!;
+    // R13 FULL-LOOT (2026-09-10): трупы NPC (контейнеры лута).
+    [Inject] private ICorpseService      Corpses     { get; set; } = null!;
     [Inject] private Modules.Interaction.DialogueService DialogueService { get; set; } = null!;
     [Inject] private Modules.Player.PlayerCombatAdapter CombatAdapter { get; set; } = null!;
     [Inject] private Modules.Inventory.BeltService BeltService { get; set; } = null!;
@@ -70,6 +72,9 @@ public partial class GameWorldController : Node2D
     // публикует NPCDeathEvent; ранее UI не был подписан — убийства невидимы:
     // игроку не было никакого отклика, только лут падал).
     [Inject] private ISubscriber<Core.Messaging.Contracts.NPCDeathEvent> NpcDeathSub { get; set; } = null!;
+    // R13 FULL-LOOT (2026-09-10): труп удалён (обыскан/TTL) → закрыть LootWindow,
+    // если он открыт для этого трупа (авторитетная точка закрытия, как у диалогов).
+    [Inject] private ISubscriber<Core.Messaging.Contracts.CorpseRemovedEvent> CorpseRemovedSub { get; set; } = null!;
 
     private Node2D        _worldRoot     = null!;
     private Camera2D      _camera        = null!;
@@ -82,6 +87,8 @@ public partial class GameWorldController : Node2D
     private CharacterSheetWindow _characterSheetWindow = null!;
     private UI.DialogueWindow _dialogueWindow = null!;
     private UI.TradeWindow _tradeWindow = null!;
+    // R13 FULL-LOOT: окно обыска трупа (E рядом с трупом → пауза + список лута).
+    private UI.LootWindow _lootWindow = null!;
     private UI.HotbarPanel _hotbarPanel = null!;
     // 2026-08-28: Книга Техник (T) — матричный браузер библиотеки
     // (вкладки-уровни / блоки-типы / строки-стихии) вместо HUD-панели.
@@ -114,6 +121,7 @@ public partial class GameWorldController : Node2D
     private System.IDisposable? _playerDamageToken;
     private System.IDisposable? _toastShownToken;
     private System.IDisposable? _npcDeathToken; // 2026-09-04 S3: kill-feed
+    private System.IDisposable? _corpseRemovedToken; // R13: закрытие LootWindow по CorpseRemovedEvent
     private System.IDisposable? _attackRejectedToken; // M2: тост причины отклонения атаки
     private CanvasLayer   _hudCanvas     = null!;
     private Label         _timeLabel     = null!;
@@ -172,6 +180,11 @@ public partial class GameWorldController : Node2D
 
     /// <summary>Торговое окно (GODOT_TRADEUX_DEBUG).</summary>
     public UI.TradeWindow? TradeWindowForQA => _tradeWindow;
+
+    // === R13 FULL-LOOT: QA-доступ (GODOT_LOOT_DEBUG) ===
+
+    /// <summary>Окно обыска трупа (GODOT_LOOT_DEBUG).</summary>
+    public UI.LootWindow? LootWindowForQA => _lootWindow;
 
     /// <summary>Инвентарное окно (GODOT_TRASHDROP_DEBUG).</summary>
     public UI.InventoryWindow? InventoryWindowForQA => _inventoryWindow;
@@ -256,6 +269,8 @@ public partial class GameWorldController : Node2D
         _playerDamageToken = DamageSub?.Subscribe(OnPlayerDamaged);
         // 2026-09-04 S3: kill-feed — смерти NPC → тост «☠ Имя повержен».
         _npcDeathToken = NpcDeathSub?.Subscribe(OnNpcDied);
+        // R13 FULL-LOOT: труп удалён → закрыть окно обыска (авторитетная точка).
+        _corpseRemovedToken = CorpseRemovedSub?.Subscribe(OnCorpseRemoved);
         // Этап 7: тосты от модулей (InventoryWindow.TryUseQiStone и др.)
         _toastShownToken = ToastShownSub?.Subscribe(OnToastShown);
         // Phase 2 fix: dialogue can end from MANY paths (E advance, Esc, choice
@@ -400,6 +415,15 @@ public partial class GameWorldController : Node2D
         {
             var chargeSim = new ChargeSimDebug { Name = "ChargeSimDebug" };
             AddChild(chargeSim);
+        }
+        // R13 FULL-LOOT (2026-09-10): headless-верификация спауна через
+        // генерацию + трупов/обыска/full loot (GODOT_LOOT_DEBUG=1) —
+        // состав населения из генератора, смерть → труп-контейнер,
+        // ЛКМ-взятие по SlotId, «Забрать всё», TTL, респаун популяции.
+        if (System.Environment.GetEnvironmentVariable("GODOT_LOOT_DEBUG") == "1")
+        {
+            var lootSim = new LootSimDebug { Name = "LootSimDebug" };
+            AddChild(lootSim);
         }
         GD.Print("[GameWorldController] Ready");
     }
@@ -723,7 +747,7 @@ public partial class GameWorldController : Node2D
             Name = "HudHint",
             Text = "WASD — движение | Shift — бег | ЛКМ — идти к точке | Колесо — зум\n" +
                    "Esc — пауза | PageUp/PageDown — скорость\n" +
-                   "E — подобрать | B — инвентарь | F — добыча | V — медитация | Z — каст | X — выбор техники\n" +
+                   "E — обыск трупа / разговор / подбор | B — инвентарь | F — добыча | V — медитация | Z — каст | X — выбор техники\n" +
                    "C — персонаж | J — журнал | T — техники | Q — квесты | M — карта | N — миникарта"
 #if DEBUG
                    + "\nF1 — чит-меню (dev)"
@@ -773,6 +797,12 @@ public partial class GameWorldController : Node2D
         // закрывается по TradeClosedEvent / Esc. Пауза — OnTradeOpened ниже.
         _tradeWindow = new UI.TradeWindow { Name = "TradeWindow" };
         _hudCanvas.AddChild(_tradeWindow);
+
+        // R13 FULL-LOOT: окно обыска трупа. Открывается по E рядом с трупом
+        // (HandleCorpseSearchOrNpcTalk ниже), закрывается Esc/кнопкой «Уйти»/
+        // CorpseRemovedEvent. Пауза тиков — при открытии (обыск = планирование).
+        _lootWindow = new UI.LootWindow { Name = "LootWindow" };
+        _hudCanvas.AddChild(_lootWindow);
 
         // Hotbar (2026-08-22): 9 quick slots bottom-center; belt slots 3-9
         // appear when a belt is equipped.
@@ -1053,6 +1083,7 @@ public partial class GameWorldController : Node2D
                       || (_characterSheetWindow is { Visible: true })
                       || (_dialogueWindow is { IsOpen: true })
                       || (_tradeWindow is { IsOpen: true })
+                      || (_lootWindow is { IsOpen: true })
                       || (_techniqueBook is { Visible: true })
                       || (_hotkeysWindow is { Visible: true })
 #if DEBUG
@@ -1339,6 +1370,13 @@ public partial class GameWorldController : Node2D
         {
             _tradeWindow.Close();
         }
+        // R13 FULL-LOOT: Esc при открытом окне обыска → закрыть + резюм тиков.
+        else if (PlayerInput.IsPausePressed && _lootWindow is { IsOpen: true })
+        {
+            _lootWindow.Close();
+            if (!_wasPausedBeforeInventory && Time is { IsPaused: true })
+                Time.Resume();
+        }
         // Esc while a dialogue is open → close it and resume ticks (Phase 2).
         else if (PlayerInput.IsPausePressed && _dialogueWindow is { IsOpen: true })
         {
@@ -1478,11 +1516,17 @@ public partial class GameWorldController : Node2D
         // otherwise pick up the nearest ground item.
         // NPC_COMBAT_PREP Phase 2: E near NPC → open role dialogue (pause ticks).
         // Phase 5: при открытой лавке E не действует (торговля — модальность).
+        // R13 FULL-LOOT: E рядом с трупом → окно обыска (труп ближе живого NPC
+        // или NPC рядом нет); при открытом окне обыска E не действует (модальность).
         if (PlayerInput.IsInteractPressed)
         {
             if (_tradeWindow is { IsOpen: true })
             {
                 // Лавка открыта — E съедается модальностью торговли.
+            }
+            else if (_lootWindow is { IsOpen: true })
+            {
+                // R13: окно обыска открыто — E съедается модальностью (взятие — ЛКМ/кнопка).
             }
             else if (_dialogueWindow != null && _dialogueWindow.IsOpen)
             {
@@ -1490,7 +1534,7 @@ public partial class GameWorldController : Node2D
                 if (_dialogueWindow is { IsOpen: false } && !_wasPausedBeforeInventory && Time is { IsPaused: true })
                     Time.Resume();
             }
-            else if (!HandleNpcTalk())
+            else if (!HandleCorpseSearchOrNpcTalk())
             {
                 HandlePickup();
             }
@@ -1507,6 +1551,7 @@ public partial class GameWorldController : Node2D
         {
             _inputAdapter.SetOverUI(_inventoryWindow.Visible
                 || _tradeWindow is { IsOpen: true }
+                || _lootWindow is { IsOpen: true }
                 || _techniqueBook is { Visible: true }
                 || _hotkeysWindow is { Visible: true }
                 || _dialogueWindow is { IsOpen: true }
@@ -1803,6 +1848,80 @@ public partial class GameWorldController : Node2D
     }
 
     /// <summary>
+    /// R13 FULL-LOOT: труп удалён (обыскан дочиста / TTL / вручную) → если
+    /// окно обыска открыто именно для этого трупа — закрыть и резюмить тики.
+    /// Авторитетная точка закрытия (как TradeClosedEvent для лавки): окно
+    /// может опустеть из ЛЮБОГО пути — кнопка «Забрать всё», последний
+    /// ЛКМ-взятый предмет, TTL в другом кадре.
+    /// </summary>
+    private void OnCorpseRemoved(in Core.Messaging.Contracts.CorpseRemovedEvent e)
+    {
+        if (_lootWindow is not { IsOpen: true }) return;
+        if (_lootWindow.Name != $"LootPanel_{e.CorpseId}") return;
+
+        _lootWindow.Close();
+        if (!_wasPausedBeforeInventory && Time is { IsPaused: true })
+            Time.Resume();
+        GD.Print($"[GameWorld] Corpse removed ({e.Reason}) — loot window closed, ticks resumed");
+    }
+
+    /// <summary>
+    /// R13 FULL-LOOT: E рядом с трупом → окно обыска. Приоритет: труп ближе
+    /// живого NPC (или живого рядом нет) → обыск; иначе — диалог (HandleNpcTalk).
+    /// Мёртвый NPC не говорит, поэтому при равных дистанциях труп выигрывает.
+    /// Возвращает true, если взаимодействие состоялось (E не падает в подбор).
+    /// Пауза тиков — пока окно открыто (обыск = планирование, как диалоги).
+    /// </summary>
+    private bool HandleCorpseSearchOrNpcTalk()
+    {
+        if (Corpses == null || Player == null) return HandleNpcTalk();
+
+        var playerPos = Player.Position;
+
+        // Ближайший труп в радиусе разговора (Чебышёв по тайлам).
+        var corpse = Corpses.FindNearestCorpse(playerPos, TalkRangeTiles);
+        if (corpse == null) return HandleNpcTalk();
+
+        int corpseDist = System.Math.Max(
+            System.Math.Abs(corpse.Position.X - playerPos.X),
+            System.Math.Abs(corpse.Position.Y - playerPos.Y));
+
+        // Дистанция ближайшего ЖИВОГО NPC (как в HandleNpcTalk).
+        int npcDist = int.MaxValue;
+        var nearby = Npcs?.GetNearbyNPCIds(playerPos, TalkRangeTiles);
+        if (nearby is { Count: > 0 })
+        {
+            foreach (var id in nearby)
+            {
+                var npc = Npcs!.GetNPC(id);
+                if (npc == null || !Npcs.IsAlive(id)) continue;
+                int dist = System.Math.Max(
+                    System.Math.Abs(npc.Position.X - playerPos.X),
+                    System.Math.Abs(npc.Position.Y - playerPos.Y));
+                if (dist < npcDist) npcDist = dist;
+            }
+        }
+
+        // Труп ближе (или равен — мёртвые не говорят, но обыск важнее) → обыск.
+        if (corpseDist <= npcDist)
+        {
+            if (corpse.IsEmpty)
+            {
+                ShowToast($"☠ {corpse.DisplayName} — уже обобран");
+                return true; // труп в радиусе — E не падает в подбор предметов
+            }
+
+            _wasPausedBeforeInventory = Time is { IsPaused: true };
+            if (Time is { IsPaused: false })
+                Time.Pause();
+            _lootWindow.Open(corpse.CorpseId);
+            return true;
+        }
+
+        return HandleNpcTalk();
+    }
+
+    /// <summary>
     /// NPC_COMBAT_PREP Phase 2 — E near an NPC opens the role dialogue.
     /// Uses the nearest NPC within TalkRange tiles of the player.
     /// Returns true when a dialogue started (E should not fall through to pickup).
@@ -2087,6 +2206,9 @@ public partial class GameWorldController : Node2D
         // Kill-feed (S3).
         _npcDeathToken?.Dispose();
         _npcDeathToken = null;
+        // R13 FULL-LOOT: закрытие LootWindow по CorpseRemovedEvent.
+        _corpseRemovedToken?.Dispose();
+        _corpseRemovedToken = null;
         // Тосты от модулей (Этап 7).
         _toastShownToken?.Dispose();
         _toastShownToken = null;
