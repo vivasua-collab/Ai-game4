@@ -5,9 +5,11 @@
 // Источник: docs/docs_v2/09_workflow/NPC_COMBAT_PREP.md §Phase 1
 // РЕДАКТИРОВАНО (R13, 2026-09-10): состав населения — ГЕНЕРАЦИЯ вместо
 // хардкод-массива. NPCSpawnCompositionService.GenerateStartup(loc) выводит
-// роли/уровни из типа локации + DangerLevel + сида (детерминированно);
-// поддержание популяции (респаун при выбивании) — ReinforcementTick из
-// NPCModule.Tick.
+// роли/уровни из типа локации + DangerLevel + сида (детерминированно).
+// R14 (2026-09-10): внутрисессионного восполнения больше НЕТ — сборка
+// локации (этот момент = игрока в ней не было) и есть естественное
+// восстановление населения; новые NPC при живом игроке — только ивенты
+// (TrySpawnEventNpc: караван/набег, вызывается event-pipeline).
 using System;
 using System.Threading;
 using System.Threading.Tasks;

@@ -620,3 +620,37 @@ Stage Summary:
 - Наблюдение (не баг): камни death-drop (таблица 4.1) суммируются с камнями
   инвентаря живого NPC (§8.2) при обыске — баланс проверить живым QA (P0).
 - Чекпоинт: checkpoints/09_10_r13_verification.md. Коммит: docs-sync.
+
+---
+Task ID: R14-POPULATION-RULE-0910
+Agent: main-agent (Z.ai Code, сессия 09-10 №3)
+Task: DEATH_AND_LOOT §2.4 — восполнение населения НЕ должно работать в
+рамках сессии (запрос пользователя): пока персонаж в локации — новых NPC
+нет, кроме ивентов (караван/набег); естественное восстановление — только
+при отсутствии персонажа (другое поселение / карта мира).
+
+Work Log:
+- Сверка с доками: TRANSITION_SYSTEM §5.3/§11.1 уже описывает правило
+  («таймер памяти»: NPC возвращаются через 1 игровой день ПОСЛЕ ухода
+  игрока) — ReinforcementTick R13 противоречил спецификации.
+- NPCSpawnCompositionService: ReinforcementTick (45с, <60%) УДАЛЁН;
+  добавлена ивент-точка входа TrySpawnEventNpc(Caravan/Raid/Event) —
+  walkable ≥12 тайлов от игрока, сид seq+время; QA-поле EventSpawnCount.
+- NPCModule.Tick: вызов восполнения убран; комментарии R14 в NPCModule/
+  NPCModuleServices/HumanNPCSpawnPhase.
+- LootSimDebug step7 перевёрнут: (a) население ниже floor НЕ восполняется
+  за ожидание 0.6с; (b) TrySpawnEventNpc(Caravan) спавнит (Guard L1).
+- docs_v2 sync: DEATH_AND_LOOT §2.4 (переписан), MODULE_STRUCTURE §2.7,
+  TESTING_RULES §0.1 (LOOT-хук).
+- QA: build 0 errors; LOOT PASS; регрессии COMBAT/KILLFEED/SAVELOAD/
+  REASSEMBLY/STORAGE/QUEST/TRASHDROP/CONTEXT — все PASS (9/9) + база.
+
+Stage Summary:
+- Правило мира зафиксировано кодом и доками: в сессии население не
+  восполняется (выбитое — остаётся выбитым); ивенты — единственный
+  внутрисессионный источник (расширение под event-pipeline/GROUP_SYSTEM);
+  естественное восстановление — при (пере)сборке локации (GenerateStartup),
+  «таймер памяти» 1 день (TRANSITION §5.3) — с будущим travel-pipeline.
+- Чекпоинт: checkpoints/09_10_r14_population_rule.md.
+- Пользователь протестирует живьём на ПК вечером; Next: R15 концепция
+  «оружие в руках» (концепция+план → после согласования внедрение).

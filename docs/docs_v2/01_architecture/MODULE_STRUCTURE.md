@@ -260,7 +260,7 @@ Modules/Xxx/
 **Ключевые сервисы:**
 - NPCService — данные NPC
 - NPCSpawnerService — спавн/деспавн
-- NPCSpawnCompositionService (R13) — процедурная генерация состава населения локации (тип локации + DangerLevel + сид → список SpawnRequest; детерминизм, кап 12; ReinforcementTick восполняет потери <60%)
+- NPCSpawnCompositionService (R13; R14) — процедурная генерация состава населения локации (тип локации + DangerLevel + сид → список SpawnRequest; детерминизм, кап 12). R14: внутрисессионное восполнение удалено (ReinforcementTick) — пока игрок в локации, новых NPC нет; единственная точка входа ивентов — TrySpawnEventNpc(Caravan/Raid/Event); естественное восстановление — при (пере)сборке локации (TRANSITION_SYSTEM §5.3)
 - CorpseService (R13) — трупы-контейнеры: снапшот экипировки/инвентаря/камней при смерти, TTL 1 игровой день, SlotId-адресное взятие (см. DEATH_AND_LOOT.md §2)
 - NPCRelationshipService — отношения (Attitude + затухание по `DayChangedEvent`)
 - NPCAIService — упрощённый Behaviour Tree

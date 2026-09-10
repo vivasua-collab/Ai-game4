@@ -71,8 +71,10 @@ public static class NPCModuleServices
 
         // === R13 «NPC спаун через генерацию» (2026-09-10) ===
         // NPCSpawnCompositionService — процедурный состав населения локации
-        // (тип локации + DangerLevel + сид) вместо хардкод-массива ролей;
-        // ReinforcementTick поддерживает популяцию (мир восполняется).
+        // (тип локации + DangerLevel + сид) вместо хардкод-массива ролей.
+        // R14: внутрисессионное восполнение запрещено — только ивенты
+        // (TrySpawnEventNpc: караван/набег); естественное восстановление —
+        // при (пере)сборке локации (TRANSITION_SYSTEM §5.3).
         builder.Register<NPCSpawnCompositionService>(Lifetime.Singleton);
 
         // === Точка входа модуля ===

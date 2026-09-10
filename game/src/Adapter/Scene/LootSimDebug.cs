@@ -10,8 +10,11 @@
 //      показывает строки, ЛКМ-взятие SlotId-адресно, повторный клик по
 //      устаревшему слоту ОТКАЗЫВАЕТСЯ (TOCTOU-защита).
 //   3. «Full loot»: LootAll забирает ВСЁ (инвентарь игрока реально растёт),
-//      труп удаляется; ReinforcementTick восполняет популяцию (мир живёт).
-//      + TTL: RemoveOldCorpses убирает старые трупы.
+//      труп удаляется; + TTL: RemoveOldCorpses убирает старые трупы.
+//      R14 (2026-09-10, запрос пользователя): восполнение населения
+//      в рамках сессии ЗАПРЕЩЕНО — выбитое население НЕ восполняется,
+//      пока игрок в локации; ивент-спаун (TrySpawnEventNpc, караван/набег)
+//      — единственная внутрисессионная точка входа, проверяем её.
 //
 // Запуск: GODOT_NEWGAME=1 GODOT_LOOT_DEBUG=1 godot --headless --path . scenes/MainMenu.tscn
 // Паттерн — KillFeedSimDebug (env-хук, public QA-поля, VERDICT в конце).
@@ -187,15 +190,16 @@ public partial class LootSimDebug : Node
             { GD.Print("[LootSim] step6 FAIL: TTL не убрал трупы"); pass = false; }
         }
 
-        // === 7. Респаун популяции («спаун через генерацию», живой мир) ======
+        // === 7. R14: популяция в сессии НЕ восполняется; ивент-спаун — можно ===
         if (_composition != null)
         {
-            // Цель: живых СТРОГО НИЖЕ floor (порог включения респауна).
+            // a) Доводим живых НИЖЕ порога (floor = 60% целевого — бывший
+            //    триггер ReinforcementTick) и ждём: население должно
+            //    ОСТАТЬСЯ просевшим — внутрисессионного восполнения нет.
             var all = _npcService.GetAllNPCIds().ToArray();
             int floor = System.Math.Max(1, (int)System.Math.Ceiling(targetPop * 0.6));
             int aliveNow = 0;
             foreach (var id in all) if (_npcService.IsAlive(id)) aliveNow++;
-            // Доводим живых до floor-1 (убиваем сверх порога).
             int needKill = aliveNow - (floor - 1);
             foreach (var id in all)
             {
@@ -207,17 +211,29 @@ public partial class LootSimDebug : Node
             }
             int aliveBefore = 0;
             foreach (var id in all) if (_npcService.IsAlive(id)) aliveBefore++;
-            int reinforcBefore = _composition.ReinforcementCount;
-            // forceCheck=true — детерминированный обход 45с-интервала (QA).
-            string? newNpc = _composition.ReinforcementTick(forceCheck: true);
+            int eventBefore = _composition.EventSpawnCount;
+            await ToSignal(GetTree().CreateTimer(0.6), SceneTreeTimer.SignalName.Timeout);
+            int aliveAfter = 0;
+            foreach (var id in _npcService.GetAllNPCIds())
+                if (_npcService.IsAlive(id)) aliveAfter++;
+            GD.Print($"[LootSim] step7a in-session: alive={aliveBefore}/{targetPop} (floor={floor}) → " +
+                     $"после ожидания alive={aliveAfter}, eventSpawns={_composition.EventSpawnCount}");
+            if (aliveAfter > aliveBefore)
+            { GD.Print("[LootSim] step7a FAIL: население восполнилось в сессии (запрещено R14)"); pass = false; }
+            if (_composition.EventSpawnCount != eventBefore)
+            { GD.Print("[LootSim] step7a FAIL: ивент-спаун без ивента"); pass = false; }
+
+            // b) Ивент-спаун (караван) — единственный внутрисессионный источник:
+            //    работает при живом игроке (расширение для event-pipeline).
+            string? evNpc = _composition.TrySpawnEventNpc(NPCEventSpawnReason.Caravan);
             await ToSignal(GetTree().CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
-            GD.Print($"[LootSim] step7 reinforcement: alive={aliveBefore}/{targetPop} (floor={floor}), " +
-                     $"spawned={newNpc != null}, total reinforc={_composition.ReinforcementCount}");
-            if (aliveBefore < floor && _composition.ReinforcementCount == reinforcBefore)
-            { GD.Print("[LootSim] step7 FAIL: популяция ниже порога, но респаун не случился"); pass = false; }
+            GD.Print($"[LootSim] step7b event-spawn(caravan): spawned={evNpc != null}, " +
+                     $"total eventSpawns={_composition.EventSpawnCount}");
+            if (evNpc == null || _composition.EventSpawnCount == eventBefore)
+            { GD.Print("[LootSim] step7b FAIL: ивент-спаун не сработал"); pass = false; }
         }
 
-        GD.Print($"[LootSim] VERDICT: {(pass ? "PASS — full-loot: спаун-генерация/трупы/обыск/full-loot/TTL/респаун" : "FAIL")}");
+        GD.Print($"[LootSim] VERDICT: {(pass ? "PASS — full-loot: спаун-генерация/трупы/обыск/full-loot/TTL/R14-нет-респауна-в-сессии+ивент-спаун" : "FAIL")}");
     }
 
     private long TotalUnits()

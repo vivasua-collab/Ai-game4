@@ -53,8 +53,10 @@ public class NPCModule : IModule
     // инвентарь NPC исчезал); теперь полный лут лежит в трупе до обыска (E).
     [Inject] private readonly CorpseService _corpseService = null!;
 
-    // R13 «NPC спаун через генерацию»: ReinforcementTick поддерживает
-    // население — если игрок выбивает NPC (full-loot цикл), мир восполняется.
+    // R13 «NPC спаун через генерацию»: генератор состава населения.
+    // R14 (2026-09-10): внутрисессионное восполнение УДАЛЕНО — пока игрок
+    // в локации, новые NPC не приходят; только ивенты (TrySpawnEventNpc:
+    // караван/набег) — точка входа для будущего event-pipeline.
     [Inject] private readonly NPCSpawnCompositionService _spawnComposition = null!;
 
     // IMPL-3: Config injected via DI (replaces obsolete SetConfig()).
@@ -118,10 +120,11 @@ public class NPCModule : IModule
         _visualService.UpdateVisualPositions();
         ProcessNpcAttacks();
 
-        // R13 «NPC спаун через генерацию»: поддержание населения — мир
-        // восполняет потери (полный full-loot цикл: убил → обыскал → новый
-        // сгенерированный NPC со временем приходит на замену).
-        _spawnComposition?.ReinforcementTick();
+        // R14: поддержание населения в тиках УДАЛЕНО — в сессии (игрок в
+        // локации) новые NPC не генерируются; естественное восстановление —
+        // при (пере)сборке локации (TRANSITION_SYSTEM §5.3 «таймер памяти»).
+        // Единственная внутрисессионная точка входа — TrySpawnEventNpc
+        // (караван/набег), вызывается event-pipeline, не тиками.
 
         // R13: TTL-очистка трупов (старые тела исчезают через 1 игровой день).
         _corpseService?.RemoveOldCorpses(CorpseTtlGameSeconds);

@@ -43,7 +43,7 @@
 | `GODOT_TRASHDROP_DEBUG=1` | TrashDropSimDebug | Баг-репорт 09-08: инвентарный drag&drop в корзину — материалы draggable (раньше пустой Variant), корзина выбрасывает весь стек, кукла отклоняет не-экипировку, чужой source отвергается |
 | `GODOT_CONTEXT_DEBUG=1` | ContextMenuSimDebug | Запрос 09-09: ПКМ-контекстное меню — окно свойств, «Разделить стак…» (слайдер −/+ с двумя числами), множественные кучки одного ItemId, слот-адресный выброс кучки в корзину, Esc-приоритет попапов (8/8); ревью-R10 SlotId: stale drop при мутации в полёте, stale split → отказ, split при дрейфе индексов (11/11). Сим сам завершает процесс (GetTree().Quit) — без HOLD |
 | `GODOT_SAVELOAD_DEBUG=1` | SaveLoadSimDebug | Ревью-R11: Save/Load round-trip — типизация (IncludeFields), честный success, РЕАЛЬНЫЕ мутации до/после (анти-тривиальность), 8 блоков, домен 5/5, integrity |
-| `GODOT_LOOT_DEBUG=1` | LootSimDebug | R13 full-loot: генерация состава населения (12 NPC/6 ролей/детерминизм), труп-контейнер, окно обыска, SlotId-взятие, double-take отказ, full loot, TTL, ReinforcementTick |
+| `GODOT_LOOT_DEBUG=1` | LootSimDebug | R13 full-loot: генерация состава населения (12 NPC/6 ролей/детерминизм), труп-контейнер, окно обыска, SlotId-взятие, double-take отказ, full loot, TTL; R14: популяция в сессии НЕ восполняется (выбитая — остаётся выбитой) + ивент-спаун TrySpawnEventNpc(Caravan) работает |
 | `GODOT_SCREENSHOT=<путь>` | GameBoot | Скриншот в файл (VLM-верификация) |
 | `GODOT_SCREENSHOT_DELAY=<сек>` | GameBoot | Задержка кадра для скриншота |
 | `GODOT_CONTEXT_HOLD=1` | ContextMenuSimDebug | Держать ПКМ-меню (скриншоты) — без HOLD сим сам завершает процесс |

@@ -1,18 +1,26 @@
 #nullable enable
 // Создано: 2026-09-10 — R13 «NPC спаун через генерацию».
+// РЕДАКТИРОВАНО (R14, 2026-09-10, запрос пользователя): внутрисессионное
+// восполнение населения ЗАПРЕЩЕНО. Пока персонаж в локации, новые NPC не
+// генерируются — убийства необратимы в рамках сессии. Единственная точка
+// входа новых NPC при живом игроке — ивенты (TrySpawnEventNpc): приход
+// каравана, нападение на локацию, другие событийные появления.
+//
+// Естественное восстановление населения — только при ОТСУТСТВИИ персонажа
+// (он в другом поселении или на карте мира): при следующей (пере)сборке
+// локации состав регенерируется GenerateStartup по правилу «таймера
+// памяти» TRANSITION_SYSTEM.md §5.3/§11.1 (NPC возвращаются через 1
+// игровой день после ухода игрока).
+//
 // Генератор состава населения локации: заменяет ХАРДКОД-массив SpawnRoles
 // в HumanNPCSpawnPhase (7 фиксированных ролей) на процедурную композицию,
 // выводимую из типа локации (Farm/WildLands/Dungeon...), уровня опасности
 // и сида локации — детерминированно для одного и того же сида.
-//
-// Плюс поддержание популяции (ITickable): мир «живёт» — если игрок выбивает
-// население (full-loot цикл: убил → обыскал), ReinforcementTick со временем
-// генерирует замену (новый сгенерированный NPC вне поля зрения игрока).
 // Зависимости инжектятся конструктором (паттерн AnimalService/NPCService).
 //
 // ДЕТЕРМИНИЗМ: стартовый состав — SeededRandom(loc.Seed + offset); уровни
-// ролей — независимые броски того же потока. Респаун-цикл эмерджентный
-// (зависит от действий игрока), его RNG сидируется игровым временем.
+// ролей — независимые броски того же потока. Ивент-спауны сидируются
+// порядковым номером и игровым временем (эмерджентность ивентов).
 using System;
 using System.Collections.Generic;
 using CultivationGame.Core.Data;
@@ -36,6 +44,19 @@ namespace CultivationGame.Modules.NPC
     }
 
     /// <summary>
+    /// R14: причина ивент-спауна NPC при живом игроке в локации.
+    /// </summary>
+    public enum NPCEventSpawnReason
+    {
+        /// <summary>Приход торгового каравана (GROUP_SYSTEM §3.5): торговец/охрана.</summary>
+        Caravan,
+        /// <summary>Нападение на локацию: враждебная волна.</summary>
+        Raid,
+        /// <summary>Другое событийное появление (квест, паломник, сюрприз).</summary>
+        Event,
+    }
+
+    /// <summary>
     /// Генератор состава населения локации («NPC спаун через генерацию»).
     ///
     /// Правила композиции по типу локации (детерминированно от сида):
@@ -45,23 +66,22 @@ namespace CultivationGame.Modules.NPC
     ///    мирные редки.
     ///  • Прочие (Region/Area/...) — смешанный состав.
     /// DangerLevel поднимает уровни и число врагов.
+    ///
+    /// R14: поддержание популяции в сессии УДАЛЕНО (ReinforcementTick) —
+    /// мир НЕ восполняет потери, пока игрок в локации; только ивенты.
     /// </summary>
     public class NPCSpawnCompositionService
     {
-        // Независимый RNG-поток (prime-offset, паттерн фаз спавна).
+        // Независимые RNG-потоки (prime-offset, паттерн фаз спавна).
         private const int CompositionSeedOffset = 31337;
-        private const int ReinforcementSeedOffset = 60013;
+        private const int EventSpawnSeedOffset = 60013;
 
         /// <summary>Кап на общий размер композиции (защита малых карт).</summary>
         private const int MaxCompositionSize = 12;
 
-        // === Респаун (поддержание популяции) ===
-        /// <summary>Интервал проверки популяции (игровые секунды).</summary>
-        private const float ReinforcementCheckIntervalSec = 45f;
-        /// <summary>Минимальная дистанция респауна от игрока (тайлы, Чебышёв).</summary>
-        private const int ReinforcementMinPlayerDistance = 12;
-        /// <summary>Доля от стартового состава, ниже которой включается респаун.</summary>
-        private const float PopulationFloorRatio = 0.6f;
+        // === Ивент-спаун (единственный внутрисессионный источник NPC) ===
+        /// <summary>Минимальная дистанция ивент-спауна от игрока (тайлы, Чебышёв).</summary>
+        private const int EventSpawnMinPlayerDistance = 12;
         private const int MaxSpawnAttempts = 60;
 
         private readonly NPCService _npcService;
@@ -70,11 +90,10 @@ namespace CultivationGame.Modules.NPC
         private readonly ITileService _tiles;
         private readonly ITimeService _timeService;
         private readonly IPlayerService _playerService;
-        private int _nextReinforcementSeq = 1;
+        private int _nextEventSpawnSeq = 1;
 
         /// <summary>Целевой размер населения (стартовый состав текущей локации).</summary>
         private int _targetPopulation;
-        private float _lastCheckGameSeconds = -1f;
 
         public NPCSpawnCompositionService(
             NPCService npcService,
@@ -97,14 +116,16 @@ namespace CultivationGame.Modules.NPC
         /// <summary>Целевая численность населения (QA).</summary>
         public int TargetPopulation => _targetPopulation;
 
-        /// <summary>Число респаунов с момента старта (QA: мир восполняется).</summary>
-        public int ReinforcementCount { get; private set; }
+        /// <summary>Число ивент-спаунов с момента старта (QA: только ивенты).</summary>
+        public int EventSpawnCount { get; private set; }
 
         // === Стартовый состав ===
 
         /// <summary>
         /// Сгенерировать стартовый состав населения локации.
         /// Детерминированно: один seed → один состав.
+        /// Вызывается при (пере)сборке локации — момент, когда игрока в ней
+        /// НЕ было (естественное восстановление населения, R14).
         /// </summary>
         public List<SpawnRequest> GenerateStartup(LocationData location)
         {
@@ -196,87 +217,84 @@ namespace CultivationGame.Modules.NPC
             return requests;
         }
 
-        // === Поддержание популяции (респаун) ===
+        // === Ивент-спаун (R14) ===
 
         /// <summary>
-        /// Периодическая проверка (вызывается из NPCModule.Tick): население
-        /// просело ниже PopulationFloorRatio от целевого → одна попытка
-        /// респауна за вызов. Возвращает ID нового NPC или null.
-        /// Локация — IWorldService.CurrentLocation (единый источник геометрии/сида).
-        /// forceCheck=true — обойти интервал (QA: детерминированный вызов).
+        /// Ивент-спаун NPC при живом игроке в локации — ЕДИНСТВЕННЫЙ
+        /// внутрисессионный источник новых NPC (R14): приход каравана,
+        /// нападение на локацию, другое событие. Вызывается будущим
+        /// event-pipeline / GROUP_SYSTEM (караваны, рейды), НЕ тиками.
+        /// Возвращает ID нового NPC или null.
         /// </summary>
-        public string? ReinforcementTick(bool forceCheck = false)
+        public string? TrySpawnEventNpc(NPCEventSpawnReason reason)
         {
             var location = _worldService?.CurrentLocation;
-            if (location == null) return null;
-            if (_targetPopulation <= 0) return null;
-
-            float now = _timeService?.TotalTime ?? 0f;
-            if (!forceCheck && _lastCheckGameSeconds >= 0f
-                && now - _lastCheckGameSeconds < ReinforcementCheckIntervalSec)
-                return null;
-            _lastCheckGameSeconds = now;
-
-            // Считаем ТОЛЬКО живых NPC (трупы населением не считаются).
-            int alive = 0;
-            foreach (var id in _npcService.GetAllNPCIds())
-                if (_npcService.IsAlive(id)) alive++;
-
-            int floor = Math.Max(1, (int)Math.Ceiling(_targetPopulation * PopulationFloorRatio));
-            if (alive >= floor) return null;
-
-            // Роль замены: по типу локации (враги в диком мире, микс в мирном).
-            var rng = new SeededRandom((location.Seed + ReinforcementSeedOffset)
-                + (long)_nextReinforcementSeq * 7919 + (long)(now * 100f));
-            bool wild = IsWildLocation(location);
-            var request = wild
-                ? new SpawnRequest(rng.Next(0, 3) switch
-                    {
-                        0 => NPCRole.Enemy,
-                        1 => NPCRole.Enemy,
-                        _ => NPCRole.Cultivator,
-                    },
-                    RollLevel(rng, 1, location.DangerLevel),
-                    rng.Next(0, 4) == 0 ? "wolf" : "human")
-                : new SpawnRequest(rng.Next(0, 6) switch
-                    {
-                        0 => NPCRole.Passerby,
-                        1 => NPCRole.Cultivator,
-                        2 => NPCRole.Guard,
-                        3 => NPCRole.Enemy,
-                        4 => NPCRole.Disciple,
-                        _ => NPCRole.Enemy,
-                    },
-                    RollLevel(rng, 1, location.DangerLevel));
-
-            // Позиция: walkable, вне поля зрения игрока.
-            var pos = FindReinforcementPosition(rng, location);
-            if (pos is null)
+            if (location == null)
             {
-                Console.WriteLine("[SpawnComposition] Reinforcement: позиция не найдена — отложено");
+                Console.WriteLine("[SpawnComposition] EventSpawn: нет активной локации — отказ");
                 return null;
             }
 
-            long seed = location.Seed + ReinforcementSeedOffset + (long)_nextReinforcementSeq * 104729;
-            _nextReinforcementSeq++;
+            float now = _timeService?.TotalTime ?? 0f;
+            var rng = new SeededRandom((location.Seed + EventSpawnSeedOffset)
+                + (long)_nextEventSpawnSeq * 7919 + (long)(now * 100f));
+
+            var request = EventRequestFor(reason, rng, location);
+
+            // Позиция: walkable, на отшибе (ивент «приходит извне»).
+            var pos = FindEventSpawnPosition(rng, location);
+            if (pos is null)
+            {
+                Console.WriteLine($"[SpawnComposition] EventSpawn({reason}): позиция не найдена — отложено");
+                return null;
+            }
+
+            long seed = location.Seed + EventSpawnSeedOffset + (long)_nextEventSpawnSeq * 104729;
+            _nextEventSpawnSeq++;
 
             string npcId = _spawner.SpawnNPC(request.SpeciesId, request.Role, request.Level, pos.Value, seed);
             if (!string.IsNullOrEmpty(npcId))
             {
-                ReinforcementCount++;
-                Console.WriteLine($"[SpawnComposition] Reinforcement #{ReinforcementCount}: " +
-                          $"{request} at ({pos.Value.X},{pos.Value.Y}) — население {alive}/{_targetPopulation}");
+                EventSpawnCount++;
+                Console.WriteLine($"[SpawnComposition] EventSpawn({reason}) #{EventSpawnCount}: " +
+                          $"{request} at ({pos.Value.X},{pos.Value.Y})");
             }
             return npcId;
+        }
+
+        /// <summary>Состав ивент-гостя по причине (караван/набег/событие).</summary>
+        private static SpawnRequest EventRequestFor(NPCEventSpawnReason reason, SeededRandom rng, LocationData location)
+        {
+            int danger = Math.Max(0, location.DangerLevel);
+            return reason switch
+            {
+                // Караван (GROUP_SYSTEM §3.5): торговец + охрана сопровождения.
+                NPCEventSpawnReason.Caravan => new SpawnRequest(
+                    rng.Next(0, 4) == 0 ? NPCRole.Guard : NPCRole.Merchant,
+                    RollLevel(rng, 1, danger)),
+                // Набег на локацию: враждебная волна (бандит/зверь).
+                NPCEventSpawnReason.Raid => new SpawnRequest(
+                    NPCRole.Enemy,
+                    RollLevel(rng, 1, danger),
+                    rng.Next(0, 4) == 0 ? "wolf" : "human"),
+                // Прочее событие: смешанный гость.
+                _ => new SpawnRequest(rng.Next(0, 4) switch
+                    {
+                        0 => NPCRole.Passerby,
+                        1 => NPCRole.Cultivator,
+                        2 => NPCRole.Guard,
+                        _ => NPCRole.Disciple,
+                    },
+                    RollLevel(rng, 1, danger)),
+            };
         }
 
         /// <summary>Сброс для повторной сборки сцены (ReAssembly).</summary>
         public void Reset()
         {
             _targetPopulation = 0;
-            _lastCheckGameSeconds = -1f;
-            ReinforcementCount = 0;
-            _nextReinforcementSeq = 1;
+            EventSpawnCount = 0;
+            _nextEventSpawnSeq = 1;
         }
 
         // === Вспомогательные ===
@@ -304,7 +322,7 @@ namespace CultivationGame.Modules.NPC
             return Math.Clamp(baseLevel + delta + Math.Max(0, danger - 1), 0, 9);
         }
 
-        private Position2D? FindReinforcementPosition(SeededRandom rng, LocationData loc)
+        private Position2D? FindEventSpawnPosition(SeededRandom rng, LocationData loc)
         {
             int mapW = _tiles?.MapWidth > 0 ? _tiles.MapWidth : loc.Width;
             int mapH = _tiles?.MapHeight > 0 ? _tiles.MapHeight : loc.Height;
@@ -317,7 +335,7 @@ namespace CultivationGame.Modules.NPC
                 if (_tiles != null && !_tiles.IsWalkable(x, y)) continue;
 
                 int dist = Math.Max(Math.Abs(x - playerPos.X), Math.Abs(y - playerPos.Y));
-                if (dist < ReinforcementMinPlayerDistance) continue;
+                if (dist < EventSpawnMinPlayerDistance) continue;
 
                 return new Position2D(x, y);
             }
