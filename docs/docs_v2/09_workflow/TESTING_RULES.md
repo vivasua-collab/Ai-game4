@@ -35,7 +35,7 @@
 | `GODOT_DIALOGUE_HOLD=1` | DialogueSimDebug | Держать диалог (скриншоты) |
 | `GODOT_TRADEUX_HOLD=1` | TradeUXSimDebug | Держать лавку UX |
 | `GODOT_FORMATION_TEST=1` | TechniqueGrantPhase | Формационный тест (этап формаций) |
-| `GODOT_REASSEMBLY_DEBUG=1` | ReAssemblySimDebug | Ревью-1: повторная сборка в одном процессе — Reset фаз оркестратора + world-scoped реестр (15/15 Completed, реестр не ×2) |
+| `GODOT_REASSEMBLY_DEBUG=1` | ReAssemblySimDebug | Ревью-1: повторная сборка в одном процессе — Reset фаз оркестратора + world-scoped реестры (16/16 Completed, техники не ×2). Аудит R13/R14: + ассерты NPC-домена — QA-смерть NPC (труп) и QA-группа в мире 1 НЕ переживают пересборку (NpcDomainResetPhase), реестр NPC не ×2 (double-spawn), ghost-NPC отсутствует; harness-гейт (QA-грязь обязана быть создана) |
 | `GODOT_STORAGE_DEBUG=1` | StorageSimDebug | Ревью-этап-4: инвентарные транзакции — spirit retrieve/stacking (P0-1/P1-2), ring Qi (P1-3), craft overflow (P1-4), pickup unknown/граница (P1-5/P2-6) |
 | `GODOT_DOT_DEBUG=1` | DotSimDebug | Ревью-этап-5: DoT (Poison/Burn/Bleed/Freeze) наносит реальный урон через DamageAppliedEvent (игрок + NPC, P1-4) |
 | `GODOT_RESPAWN_DEBUG=1` | RespawnSimDebug | Ревью-этап-6: respawn ресурсов (истощение→7 дней→восстановление тайла), честный TryTravel, TimeChangedEvent.Delta == DeltaTime |

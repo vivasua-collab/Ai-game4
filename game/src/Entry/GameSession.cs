@@ -31,6 +31,8 @@ public sealed class GameSession : IGameSession
     [Inject] private readonly ISaveService _save = null!;
     [Inject] private readonly IPublisher<GamePausedEvent> _pausedPub = null!;
     [Inject] private readonly IPublisher<GameResumedEvent> _resumedPub = null!;
+    // R13/R14-аудит: сброс NPC-домена при тёплой загрузке (до RestoreState).
+    [Inject] private readonly Modules.NPC.NPCModule _npcModule = null!;
 
     private long _frameCounter;
 
@@ -131,6 +133,15 @@ public sealed class GameSession : IGameSession
         Console.WriteLine($"[GameSession] LoadGame slot='{slot}' — loading...");
         try
         {
+            // R14-аудит (P2-1): сброс NPC-домена ДО RestoreState — в этом же
+            // процессе мог жить прошлый мир (NewGame → меню → LoadGame):
+            // реестр NPC/трупы/группы/провайдеры должны быть пусты ДО того,
+            // как сейв наполнит их заново. RestoreState делает merge (не
+            // чистит реестр) — «призраки» прошлого мира иначе остаются.
+            // Аналог NpcDomainResetPhase (фаза 0, NewGame-режим): на Load
+            // фазы идут ПОСЛЕ восстановления — сброс в фазе опоздал бы.
+            _npcModule.ResetWorld();
+
             // ISaveService.Load triggers ISaveable.RestoreState on every
             // registered saveable. GameSession.Data is refreshed minimally
             // here; full restoration happens inside the save module.

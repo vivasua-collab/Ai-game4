@@ -196,6 +196,23 @@ namespace CultivationGame.Modules.NPC
             return removed;
         }
 
+        /// <summary>
+        /// R13-аудит (P2-4) + R14-аудит (P2-1): полный сброс домена трупов при
+        /// пересборке мира в том же процессе (меню → NewGame/LoadGame).
+        /// CorpseService — DI-синглтон: _corpses переживал сборку, трупы
+        /// прошлого мира оставались в новом. RemoveInternal публикует
+        /// CorpseRemovedEvent на каждый труп (рендер-маркеры и открытое окно
+        /// обыска корректно очищаются); счётчик ID перезапускается.
+        /// </summary>
+        public void ResetWorld()
+        {
+            int total = _corpses.Count;
+            for (int i = _corpses.Count - 1; i >= 0; i--)
+                RemoveInternal(_corpses[i], "world-reset");
+            _nextCorpseSeq = 1;
+            Console.WriteLine($"[CorpseService] ResetWorld: {total} трупов очищено");
+        }
+
         public void Dispose()
         {
             _npcDeathSubscription?.Dispose();

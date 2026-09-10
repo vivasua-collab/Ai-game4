@@ -126,31 +126,10 @@ namespace CultivationGame.Modules.NPC
         }
 
         /// <summary>
-        /// NPC получает урон — уведомление (НЕ вычитает HP напрямую).
-        /// ПРОТИВОРЕЧИЕ #3: единая система через BodyParts.
-        /// HP = Σ(BodyParts.RedHP) — всегда пересчитывается из body parts.
-        /// Урон проходит через BodyService → DamageAppliedEvent → BodyParts.
+        /// R16-аудит (P3-1): мёртвый метод ApplyDamage удалён — ни одного
+        /// вызователя в game/src (урон NPC идёт через DamageAppliedEvent →
+        /// OnDamageApplied → NPCDamagedEvent, см. ниже).
         /// </summary>
-        public void ApplyDamage(string npcId, string sourceId, int damage)
-        {
-            var state = _npcService.GetNPCState(npcId);
-            if (state == null || !state.IsAlive) return;
-
-            // ПРОТИВОРЕЧИЕ #3: НЕ вычитаем HP напрямую!
-            // Урон проходит через BodyService → DamageAppliedEvent → BodyParts
-            // NPCHealth пересчитывается из BodyParts через IBodyDataProvider.GetCurrentHealth()
-
-            // Публикуем событие получения урона (уведомление)
-            // CurrentHealth пересчитывается из IBodyDataProvider.GetCurrentHealth()
-            float healthRatio = state.MaxHealth > 0
-                ? (float)state.CurrentHealth / state.MaxHealth
-                : 0f;
-
-            _npcDamagedPub.Publish(new NPCDamagedEvent(npcId, sourceId, damage, healthRatio));
-
-            // Проверка смерти — через кэшированное HP
-            // Временно: оставляем проверку через CurrentHealth (будет обновляться через событие)
-        }
 
         // === Обработчики кросс-модульных событий ===
 

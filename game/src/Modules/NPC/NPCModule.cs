@@ -107,6 +107,21 @@ public class NPCModule : IModule
     /// </summary>
     private readonly Dictionary<string, float> _npcAttackTimers = new();
 
+    /// <summary>
+    /// R13-аудит (P2-4) + R14-аудит (P2-1): сброс NPC-домена при пересборке
+    /// мира в том же процессе. Вызывается NpcDomainResetPhase (фаза 0,
+    /// NewGame — до спавн-фаз 6/7/8) и GameSession.LoadGame (до RestoreState
+    /// из сейва — фазы идут ПОСЛЕ восстановления). Чистит: реестр NPC +
+    /// per-entity провайдеры + баффы + якоря блуждания + отношения (полный
+    /// путь DespawnNPC), трупы (с CorpseRemovedEvent на каждый), группы.
+    /// </summary>
+    public void ResetWorld()
+    {
+        _spawnerService.ResetWorld();
+        _corpseService?.ResetWorld();
+        _groupService?.ResetWorld();
+    }
+
     public void Tick(int tickCount)
     {
         if (!_isConfigured) return;

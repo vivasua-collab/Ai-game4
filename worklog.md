@@ -914,3 +914,73 @@ Stage Summary:
 - CombatLootService (последний legacy-осколок лут-пайплайна Unity-эпохи)
   удалён полностью: файл, DI, конфиг, доки.
 - Далее: аудит R14 → R15 → R16 (по очереди, субагентами flash-класса).
+
+---
+Task ID: R14-R16-AUDIT-0910
+Agent: main-agent (Z.ai Code, сессия 2026-09-10 №7, 17:00–20:00 UTC; два обрыва контекста — работа восстановлена по диффу/git-статусу, потерь нет)
+Task: Аудит R14/R15/R16 по заданию пользователя «аудит задач r13–r16 по
+очереди, исправить найденные ошибки» (продолжение R13-AUDIT-0910, коммит
+0843e27). Пользователь также запросил вести детальные чекпоинты.
+
+Work Log:
+- R14-аудит. НАЙДЕНО (P2-1, критично): NPC-домен — DI-синглтоны, реестр NPC
+  не чистился НИГДЕ при пересборке мира в том же процессе → double-spawn
+  (меню → NewGame повторно) и «призраки» (тёплый LoadGame: NPC, которых нет
+  в сейве). ФИКС: NpcDomainResetPhase (новая фаза 0, до спавн-фаз 6/7/8) +
+  GameSession.LoadGame → ResetWorld ДО RestoreState (фазы на Load идут ПОСЛЕ
+  восстановления) + ResetWorld: NPCSpawnerService (полный путь DespawnNPC +
+  восстановленные из сейва через GetAllStates), CorpseService (RemoveInternal
+  → CorpseRemovedEvent на каждый труп), NPCGroupService (+интерфейс);
+  WeaponVisualCatalog.ResetCache. НАЙДЕНО (P2-2): восстановленные из сейва
+  NPC блуждали вокруг (0,0) — якорь не восстанавливается → блуждание вокруг
+  текущей позиции.
+- R15-аудит. НАЙДЕНО (P1-1): EquipFromGenerator экипировал зверей («волки с
+  мечами», урон оружия поверх BaseDamage вида) → морфологический фильтр
+  (Humanoid/Harpy/Lamia) в генерации + страховка рендера в
+  NPCSpriteRenderer (defense-in-depth). НАЙДЕНО (P2-2):
+  WeaponVisualCatalog.ResetCache существовал, но не вызывался → вызов в
+  NpcDomainResetPhase.
+- R16-аудит. НАЙДЕНО (P1-1, лок боя): AbandonCombat (бегство/leash) может
+  завершить бой ПОСЕРЕДИ чужого каста — незагашенный _isCasting отклонял
+  все новые атаки, анти-лок EnemyTurnTimeout отключён условием → гашение
+  каста в EndCombat. НАЙДЕНО (P2-1): проводка NPCDefenseSelector не покрыта
+  QA (кейсы селектора — напрямую, проводка могла регрессировать молча) →
+  CombatService.LastNpcDefenseSelected (QA-геттер) + проверка в тесте 3.
+  НАЙДЕНО (P2-2): тест «двусторонний бой» проходил впустую при Fleeing-
+  fallback миролюбивого NPC → урон по NPC обязателен. НАЙДЕНО (P3-1/2/3):
+  мёртвый NPCCombatAdapter.ApplyDamage удалён; PlayerCombatAdapter
+  CurrentDefenseStance сброс на CombatEnded (рассинхрон с
+  _lastPlayerDefense); пустые подписки CombatStarted/DamageApplied удалены.
+- REASSEMBLY QA усилен (шаг, на котором оборвалась сессия — завершён):
+  NPC-домен-ассерты. «Грязный» мир 1: QA-смерть первого NPC (IsAlive=false
+  ДО публикации — контракт реального флоу; труп создаётся) + QA-группа.
+  Ассерты после 2-й сборки: alive-NPC не ×2 и не в ноль (double-spawn/
+  over-wipe), ghost-NPC отсутствует, трупы == 0, группы не накопились,
+  harness-гейт (QA-грязь обязана быть создана — иначе always-true).
+- QA полный прогон: build 0 errors; 14/14 VERDICT: PASS — REASSEMBLY
+  (16/16 фаз; NPC-домен: alive 12→12, ghost убран, труп/группы сброшены),
+  COMBAT_SIM, COMBATAI (с новыми ассертами stale-cast/проводка/двусторон-
+  ность), LOOT, SAVELOAD (критично: сброс домена при LoadGame), KILLFEED,
+  QUEST, STORAGE, HOTBAR, DOT, CHARGE, TRASHDROP, CONTEXT, WEAPONVIS.
+- Детальный чекпоинт (запрос пользователя): checkpoints/09_10_r14_r16_audit.md.
+- docs_v2 sync: ARCHITECTURE §6.1 (фаза 0 в таблице, 16 фаз), FILE_TREE
+  (+NpcDomainResetPhase.cs, 15→16), MODULE_STRUCTURE §2.7 (ResetWorld-блок,
+  морфологии, якорь) + §2.4 (R16-аудит-блок), COMBAT_SYSTEM §1.4.1 (гашение
+  каста, сброс стойки), NPC_AI_SYSTEM шапка (аудиторский статус),
+  TESTING_RULES §0.1 (REASSEMBLY: 16/16 + NPC-домен-ассерты).
+- SESSION_SUMMARY/SESSION_CONTEXT: сессии №6 (R13-аудит, задним числом —
+  коммит был без SESSION-обновления) и №7 (этот аудит).
+
+Stage Summary:
+- Аудит R13–R16 ПОЛНОСТЬЮ закрыт: 12 дефектов за две сессии (4 в R13, 8 в
+  R14–R16: double-spawn/ghost-домен, дрейф к (0,0), звери с мечами, лок
+  боя, мёртвый код ×3, дыры QA-покрытия ×2 + сброс кэша).
+- Главный системный вывод: DI-синглтоны, живущие дольше мира, требуют
+  world-scoped сброса — паттерн NpcDomainResetPhase закреплён (новые
+  реестры NPC-домена → ResetWorld-ветка + ассерт в REASSEMBLY QA).
+- REASSEMBLY QA теперь ловит double-spawn детерминированно (QA-смерть +
+  QA-группа + счётчики домена + harness-гейт).
+- Осталось пользователю: живой QA на ПК (бой/G-стойка/бегство/leash,
+  повторный NewGame, загрузка сейва с NPC).
+- Next-кандидаты R17: авто-замедление времени в бою (§1.2), PNG-ассеты,
+  броня-слои, спинальный AI/Brain.

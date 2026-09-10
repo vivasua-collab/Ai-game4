@@ -195,9 +195,15 @@ public partial class CombatAISimDebug : Node2D
             await ToSignal(GetTree().CreateTimer(0.5), SceneTreeTimer.SignalName.Timeout);
             waited += 0.5f;
         }
-        bool twoWayOk = _damageToPlayer > 0 || npcState.AIState == NPCAIState.Fleeing;
+        // R16-аудит (P2-2): урон по NPC обязателен в ЛЮБОЙ ветке — иначе
+        // fallback FindAnyNpc (миролюбивый NPC → Fleeing без единого удара
+        // по игроку) проходил тест «двусторонний бой» впустую.
+        bool twoWayOk = (_damageToPlayer > 0 || npcState.AIState == NPCAIState.Fleeing)
+                        && _damageToNpc > 0;
+        if (npcState.AIState == NPCAIState.Fleeing && _damageToPlayer == 0)
+            GD.Print("[CombatAI] WARN: тест 2 вырожден — NPC бежал, не ударив игрока (не-Hostile fallback)");
         GD.Print($"[CombatAI] 2-двусторонний-бой: игрок получил {_damageToPlayer} атак, " +
-                 $"AIState={npcState.AIState} → {(twoWayOk ? "OK" : "FAIL")}");
+                 $"урон по NPC={_damageToNpc}, AIState={npcState.AIState} → {(twoWayOk ? "OK" : "FAIL")}");
 
         // === 3. СЕЛЕКТОР ЗАЩИТ NPC (детерминированные кейсы) ===
         bool selectorOk = true;
@@ -205,8 +211,19 @@ public partial class CombatAISimDebug : Node2D
         selectorOk &= CultivationGame.Modules.Combat.NPCDefenseSelector.PickDefense(false, true, 10, 15) == DefenseSubtype.Parry;
         selectorOk &= CultivationGame.Modules.Combat.NPCDefenseSelector.PickDefense(false, true, 12, 10) == DefenseSubtype.Dodge;
         selectorOk &= CultivationGame.Modules.Combat.NPCDefenseSelector.PickDefense(false, false, 8, 8) == DefenseSubtype.Dodge;
-        GD.Print($"[CombatAI] 3-селектор: кейсы {(selectorOk ? "OK" : "FAIL")}; наблюдения в бою: " +
-                 $"dodge={_npcDefendedDodge}, parry={_npcDefendedParry}, block={_npcDefendedBlock}");
+        // R16-аудит (P2-1): ПРОВОДКА селектора в реальном бою — детерминированно
+        // через CombatService.LastNpcDefenseSelected (селектор вызывается на
+        // КАЖДОЙ атаке по NPC-защитнику; None после тестов 1–2 = регрессия
+        // проводки в BuildAndExecuteDamageRequest — дефект D4). Счётчики
+        // Dodge/Parry/Block (успешные защиты) — только информация: зависят от
+        // RNG-ролла, при одном обмене могут быть нулевыми.
+        bool wiringOk = _combatServiceImpl!.LastNpcDefenseSelected != DefenseSubtype.None;
+        selectorOk &= wiringOk;
+        int defendedTotal = _npcDefendedDodge + _npcDefendedParry + _npcDefendedBlock;
+        GD.Print($"[CombatAI] 3-селектор: кейсы {(selectorOk ? "OK" : "FAIL")}; проводка в бою: " +
+                 $"selected={_combatServiceImpl.LastNpcDefenseSelected} → {(wiringOk ? "OK" : "FAIL")}; " +
+                 $"успешные защиты: dodge={_npcDefendedDodge}, parry={_npcDefendedParry}, " +
+                 $"block={_npcDefendedBlock} (инфо, RNG)");
 
         // === 4. БЕГСТВО В БОЮ (HP<20%) ===
         _disengageCount = 0;
@@ -229,8 +246,14 @@ public partial class CombatAISimDebug : Node2D
         _playerService.SetPosition(new Position2D(farX, farY));
         await ToSignal(GetTree().CreateTimer(1.5), SceneTreeTimer.SignalName.Timeout);
         bool leashOk = !npcState.IsInCombat && _disengageCount > 0;
+        // R16-аудит (P1-1): после выхода из боя НИКАКОГО зависшего каста —
+        // AbandonCombat/EndCombat обязан погасить _isCasting (иначе все
+        // следующие атаки отклоняются гейтом «Каст уже идёт» навсегда).
+        bool noStaleCast = !_combatServiceImpl!.IsCasting;
+        leashOk &= noStaleCast;
         GD.Print($"[CombatAI] 5-leash: игрок → ({farX},{farY}), IsInCombat={npcState.IsInCombat}, " +
-                 $"AIState={npcState.AIState}, disengage={_disengageCount} → {(leashOk ? "OK" : "FAIL")}");
+                 $"AIState={npcState.AIState}, disengage={_disengageCount}, " +
+                 $"staleCast={_combatServiceImpl.IsCasting} → {(leashOk ? "OK" : "FAIL")}");
         // Вернуть игрока (последующие хуки/визуал не должны «улететь»).
         _playerService.SetPosition(playerPos);
 

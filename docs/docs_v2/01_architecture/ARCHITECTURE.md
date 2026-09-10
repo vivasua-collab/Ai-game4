@@ -257,6 +257,7 @@ public static class ChargerModuleServices
 
 | # | Фаза | Что делает | SkipOnLoad |
 |---|------|------------|------------|
+| 0 | NpcDomainResetPhase | Сброс NPC-домена перед пересборкой (реестр NPC + per-entity провайдеры/баффы/якоря/отношения, трупы с CorpseRemovedEvent, группы, кэш спрайтов оружия) — анти-double-spawn. 2026-09-10 (аудит R13/R14); на LoadGame сброс делает GameSession.LoadGame ДО RestoreState (фазы идут ПОСЛЕ восстановления) | true (ген.) |
 | 1 | CoreValidationPhase | Проверка DI-резолва всех интерфейсов ядра | false (wiring) |
 | 2 | TileMapGenPhase | Генерация тайловой карты | true (ген.) |
 | 3 | WorldInitPhase | Инициализация мира + world-scoped сброс TechniqueRegistry | true (ген.) |

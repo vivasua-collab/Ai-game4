@@ -14,6 +14,13 @@
 > (`NPCDefenseSelector`: §5 Dodge/Parry/Block по статам/экипировке),
 > kiting дальнобойных NPC (§6.3). Спинальный уровень (рефлексы) и
 > Neural Router — будущие фазы; Brain Controller — заглушка.
+>
+> Аудит (2026-09-10): R14 — NPC-домен НЕ переживает пересборку мира
+> (NpcDomainResetPhase/GameSession.LoadGame → ResetWorld: реестр/трупы/
+> группы — анти-double-spawn; якорь блуждания восстановленных из сейва
+> NPC — вокруг их текущей позиции, §6 Wandering). R15 — оружие только
+> морфологиям с руками (Humanoid/Harpy/Lamia). R16 — проводка селектора
+> защит подтверждена QA-геттером `LastNpcDefenseSelected`.
 
 ---
 

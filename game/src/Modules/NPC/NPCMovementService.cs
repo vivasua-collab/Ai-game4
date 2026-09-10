@@ -374,9 +374,20 @@ namespace CultivationGame.Modules.NPC
         /// </summary>
         private Vector2 GenerateRandomPointInRadius(string npcId, float radius)
         {
-            Vector2 center = _spawnPositions.TryGetValue(npcId, out var spawn)
-                ? spawn
-                : Vector2.zero;
+            // R14-аудит (P2-2): якорь не зарегистрирован (NPC восстановлен из
+            // сейва — RestoreState пишет позицию, но не якорь блуждания) →
+            // блуждаем вокруг ТЕКУЩЕЙ позиции, а не (0,0): раньше всё
+            // восстановленное население дрейфовало к углу карты.
+            Vector2 center;
+            if (_spawnPositions.TryGetValue(npcId, out var spawn))
+            {
+                center = spawn;
+            }
+            else
+            {
+                var restored = _npcService.GetNPCState(npcId);
+                center = restored != null ? restored.Position : Vector2.zero;
+            }
 
             float angle = (float)(Random.Shared.NextDouble() * 360.0) * ((float)Math.PI / 180f);
             float dist = (float)(Random.Shared.NextDouble() * (radius - 1.0) + 1.0);

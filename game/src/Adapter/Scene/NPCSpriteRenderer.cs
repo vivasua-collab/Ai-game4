@@ -263,6 +263,14 @@ public partial class NPCSpriteRenderer : Node2D
 
         // Facing-гистерезис по позиции (позиции — в тайлах).
         var npc = _npcService?.GetNPC(npcId);
+        // R15-аудит (P1-1): страховка рендера — оружие рисуют только морфологии
+        // с руками (тот же фильтр, что EquipFromGenerator/NPCAssemblyService).
+        // Защита от любых данных, где зверь экипирован (старые сейвы, чит-панель,
+        // будущие пути): волк с мечом не отрисуется даже если WeaponMain задан.
+        if (npc != null && npc.Morphology != Morphology.Humanoid
+            && npc.Morphology != Morphology.HybridHarpy
+            && npc.Morphology != Morphology.HybridLamia)
+            return;
         if (npc != null)
         {
             if (_npcLastX.TryGetValue(npcId, out var lastX))

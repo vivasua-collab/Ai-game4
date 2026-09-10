@@ -132,6 +132,13 @@ namespace CultivationGame.Modules.Combat
         /// </summary>
         public bool IsCasting => _isCasting;
 
+        /// <summary>
+        /// R16-аудит (P2-1): последняя стойка, ВЫБРАННАЯ NPCDefenseSelector для
+        /// NPC-защитника в реальной атаке. None = селектор не вызывался (регрессия
+        /// проводки — дефект D4). QA-геттер CombatAISimDebug, детерминирован.
+        /// </summary>
+        public DefenseSubtype LastNpcDefenseSelected { get; private set; } = DefenseSubtype.None;
+
         // === R16 (2026-09-10): доработка боевой системы ===
 
         /// <summary>
@@ -338,6 +345,21 @@ namespace CultivationGame.Modules.Combat
             _currentTurnOwnerId = null;
             _combatTimer = 0f;
             _lastPlayerDefense = DefenseSubtype.None;
+
+            // R16-аудит (P1-1): гасим незавершённый каст. До R16 EndCombat
+            // вне резолва атаки был недостижим (MaxCombatDuration=0); R16
+            // добавил AbandonCombat (бегство/leash по инициативе NPC из
+            // NPCModule.Tick) — бой может завершиться ПОСЕРЕДИ чужого каста.
+            // UpdateTimer гейтится !_isInCombat → каст никогда не резолвится
+            // и не чистится: гейт _isCasting (строка выше) отклоняет ВСЕ новые
+            // атаки, анти-лок EnemyTurnTimeout отключён условием !_isCasting →
+            // перманентный лок боевой подсистемы до пересборки локации.
+            if (_isCasting)
+            {
+                Console.WriteLine($"[Combat] EndCombat: прерываем незавершённый каст '{_pendingTechnique.TechniqueId}' ({_pendingTechnique.AttackerId}) — бой завершён");
+                _isCasting = false;
+                _pendingTechnique = default;
+            }
 
             // Освобождаем подписку
             _qiDepletedSubscription?.Dispose();
@@ -759,6 +781,10 @@ namespace CultivationGame.Modules.Combat
                     defenderHasShield, defenderHasWeapon,
                     _statProvider.GetStat(defenderId, StatType.Agility),
                     _statProvider.GetStat(defenderId, StatType.Strength));
+                // R16-аудит (P2-1): экспорт для QA — детерминированное
+                // свидетельство ПРОВОДКИ селектора (без RNG-зависимости от
+                // успеха защиты: селектор вызывается на КАЖДОЙ атаке по NPC).
+                LastNpcDefenseSelected = defenderDefense;
             }
 
             // P2-7.3 FIX: передаём подтип атаки для различения slashing/piercing от blunt

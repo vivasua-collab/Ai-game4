@@ -230,6 +230,45 @@ namespace CultivationGame.Modules.NPC
         }
 
         /// <summary>
+        /// R14-аудит (P2-1): сброс домена NPC при пересборке мира в том же
+        /// процессе (меню → NewGame/LoadGame). Раньше реестр NPC не чистился
+        /// НИГДЕ (только Dispose, который никто не вызывает): повторная сборка
+        /// давала double-spawn (живые NPC прошлого мира + новая композиция,
+        /// рост до MaxActiveNPCs с молчаливым SpawnNPC→null), а тёплый LoadGame
+        /// оставлял NPC, которых нет в сейве («призраки»).
+        /// Полный путь очистки = DespawnNPC (провайдеры тела/Ци/экипировки,
+        /// баффы, якоря блуждания, отношения, реестр); плюс NPC, попавшие в
+        /// реестр через RestoreState (вне _spawnedIds — включая мёртвых,
+        /// которых GetAllNPCIds не возвращает — берём GetAllStates()).
+        /// </summary>
+        public void ResetWorld()
+        {
+            // 1. Спавнер-трэкинговые NPC — полный путь (с событием деспавна;
+            // GetSpawnedNPCIds возвращает копию — мутация _spawnedIds внутри
+            // DespawnNPC безопасна).
+            var tracked = GetSpawnedNPCIds();
+            foreach (var id in tracked)
+                DespawnNPC(id);
+
+            // 2. Остальные в реестре (восстановлены из сейва прошлой сессии
+            // этого же процесса; Alive и мёртвые) — та же per-entity очистка.
+            var remaining = _npcService.GetAllStates();
+            foreach (var st in remaining)
+            {
+                _bodyDataProvider.RemoveEntity(st.NpcId);
+                _qiDataProvider.RemoveEntity(st.NpcId);
+                _equipmentDataProvider.RemoveEntity(st.NpcId);
+                _buffService.RemoveAllBuffs(st.NpcId);
+                _movementService.UnregisterSpawnPosition(st.NpcId);
+                _relationshipService.RemoveAllForNPC(st.NpcId);
+                _npcService.UnregisterNPC(st.NpcId);
+            }
+            _spawnedIds.Clear();
+            _generatedDamage.Clear();
+            Console.WriteLine($"[NPCSpawnerService] ResetWorld: домен NPC очищен (tracked={tracked.Count}, restored={remaining.Count})");
+        }
+
+        /// <summary>
         /// Количество активных NPC.
         /// </summary>
         public int ActiveNPCCount => _spawnedIds.Count;
@@ -248,6 +287,16 @@ namespace CultivationGame.Modules.NPC
         private void EquipFromGenerator(NPCState state, NPCRole role, int locationLevel, long seed)
         {
             if (_equipmentGenerator == null || state.EquipmentIds == null) return;
+
+            // R15-аудит (P1-1): оружие/броня — только морфологиям с руками
+            // (тот же фильтр, что NPCAssemblyService.Шаг 5: звери получают
+            // усиление тела, а не экипировку). Раньше экипировались ВСЕ —
+            // волки с мечами (R15-overlay это вскрыл визуально) + урон
+            // оружия зверям поверх BaseDamage вида.
+            bool canWield = state.Morphology == Morphology.Humanoid
+                || state.Morphology == Morphology.HybridHarpy
+                || state.Morphology == Morphology.HybridLamia;
+            if (!canWield) return;
 
             int weaponLevel = System.Math.Clamp(
                 locationLevel + (state.Disposition == NPCDisposition.Hostile ? 1 : 0), 1, 9);

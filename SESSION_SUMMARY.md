@@ -1,15 +1,54 @@
 # Сводка сессий (обновляется при завершении каждой сессии)
 
-Обновлено: 2026-09-10 10:55 UTC (облачный агент Z.ai Code)
+Обновлено: 2026-09-10 19:55 UTC (облачный агент Z.ai Code)
 
 ## Проект
 Cultivation World Simulator (Ai-game4), Godot 4.7.1 .NET, C#
 Репозиторий: https://github.com/vivasua-collab/Ai-game4 (публичный)
-HEAD: см. `git ls-remote origin main` (R16 запушена)
+HEAD: см. `git ls-remote origin main` (аудит R13–R16 запушен)
 
 ---
 
 ## Последние сессии
+
+### 2026-09-10 №7 (Аудит R14–R16: 9 дефектов исправлено, REASSEMBLY QA усилен)
+- **R14:** P2-1 — NPC-домен переживал пересборку мира (double-spawn,
+  «призраки» при тёплом LoadGame) → NpcDomainResetPhase (фаза 0) +
+  GameSession.LoadGame сброс до RestoreState + ResetWorld по всему
+  NPC-домену (Spawner/Corpse/Group; CorpseRemovedEvent на каждый труп);
+  P2-2 — восстановленные из сейва NPC дрейфовали к (0,0) (якорь блуждания
+  не восстанавливался) → блуждание вокруг текущей позиции.
+- **R15:** P1-1 — звери экипировались оружием («волки с мечами», урон
+  поверх BaseDamage) → фильтр морфологий с руками (генерация + рендер
+  defense-in-depth); P2-2 — ResetCache кэша спрайтов оружия вызван
+  при пересборке.
+- **R16:** P1-1 — незавершённый каст переживал EndCombat (AbandonCombat
+  посреди каста → перманентный лок боя) → гашение в EndCombat; P2-1 —
+  QA-геттер LastNpcDefenseSelected (детерминированная проверка проводки
+  селектора защит); P2-2 — тест двустороннего боя требует урона по NPC;
+  P3 — мёртвый ApplyDamage удалён, сброс CurrentDefenseStance на
+  CombatEnded, пустые подписки адаптера удалены.
+- **REASSEMBLY QA усилен:** NPC-домен-ассерты (QA-смерть+QA-группа в мире 1
+  → ghost/труп/группы не переживают пересборку; реестр не ×2;
+  harness-гейт). 16/16 фаз.
+- QA: build 0 err; 14 инструментов VERDICT: PASS (REASSEMBLY/
+  COMBAT_SIM/COMBATAI/LOOT/SAVELOAD/KILLFEED/QUEST/STORAGE/HOTBAR/
+  DOT/CHARGE/TRASHDROP/CONTEXT/WEAPONVIS).
+- docs_v2: ARCHITECTURE §6.1 (фаза 0), FILE_TREE (16), MODULE_STRUCTURE
+  §2.4/§2.7, COMBAT_SYSTEM §1.4.1, NPC_AI_SYSTEM шапка, TESTING_RULES.
+  Чекпоинт: checkpoints/09_10_r14_r16_audit.md.
+
+### 2026-09-10 №6 (Аудит R13: 3×P1 + P2 исправлены; CombatLootService удалён)
+- P1-1 окно обыска не закрывалось при удалении трупа (Name-сравнение
+  никогда не срабатывало) → LootWindow.CurrentCorpseId; P1-2 резюм тиков
+  дублирован в 3 путях → единая точка LootWindow.Closed; P1-3
+  CombatLootService УДАЛЁН — двойной лут поверх труп-контейнера;
+  P2-2 гварды модальности T/F1/J/Q/B/C при обыске.
+- Урок аудита: чекпоинт-verification R13 синхронизировал доки, но код не
+  тронул — «удалено» относилось к документации. Аудит обязан сверять
+  claims с кодом.
+- QA: build 0 err, LOOT/COMBAT_SIM/KILLFEED/QUEST/SAVELOAD PASS.
+  Коммит: 0843e27.
 
 ### 2026-09-10 №5 (R16: боевой ИИ NPC + рабочий бой + анимация удара)
 - **Аудит D1–D8:** NPC не отвечал на атаку игрока («манекен» — гейт

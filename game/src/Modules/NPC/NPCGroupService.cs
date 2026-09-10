@@ -43,6 +43,21 @@ namespace CultivationGame.Modules.NPC
             Console.WriteLine($"[NPCGroupService] Disbanded group {groupId} ({group.MemberIds.Count} members)");
         }
 
+        /// <summary>
+        /// R14-аудит (P2-1): сброс реестра групп при пересборке мира в том же
+        /// процессе (меню → NewGame/LoadGame). Сервис — DI-синглтон на весь
+        /// процесс: без сброса группы прошлого мира (и их членство) оставались
+        /// бы в _groups/_memberToGroup поверх новых.
+        /// </summary>
+        public void ResetWorld()
+        {
+            int groups = _groups.Count;
+            _groups.Clear();
+            _memberToGroup.Clear();
+            _nextGroupId = 1;
+            Console.WriteLine($"[NPCGroupService] ResetWorld: {groups} групп очищено");
+        }
+
         public void AddMember(string groupId, string npcId, GroupRole role = GroupRole.Follower)
         {
             if (!_groups.TryGetValue(groupId, out var group)) return;

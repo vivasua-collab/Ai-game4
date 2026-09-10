@@ -44,9 +44,9 @@ public sealed class PlayerCombatAdapter : IDisposable
     // CombatModule → ICombatService.ExecuteDefense).
     [Inject] private readonly IPublisher<DefenseIntentEvent> _defenseIntentPub = null!;
     [Inject] private readonly ISubscriber<AttackRejectedEvent> _attackRejectedSub = null!;
-    [Inject] private readonly ISubscriber<CombatStartedEvent> _combatStartedSub = null!;
+    // R16-аудит (P3-3): подписки CombatStarted/DamageApplied удалены (пустые
+    // обработчики, никто не читал).
     [Inject] private readonly ISubscriber<CombatEndedEvent> _combatEndedSub = null!;
-    [Inject] private readonly ISubscriber<DamageAppliedEvent> _damageSub = null!;
 
     /// <summary>Max Chebyshev distance (tiles) for Space-key melee target lock.</summary>
     public const float AttackRangeTiles = 2.5f;
@@ -105,9 +105,7 @@ public sealed class PlayerCombatAdapter : IDisposable
     /// </summary>
     public float AttackCooldownRemaining => _attackCooldownSec > 0f ? _attackCooldownSec : 0f;
 
-    private IDisposable? _combatStartedToken;
     private IDisposable? _combatEndedToken;
-    private IDisposable? _damageToken;
     private IDisposable? _attackRejectedToken;
 
     /// <summary>
@@ -153,9 +151,11 @@ public sealed class PlayerCombatAdapter : IDisposable
 
     public void Start()
     {
-        _combatStartedToken = _combatStartedSub.Subscribe(OnCombatStarted);
+        // R16-аудит (P3-3): подписки OnCombatStarted/OnDamageApplied удалены —
+        // пустые обработчики («handled by PlayerService» — не соответствует
+        // коду: PlayerService на эти события не подписан).
+        // CombatEnded нужна: сброс стойки игрока при конце боя (P3-2).
         _combatEndedToken = _combatEndedSub.Subscribe(OnCombatEnded);
-        _damageToken = _damageSub.Subscribe(OnDamageApplied);
         // Review этап 3 (P0-1): бэкофф-подписка на отклонения атак игрока.
         _attackRejectedToken = _attackRejectedSub.Subscribe(OnAttackRejected);
     }
@@ -324,29 +324,21 @@ public sealed class PlayerCombatAdapter : IDisposable
         return best;
     }
 
-    private void OnCombatStarted(in CombatStartedEvent e)
-    {
-        // PlayerModule reads stance to gate non-combat actions.
-        // Stance flip handled by PlayerService via its own CombatStarted subscription.
-    }
-
     private void OnCombatEnded(in CombatEndedEvent e)
     {
-        // Stance reset handled by PlayerService via its own subscription.
-    }
-
-    private void OnDamageApplied(in DamageAppliedEvent e)
-    {
-        // Death detection delegated to PlayerService (Q4: HP via BodyService).
+        // R16-аудит (P3-2): CombatService.EndCombat сбрасывает свою стойку
+        // (_lastPlayerDefense=None), но адаптерский CurrentDefenseStance жил
+        // дальше — после нового боя G-цикл шёл от «призрачной» стойки, а
+        // PlayerModule гейтил действия по рассинхронизированному значению.
+        // Сброс здесь синхронизирует адаптер с пайплайном.
+        CurrentDefenseStance = DefenseSubtype.None;
     }
 
     public void Dispose()
     {
-        _combatStartedToken?.Dispose();
         _combatEndedToken?.Dispose();
-        _damageToken?.Dispose();
         _attackRejectedToken?.Dispose();
-        _combatStartedToken = _combatEndedToken = _damageToken = null;
+        _combatEndedToken = null;
         _attackRejectedToken = null;
     }
 }

@@ -30,6 +30,13 @@ public interface INPCGroupService
     /// <summary>Расформировать группу.</summary>
     void DisbandGroup(string groupId);
 
+    /// <summary>
+    /// R14-аудит (P2-1): полный сброс реестра групп при пересборке мира в том
+    /// же процессе (меню → NewGame/LoadGame) — группы прошлого мира не должны
+    /// переживать сборку (сервис — DI-синглтон на весь процесс).
+    /// </summary>
+    void ResetWorld();
+
     /// <summary>Добавить NPC в группу.</summary>
     /// <param name="groupId">ID группы</param>
     /// <param name="npcId">ID NPC</param>

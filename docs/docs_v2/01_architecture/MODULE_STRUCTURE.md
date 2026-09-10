@@ -184,6 +184,15 @@ Modules/Xxx/
 > ДВОЙНОЙ лут с одного убийства. Лут после боя — только CorpseService
 > (DEATH_AND_LOOT §2); подписка CombatModule на EnemyKilledEvent удалена
 > (самивент жив: публикует CombatService, читают EventLogWindow/Quest).
+>
+> R16-аудит (2026-09-10): P1-1 — EndCombat/AbandonCombat гасит незавершённый
+> каст (`_isCasting=false`): R16 сделал EndCombat достижимым ПОСЕРЕДИ чужого
+> каста (бегство/leash), незагашенный каст давал перманентный лок боевой
+> подсистемы (гейт «Каст уже идёт» + отключённый анти-лок). P2-1 —
+> `LastNpcDefenseSelected` (QA-геттер): детерминированное свидетельство
+> проводки NPCDefenseSelector в реальном бою. P3: PlayerCombatAdapter
+> сбрасывает CurrentDefenseStance на CombatEnded (синхронизация с
+> _lastPlayerDefense); пустые подписки CombatStarted/DamageApplied удалены.
 
 **Особенности:**
 - Полная реализация 11-слойного пайплайна урона (см. `09_workflow/ALGORITHMS.md` §5).
@@ -270,13 +279,21 @@ Modules/Xxx/
 
 **Ключевые сервисы:**
 - NPCService — данные NPC
-- NPCSpawnerService — спавн/деспавн
+- NPCSpawnerService — спавн/деспавн. Аудит R14 (P2-1): `ResetWorld()` — полный сброс домена при пересборке мира в том же процессе (меню → NewGame/LoadGame): реестр NPC НЕ чистился нигде → double-spawn и «призраки» прошлого мира; полный путь per-entity очистки (провайдеры тела/Ци/экипировки, баффы, якоря, отношения) для спавнер-трэкинговых И восстановленных из сейва. Аудит R15 (P1-1): EquipFromGenerator — оружие/броня только морфологиям с руками (Humanoid/Harpy/Lamia); звери — усиление тела (волк с мечом = баг, вскрыт R15-overlay)
 - NPCSpawnCompositionService (R13; R14) — процедурная генерация состава населения локации (тип локации + DangerLevel + сид → список SpawnRequest; детерминизм, кап 12). R14: внутрисессионное восполнение удалено (ReinforcementTick) — пока игрок в локации, новых NPC нет; единственная точка входа ивентов — TrySpawnEventNpc(Caravan/Raid/Event); естественное восстановление — при (пере)сборке локации (TRANSITION_SYSTEM §5.3)
-- CorpseService (R13) — трупы-контейнеры: снапшот экипировки/инвентаря/камней при смерти, TTL 1 игровой день, SlotId-адресное взятие (см. DEATH_AND_LOOT.md §2)
+- CorpseService (R13) — трупы-контейнеры: снапшот экипировки/инвентаря/камней при смерти, TTL 1 игровой день, SlotId-адресное взятие (см. DEATH_AND_LOOT.md §2). Аудит R13/R14 (P2-4/P2-1): `ResetWorld()` — сброс реестра трупов при пересборке (RemoveInternal → CorpseRemovedEvent на каждый: рендер-маркеры и открытое окно обыска корректно очищаются)
 - NPCRelationshipService — отношения (Attitude + затухание по `DayChangedEvent`)
 - NPCAIService — упрощённый Behaviour Tree; R16: боевые переходы ДО гейта IsInCombat — месть на агрессию (Attacking/Fleeing по личности), бегство HP≤20% в активном бою, leash AggroRadius×3 (aggro-drop), публикация CombatDisengageEvent; раненый NPC не пере-агрится (гейт healthRatio на пути угроз — анти-flip-flop)
 - NPCCombatAdapter — адаптер боя через шину (НЕ прямая ссылка на CombatService); R16: MarkNpcCombatStarted помечает состояния напрямую (фантомный publish CombatStartedEvent удалён — единственный источник события теперь CombatService), OnCombatDisengage сбрасывает IsInCombat/TargetId участников, OnCombatEnded null-безопасен для Flee-финала
-- NPCMovementService — упрощённая навигация (grid pathfinding, без NavMesh); R16: kiting дальнобойных NPC (AttackRange>2: dist<3 → отход, в зоне обстрела — стоит)
+- NPCMovementService — упрощённая навигация (grid pathfinding, без NavMesh); R16: kiting дальнобойных NPC (AttackRange>2: dist<3 → отход, в зоне обстрела — стоит). Аудит R14 (P2-2): якорь блуждания для NPC, восстановленных из сейва (RestoreState пишет позицию, но не якорь) — блуждание вокруг ТЕКУЩЕЙ позиции, не дрейф к (0,0)
+
+**Сброс домена при пересборке (аудит R13/R14):** `NPCModule.ResetWorld()` =
+Spawner.ResetWorld + CorpseService.ResetWorld + NPCGroupService.ResetWorld
+(реестр групп + членство). Вызывается `NpcDomainResetPhase` (фаза 0, NewGame —
+до спавн-фаз 6/7/8) и `GameSession.LoadGame` (ДО RestoreState — фазы на Load
+идут ПОСЛЕ восстановления, сброс в фазе опоздал бы). Ди-синглтоны переживают
+мир — без сброса повторная сборка даёт double-spawn, трупы/группы прошлого
+мира остаются в новом. QA: GODOT_REASSEMBLY_DEBUG (NPC-домен-ассерты).
 
 **Визуал (Adapter/Scene, R15):** NPCSpriteRenderer рисует overlay оружия
 в основной руке (hand-спрайты WeaponVisualCatalog: 7 классов × 5 тиров
@@ -284,6 +301,9 @@ Modules/Xxx/
 публикует события; flip по направлению движения с гистерезисом).
 R16: замах оружия NPC — AttackIntentEvent (melee, attacker=NPC) → выпад
 hand-спрайта к цели (sin-кривая 0.42с, инверсия dx при facingLeft-зеркале).
+Аудит R15 (P1-1): страховка рендера — оружие рисуют только морфологии с
+руками (тот же фильтр, что EquipFromGenerator); зверь с WeaponMain не
+отрисуется (защита от старых сейвов/чит-панели).
 
 **Особенности:**
 - Трёхуровневая нервная система: Spinal AI (1–10 мс) / Neural Router (10–50 мс) / Brain Controller (100–500 мс).

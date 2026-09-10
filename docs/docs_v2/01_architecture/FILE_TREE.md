@@ -383,8 +383,9 @@ CultivationGame.Entry/
 ├── SceneAssemblyRegistrar.cs         # Регистрация фаз
 ├── MessagingRegistrar.cs             # Регистрация контрактов шины
 │
-├── Phases/                           # Фазы сборки сцены (15; порядок — PhaseOrder)
+├── Phases/                           # Фазы сборки сцены (16; порядок — PhaseOrder)
 │   ├── AbstractSceneAssemblyPhase.cs # Базовый класс фазы
+│   ├── NpcDomainResetPhase.cs        # Фаза 0: Сброс NPC-домена при пересборке (аудит R13/R14)
 │   ├── CoreValidationPhase.cs        # Фаза 1: Валидация DI
 │   ├── TileMapGenPhase.cs            # Фаза 2: Генерация тайлов
 │   ├── WorldInitPhase.cs             # Фаза 3: Инициализация мира
