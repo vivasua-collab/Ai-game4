@@ -1,13 +1,32 @@
 # SESSION_CONTEXT — Передача контекста агенту
 
 **Дата создания:** 2026-08-22
-**Обновлено:** 2026-09-10 07:30 UTC (R13 full-loot верифицирован; docs_v2 синхронизированы)
+**Обновлено:** 2026-09-10 09:50 UTC (R14: восполнение населения только вне сессии; R15-план «оружие в руках» на согласовании)
 **Назначение:** Полный контекст для продолжения разработки
 **Инструкция:** Прочитай START_PROMPT.md ПЕРВЫМ, затем этот файл.
 
 ---
 
-## 0. ЧТО СДЕЛАЛОСЬ ЗА СЕССИИ 2026-09-08…10 (коммиты 3e41927…7347bc1)
+## 0. ЧТО СДЕЛАЛОСЬ ЗА СЕССИИ 2026-09-08…10 (коммиты 3e41927…c07427c)
+
+### Сессия 2026-09-10 №3: R14 — правило восполнения населения (коммит c07427c)
+1. **§2.4 DEATH_AND_LOOT исправлен по запросу пользователя:** пока
+   персонаж в локации, новые NPC НЕ генерируются (ReinforcementTick
+   удалён из NPCModule.Tick); выбитое население остаётся выбитым.
+2. **Ивент-точка входа:** TrySpawnEventNpc(Caravan/Raid/Event) —
+   единственный внутрисессионный источник NPC (будущий event-pipeline/
+   GROUP_SYSTEM: караваны/набеги). QA: EventSpawnCount.
+3. **Естественное восстановление** — при (пере)сборке локации
+   (GenerateStartup; «таймер памяти» TRANSITION_SYSTEM §5.3: NPC —
+   1 игровой день после ухода; с будущим travel-pipeline).
+4. docs_v2 sync: DEATH_AND_LOOT §2.4, MODULE_STRUCTURE §2.7,
+   TESTING_RULES §0.1. QA 9/9 PASS (LOOT step7 перевёрнут: население
+   ниже floor НЕ восполняется; ивент-спаун работает).
+5. **R15 КОНЦЕПЦИЯ+ПЛАН** (на согласовании с пользователем, внедрение
+   после одобрения): отображение оружия в руках игрока и NPC —
+   checkpoints/plans/2026-09-10_r15_weapon_visualization_plan.md
+   (RimWorld-слои: 7 классов оружия, icon+hand спрайты, facing-wiring,
+   фазы A/B/C, вопросы-дефолты в §6).
 
 ### Сессия 2026-09-10 №2: верификация R13 + синхронизация docs_v2
 1. **R13 full-loot верифицирован** по правилам docs_v2 (запрос пользователя):
@@ -107,7 +126,7 @@ env GODOT_NEWGAME=1 GODOT_SAVELOAD_DEBUG=1 timeout 90 "$GODOT" --headless --path
 
 ---
 
-## 2. ТЕКУЩЕЕ СОСТОЯНИЕ (HEAD 7347bc1 — synced с origin/main)
+## 2. ТЕКУЩЕЕ СОСТОЯНИЕ (HEAD c07427c — synced с origin/main)
 
 ### Что работает
 - ✅ Main Menu → New Game (50×50) / Large World (500×500)
@@ -118,9 +137,11 @@ env GODOT_NEWGAME=1 GODOT_SAVELOAD_DEBUG=1 timeout 90 "$GODOT" --headless --path
 - ✅ Бой: Space-атака, урон по частям тела, HP-бары, цифры урона,
       kill-feed, стрелка атакующего, ranged+LOS+ammo, turn-gate,
       смерть→респавн
-- ✅ **Full loot (R13):** спаун NPC через генерацию состава, трупы-
-      контейнеры (снапшот экипировки/инвентаря/камней), обыск E,
-      «Забрать всё», TTL трупов, ReinforcementTick
+- ✅ **Full loot (R13) + правило населения (R14):** спаун NPC через
+      генерацию состава, трупы-контейнеры (снапшот экипировки/инвентаря/
+      камней), обыск E, «Забрать всё», TTL трупов; восполнение населения
+      — ТОЛЬКО вне сессии (R14), ивенты (караван/набег) — через
+      TrySpawnEventNpc
 - ✅ Save/Load (R11): типизированный round-trip, 8 ISaveable-блоков,
       IncludeFields, честные события
 - ✅ Торговля: диалог → лавка → buy/sell за духовные камни
@@ -182,15 +203,18 @@ game/src/
 ## 5. СЛЕДУЮЩИЕ ШАГИ (приоритет)
 
 ### P0 — живая проверка в редакторе (ПК)
-1. Визуал R13: маркеры трупов, LootWindow, «Забрать всё», респаун
-   подкреплений глазами; Xvfb-скриншот с GODOT_TRADE_HOLD-подобным HOLD
+1. Визуал R13 + правило R14: маркеры трупов, LootWindow, «Забрать всё",
+   НЕ-восполнение населения после зачистки (вечером у пользователя)
 2. Баланс камней в трупах (таблица 4.1 vs ощущение)
 
 ### P1 — кандидаты следующей сессии
-3. Лут с животных: материалы по видам (шкура/клыки/мясо) в CorpseService
-4. Обыск трупов ИИ-NPC (приоритет лута для AI)
-5. Faction port (Ai-game3-ref, ~400 LOC)
-6. Генерация состава для 500×500 (мульти-локации)
+3. **R15 «оружие в руках»** — план ГОТОВ, ждёт согласования пользователя:
+   checkpoints/plans/2026-09-10_r15_weapon_visualization_plan.md
+   (фаза A: игрок+хотбар; B: NPC; C: анимация/щит)
+4. Лут с животных: материалы по видам (шкура/клыки/мясо) в CorpseService
+5. Обыск трупов ИИ-NPC (приоритет лута для AI)
+6. Faction port (Ai-game3-ref, ~400 LOC)
+7. Генерация состава для 500×500 (мульти-локации)
 
 ### P2 — долг
 7. Per-attacker pending technique
@@ -229,13 +253,15 @@ DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 GODOT_NEWGAME=1 \
 |------|------------|
 | `SESSION_CONTEXT.md` | ЭТОТ ФАЙЛ |
 | `SESSION_SUMMARY.md` | Сводка сессий + состояние |
+| `checkpoints/09_10_r14_population_rule.md` | Чекпоинт R14 (правило населения) |
+| `checkpoints/plans/2026-09-10_r15_weapon_visualization_plan.md` | R15 концепция+план «оружие в руках» (на согласовании) |
 | `checkpoints/09_10_r13_full_loot.md` | Чекпоинт R13 (фичи) |
-| `docs/docs_v2/04_entities/DEATH_AND_LOOT.md` | Спецификация смерти/лута (синхронизирована с R13) |
+| `docs/docs_v2/04_entities/DEATH_AND_LOOT.md` | Спецификация смерти/лута (§2.4 R14) |
 | `docs/docs_v2/09_workflow/TESTING_RULES.md` | Реестр 30 QA-хуков |
 | `game/src/Modules/NPC/CorpseService.cs` | Трупы-контейнеры |
-| `game/src/Modules/NPC/NPCSpawnCompositionService.cs` | Генерация населения |
+| `game/src/Modules/NPC/NPCSpawnCompositionService.cs` | Генерация населения + TrySpawnEventNpc |
 | `game/src/Adapter/UI/LootWindow.cs` | Окно обыска |
-| `game/src/Adapter/Scene/LootSimDebug.cs` | QA full-loot |
+| `game/src/Adapter/Scene/LootSimDebug.cs` | QA full-loot + R14 |
 
 ---
 

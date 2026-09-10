@@ -654,3 +654,37 @@ Stage Summary:
 - Чекпоинт: checkpoints/09_10_r14_population_rule.md.
 - Пользователь протестирует живьём на ПК вечером; Next: R15 концепция
   «оружие в руках» (концепция+план → после согласования внедрение).
+
+---
+Task ID: R15-PLAN-0910
+Agent: main-agent (Z.ai Code, сессия 09-10 №3)
+Task: Концепция+план «Отображение оружия в руках у героя и NPC»
+(RimWorld-подобная система) — по запросу пользователя: сначала концепция
+и план, внедрение в код после согласования.
+
+Work Log:
+- Аудит текущего визуала: игрок — один статичный Sprite2D (CreatePlayerSprite
+  48×48, facing НЕ подключён — Direction есть в PlayerData, SetFacing никто
+  не вызывает); NPC — NPCSpriteRenderer._Draw с кэшем по роли (оружия нет);
+  хотбар слоты 1-2 — ТЕКСТ без иконок; CreateEquipmentIcon определён, но
+  нигде не используется; EquipmentChangedEvent готов (EntityId/Slot/ItemId);
+  NPC экипировка доступна (IEquipmentDataProvider.GetEquipped).
+- Найдена готовая спека: SPRITE_CATALOG §7 «Equipped-спрайты (планируется)»
+  (overlay-слои, 1 слот = 1 предмет = 1 спрайт) + §16 зеркалирование +
+  §16.5 структура узла персонажа + §17 sprite-swap — концепция пользователя
+  совпадает с задокументированным планом проекта.
+- Написан план: checkpoints/plans/2026-09-10_r15_weapon_visualization_plan.md
+  — 7 классов оружия (dagger/sword/axe/spear/greatsword/bow/staff) ×
+  5 тиров материала + rarity-обводка; ДВА спрайта на класс (icon 32×32
+  вертикальный + hand 48×48 диагональный); WeaponClassId в EquipmentData
+  (+fallback-парсинг eq_wep_{subtype}_ для старых сейвов); композит
+  PlayerVisual (Body+MainHand) с EquipmentChangedEvent-wiring и SetFacing;
+  NPC overlay с кэшем и flip по движению; фазы A (игрок+хотбар+кукла) /
+  B (NPC) / C (анимация замаха, щит, лут-иконки); QA-хук
+  GODOT_WEAPONVIS_DEBUG + Xvfb-скриншот; docs sync SPRITE_CATALOG §7/§18.
+- SESSION_CONTEXT.md / SESSION_SUMMARY.md обновлены (R14 итог + R15-план
+  на согласовании).
+
+Stage Summary:
+- План передан пользователю на согласование (вопросы с дефолтами — §6
+  плана). Внедрение фазы A/B — после одобрения. Коммит: docs-only.
