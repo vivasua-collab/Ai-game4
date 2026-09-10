@@ -824,3 +824,38 @@ Stage Summary:
 - Next: живой QA на ПК (P0: бой/G-стойки/бегство/leash/анимация);
   авто-замедление времени в бою (§1.2); PNG-ассеты (план пользователя);
   броня-слои; спинальный AI/Brain (NPC_AI_SYSTEM §2).
+
+---
+Task ID: ENV-RESTORE-0910-S6
+Agent: main-agent (Z.ai Code, сессия пользователя, вечер 09-10)
+Task: Новый сброс песочницы: остановка Next.js DEV (указание пользователя),
+клон Ai-game4 с GitHub, восстановление окружения разработки через
+cold_start.sh, полное чтение контекста (START_PROMPT / SESSION_SUMMARY /
+SESSION_CONTEXT / README / worklog) — и ожидание указаний.
+
+Work Log:
+- Next.js DEV сервер остановлен (замороженное правило §9-4 подтверждено).
+- Токен GitHub (из чата) сохранён в /home/z/my-project/.auth/github.token
+  (chmod 600, вне git, персистентная зона) + credential store актуализирован.
+- Репозиторий: клон → /home/z/Ai-game4, затем ПЕРЕНЕСЁН в
+  /home/z/my-project/Ai-game4 как РЕАЛЬНАЯ директория (канонический layout
+  cold_start.sh; переживает снапшот-сбросы платформы). Симлинки:
+  my-project/aigame4 → Ai-game4; /home/z/godot → my-project/godot.
+- cold_start.sh — полный прогон, все 6 шагов OK:
+  .NET SDK 8.0.425 + 9.0.318 (/home/z/.dotnet); Godot 4.7.1 mono
+  (python-zipfile → my-project/godot, бинаррь 145073296 байт,
+  версия 4.7.1.stable.mono.official.a13da4feb); git pull — Already up
+  to date; NuGet.config создан.
+- Верификация: dotnet build — 0 errors; Godot headless --quit —
+  WorldModule/TileModule/PlayerModule стартовали без ошибок.
+- Сверка: HEAD e182200 == origin/main e1822008 (R16), рабочее дерево
+  чистое. Контекст сессий восстановлен полностью (worklog 827 строк,
+  история R1–R16).
+
+Stage Summary:
+- Окружение разработки полностью работоспособно: сборка, headless-QA,
+  push через credential store — всё готово к работе.
+- Состояние игры: R16 (боевой ИИ NPC, рабочий бой, анимация удара) —
+  последняя внедрённая фича; P0-кандидаты следующей сессии — живой QA
+  на ПК, авто-замедление времени в бою (§1.2), PNG-ассеты, броня-слои.
+- Агент ожидает указаний пользователя.
