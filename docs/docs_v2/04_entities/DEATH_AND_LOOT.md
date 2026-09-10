@@ -127,11 +127,14 @@ HP сердца/головы ≤ 0
 
 | Событие | Триггер | Реакция |
 |---------|---------|---------|
-| `NPCDeathEvent` | NPC HP ≤ 0 | LootService генерирует лут, GroundItemService выпадает |
+| `NPCDeathEvent` | NPC HP ≤ 0 | CorpseService создаёт труп-контейнер (снапшот §2.2) |
+| `CorpseCreatedEvent` | Труп создан | CorpseSpriteRenderer рисует маркер, EventLog подсказка |
+| `CorpseRemovedEvent` | TTL (1 игровой день) / опустошение | Маркер удаляется, LootWindow закрывается авторитетно |
+| `CorpseLootedEvent` | Игрок взял предмет(ы) | UI/EventLog обновление, труп опустошается при 0 записей |
 | `PlayerDeathEvent` | Player Heart/Head ≤ 0 | UI экран смерти, пауза |
 | `PlayerReviveEvent` | Игрок выбрал Revive | HP/body/Qi восстановлены, симуляция возобновлена |
-| `ItemDroppedEvent` | Loot выпал на землю | Renderer рисует спрайт |
-| `ItemPickedUpEvent` | Игрок подобрал E | → ItemAddRequestEvent → InventoryService |
+| `ItemAddRequestEvent` | Взятие из трупа (command) | InventoryModule добавляет; overflow → `ItemDroppedEvent` на землю |
+| `ItemDroppedEvent` | Overflow инвентаря при луте | Renderer рисует спрайт |
 
 ---
 
