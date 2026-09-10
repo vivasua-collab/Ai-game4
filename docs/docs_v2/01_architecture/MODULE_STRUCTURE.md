@@ -43,7 +43,7 @@ Modules/Xxx/
 | 4 | Combat | ICombatService, IDamageService | 10+ | 5 | ✓ | 11-слойный пайплайн урона |
 | 5 | Formation | IFormationService | 5+ | 5 | ✓ | Магические массивы, контур, пул |
 | 6 | Inventory | IInventoryService, ISpiritStorageService, IStorageRingService, ICraftingService, IEquipmentService | 7+ | 7 | — | Инвентарь, экипировка, крафт |
-| 7 | NPC | INPCService, INPCSpawnerService | 6+ | 7 | ✓ | Спавн, AI, отношения, движение |
+| 7 | NPC | INPCService, INPCSpawnerService, ICorpseService | 8+ | 7 | ✓ | Спавн, AI, отношения, движение, трупы/full loot (R13) |
 | 8 | Player | IPlayerService, IPlayerInputService | 5+ | 4 | ✓ | Игрок, ввод, сон, стойки |
 | 9 | Qi | IQiService, IQiBufferService | 4+ | 11+ | ✓ | Ци, ядро, проводимость, прорывы |
 | 10 | Tile | ITileService, IResourceService | 4+ | 6 | — | Тайловая карта, ресурсы |
@@ -247,8 +247,8 @@ Modules/Xxx/
 
 | Свойство | Значение |
 |----------|----------|
-| Главные интерфейсы | `INPCService`, `INPCSpawnerService` |
-| Контракты | `NPCContracts` — NPCSpawned/Despawned/Death/Interacted/AIStateChanged/Damaged, AttitudeChanged |
+| Главные интерфейсы | `INPCService`, `INPCSpawnerService`, `ICorpseService` (R13) |
+| Контракты | `NPCContracts` — NPCSpawned/Despawned/Death/Interacted/AIStateChanged/Damaged, AttitudeChanged; `CorpseContracts` (R13) — CorpseCreated/Removed/Looted |
 | Tick | Да |
 | Зависимости Core | ITimeService |
 | Подписки на события | QiChanged, DamageApplied, BodyPartSevered, PlayerPositionChanged, CombatStarted, CombatEnded, DayChanged |
@@ -260,6 +260,8 @@ Modules/Xxx/
 **Ключевые сервисы:**
 - NPCService — данные NPC
 - NPCSpawnerService — спавн/деспавн
+- NPCSpawnCompositionService (R13) — процедурная генерация состава населения локации (тип локации + DangerLevel + сид → список SpawnRequest; детерминизм, кап 12; ReinforcementTick восполняет потери <60%)
+- CorpseService (R13) — трупы-контейнеры: снапшот экипировки/инвентаря/камней при смерти, TTL 1 игровой день, SlotId-адресное взятие (см. DEATH_AND_LOOT.md §2)
 - NPCRelationshipService — отношения (Attitude + затухание по `DayChangedEvent`)
 - NPCAIService — упрощённый Behaviour Tree
 - NPCCombatAdapter — адаптер боя через шину (НЕ прямая ссылка на CombatService)
@@ -591,7 +593,8 @@ Modules/Xxx/
 | `EquipmentChanged/Blocked` | Equipment | UI |
 | `CraftCompleted/Failed` | Crafting | UI |
 | `NPCSpawned/Despawned` | NPCSpawner | UI |
-| `NPCDeath` | NPCCombatAdapter | UI, Save |
+| `NPCDeath` | NPCCombatAdapter | CorpseService (труп-контейнер), UI, Save |
+| `CorpseCreated/Removed/Looted` | CorpseService (R13) | UI (CorpseSpriteRenderer, LootWindow), EventLog |
 | `NPCAIStateChanged` | NPC | UI |
 | `PlayerDeath/Revive` | Player | NPC, UI, Save |
 | `PlayerSleepEvent` | Sleep/Player | Qi, Body, UI |

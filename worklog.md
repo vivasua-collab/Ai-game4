@@ -574,3 +574,49 @@ Stage Summary:
 - Следующие шаги (рекомендации): UI-верификация в реальном окне (маркеры
   трупов/LootWindow — headless не рендерит), баланс камней в трупах,
   обыск трупов ИИ-NPC (чтобы лут не лежал вечно), генерация для large_world.
+
+---
+Task ID: R13-VERIFICATION-0910
+Agent: main-agent (Z.ai Code, сессия 09-10 №2, 06:30–07:30 UTC)
+Task: Корректный старт по START_PROMPT (пользователь: указания были неполными
+при прошлом старте): прочитать входные документы, обновить SESSION_CONTEXT/
+SESSION_SUMMARY, ответить про правила чекпоинтов, верифицировать R13 согласно
+документации и планов docs_v2.
+
+Work Log:
+- Прочитаны: START_PROMPT.md (правила §6-9, запреты), SESSION_CONTEXT.md
+  (был 08-28 — отставание на 09-08…09-10), SESSION_SUMMARY.md (был 08-25),
+  README.md, docs_v2: AI_DEVELOPMENT_WORKFLOW («доки = спецификация,
+  расхождение = баг»), TESTING_RULES §0 (конвейер QA), DEATH_AND_LOOT,
+  NPC_ASSEMBLY_PIPELINE §8.1-8.2, MODULE_STRUCTURE §2.7, DI_AND_EVENTBUS §2.3.
+- ПРАВИЛА ЧЕКПОИНТОВ: живут в START_PROMPT.md §6; отдельного файла правил в
+  checkpoints/ НЕТ и никогда не было — проверено полной git-историей имён
+  (только ММ_ДД_*.md, plans/, бэкапы worklog). Дизайн: START_PROMPT читается
+  первым на сессии → правила в контексте до создания чекпоинта.
+- ФУНКЦИОНАЛЬНАЯ ВЕРИФИКАЦИЯ R13: dotnet build 0 errors (348 warn — база);
+  GODOT_LOOT_DEBUG=1 PASS; регрессии COMBAT_SIM/SAVELOAD/CONTEXT/REASSEMBLY/
+  KILLFEED/TRASHDROP/STORAGE/QUEST — все PASS. Итог 9/9 хуков.
+- ВЕРИФИКАЦИЯ СООТВЕТСТВИЯ СПЕЦИФИКАЦИИ: найдены 4 doc-sync расхождения
+  (DEATH_AND_LOOT описывал старый случайный дроп; MODULE_STRUCTURE/DI_AND_
+  EVENTBUS не знали Corpse-сервисы/контракты; TESTING_RULES §0.1 не имел
+  5 хуков: LOOT/SAVELOAD/CONTEXT_HOLD/SCREENSHOT_MENU/SCREENSHOT_SPLIT).
+- DOCS_V2 СИНХРОНИЗИРОВАНЫ (workflow §3.3, с обоснованием в шапках):
+  DEATH_AND_LOOT.md §1.2/1.3/2/5/6 (трупы-контейнеры, TTL, ReinforcementTick,
+  таблица событий CorpseContracts, камни 4.1 vs §8.2 примечание);
+  MODULE_STRUCTURE.md (§1 таблица: NPC +ICorpseService 8+; §2.7:
+  NPCSpawnCompositionService + CorpseService; события: +Corpse-строка);
+  DI_AND_EVENTBUS.md (+CorpseContracts: 3); TESTING_RULES.md §0.1 (25→30).
+- SESSION_CONTEXT.md + SESSION_SUMMARY.md переписаны под 09-10: R13,
+  верификация, Godot flat-путь, поштучные QA-команды, актуальные next-шаги.
+- Git: «[ahead 2]» оказался устаревшим tracking-ref — git fetch; ls-remote:
+  origin/main == 7347bc1 == HEAD (push R13 подтверждён вторично).
+
+Stage Summary:
+- R13 верифицирован ПОЛНОСТЬЮ: функционально (QA 9/9 PASS, build 0 err) и
+  документационно (расхождения устранены синхронизацией docs_v2).
+- Входные документы проекта актуализированы (SESSION_CONTEXT/SUMMARY —
+  2026-09-10). Правило о чекпоинтах: §6 START_PROMPT, файла в checkpoints/
+  нет по дизайну (прецедент зафиксирован).
+- Наблюдение (не баг): камни death-drop (таблица 4.1) суммируются с камнями
+  инвентаря живого NPC (§8.2) при обыске — баланс проверить живым QA (P0).
+- Чекпоинт: checkpoints/09_10_r13_verification.md. Коммит: docs-sync.

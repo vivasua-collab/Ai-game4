@@ -224,6 +224,7 @@ public readonly struct BodyPartDamagedEvent
 | PlayerContracts | Игрок | 4 | PlayerDeath, PlayerRevive, PlayerSleep, PlayerPositionChanged |
 | WorldContracts | Мир | 11 | TimeChanged, DayChanged, TimeSpeedChanged, SceneTransitionRequest, SceneLoaded, MonthChanged, YearChanged, LocationChanged, TravelStarted, WorldEventTriggered, WorldEventEnded |
 | NPCContracts | NPC | 7 | NPCSpawned, NPCDespawned, AttitudeChanged, NPCDeath, NPCInteracted, NPCAIStateChanged, NPCDamaged |
+| CorpseContracts | Трупы (R13) | 3 | CorpseCreated, CorpseRemoved, CorpseLooted |
 | FormationContracts | Формации | 5 | FormationActivated, FormationDeactivated, FormationQiPoolChanged, FormationStageChanged, FormationContributeQiRequest |
 | QuestContracts | Квесты | 6 | QuestStarted, QuestObjectiveUpdated, QuestCompleted, QuestFailed, QuestAbandoned, QuestRewardGranted |
 | SaveContracts | Сохранение | 4 | SaveRequested, LoadRequested, SaveCompleted, LoadCompleted |

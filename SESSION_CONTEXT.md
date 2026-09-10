@@ -1,134 +1,61 @@
 # SESSION_CONTEXT — Передача контекста агенту
 
 **Дата создания:** 2026-08-22
-**Обновлено:** 2026-08-28 10:45 UTC (push 2 коммитов + персистентный токен GitHub + Caveman.md)
+**Обновлено:** 2026-09-10 07:30 UTC (R13 full-loot верифицирован; docs_v2 синхронизированы)
 **Назначение:** Полный контекст для продолжения разработки
-**Инструкция:** Прочитай этот файл ПЕРВЫМ при старте новой сессии
+**Инструкция:** Прочитай START_PROMPT.md ПЕРВЫМ, затем этот файл.
 
 ---
 
-## 0. ЧТО СДЕЛАЛОСЬ ЗА ОБЛАЧНЫЕ СЕССИИ 2026-08-25…28 (коммиты 679f19e…6b317bf)
+## 0. ЧТО СДЕЛАЛОСЬ ЗА СЕССИИ 2026-09-08…10 (коммиты 3e41927…7347bc1)
 
-### Сессия 2026-08-28 №3: push + персистентный токен (коммит на подходе)
-1. **Запушены 2 зависших коммита** сессии №2 (cd60c2d..6b317bf) — они
-   не были запушены, потому что у той сессии не было токена.
-2. **Диагноз потери токена:** контекст чата сбрасывается/сжимается между
-   сообщениями (summary платформы протухает — входной summary этой
-   сессии был старше последней сессии на 2+ часа). Правило START_PROMPT
-   «токен хранить в памяти сессии» (эпоха GLM 5.2 с живым контекстом)
-   больше не работает.
-3. **Инфраструктура токена:** `my-project/.auth/github.token` (вне git,
-   в зоне снапшота платформы → переживает сбросы; платформа снапшотит
-   my-project в /home/sync/repo.tar и восстанавливает), зеркало
-   `/home/sync/.auth/`, `.auth/` в .gitignore my-project (автокоммиты
-   платформы не трогают), восстановление credential store в cold_start.sh
-   (шаг 3), правила в START_PROMPT §5/§9-6.
-4. **Caveman.md портирован** из Ai-game3; режим по умолчанию lite
-   (START_PROMPT §13).
+### Сессия 2026-09-10 №2: верификация R13 + синхронизация docs_v2
+1. **R13 full-loot верифицирован** по правилам docs_v2 (запрос пользователя):
+   build 0 errors; QA 9/9 хуков PASS (LOOT/COMBAT/SAVELOAD/CONTEXT/
+   REASSEMBLY/KILLFEED/TRASHDROP/STORAGE/QUEST).
+2. **docs_v2 синхронизированы с R13** (workflow §3.3: расхождение код↔доки = баг):
+   DEATH_AND_LOOT.md (трупы-контейнеры вместо случайного дропа, таблица
+   событий с CorpseContracts, TTL, ReinforcementTick, камни 4.1);
+   MODULE_STRUCTURE.md §1/§2.7 (NPCSpawnCompositionService, CorpseService,
+   ICorpseService, CorpseContracts в таблицах); DI_AND_EVENTBUS.md
+   (CorpseContracts: 3 события); TESTING_RULES.md §0.1 (реестр хуков
+   25→30: +LOOT/SAVELOAD/CONTEXT_HOLD/SCREENSHOT_MENU/SCREENSHOT_SPLIT).
+3. Ответ на вопрос пользователя о правилах чекпоинтов: правила живут в
+   START_PROMPT.md §6 (по дизайну — START_PROMPT читается первым на каждой
+   сессии); отдельного файла правил в checkpoints/ никогда не было
+   (подтверждено git-историей всех имён файлов).
 
-### Сессия 2026-08-28 №2: Technique Book + library model (коммиты 2fcf9db, 6b317bf)
-1. Technique Book (T+пауза): матрица уровни/типы/стихии, архив, свитки,
-   слоты; TechniquesPanel (HUD-список) удалён; библиотека cap 8+2(L−1),
-   эхо мастерства 15% при забвении, свитки базовых форм (обход резонанса).
-2. F1 = справка клавиш (HotkeysWindow, Old School), F2 = чит-окно
-   (модальное), инлайн-хинты клавиш убраны из всех окон.
-3. TechniqueService теперь ISaveable: техники+эхо+свитки в сейве.
-4. ЛАТЕНТНЫЙ БАГ (задокументирован, не фиксировался): System.Text.Json
-   без IncludeFields=true не сериализует public-поля DTO (SlotState и др.),
-   Load отдаёт JsonElement — типизированные касты state is X молча падают.
-5. Рантайм-смоук (NEWGAME + T/пауза + F1/F2/Esc) — отложен до >19:00 МСК.
+### Сессия 2026-09-10 №1: R13 FULL-LOOT (коммиты 5f7e7e7 + 7347bc1)
+1. **NPC спаун через генерацию:** NPCSpawnCompositionService — состав
+   населения локации от (тип локации + DangerLevel + сид), детерминизм,
+   кап 12; ReinforcementTick (45 игр. сек) восполняет потери <60%.
+   Хардкод-массив ролей в HumanNPCSpawnPhase удалён.
+2. **Доступ к инвентарю мёртвого NPC:** CorpseService + CorpseData +
+   CorpseContracts + ICorpseService — смерть → труп-контейнер (снапшот
+   экипировки + инвентаря + камней по таблице 4.1), TTL 1 игровой день,
+   SlotId-адресность (паттерн R10), защита от фантомных ID (P1-5).
+   Старый «случайный дроп 1-2 предмета» удалён.
+3. **Full loot:** LootWindow (E — обыск, ЛКМ — по одному, «Забрать всё»,
+   Esc/CorpseRemovedEvent — авторитетное закрытие, пауза тиков) +
+   CorpseSpriteRenderer (саван/крест/лут-бейдж) + EventLog-подсказки.
+4. Фикс: ClassicLootSeeder регистрирует 4 «фантомных» ID материалов
+   (material_iron_scrap и др.) в ItemDatabase.
+5. QA: GODOT_LOOT_DEBUG=1 → PASS; 8 регрессий PASS; build 0 errors.
 
-### Сессия 2026-08-28 №1: фикс-сессия аудита-4 + восстановление окружения (1fd576a, 06668c4, 6204593, fd39377)
-1. **Аудит-4** (сессия 08-26 №3, сверено в коде): все 17 модулей ядра;
-   EQ-A1 MAJOR (потеря off-hand при двуручнике) + EQ-A2 фиксы на месте.
-2. **Закрыты ВСЕ задокументированные находки аудита-4:** BUFF-A1
-   (TickBuffs: двойной снапшот + отложенное удаление + пересчёт статов
-   ПОСЛЕ удаления), BUFF-A3 (StatModifierChanged в RemoveAllBuffs),
-   NPC-A2 (GetAllStates → снапшот List), INV-A1 (аккумуляция addedCount
-   в рекурсиях TryAddItem), SAVE-A1 (SaveModule собирает ISaveable через
-   IResolver.ResolveAll — в логе «6 ISaveable registered»; save_meta
-   больше не мёртвый код).
-3. **Хвост аудита-3:** C-5 — AttackRejectedEvent при атаке во время
-   каста (вместо тихого return); C-6 — CombatConfig.PlayerEntityId удалён.
-4. **cold_start.sh hardened:** чистит битый симлинк godot, работает без
-   GITHUB_TOKEN (публичный pull), ln -sfn + чистка симлинк-петель.
-   Прогон с чистого сброса — PASS end-to-end.
-5. Верификация: build 0 err / 271 warn (базовый уровень); NEWGAME,
-   COMBAT_SIM, TRADE_DEBUG, GEN_DEBUG — все PASS с эталонами.
+### Сессия 2026-09-09: R10 + R11 (коммиты 756fd79, 1fd5ba9)
+1. **R10:** SlotId-адресность инвентаря (Guid на кучку) — TOCTOU-защита:
+   stale drop/split отклоняются при мутации в полёте. ПКМ-меню
+   (свойства, разделение стака слайдером, слот-адресный выброс).
+2. **R11:** Save/Load persistence — типизированный round-trip
+   (IncludeFields, честный success/error), World biome/danger в сейве.
+   SaveLoadSimDebug v2 с анти-тривиальными мутациями и integrity.
 
-### Сессия 2026-08-26 №1: генераторы + верификация (коммиты 29f8d50…31d679b)
-1. **LevelBoundaries.cs** — границы уровней для техник/экипировки/формаций
-   (L1-10 × грейды × подтипы), OvershootPolicy (None/DamageAndQi/All).
-2. **VerificationService** — валидация генерируемых объектов по границам
-   (+WithOvershootApplied для легендарных +1lvl).
-3. **DeduplicationService** — fingerprints, очистка дублей по статам.
-4. **PreGenTechniquePhase** — предгенерация техник при создании мира
-   (100 техник, дедуп, верификация, регистрация в реестре).
-5. **CheatPanel** — секции генерации: экипировка/расходники/техника+формация/
-   cycle-формация/верификация (F1 в игре).
-6. docs_v2: CHEAT_PANEL, LEVEL_BOUNDARIES, VERIFICATION_SYSTEM,
-   PRE_GENERATION.
-
-### Сессия 2026-08-26 №2: Epic→Legendary оверкап + 3 аудита (f0d11a6, b8ddda1, e7f2008, 1c3e041)
-1. **Epic→Legendary промоушен:** при ролле Transcendent — 20% шанс
-   промо в Legendary (итог: L9+ ≈4% легендарок). **Оверкап** 18%
-   (диапазон ТЗ 10-25%): только Damage/Defense + Durability по формулам
-   L+1, RequiredCultivationLevel остаётся L. Легендарка ВСЕГДА получает:
-   энчант, макс стат-бонусы (5), value×3. API:
-   GenerateLegendaryWeapon/Armor(level, subtype?, seed, forceOvercap?).
-   Константы в GameConstants: EPIC_TO_LEGENDARY_PROMOTE_CHANCE,
-   LEGENDARY_OVERCAP_CHANCE, LEGENDARY_VALUE_MULTIPLIER.
-2. **3 баг-фикса генераторов:** VerificationService матчинг «_id_» (sword⊂
-   greatsword ложные out-of-bounds); оружие категории Void на T5 (иначе всё
-   L9-оружие — ЖЕЛЕЗО T1); BaseDamage MathF.Round (отбои на дробных гранях).
-3. **Аудит-1 (архитектура):** 6 находок, 4 фикса — порядок фаз
-   перенумерован 1-14 (Finalize последняя), FormationData перенесён в
-   Core.Data (Core→Modules нарушение), стабильная сортировка фаз, дубль
-   SceneReadyEvent удалён.
-4. **Аудит-2 (мир+NPC):** 7 находок, 4 фикса — травы chance 1→100
-   (двойной ролл давал 0.01%!), ResourceHarvestedEvent с исходным
-   ResourceId, сброс _placedGroupCentres между сборками, dead
-   NPCSpawnPhase удалён.
-5. **Аудит-3 (боевой контур):** 6 находок, 1 CRITICAL-фикс — инверсия
-   ролей игрока при NPC-инстагаторе (5 мест в CombatService через
-   PlayerIdResolver: qi-щит игрока, защита, fatal-ветка — лут/квесты
-   дропались НА игрока при ЕГО гибели, EndCombat winner, ExecuteDefense).
-6. **Итог регресса (Phase H):** все 4 headless-теста PASS — NEWGAME,
-   COMBAT_SIM (обе стороны получают урон; qi-щит отражает), TRADE_DEBUG
-   (buy/sell), GEN_DEBUG (промо 16.8%/4.0%, оверкап 2/16, верификация
-   40/40 легендарок).
-
-### Сессия 2026-08-25: P0-фиксы боя + торговля + визуал (679f19e, f02d61d, 8a5001b)
-- **P0-баги:** урон NPC→игрок не применялся ("player" vs "player_0"); все
-  таймеры в 60× медленнее (DeltaTime 1/60→1.0). Исправлены.
-
-### Phase 8: wiring экипировки (5 TODO CombatService закрыты)
-- IEquipmentDataProvider: +GetDodgeBonusPermil/GetBlockBonusPermil/
-  GetParryBonusPermil/GetCritBonusPermil/GetWeaponPenetration/SetEquipmentData
-- EquipmentDataProvider: резолв ID→EquipmentData через IItemDatabaseService
-- EquipmentService.SyncToProvider: экипировка игрока видна бою (оба player-ID)
-- CombatService: броня→уклонение, щит/оружие→блок/парирование, крит, пробитие;
-  базовая атака с оружием использует урон оружия (кулак был всегда 10)
-
-### Phase 7: Combat Visuals
-- DamageNumberRenderer: «−N»/«КРИТ −N»/«уклонение»/«парирование»/«блок»
-  над целями (пул структур, _Draw, ZIndex Objects+3)
-- HP-бар 48×5 над раненым NPC в NPCSpriteRenderer
-- Подписки EventBus в Godot-нодах — ТОЛЬКО в _Ready (_EnterTree ранf DI!)
-
-### Phase 4-5: Торговля (модуль Trade — 17-й)
-- CurrencyService (ICurrencyService, старт 50 камней, CurrencyChangedEvent)
-- TradeService: сток от FNV-1a(npcId): 1-2 оружия+1-2 брони «Матрёшка» L1-3,
-  3-4 расходника, 1 материал; цены Permil 1200‰/500‰
-- TradeWindow «Лавка торговца» (900×600): Товары/Инвентарь, ЛКМ=1/Shift=5
-- Диалог торговца «Покажи товары» → sentinel "open_trade" → TradeRequestedEvent
-  (EndDialogue ДО публикации — иначе resume поверх паузы лавки)
-
-### Headless-хуки верификации (новые)
-- GODOT_COMBAT_SIM=1 — бой в обе стороны + weapon end-to-end (VERDICT: PASS)
-- GODOT_TRADE_DEBUG=1 — smoke buy/sell; GODOT_TRADE_HOLD=1 — держать лавку
-- GODOT_SCREENSHOT_DELAY=<сек> — задержка скриншота (для кадров боя)
-- `--import --path <АБСОЛЮТНЫЙ>` генерирует .ctex — текстуры работают в облаке
+### Сессия 2026-09-08: внешнее ревью этапы 1-7 (коммиты 3e41927…80f4f25)
+34 находки внешнего ревью: combat authority (turn-gate, фантомный enemy,
+ammo-транзакция), inventory transactions (spirit retrieve/stacking, ring Qi,
+craft overflow, pickup integrity), qi transactions + DoT, world/tile
+(respawn, честный travel, time delta), quests (semantic targets, real
+rewards, dialogue-quest link, gates). QA 17/17 PASS. Доки 1v1.
 
 ---
 
@@ -138,119 +65,102 @@
 - **Название:** Cultivation World Simulator (Ai-game4)
 - **Жанр:** Xianxia cultivation life-sim (Kenshi + RimWorld + cultivation)
 - **Движок:** Godot 4.7.1 .NET (C#, net8.0)
-- **Рендер:** 2D top-down, NEAREST, gl_compatibility/opengl3
-- **Репозиторий:** https://github.com/vivasua-collab/Ai-game4
+- **Репозиторий:** https://github.com/vivasua-collab/Ai-game4 (публичный)
 
-### Восстановление окружения (cloud sandbox)
+### Окружение (после ночного сброса песочницы)
 ```bash
-# 1. .NET SDK 8.0 (8.0.424; 8.0.30 EOL — НЕ доступен, 424 работает)
-curl -sSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --channel 8.0 --install-dir /home/z/.dotnet
+# Полное восстановление одной командой (idempotent, ~1 мин):
+bash /home/z/my-project/Ai-game4/recover_sandbox.sh
+# или вручную:
+bash /home/z/my-project/automation/restore_env.sh
+```
 
-# 2. Godot 4.7.1 mono
-mkdir -p /home/z/godot && cd /home/z/godot && \
-curl -sSL https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_mono_linux_x86_64.zip -o /tmp/g.zip && unzip -oq /tmp/g.zip
+**Проверенное окружение 2026-09-10:**
+- .NET SDK 9.0.318 → /home/z/.dotnet (DOTNET_ROOT)
+- Godot 4.7.1 mono → **/home/z/godot_flat/godot** (flat-структура! не старый путь)
+- Репо: /home/z/my-project/Ai-game4 (HEAD 7347bc1 == origin/main)
+- Токен: /home/z/my-project/.auth/github.token (вне git, переживает сбросы)
+- Симлинк: /home/z/my-project/Ai-game4-repo → Ai-game4 (в git окружения)
 
-# 3. Репо + симлинки
-cd /home/z/my-project && git clone https://github.com/vivasua-collab/Ai-game4.git
-ln -sfn /home/z/my-project/Ai-game4 /home/z/my-project/aigame4
-ln -sfn /home/z/godot /home/z/my-project/godot
-
-# 4. NuGet.config (game/NuGet.config, gitignored)
-cat > /home/z/my-project/Ai-game4/game/NuGet.config << 'EOF'
-<?xml version="1.0" encoding="utf-8"?>
-<configuration><packageSources>
-<add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-</packageSources></configuration>
-EOF
-
-# 5. Сборка + ИМПОРТ (абсолютный путь!) + верификация
+### Сборка и QA
+```bash
 export DOTNET_ROOT=/home/z/.dotnet && export PATH="$DOTNET_ROOT:$PATH"
-cd /home/z/my-project/Ai-game4/game && dotnet build
-GODOT='/home/z/godot/Godot_v4.7.1-stable_mono_linux_x86_64/Godot_v4.7.1-stable_mono_linux.x86_64'
-timeout 240 "$GODOT" --headless --import --path /home/z/my-project/Ai-game4/game
-GODOT_NEWGAME=1 timeout 25 "$GODOT" --headless --path "$PWD" scenes/MainMenu.tscn
+cd /home/z/my-project/Ai-game4/game && dotnet build        # 0 errors (348 warnings — базовый уровень)
+
+GODOT='/home/z/godot_flat/godot'
+GODOT_NEWGAME=1 timeout 90 "$GODOT" --headless --path "$PWD" scenes/MainMenu.tscn   # полный флоу
+env GODOT_NEWGAME=1 GODOT_LOOT_DEBUG=1 timeout 90 "$GODOT" --headless --path "$PWD" scenes/MainMenu.tscn    # R13 full-loot
+env GODOT_NEWGAME=1 GODOT_COMBAT_SIM=1 timeout 90 "$GODOT" --headless --path "$PWD" scenes/MainMenu.tscn     # бой
+env GODOT_NEWGAME=1 GODOT_SAVELOAD_DEBUG=1 timeout 90 "$GODOT" --headless --path "$PWD" scenes/MainMenu.tscn # сейвы
+# Полный реестр 30 хуков: docs/docs_v2/09_workflow/TESTING_RULES.md §0.1
 ```
 
 ВНИМАНИЕ:
-- `--import` с `--path .` из чужого cwd молча берёт НЕ ТОТ проект → всегда
-  абсолютный путь
-- Сообщения «.NET Sdk not found. The required version is '8.0.30'» и
-  «Microsoft.Build not found» при import — НЕ фатальны
-- Push: `git push origin main` — работает через credential store.
-  Токен живёт в `/home/z/my-project/.auth/github.token` (персистентно,
-  вне git). НЕ запрашивать токен у пользователя пока файл существует.
-  Если push упал с auth — `bash cold_start.sh` (шаг 3 восстановит
-  credentials) или вручную:
-  `printf 'protocol=https\nhost=github.com\nusername=vivasua-collab\npassword=%s\n' "$(cat /home/z/my-project/.auth/github.token)" | git credential approve`
+- Хуки запускать поштучно (не в bash-цикле с общим пайпом) — некоторые
+  сцены держат процесс; вердикт искать grep 'VERDICT'.
+- `--import` — только абсолютный путь; сообщения GodotSharp при import
+  нефатальны. После клона импорт мог НЕ выполняться (.ctex отсутствует,
+  ERROR в логе) — headless QA работает, скриншоты требуют Xvfb+opengl3.
+- Push: `git push origin main` через credential store; токен в
+  /home/z/my-project/.auth/github.token. НЕ запрашивать у пользователя,
+  если файл есть. Пушить только с полным QA-прогоном.
 
 ---
 
-## 2. ТЕКУЩЕЕ СОСТОЯНИЕ (коммит 6b317bf — synced с origin/main)
+## 2. ТЕКУЩЕЕ СОСТОЯНИЕ (HEAD 7347bc1 — synced с origin/main)
 
 ### Что работает
 - ✅ Main Menu → New Game (50×50) / Large World (500×500)
-- ✅ Мир: 9 биомов + ТЕКСТУРЫ (импорт облака), переходы, объекты, harvest (F),
-      ground items (E), перевес, процедурные спрайты
-- ✅ Инвентарь (B) + кукла (11 слотов) + слоты пояса (хотбар 3-9)
-- ✅ Character Sheet (C): силуэт тела, статы, культивация
-- ✅ **Бой (P0-фиксы):** Space-атака (цель ≤2.5 тайла), урон NPC→игрок по
-      частям тела (70/30 RedHP/WhiteHP), HP-бар, тосты, смерть→респавн 3с,
-      лут с трупов (1-2 предмета)
-- ✅ **Статы экипировки в бою:** урон оружия (вкл. базовую атаку), пробитие,
-      штраф уклонения брони, блок/парирование/крит бонусы, coverage
-- ✅ **Combat Visuals:** цифры урона (−N/КРИТ) + слова защиты; HP-бары над NPC
-- ✅ **Торговля:** E у торговца → диалог → «Покажи товары» → лавка (Товары/
-      Инвентарь, ЛКМ=1/Shift=5, Esc), духовные камни (старт 50)
-- ✅ NPC: 6 на локации (2 Enemy + Guard + 2 Passerby + Merchant), ИИ
-      диспозиций, диалоги, NPC-атаки раз в 1.6с
-- ✅ Qi: уровни/прорывы, техники (T, слоты, Z/X каст), формации (генератор +
-      lifecycle + визуал), камни Ци (RMB), медитация (V), чит-меню (F1)
-- ✅ Генераторы: «Матрёшка» экипировка (7 оружий × 6 бронь × 14 материалов ×
-      грейды × зачарования), техники, формации, предметы
-- ✅ **Legendary-предметы:** промо Epic→Legendary 20%, оверкап 18%
-      (статы L+1 в Damage/Defense/Durability), верификация по границам
-      (все 40/40 принудительных легендарок L9 валидны)
-- ✅ **Верификация/дедуп генераторов:** LevelBoundaries + VerificationService
-      + DeduplicationService + PreGenTechniquePhase (100 техник при старте)
-- ✅ Скорость PageUp/Down; EventBus re-entrancy; детерминированный combat RNG
+- ✅ Мир: 9 биомов, переходы, объекты, harvest (F), ground items (E),
+      перевес, процедурные спрайты
+- ✅ Инвентарь (B) + кукла (11 слотов) + пояс (3-9) + ПКМ-контекстное
+      меню (свойства/разделение стака/выброс, SlotId-адресно — R10)
+- ✅ Бой: Space-атака, урон по частям тела, HP-бары, цифры урона,
+      kill-feed, стрелка атакующего, ranged+LOS+ammo, turn-gate,
+      смерть→респавн
+- ✅ **Full loot (R13):** спаун NPC через генерацию состава, трупы-
+      контейнеры (снапшот экипировки/инвентаря/камней), обыск E,
+      «Забрать всё», TTL трупов, ReinforcementTick
+- ✅ Save/Load (R11): типизированный round-trip, 8 ISaveable-блоков,
+      IncludeFields, честные события
+- ✅ Торговля: диалог → лавка → buy/sell за духовные камни
+- ✅ Qi: уровни/прорывы, техники (T, Z/X), формации, камни Ци (RMB),
+      медитация (V), зарядники
+- ✅ Генераторы: «Матрёшка» + легендарки (промо 20%/оверкап 18%) +
+      верификация/дедуп
+- ✅ Квесты: полный цикл через реальный диалог, гейты, награды
 
 ### НЕ проверено живьём (в редакторе на ПК)
-- ⚠ Страж-союзник вступается (Friendly → threat врагу)
-- ⚠ Слоты пояса end-to-end (надеть → drag&drop → клавиша 3)
-- ⚠ Лут-дроп + подбор E (пайплайн готов, headless не проверяет подбор)
+- ⚠ Визуал R13: маркеры трупов/LootWindow в реальном рендере
+      (headless не рисует; нужен Xvfb-скриншот или ПК)
+- ⚡ Баланс: камни в трупах по таблице 4.1 могут быть щедрыми
 
 ### Что НЕ работает (отложено)
-- ❌ Phase 3: Faction system (порт из Ai-game3-ref, ~400 LOC)
-- ❌ Phase 8 остаток: isRanged → CombatSubtype (CombatService ~:300);
-      ammo/луки/стрелы (Phase 8 ч.2 — ProjectileRenderer ~300 LOC)
-- ❌ Phase 9: метательное оружие + dual wield
-- ❌ Tooltip + Context Menu (UI_DESIGN #21-22)
-- ❌ Per-attacker pending technique (глобальный pending: NPC может ударить
-      себя при смене цели в полёте атаки)
-- ❌ Save/load (Q8 — отключён); TileMapLayer миграция (Q11)
+- ❌ Faction system (порт из Ai-game3-ref)
+- ❌ Лут с животных: материалы (шкура/мясо) TODO — звери дают только камни
+- ❌ Per-attacker pending technique
+- ❌ Обыск трупов ИИ-NPC (только игрок)
+- ❌ Генерация состава для large_world (500×500) — не проверено
 
 ---
 
-## 3. АРХИТЕКТУРА (кратко — детали в START_PROMPT.md)
+## 3. АРХИТЕКТУРА (кратко — детали в START_PROMPT.md / MODULE_STRUCTURE.md)
 
 ```
 game/src/
-├── Core/            ← engine-agnostic: Data, Interfaces (40+), Messaging/Contracts
-├── Modules/         ← 17 модулей: ... Interaction, Trade (НОВЫЙ), UI, ...
-├── Entry/           ← GameSession, 10+ Phases, GameLifetimeScope (порядок см. ниже)
-└── Adapter/         ← Godot: Scene (GameBoot, GameWorldController, рендереры),
-                        UI (окна), Input, DI, Persistence
+├── Core/            ← engine-agnostic: Data, Interfaces (45+), Messaging/Contracts (~133)
+├── Modules/         ← 17 модулей: ... CorpseService в NPC, Trade, Generator ...
+├── Entry/           ← GameSession, 16 фаз, GameLifetimeScope
+└── Adapter/         ← Godot: Scene (рендереры, *SimDebug QA), UI (окна), Input, DI
 ```
 
 - **DI-порядок** (GameLifetimeScope): World → Tile → Body → Qi → Buff →
   Inventory → Combat → Formation → NPC → Player → Quest → Interaction →
-  **Trade** → UI → Charger → Save → Generator (19 startables, 18 tickables)
-- **Игрок под двумя ID**: "player" (EquipmentService/BodyService) и "player_0"
-  (PlayerService/Combat/NPC AI). Нормализация: BodyService.IsPlayerEntityId,
-  EquipmentService.SyncToProvider пушит под обоими
-- **Время:** DeltaTime=1.0/тик (1 тик = 1 игроминута = 1 сек на Normal;
-  Fast ×5, Quick ×15 тиков/сек). Все таймеры — «секунды на Normal»
-- **Подписки Godot-нод на EventBus — в _Ready ПОСЛЕ ContainerAdapter.InjectProperties**
+  Trade → UI → Charger → Save → Generator
+- **Игрок под двумя ID**: "player" (Equipment/Body) и "player_0"
+  (PlayerService/Combat/NPC AI) — IsPlayerEntityId нормализует
+- **Время:** 1 тик = 1 игроминута = 1 сек на Normal
+- **Подписки Godot-нод на EventBus — в _Ready ПОСЛЕ DI-инъекции**
 
 ---
 
@@ -259,73 +169,56 @@ game/src/
 1. Godot 4.7.1 .NET — единственный движок; чистый 2D
 2. Qi = long (не float); integer math (Permil) для боя
 3. config/name без пробелов ("CultivationGame")
-4. Input actions программно; constructor injection поддерживается
-5. **Документация первична** — НЕ редактировать без прямого указания
-6. Custom _Draw рендеринг (TileMapLayer отложен); Element.Poison остаётся
-7. Save/load отключён (Q8); GameTile mutable (Q14)
-8. НЕ запускать Next.js DEV сервер (песочница — не для игры)
+4. Input actions программно
+5. **Документация первична** — редактирование docs_v2 только с
+   обоснованием и синхронизацией (workflow §3.3), без «тайных» знаний
+6. Custom _Draw рендеринг; Element.Poison остаётся
+7. Save/load включён (R11 закрыл Q8)
+8. **НЕ запускать Next.js DEV сервер** (песочница — не для игры;
+   сейчас он остановлен по запросу пользователя от 09-10)
 
 ---
 
 ## 5. СЛЕДУЮЩИЕ ШАГИ (приоритет)
 
-### P0 — живая проверка в редакторе (ПК, после 19:00)
-1. **Чит-кнопки легендарок (F1):** «Легендарки (промо 20% / оверкап 18%)» —
-   оружие/броня/батч ×20 со статистикой + верификацией. Сравнить семплы
-   с/без оверкапа (dmg 115 vs 104 на L9 — эталон из дампа).
-2. Бандит бьёт игрока: HP падает, тосты, смерть→респавн; qi-щит отражает
-   урон атакующему (новое после фикса C-1)
-3. Страж вступается; лут-подбор; пояс end-to-end
-4. Цифры урона/HP-бары/лавка — глазами
+### P0 — живая проверка в редакторе (ПК)
+1. Визуал R13: маркеры трупов, LootWindow, «Забрать всё», респаун
+   подкреплений глазами; Xvfb-скриншот с GODOT_TRADE_HOLD-подобным HOLD
+2. Баланс камней в трупах (таблица 4.1 vs ощущение)
 
-### P1 — по плану NPC_COMBAT_PREP / кандидаты аудита-5+
-4. ~~Аудит-4 + C-5/C-6~~ — ЗАКРЫТО 2026-08-28 (все 17 модулей ядра +
-   все находки серии 1–4 закрыты фиксами; см. чекпоинт аудита-4).
-   Кандидаты аудита-5+: Adapter-слой (Scene/UI/Input),
-   Body/Enhancement глубже, NPC Soul, Trade-экономика.
-5. Phase 3: Faction Port (Ai-game3-ref/Modules/World/FactionService.cs —
-   227 LOC portable; FactionData 34 LOC; wire в NPCRelationshipService)
-6. Phase 8 ч.2: Weapon Variety + Ammo (WeaponSubtype в атаках, IAmmoService,
-   ProjectileRenderer ~300 LOC; генератор уже выдаёт bow/spear/axe/dagger)
-7. Phase 9: Thrown + Dual Wield
+### P1 — кандидаты следующей сессии
+3. Лут с животных: материалы по видам (шкура/клыки/мясо) в CorpseService
+4. Обыск трупов ИИ-NPC (приоритет лута для AI)
+5. Faction port (Ai-game3-ref, ~400 LOC)
+6. Генерация состава для 500×500 (мульти-локации)
 
 ### P2 — долг
-7. Per-attacker pending technique (CombatService)
-8. Tooltip/ContextMenu (UI_DESIGN #21-22)
-9. Консистентность единиц времени (TICK_SECONDS=3.0 в CombatConsequences)
+7. Per-attacker pending technique
+8. Tooltip-система (UI_DESIGN)
+9. Классические dotnet test-наборы (TESTING_RULES §1-§10 — плановая работа)
 
 ---
 
-## 6. КОМАНДЫ ПРОВЕРКИ
+## 6. КОМАНДЫ ПРОВЕРКИ (полный реестр — TESTING_RULES.md §0.1)
 
 ```bash
 export DOTNET_ROOT=/home/z/.dotnet && export PATH="$DOTNET_ROOT:$PATH"
-cd /home/z/my-project/aigame4/game
-GODOT='/home/z/godot/Godot_v4.7.1-stable_mono_linux_x86_64/Godot_v4.7.1-stable_mono_linux.x86_64'
+cd /home/z/my-project/Ai-game4/game
+GODOT='/home/z/godot_flat/godot'
 
 dotnet build                                                     # 0 errors
 
-GODOT_NEWGAME=1 timeout 25 "$GODOT" --headless --path "$PWD" scenes/MainMenu.tscn          # полный флоу
-GODOT_NEWGAME=1 GODOT_COMBAT_SIM=1 timeout 25 "$GODOT" --headless --path "$PWD" scenes/MainMenu.tscn  # бой: VERDICT PASS
-GODOT_NEWGAME=1 GODOT_TRADE_DEBUG=1 timeout 25 "$GODOT" --headless --path "$PWD" scenes/MainMenu.tscn # торговля smoke
-GODOT_MAP_SIZE=500 timeout 30 "$GODOT" --headless --path "$PWD" scenes/GameWorld.tscn      # большая карта
-GODOT_GEN_DEBUG=1 timeout 20 "$GODOT" --headless --path "$PWD" scenes/GameWorld.tscn       # дамп генераторов
+# Ключевые хуки (полный список 30 шт — TESTING_RULES §0.1):
+env GODOT_NEWGAME=1 timeout 90 "$GODOT" --headless --path "$PWD" scenes/MainMenu.tscn
+env GODOT_NEWGAME=1 GODOT_LOOT_DEBUG=1 timeout 90 "$GODOT" --headless --path "$PWD" scenes/MainMenu.tscn
+env GODOT_NEWGAME=1 GODOT_COMBAT_SIM=1 timeout 90 "$GODOT" --headless --path "$PWD" scenes/MainMenu.tscn
+env GODOT_NEWGAME=1 GODOT_SAVELOAD_DEBUG=1 timeout 90 "$GODOT" --headless --path "$PWD" scenes/MainMenu.tscn
 
-# Скриншот с боем (Xvfb + софтверный GL + VLM для анализа)
+# Скриншот (Xvfb + софтверный GL + VLM):
 Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 & sleep 2
-DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 GODOT_NEWGAME=1 GODOT_COMBAT_SIM=1 \
+DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 GODOT_NEWGAME=1 \
   GODOT_SCREENSHOT=/tmp/shot.png GODOT_SCREENSHOT_DELAY=4.3 timeout 60 "$GODOT" \
   --path "$PWD" --rendering-driver opengl3 scenes/MainMenu.tscn
-# Скриншот лавки: GODOT_TRADE_DEBUG=1 GODOT_TRADE_HOLD=1 GODOT_SCREENSHOT_DELAY=5.0
-```
-
-### Ожидаемый вывод боя (ключевые строки)
-```
-[CombatSim] equip[npc_...]: pen=4 dodge=... dmg=15
-[CombatSim] damage: npc_... → player_0: 21 (Hit, part=Torso)
-[CombatSim] player equipped 'Сталь Посох' (dmg=7, pen=1) — provider: dmg=7, pen=1
-[CombatSim] armed swing: npc HP 493→479 (14 RedHP dmg)
-[CombatSim] VERDICT: PASS — обе стороны боя получают урон
 ```
 
 ---
@@ -336,37 +229,33 @@ DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 GODOT_NEWGAME=1 GODOT_COMBAT_SIM=1 \
 |------|------------|
 | `SESSION_CONTEXT.md` | ЭТОТ ФАЙЛ |
 | `SESSION_SUMMARY.md` | Сводка сессий + состояние |
-| `checkpoints/plans/2026-08-26_epic_legendary_overcap_and_audit_plan.md` | План сессии 08-26 №2 |
-| `checkpoints/2026-08-26_epic_legendary_overcap_checkpoint.md` | Чекпоинт сессии 08-26 №2 (фазы A-H) |
-| `checkpoints/2026-08-26_audit_pass1_architecture.md` | Аудит-1: архитектура (6 находок) |
-| `checkpoints/2026-08-26_audit_pass2_worldgen.md` | Аудит-2: мир+NPC (7 находок) |
-| `checkpoints/2026-08-26_audit_pass3_combat_qi.md` | Аудит-3: боевой контур (6 находок) |
-| `checkpoints/2026-08-27_generators_verification_checkpoint.md` | Чекпоинт сессии 08-26 №1 (генераторы) |
-| `docs/docs_v2/02_systems/LEVEL_BOUNDARIES.md` | Границы уровней + промо/оверкап |
-| `docs/docs_v2/07_ui/CHEAT_PANEL.md` | Чит-меню (вкл. секция «Легендарки») |
-| `game/src/Adapter/Scene/CombatSimDebug.cs` | Headless-верификация боя |
-| `game/src/Modules/Combat/CombatService.cs` | Боевой контур (фикс C-1 аудита-3) |
+| `checkpoints/09_10_r13_full_loot.md` | Чекпоинт R13 (фичи) |
+| `docs/docs_v2/04_entities/DEATH_AND_LOOT.md` | Спецификация смерти/лута (синхронизирована с R13) |
+| `docs/docs_v2/09_workflow/TESTING_RULES.md` | Реестр 30 QA-хуков |
+| `game/src/Modules/NPC/CorpseService.cs` | Трупы-контейнеры |
+| `game/src/Modules/NPC/NPCSpawnCompositionService.cs` | Генерация населения |
+| `game/src/Adapter/UI/LootWindow.cs` | Окно обыска |
+| `game/src/Adapter/Scene/LootSimDebug.cs` | QA full-loot |
 
 ---
 
 ## 8. ПРЕДУПРЕЖДЕНИЯ
 
-1. Next.js DEV сервер НЕ запускать — песочница для игры
-2. `--import` — ТОЛЬКО абсолютный путь
-3. SDK 8.0.30 EOL → 8.0.424; ошибки GodotSharp editor при import нефатальны
+1. Next.js DEV сервер НЕ запускать (сейчас остановлен по запросу)
+2. `--import` — ТОЛЬКО абсолютный путь; после клона .ctex может
+   отсутствовать (headless QA работает без него)
+3. QA-хуки запускать поштучно с таймаутом ≥90 сек
 4. BiomeTiles/спрайты логируют каждый кадр — спам в лог
-5. Токен GitHub: персистентно в `/home/z/my-project/.auth/github.token`
-   (вне git, переживает сбросы; зеркало `/home/sync/.auth/`). НЕ запрашивать
-   у пользователя, если файл есть; НИКОГДА не коммитить и не вставлять в
-   remote URL постоянно. Контекст чата между сообщениями сбрасывается —
-   на память сессии не рассчитывать, сразу читать этот файл.
-6. Документация НЕ редактируется без прямого указания пользователя
-7. **Сброс песочницы между сессиями:** если Godot/dotnet пропали — запускать
-   `bash /home/z/my-project/Ai-game4/cold_start.sh` (idempotent, ~1 мин с
-   нуля; переживает битые симлинки, отсутствие GITHUB_TOKEN, петли).
-   08-28: «аномалия ФС» 08-26 объяснена и закрыта в cold_start
-   (подчёркивание/точка в имени бинаря, ненадёжный unzip, ln -sf сквозь
-   симлинк). Локальный git может ОТСТАВАТЬ от GitHub после сброса:
-   сверять `git ls-remote origin` → fetch + reset --hard origin/main.
+5. Токен GitHub: /home/z/my-project/.auth/github.token (вне git).
+   НЕ запрашивать у пользователя, если файл есть. Репозиторий публичный
+   (pull без токена работает).
+6. **Сброс песочницы:** Godot/dotnet могут пропасть →
+   `bash /home/z/my-project/Ai-game4/recover_sandbox.sh`. Локальный git
+   может отставать от GitHub → сверять `git ls-remote origin` → fetch.
+   После сброса Godot живёт в **/home/z/godot_flat/godot** (flat).
+7. Документация редактируется только с обоснованием и коммитом-ссылкой
+   на причину (workflow §3.3) — прецедент: синхронизация R13 2026-09-10.
+8. Правила чекпоинтов — в START_PROMPT.md §6 (не отдельный файл в
+   checkpoints/; подтверждено git-историей 2026-09-10).
 
-*Конец файла. Прочитай START_PROMPT.md следующим.*
+*Конец файла. Полная хроника — worklog.md (репо) + checkpoints/.*
