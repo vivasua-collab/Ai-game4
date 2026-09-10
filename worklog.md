@@ -513,3 +513,64 @@ Stage Summary:
 - Тест round-trip стал доказательным: анти-тривиальность + маркеры
   содержимого. Дефект «камни 10→10» устранён.
 - Чекпоинт: checkpoints/09_09_r11_save_load.md.
+
+---
+Task ID: R13-FULL-LOOT
+Agent: main-agent (Z.ai Code, сессия пользователя 05:35 UTC / 08:35 МСК, токен из чата)
+Task: Три фичи по задаче пользователя: (1) NPC спаун через генерацию;
+(2) доступ к инвентарю мёртвого NPC; (3) система full loot.
+
+Work Log:
+- Токен сохранён в /home/z/my-project/.auth/github.token (classic, scope repo).
+  Сверка: local HEAD 1fd5ba9 == origin/main; дерево чистое; Godot/dotnet на месте.
+- «NPC спаун через генерацию»: NPCSpawnCompositionService (Modules/NPC) —
+  процедурный состав населения от типа локации + DangerLevel + сида
+  (детерминизм: SeededRandom, prime-offset 31337, кап 12). Хардкод-массив
+  SpawnRoles[7] в HumanNPCSpawnPhase УДАЛЁН → GenerateStartup(loc).
+  ReinforcementTick (из NPCModule.Tick, интервал 45 игр. сек): живых < 60%
+  целевого → 1 сгенерированный NPC на walkable ≥12 тайлов от игрока — мир
+  восполняет потери (full-loot цикл замыкается). Reset() для ReAssembly.
+- «Доступ к инвентарю мёртвого NPC»: Core/Data/CorpseData (CorpseItem:
+  SlotId-Guid + ItemId + Count + Rarity + Source), CorpseContracts
+  (Created/Removed/Looted), ICorpseService; Modules/NPC/CorpseService —
+  подписка NPCDeathEvent → снапшот экипировки + инвентаря + духовных камней
+  (таблица 4.1) в труп на месте смерти. Гварды: fake-death (NPC жив → трупа
+  нет — нашли QA KILLFEED), дедуп повторных смертей. TTL 1440 игр. сек.
+  SlotId-адресность (паттерн R10 TOCTOU). Выдача — ItemAddRequestEvent (EVT-02).
+- ЗАМЕНА Этапа 3: NPCModule.OnNPCDeathForLoot (1-2 СЛУЧАЙНЫХ предмета на
+  землю, реальная экипировка NPC исчезала) удалён — честный full loot в трупе.
+- «Full loot»: Adapter/UI/LootWindow (паттерн TradeWindow): слева содержимое
+  трупа группами (ношеное/камни/карманы), ЛКМ — взять по SlotId, справа
+  инвентарь игрока (вес/объём), «✦ Забрать всё (N)», «Уйти», Esc. Пауза тиков
+  при открытии; авторитетное закрытие — Esc/CorpseRemovedEvent (как лавка).
+  GameWorldController: E-flow «HandleCorpseSearchOrNpcTalk» — труп ближе живого
+  NPC → обыск (мёртвый не говорит, при равенстве дистанций труп важнее);
+  модальные гварды (modalOpen/SetOverUI). CorpseSpriteRenderer: «саван»+крест+
+  золотой лут-бейдж+имя, рисуется ПОД живых NPC. EventLogWindow: подсказки
+  «можно обыскать (N поз., E)» / «Обыскано: …».
+- ФИКС «фантомных» предметов (найден QA): material_iron_scrap,
+  material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment —
+  использовались с фазы 4.1 (FillInventory, CombatLootService), но НЕ были
+  зарегистрированы в ItemDatabase → InventoryModule молча отклонял взятие.
+  ClassicLootSeeder (Modules/Generator, вызов из GeneratorModule.Start)
+  регистрирует все 4. CorpseService: неизвестные БД предметы в труп не
+  попадают (P1-5 паттерн, предупреждение).
+- QA: build 0 errors (348 warnings — прежний набор). GODOT_LOOT_DEBUG=1 →
+  VERDICT: PASS (состав 12 NPC/6 ролей/детерминизм; труп; окно; SlotId-взятие;
+  double-take отказ; full loot инвентарь 84→86; удаление; TTL; reinforcement
+  alive 5/10 floor 6 → spawned=True). Регрессии: KILLFEED/STORAGE/TRASHDROP/
+  CONTEXT/SAVELOAD/QUEST/COMBAT_SIM/REASSEMBLY — все PASS.
+- Commit 5f7e7e7 (17 файлов: 9 новых + 8 правок, +2213/-59), push на GitHub
+  (1fd5ba9..5f7e7e7), ls-remote подтверждает origin/main == HEAD.
+
+Stage Summary:
+- Все три фичи задачи реализованы и верифицированы headless-QA:
+  спаун генерируется составом от локации (не хардкод) + мир восполняется;
+  смерть создаёт труп-контейнер с честным содержимым; E — окно обыска
+  с взятием по одному (SlotId-адресно) и «Забрать всё» (full loot).
+- Побочный фикс: 4 классических предмета лута зарегистрированы в БД
+  (P1-5-класс «фантомных» ID существовал с 2026-05).
+- Чекпоинт: checkpoints/09_10_r13_full_loot.md.
+- Следующие шаги (рекомендации): UI-верификация в реальном окне (маркеры
+  трупов/LootWindow — headless не рендерит), баланс камней в трупах,
+  обыск трупов ИИ-NPC (чтобы лут не лежал вечно), генерация для large_world.
