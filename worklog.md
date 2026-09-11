@@ -1044,3 +1044,938 @@ Stage Summary:
   рендерах (иначе «невидимость» для боевых потребителей, как волки D1).
 - Пользователю: живой QA на ПК (посох→волк полный флоу, месть, уход от
   погони, F1-справка без легенды на HUD).
+
+---
+Task ID: AUDIT-WORLDTILE-0911
+Agent: worldtile-audit-agent (Z.ai Code субагент)
+Task: Аудит модулей World + Tile
+
+Work Log:
+- Скоуп READ-ONLY: Modules/World (WorldConfig/WorldModule/WorldService.cs=TimeService+
+  WorldService), Modules/Tile (TileConfig/TileModule/TileService/ResourceService) —
+  полностью; контекст: WorldContracts/TileContracts, WorldInitPhase/TileMapGenPhase/
+  NpcDomainResetPhase, GameSession/SceneOrchestrator/GameBoot(tick), GWC (harvest F/
+  pickup E/рендер), GroundItemService/InventoryModule (drop-контракт), ObjectDefaults/
+  GameTile/WorldTime/SeededRandom/ValueNoise/Constants; docs_v2/03_world ×4.
+- Верифицированы цепочки: harvest→inventory→overflow→drop→pickup (замкнуто, dupe нет);
+  respawn-проводка DayChanged→RespawnCheck→ResourceRespawned→OnResourceRespawned→
+  SetTile; пересборка NewGame/LoadGame (фазы, SkipOnLoad, ResetWorld-паттерн NPC);
+  сид-детерминизм генерации; tick-стоимость при 500×500; R11 biome/danger round-trip.
+- 12 находок (1×P1, 5×P2, 6×P3): WT-1 респаун ресурсов мёртв (ResourceService.
+  Initialize() никто не вызывает; RespawnSimDebug маскирует прямым вызовом
+  RespawnCheck); WT-2 респаун по дню месяца (wrap 30→1 — истощение ≥24-го не
+  респаунится никогда); WT-3 Large World: SetActiveLocation("large_world") NOT FOUND
+  (реестр WorldService знает только test_polygon) → состав NPC/DangerLevel от чужой
+  локации, остаток R11-P2 «две модели карты»; WT-4 у домена World/Tile нет
+  ResetWorld-аналога (NpcDomainResetPhase-паттерн не распространён: _depleted не
+  чистится, на LoadGame grid не регенерируется/не восстанавливается, реестры World
+  переживают мир); WT-5 TimeService не сбрасывается на NewGame и не в сейве (8
+  ISaveable-блоков без world/time) — время после LoadGame ≠ сейвовскому; WT-6
+  истощение не возвращает TileFlags.Passable — срубленный лес навсегда непроходим для
+  NPC/животных; P3: хардкод RespawnDayDelay=7 мимо ObjectDefaults.RespawnDays;
+  мёртвый WorldConfig (StartHour 12 vs 06:00, "start_village"); фиктивные Day/Month/
+  YearChanged на 1-м тике; устаревший XML IWorldService.TryTravel; мёртвый
+  TileMapGeneratedEvent; latent Empty-харвест (дробный остаток <1 обнуляется без
+  Depleted).
+- Чисто: сид-детерминизм (SeededRandom/ValueNoise), anti-dupe harvest, drop-контракт,
+  tick O(1)/no-op, viewport-culled рендер, R11-маппинг biome/danger, counts[16] в
+  SmoothBiomes.
+- Чекпоинт: checkpoints/09_11_audit_world_tile.md (полные file:line, доказательства,
+  фиксы, таблица docs_v2-соответствия).
+
+Stage Summary:
+- Главный системный вывод: респавн-фича Tile сломана в ДВУХ местах проводки (нет
+  Initialize + day-of-month wrap), и сломана ТИХО — QA-сим обходит проводку прямым
+  вызовом. Второй кластер: lesson R14 «DI-синглтоны живут дольше мира» не применён к
+  World/Tile — нет сброса реестров/времени/_depleted, LoadGame не восстанавливает и
+  не перегенерирует мир (биом/danger честны только в рантайме; world/time в сейве
+  отсутствуют).
+- Код НЕ изменялся (READ-ONLY аудит). Все находки с рекомендованными фиксами в
+  чекпоинте; приоритет фикса: WT-1+WT-2 (один PR), затем WT-3, WT-4/WT-5 (паттерн
+  сброса), WT-6.
+- Пользователю: после фиксов оживить ассерты проводки в RespawnSimDebug (реальный
+  DayChanged-путь + wrap месяца), иначе регресс вернётся тихо.
+
+---
+Task ID: AUDIT-BODY-0911
+Agent: bodybuff-audit-agent
+Task: Глубокий READ-ONLY аудит модуля Body (11 файлов Modules/Body + проводка
+Core/Data/BodyPart, BodyContracts, Container, Combat/NPC/Animal/Player-потребители)
+— проверка per-part HP-логики, единого правила смерти (D8), фабрик/морфологий,
+SeveredDebuff, BodyEnhancement, doc-drift BODY_SYSTEM.md. Детальный отчёт:
+checkpoints/09_11_audit_body.md.
+
+Work Log:
+- Прочитаны полностью все 11 файлов Modules/Body (≈2.4k строк) + BodyPart.cs,
+  BodyContracts.cs, Container.cs, Constants.cs (hit-таблицы/реген/HP),
+  CombatService/NPCCombatAdapter/AnimalService/PlayerService (домены смерти),
+  DamageService/DamageCalculator (DetermineHitPart), NPCAssemblyService
+  (усиления), CombatConsequencesService/ElementalEffectService (бафф-проводка).
+- Находки: 11 (2×P1, 5×P2, 4×P3). P1: BOD-1 MorphologyHitTables оперируют
+  гуманоидными BodyPartType, отсутствующими в телах Quadruped/Arthropod/
+  Amorphous/Serpentine → 46% попаданий по волку фолбэком в торс, ноги зверей
+  недостижимы, 40% попаданий по пауку бьют сердце, 50% урона по призраку
+  теряются (ResolveEntityTarget → null); BOD-2 единое правило смерти не
+  покрывает игрока — PlayerService реагирует только на Heart+Disabled (Head
+  RedHP→0 не убивает), IsAlive=!IsPartSevered(Heart) всегда true (сердце не
+  ампутируется) — игрок «жив» после смерти. P2: BOD-3 усиления негуманоидных
+  видов не работают (фильтр GetEnhancementBonuses(All) + таргетинг
+  несуществующих частей); BOD-4 параметры severed-дебаффов теряются в
+  BuffService (buffId не распознан → AttackBoost-ветка, duration −1 → 30
+  тиков); BOD-5 пассивная регенерация не восстанавливает BlackHP (дока §9
+  требует structural-first) и NPC не регенерируют вовсе; BOD-6 ампутации не
+  переживают load (RestoreState не публикует Severed-события, _activeDebuffs
+  теряется, ReattachPart без вызовов); BOD-7 cultivationBonus HP из доки §7.1
+  не реализован. P3: StatChangedEvent никто не публикует (RecalculateHPFromVitality
+  мёртв), малое лечение целиком в BlackHP, строгий == вместо PlayerIdResolver
+  в player-ветке IBodyDataProvider, расхождение реестра видов с докой.
+- Проверено чисто: D8-правило для NPC/животных (все 3 домена IsEntityAlive +
+  дренаж; «суммарного HP»-домена не осталось); split 70/30 с redDmg≥1;
+  «урон в мёртвую часть теряется» — OK-BY-DESIGN (Math.Max(0,…) в TakeDamage);
+  GreenHP в кодовой базе нет — конверсии не существует, сплит одновременный
+  (DISC-01); DI-одиночность BodyService под 3 интерфейсами (impl-кэш
+  контейнера); реген-аккумулятор/L10-instant; BD-23; SetMaxHP-пропорции;
+  seed-детерминизм NPC/Animal; wolf STR 8/AGI 14 подтверждён.
+- Код НЕ изменялся (READ-ONLY аудит).
+
+Stage Summary:
+- Модуль Body механически крепок (per-part HP, фабрики, события, сейв),
+  но три системных рассинхрона данных: hit-таблицы↔шаблоны морфологий,
+  правило смерти↔игрок, таблица усилений↔морфологии видов. D8-фикс для
+  NPC/зверей подтверждён рабочим; следующий приоритет — BOD-1+BOD-2.
+- Связка с Buff: severed-дебаффы фактически не работают (см. AUDIT-BUFF-0911
+  BUF-1/BUF-2/BUF-5) — чинить одним пакетом с BOD-4.
+
+---
+Task ID: AUDIT-BUFF-0911
+Agent: bodybuff-audit-agent
+Task: Глубокий READ-ONLY аудит модуля Buff (7 файлов Modules/Buff + проводка
+BuffContracts/IBuffService, продюсеры CombatConsequences/ElementalEffect/
+SeveredDebuff/Perk, потребители DamageService/BodyModule, очистка
+NPCSpawnerService/AnimalService) — тики/истечение/стекинг, отрицательные баффы
+(DoT), очистка при смерти/пересборке, Save/Load, doc-drift
+BUFF_MODIFIERS_SYSTEM.md. Детальный отчёт: checkpoints/09_11_audit_buff.md.
+
+Work Log:
+- Прочитаны полностью 7 файлов Modules/Buff + вся проводка (продюсеры,
+  потребители, EventBus-семантика, WorldService.DeltaTime=1/тик).
+- Находки: 11 (2×P1, 5×P2, 4×P3). P1: BUF-1 процентные баффы дают нулевой
+  модификатор — CalculateStatModifier(baseValue=0) при flat=0 всегда 0,
+  GetStatModifierPermil=0 → слои 3a/3b DamageService ничего не меняют; контракт
+  IBuffService («1200 = ×1.2») нарушен; затронуты shock/slow/перки/все
+  boost-типы. BUF-2 «combat_bleed» не распознан эвристикой MapBuffIdToType →
+  default AttackBoost: кровотечение не наносит урона, показывается как бафф,
+  Purify не снимает; ветка BuffType.Bleed в BodyModule недостижима. P2:
+  BUF-3 «combat_shock»/«elemental_void_pierce» маппятся в AttackBoost-БАФФ
+  (потенция 200 → +2000% percentSum — бомба при починке BUF-1); BUF-4 DoT-урон
+  хардкод (poison 10 / burn 15 за тик), potency продюсеров игнорируется —
+  задуманные 3% maxHP / 5% урона отбрасываются; BUF-5 duration≤0 → 30 тиков
+  вместо Permanent (severed-дебаффы «вечные» лишь по комментарию); BUF-6 стан
+  не имеет потребителя (проверок Stun нет нигде), HasImmunity — 0 вызовов;
+  BUF-7 баффы не сериализуются (BuffService не ISaveable): сейв/лоад теряет
+  баффы игрока и перки NPC, смерть/respawn игрока не снимает баффы,
+  ClearAnimals не чистит баффы зверей (в отличие от NPC-пути P2-X1). P3:
+  двойной учёт Value×Stacks (латентно), QiRestoration-тики-заглушка + HoT
+  лечит только торс игрока (TODO P1-08), GetElementResistance — мёртвый API,
+  неизвестные ID тихо подменяются AttackBoost+10%.
+- Проверено чисто: TickBuffs-снапшоты (BUFF-A1/A3/A10) — мутации во время
+  итерации исключены; DoT-проводка через единый DamageAppliedEvent-пайплайн
+  (BodyModule → BodyService per-part → смерть NPC) — DoT реально убивает;
+  Purify работает; BF-I04 (сброс таймера тика); лимит 20 баффов; DI-
+  одиночность BuffService; readonly-контракты.
+- Код НЕ изменялся (READ-ONLY аудит).
+
+Stage Summary:
+- Модуль Buff в текущем геймплее влияет на мир ТОЛЬКО через DoT-урон
+  (яд/горение с фиксированным уроном) и Purify; вся стат-модифицирующая
+  часть (баффы/дебаффы статов, кровотечение, стан, «постоянные» дебаффы
+  ампутаций) — не работает из-за двух корневых дефектов: формулы
+  модификатора без baseValue и подстрочной эвристики распознавания buffId.
+- Рекомендуемый порядок фиксов: единым пакетом BUF-1+BUF-2+BUF-3 (реестр
+  BuffDef вместо эвристики + percent-семантика), затем BUF-5 (Permanent) и
+  BUF-7 (Save/Load), в связке с BOD-4 из аудита Body.
+
+---
+Task ID: AUDIT-CORE-0911
+Agent: core-audit-agent (Z.ai Code субагент)
+Task: Аудит Core-слоя (DI/EventBus/Contracts/Data/Interfaces)
+
+Work Log:
+- Скоуп READ-ONLY: Core целиком — DI (Container/DIInterfaces), Events/EventBus,
+  Messaging/Contracts ×24 (158 readonly struct), Data ×40 (Permil/SeededRandom/
+  ValueNoise/Constants/Enums/Structs/DataModels/таблицы), Interfaces ×48,
+  PlayerIdResolver, CoreProjectInfo; lifecycle-контекст: GameLifetimeScope/
+  GameSession/GameEntryPoint/SceneOrchestrator/CoreValidationPhase/GameBoot.
+- Программная верификация: pub/sub-карта всех 158 контрактов по всему game/src
+  (multiline + namespace-aware: IPublisher/ISubscriber/Publish(new/Subscribe/
+  MessageHandler); дубли значений всех 69 enum'ов; суммы MorphologyHitTables
+  (=1000 у всех 6); все DI-регистрации 17 модулей vs 58 интерфейсов; регистрация
+  BodyService под 3 интерфейсами (singleton-кэш по impl-типу — один инстанс).
+- Трассировка ключевых проводок: пересборка мира (контейнер/шина — один на
+  процесс, фазы Reset, 0 Subscribe в Phases — утечки подписок нет); исключения
+  в подписчиках (нет изоляции — E-1); re-entrancy A→B→A (корректно); E-путь
+  GWC→NPCService.OnNPCInteracted (мимо InteractionService.TryInteract); StatService
+  0 Publish → мёртвая подписка BodyModule (П.24); окно K — прямой Toggle мимо
+  контракта; сейв-контур — прямой вызов ISaveService, командные события мертвы.
+- Сверка docs_v2: DI_AND_EVENTBUS (§2.3 реестр 130/20 vs факт 158/24; §4-уроки
+  SAV-03/WLD-B01/PLR-A01 — проводки не существуют; §2.7 несуществующие имена),
+  ARCHITECTURE §4.3 (тот же счётчик) — таблица в чекпоинте.
+- 21 находка (P1×0, P2×4, P3×17); сироты: 21 полный + 10 sub-only + 41 pub-only.
+
+Stage Summary:
+- Ядро механически здорово: pub/sub+snapshot, zero-GC Publish(in T) (no boxing),
+  re-entrancy Q13 работает, DI multi-interface/ResolveAll(R11) корректны, lifecycle
+  «один контейнер на процесс + Reset-фазы» без утечек подписок, Permil/SeededRandom/
+  ValueNoise/морфотаблицы математически чисты, enum-дублей нет.
+- Главные дефекты — «тихие провода»: (1) исключение подписчика рвёт доставку
+  остальным и застревает re-entrant очередь (EventBus без try/catch); (2) мёртвые
+  sub-only проводки: StatChangedEvent (пересчёт HP от VIT П.24 не работает),
+  CultivationWindowToggle (окно K напрямую), Save/UI/Input request-контракты;
+  (3) docs_v2-реестр контрактов и §4-уроки отстали от кода на ~28 контрактов и
+  3 несуществующие проводки.
+- 41 pub-only контракт — «события в никуда»: поля честно заполняются, но ни один
+  слушатель не прочитает (зона тихих регрессий). Код НЕ изменялся; все фиксы с
+  file:line в checkpoints/09_11_audit_core_layer.md. Приоритет: E-1 → C-1 → C-2.
+
+---
+Task ID: AUDIT-INVENTORY-0911
+Agent: inventory-audit-agent (Z.ai Code субагент)
+Task: Глубокий READ-ONLY аудит модуля Inventory
+
+Work Log:
+- Скоуп: 15 файлов Modules/Inventory + Data/ (3356 строк, все полностью):
+  InventoryService/BackpackService/BeltService/CraftingService/EquipmentService/
+  EquipmentStatAggregator/EquipmentValidator/EquipmentDataProvider/GroundItemService/
+  InventoryConfig/InventoryModule/InventoryModuleServices/MaterialService/
+  SpiritStorageService/StorageRingService + CraftingRecipe/StorageRingEntry.
+- Проводка: Core/Data (ItemData/EquipmentData/QiStoneData/Structs.InventorySlot/
+  Enums.EquipmentSlot/Constants), контракты Inventory/GroundItem/Belt/Crafting;
+  TradeService (buy/sell), CorpseService (LootWindow-стык), UI: InventoryWindow
+  (1020 строк) + CharacterDollPanel + ItemContextMenu/SplitStackDialog + LootWindow;
+  GameSession/SaveModule/SaveDataAggregator (R11-стык), DamageService/CombatService
+  (EquipmentDataProvider-стык), TileService (harvest-источник), EquipmentGenerator/
+  WeaponVisualCatalog (R15), GameWorldController (pickup/hotbar).
+- Целевые проверки по заданию: R10 SlotId-адресность всех мутирующих операций
+  (drop/split/equip/лут) — проверены все точки; стаки/MaxStack/сплит; overflow-политика
+  (OnItemAddRequest/OnCraftCompleted vs OnEquipmentChanged/OnResourceHarvested);
+  GroundItem pickup/TTL/сейв; агрегатор/валидатор/двурурук; крафт-атомарность;
+  Qi-транзакции колец; R11 round-trip (кто ISaveable, кто нет); doc-drift 06_player/
+  05_data (INVENTORY/GROUND_ITEM/SAVE_SYSTEM).
+- 16 находок: P1×5 (INV-1 кэш GetItemCount при мульти-кучках; INV-2 потеря при
+  unequip/замене при volume-full; INV-3 потеря части стака при возврате из пояса;
+  INV-4 сейв/лоад домена — кукла/пояс/кольца/ground не сохраняются и не сбрасываются
+  → дюп при смене сейва; INV-5 стык SetEquipmentData → raw-статы без грейдов и
+  coverage=0 → DefenseProcessor не применяется), P2×4 (Use без гейта пояса;
+  SpiritStorage/StorageRing без UI; ground без TTL/Reset; doc-drift INVENTORY_SYSTEM
+  §4.1/§7/§9.1/§12), P3×7. INV-17 (harvest-потеря) помечен P1 в чекпоинте.
+- Код НЕ изменялся (READ-ONLY). Все находки с file:line и сценарием.
+
+Stage Summary:
+- R10 SlotId TOCTOU-защита работает образцово во всех UI-путях (drop/split/лут —
+  Guid+expectedItemId, stale → отказ без деструктивного фолбэка); equip по ItemId
+  безопасен из-за уникальности ItemId генератора. R15 WeaponClassId+fallback — ок.
+  R11 инвентарь round-trip — ок, НО домен Inventory частично мимо сейва (кукла/пояс/
+  кольца/ground) и без Reset при LoadGame → дюп-окно при смене сейва.
+- Систематическая дыра: overflow-компенсация (3-arg TryAddItem + DropItemsNearPlayer)
+  реализована только в OnItemAddRequest/OnCraftCompleted; OnEquipmentChanged,
+  OnResourceHarvested (тайл истощается ДО публикации!) и BeltService.ReturnSlotToInventory
+  теряют предметы при volume-full — три P1 одним паттерном.
+- Стык Inventory→Combat: EquipmentDataProvider.SetEquipmentData пишет raw Defense/
+  Damage без грейд-множителей и не заполняет armor coverage (SetArmorCoverage —
+  0 вызовов глобально) → броня игрока (и, похоже, всех) не проходит слой DefenseProcessor.
+- Полный отчёт: checkpoints/09_11_audit_inventory.md (находки INV-1…INV-17,
+  «проверено чисто», таблица docs_v2-соответствия, приоритет фиксов). Рекомендуемый
+  порядок: INV-2/17/3 (единый overflow-паттерн) → INV-4 (ISaveable+ResetWorld) →
+  INV-1 (строка кэша) → INV-5 (совместно с Combat).
+
+---
+Task ID: AUDIT-QI-0911
+Agent: qicharger-audit-agent (Z.ai Code субагент)
+Task: Глубокий READ-ONLY аудит модуля Qi (QiService/Breakthrough/Regen/Buffer/
+Provider/Module) + проводки техник, Ци-камней, боя, сейва, docs_v2.
+
+Work Log:
+- Скоуп READ-ONLY: 8 файлов Modules/Qi полностью; стыки — QiContracts/
+ChargerContracts/TechniqueChargeContracts, GameConstants, PlayerIdResolver,
+EventBus (синхронный диспатч — кэши свежие), TechniqueChargeService,
+PlayerTechniqueCaster, CombatService/DamageService (Qi-ветки),
+NPCQiRegenService, FormationQiPool, InventoryWindow RMB, CultivationWindow/
+CheatPanel/GameWorldController, Save-контур (SaveModule/Aggregator/
+GameSession/GameEntryPoint/GameBoot).
+- Трассировка всех QiConsumeRequestEvent/QiAddRequestEvent/QiBuffer* проводок
+  по game/src: семантика RequesterId vs EntityId (Charger/Combat/TCS), фильтр
+  QiService по PlayerIdResolver.
+- Верификация long-арифметики: SafeMultiply/MAX_SAFE_CAPACITY на L9 ~524M —
+  запас ×10^10; найден выход за long.MaxValue на L10 (float.MaxValue множитель
+  → отрицательный каст на x64 → реген мёртв).
+- Сверка docs_v2: QI_SYSTEM (§5.1 реген: дока 10% coreCapacity/const vs код
+  10% maxQi×Multipliers — расхождение ×256 000 на L9), BREAKTHROUGH_MODELS
+  (§4.7 время прорыва 8ч/80ч vs мгновенно; таблицы off-by-усечение),
+  TECHNIQUE_SYSTEM §5.1-5.4 (chargeRate/50% refund — OK).
+- 10 находок: P1×2 (двойное списание Ци щита в CombatService.ExecuteDefense
+  25%→50%; Qi-стейт игрока отсутствует в сейве — нет ISaveable, 8 SaveKey
+  без «qi»), P2×5 (реген vs доки; L10 float.MaxValue; потеря штрафа
+  «сердце ампутировано» при RecalculateStats; Gathering ×2 без зоны;
+  мёртвый QiBufferService.AbsorbDamage → полный возврат депозита щита),
+  P3×3. Проверено чисто: проводка техник (без двойного списания), RMB-камни
+  (атомарная транзакция), NPCQiRegen (раз в сутки, не каждый тик), формулы
+  буфера DamageService==QiBufferService. Код НЕ изменялся.
+
+Stage Summary:
+- Механика ядра Qi математически здорова (long+permil, клампы переполнений
+  умножений), но три системных дефекта: (1) боевой щит оплачивается дважды;
+  (2) прогресс культивации не переживает загрузку сейва; (3) пассивная
+  регенерация игрока в ~256 000 раз быстрее канона на L9, а на L10 мертва
+  из-за float.MaxValue.
+- Рекомендуемый порядок фиксов: QI-1 (убрать явный QiConsumeRequestEvent в
+  ExecuteDefense) → QI-2 (QiService:ISaveable) → QI-3/QI-4 (канон регена)
+  → QI-5/QI-6 → QI-7. Все фиксы с file:line в checkpoints/09_11_audit_qi.md.
+
+---
+Task ID: AUDIT-CHARGER-0911
+Agent: qicharger-audit-agent (Z.ai Code субагент)
+Task: Глубокий READ-ONLY аудит модуля Charger (Service/Buffer/Heat/Slot/
+Data/Module) + проводки Qi/Formation/Save, docs_v2 CHARGER_SYSTEM.
+
+Work Log:
+- Скоуп READ-ONLY: 7 файлов Modules/Charger полностью; стыки — ChargerContracts,
+  GameConstants CHARGER_* (heat 0.05/100, cooldown 30, cooling 0.01/0.005,
+  loss 0.1), QiService (приём команд от зарядника — EntityId-семантика),
+  FormationService.OnContributeQiRequest, Save-контур (ChargerInitPhase —
+  wiring-стаб; GameBoot/GameEntryPoint — Configure один раз за процесс;
+  SaveLoadSimDebug round-trip), InventoryWindow (QiStoneData vs QiStone).
+- Grep-доказательство изоляции: единственный потребитель IChargerService вне
+  модуля — SaveLoadSimDebug (Mode-toggle); EnterCombat/ExitCombat/
+  UseQiForTechnique/InsertStone — 0 gameplay-вызовов (подтверждение известного
+  TODO из 08_23_qi_impl_plan).
+- Анализ порядка восстановления: cold-load корректен (Start→Configure→
+  Activate → _save.Load→RestoreState); warm-load (Quitting→LoadGame той же
+  сессией) — RestoreState мержит поверх живого состояния: слоты заняты →
+  камни сейва тихо теряются, bufferQi накапливается поверх (NPC-домен
+  сбрасывается R14, зарядник — нет).
+- Сверка формул с CHARGER_SYSTEM: heat/qiUsed=0.05 норм. ✓ (док-примеры
+  совпадают), рассеивание 1%/0.5% ✓, порядок ядро→буфер+ceil(rem/0.9) ✓,
+  перегрев-блок ✓; расхождения: DepleteStones списывает post-loss (камни
+  «бессмертны» на 10%), §5.5 «−2%/сек» противоречит §5.3 (код по §5.3),
+  слой материалов/грейдов мёртв.
+- 7 находок: P2×3 (неинтегрированность; warm-load мерж; истощение камней
+  post-loss), P3×4 (перегрев/кулдаун не восстанавливаются + мимо событий UI;
+  мёртвые ChargerConfigs-таблицы/GetEfficiency/_inputRate/_qiRetention;
+  StoneId 32 бита). Проверено чисто: CH-17 remainder, CH-18 аккумулятор,
+  CH-24 гварды, тепло-модель, проводка к QiService/FormationService,
+  буферные клампы. Код НЕ изменялся.
+
+Stage Summary:
+- Charger механически корректен в изоляции (буфер/тепло/слоты/save-data
+  честные), но функционально спит: не подключён ни к экипировке, ни к техникам,
+  ни к бою, ни к инвентарю камней — все «боевые» ветки (CH-16, автоактивация,
+  боевой кулдаун) недостижимы; save round-trip валиден только для cold-load.
+- Рекомендуемый порядок: CH-2 (сброс состояния в RestoreState/ResetWorld-
+  паттерн) → CH-1 (интеграция как следующий эпизод: слот charger экипировки +
+  EnterCombat/ExitCombat из CombatModule + ветка UseQiForTechnique в
+  TechniqueChargeService + унификация камней QiStoneData↔QiStone) → CH-3
+  (истощение камней сырой величиной). Все фиксы с file:line в
+  checkpoints/09_11_audit_charger.md.
+
+---
+Task ID: AUDIT-COMBAT-0911
+Agent: combat-audit-agent (Z.ai Code субагент)
+Task: Аудит модуля Combat
+
+Work Log:
+- Скоуп READ-ONLY, HEAD d0b065d: модуль Combat целиком (19 файлов ~4.6k строк;
+  CombatService 1145 прочитан полностью в 3 прохода) + стыки: CombatContracts,
+  PlayerCombatAdapter (Space/G), NPCCombatAdapter, AnimalService (месть/смерть),
+  NPCModule.ProcessNpcAttacks, StrikeFxRenderer, DamageNumberRenderer,
+  EventLogWindow, QiService (фильтр QiConsumeRequestEvent), BodyService
+  (IsEntityAlive/GetCurrentHealth/TakeDamage-кламп), EquipmentDataProvider,
+  QiDataProvider, Constants (пермил-таблицы), COMBAT_SYSTEM.md (594 строки).
+- Аудит целей: turn-gate/гейты _isCasting/_isInCombat (все пути выхода боя),
+  _lastPlayerDefense vs NPCDefenseSelector, Instigator-семантика (регресс C-1
+  аудита-3), LoS/leash/ranged-гейты, пермил-математика (DamageCalculator/
+  DefenseProcessor/LevelSuppression/WeaponDamageCalculator), крит/per-part/
+  элементы/DoT, Consequences-проводка, StatProviderAdapter (ветка животных D7),
+  ammo-транзакции, CombatRng-детерминизм, полнота DamageAppliedEvent и парность
+  CombatStarted/Ended/Disengage, Victory/Defeat по телу, doc-drift §1.4.1/§1.4.2/
+  §7/turn-gate/пермил-таблицы.
+- Программная верификация: git-grep вызовов SetArmorCoverage (0 вызывающих —
+  основа P1), SetTotalArmor/SetEquipmentData/SetQiState (источники данных брони/
+  Ци по сущностям); трассировка 5 публикаторов AttackIntentEvent и 13
+  подписчиков DamageAppliedEvent (HP-бары/цифры/killfeed/анимация/угроза/труп).
+- Сверка фиксов R16/09-10/animal-09-11 (гашение каста в EndCombat, селектор
+  NPC-защиты + QA-геттер, таргетинг NPC∪животные, месть волка, Victory по телу,
+  D8-правило смерти) — все на месте, регрессов нет.
+- Deliverables: checkpoints/09_11_audit_combat.md (15 находок: P1×1, P2×5,
+  P3×9); работа append'ом в этот worklog; код НЕ изменялся.
+
+Stage Summary:
+- Боевой каркас здоров: turn-gate/гейты/пайплайн урона/детерминизм/события
+  работают, все недавние фиксы держатся. Но найден P1: слой брони (6-7)
+  МЁРТВ для всех сущностей — SetArmorCoverage никем не вызывается, а P2-6.2
+  сменил default 100→0: armorCoversHit всегда false, DefenseProcessor с бронёй
+  и penetration никогда не выполняются (экипировка игрока синкается, но
+  игнорируется; QA броню не покрывает — регрессия 2026-05-22 незамечена).
+- P2-пачка: Qi-техники Ranged* требуют/списывают стрелы (CombatModule не
+  различает лук и Ци-снаряд); Dodge не публикует DamageAppliedEvent («уклонение»
+  невидимо, ветка DamageNumberRenderer мертва); броня незарегистрированных
+  целей (животные) падает в кэш игрока; техники (Z) не видят животных (D1
+  покрыл только Space); NPC-vs-NPC инверсия победителя при смерти инстагатора.
+- P3: три латентных PlayerIdResolver-литерала (CombatService 552/640,
+  DamageService 390, StrikeFxRenderer), «единое правило смерти» разошлось в
+  трёх копиях, LOS-гейт модуля не резолвит животных, стрела списывается до
+  резолва каста, doc-drift пачка (§1.2 superSuperSlow, §10.1/§11.1 DoT-таблицы,
+  §2 слой 7). Приоритет фиксов: CMB-1 → CMB-2 → CMB-3 → CMB-4 (в связке) →
+  CMB-5/6 → P3. Всё с file:line в checkpoints/09_11_audit_combat.md.
+
+---
+Task ID: AUDIT-NPC-0911
+Agent: npc-audit-agent (Z.ai Code субагент)
+Task: Аудит модуля NPC
+
+Work Log:
+- Скоуп READ-ONLY, HEAD d0b065d: все 22 файла Modules/NPC (~6.9k строк) прочитаны
+  полностью (NPCService/NPCAIService/AnimalService/CorpseService/Movement/
+  Spawner/Composition/Assembly/Soul/Name/Group/Relationship/CombatAdapter/
+  QiRegen/Visual/Perk/Species/Config + Data). Стыки: NpcDomainResetPhase(0),
+  AnimalSpawn(6)/HumanNPCSpawn(7)/GroupSpawn(8), AbstractSceneAssemblyPhase
+  (SkipOnLoad), GameSession (LoadGame-порядок), Core/Data (NPCState/NPCGroup/
+  CorpseData/AnimalInfo/Position2D), WorldService (DeltaTime=1/тик),
+  QiService (эмиттер QiChangedEvent только игрок), CombatModule.OnAttackIntent,
+  NPCSpriteRenderer (Adapter), ClassicLootSeeder, ReAssemblySimDebug-ассерты,
+  docs_v2 (NPC.md, NPC_AI_SYSTEM, NPC_ASSEMBLY_PIPELINE, ANIMALS,
+  DEATH_AND_LOOT, GROUP_SYSTEM).
+- Аудит целей: 1) полнота ResetWorld по всем NPC-сервисам (паттерн
+  «реестр без сброса»); 2) реестр/деспавн/ghost-NPC/ID-семантика; 3) AI
+  (месть/бегство/leash ДО гейта боя, анти-flip-flop, O(n)-тики); 4) движение
+  (дистанции/проходимость/stuck/kiting); 5) звери (месть волка 2 тика <
+  EnemyTurnTimeout, de-aggro, кролик, Quadruped, TryCreateAnimalCorpse);
+  6) трупы (full-loot/дедуп/SlotId/TTL/CorpseRemovedEvent); 7) состав
+  населения (детерминизм/кап 12/R14-запрет восполнения); 8) смерть в бою/
+  группы/отношения; 9) save/load round-trip; 10) doc-drift.
+- Программная верификация: grep-трассировки ResetWorld/ClearAnimals (0
+  вызовов ClearAnimals вне AnimalSpawnPhase — основа NPC-1), писателей
+  NPCState.AttitudeScore (только Assemble=0/Restore — основа NPC-4),
+  SetTotalDamage/SetTotalArmor (спавн vs RestoreState — основа NPC-3),
+  SelectSpecies (0 вызовов — мёртвый код), material_iron_scrap (зарегистрирован),
+  QiChangedEvent-эмиттеры (только игрок — кэш Ци честен), writers
+  NPCState.CurrentQi (дрейф-анализ NPC-15).
+- Сверка фиксов R13/R14/R14-P2-1/R14-P2-2/R15-P1-1/R16/animal-09-11 — все
+  на месте, регрессий НЕ найдено (ResetWorld-порядок, боевые переходы до
+  гейта, null-гварды, единое правило тел, кулдаун волка, кап композиции).
+- Deliverables: checkpoints/09_11_audit_npc.md (16 находок: P2×7, P3×9,
+  «проверено чисто» + таблица doc-соответствия); эта запись worklog; код НЕ
+  изменялся.
+
+Stage Summary:
+- Ядро NPC-модуля здорово: lifecycle/пересборка NPC-домена (double-spawn
+  устранён), full-loot трупы, месть/бегство/leash R16, звериный контур 09-11,
+  детерминизм состава — всё работает, недавние фиксы держатся.
+- P2-пачка: (1) AnimalService НЕ сбрасывается при тёплом LoadGame — звери
+  (вкл. мёртвых и hostile) переживают загрузку, аналог R14-P2-1 для животных
+  (на NewGame чистит фаза 6, на LoadGame — никто); (2) NPC-движение без
+  walkability — сквозь стены, kiting уводит лучников в непроходимые тайлы;
+  (3) RestoreState пишет SetTotalDamage/SetTotalArmor БЕЗ вклада экипировки —
+  урон/броня NPC деградируют после каждой загрузки; (4) отношения NPC не
+  сериализуются (NPCSaveEntry.AttitudeScore — мёртвое поле), месть сбрасывается
+  при load; (5) смерть лидера/участника группы не обрабатывается (doc
+  GROUP_SYSTEM §129 не реализован); (6) двойная генерация экипировки —
+  «Матрёшка» спавнера затирает assembly-набор (предметы исчезают молча) +
+  doc-drift §6.2; (7) фантомная угроза "sever_unknown" → Attacking на
+  несуществующую цель, фолбэк трактует её как игрока (преследование без
+  агро). P3: темп движения NPC vs зверей, Random.Shared в AI, кролик без
+  «удвоенного убегания» (ANIMALS.md:121), мёртвый NPCSpeciesSelector,
+  ghost-кэши (_npcAttackTimers и др.), doc-drift NPC.md §12, недетерминизм
+  камней (string.GetHashCode), [UNVERIFIED] Merchant-гейт vs месть вне боя.
+- Приоритет фиксов: NPC-1 → NPC-3+NPC-6 (в связке) → NPC-7 → NPC-4 → NPC-5
+  → NPC-2 → P3. Всё с file:line в checkpoints/09_11_audit_npc.md.
+
+---
+Task ID: AUDIT-FORMATION-0911
+Agent: formationgenerator-audit-agent (Z.ai Code субагент)
+Task: Глубокий аудит модуля Formation (READ-ONLY)
+
+Work Log:
+- Скоуп: Modules/Formation — все 8 файлов (FormationService 722 стр. полностью,
+  FormationQiPool, FormationCalculator, FormationConfig, FormationEffects,
+  FormationModule/Services, Data/FormationRegistry) + FormationGeneratorService
+  (Generator) + Core/Data (FormationData/FormationEnums/Constants 1296-1409/
+  LevelBoundaries) + контракты FormationContracts/QiContracts + стыки: QiService/
+  QiDataProvider (кэш QiChangedEvent — только игрок), ChargerService
+  (FormationContributeQiRequestEvent), QiModule (Gathering ×2 медитации),
+  PlayerTechniqueCaster (Formation-техника, Amplification-зона),
+  DamageService (слой 3b бонусы), GameWorldController/FormationVisualRenderer,
+  GameSession/SceneOrchestrator/AbstractSceneAssemblyPhase (Save/Load),
+  TechniqueGrantPhase; docs_v2 FORMATION_SYSTEM.md полностью.
+- Цели: вклады/возвраты Qi (двойное списание? потери?), long-арифметика пула,
+  вступление/выход/смерть участников, сброс при пересборке/LoadGame (ISaveable),
+  формулы vs доку (пермил, стекинг), сид-детерминизм генератора.
+- Программные проверки: grep-карта вызовов StartDrawing/ContributeQi/
+  AutoFillTick/DeactivateFormation (все кастеры — игрок; NPC-кастеров нет);
+  трассировка QiChangedEvent-публикаторов (QiService игрока + DotSimDebug →
+  кэш FormationService игрок-scoped); consumers FormationActivated/
+  DeactivatedEvent (QiModule/PlayerTechniqueCaster/GameWorldController/
+  FormationVisualRenderer) — вывод о непере-публикации при RestoreState.
+- 12 находок: P2×4 (Charger→Formation стык мёртв — вклад "Charger" всегда
+  отвергается проверкой уровня помощника; Save/Load: позиция не сохраняется,
+  события активации не пере-публикуются → Gathering×2/Amplification-зона/
+  визуал теряются после загрузки; бонусы формации глобальны без зоны и
+  ally/enemy в DamageService; состояние формации переживает NewGame — нет
+  ResetWorld), P3×6 (cold-load потеря генерируемой формации — реестр пуст,
+  сид недетерминирован; ручные формации без EffectRadiusMeters по размеру;
+  float-дрейф в drain; AutoFill теряет чанк при отказе; StartDrawing грязнит
+  состояние при отказе; NPC-кастер гейтится по кэшу игрока),
+  OK-BY-DESIGN×2 (Qi вкладов не возвращается — док refund не обещает,
+  двойного списания нет — подтверждение кэш-дифом; смерть участника — §2.3
+  самостоятельность). Проверено чисто: все формулы §6/§7/§8/§9.2/§9.3
+  совпадают с Constants/Calculator дословно; Heavy L6+; атомарность
+  списание→пул; Depleted-перезарядка; CombatEnded-парность; промил-конверсия.
+  Код НЕ изменялся.
+
+Stage Summary:
+- Formation-механика изолированно честна (формулы = канон, пул long, этапы
+  жизненного цикла и автонаполнение работают), но три системных пробела:
+  (1) стык с Charger мёртв по псевдо-ID "Charger" + латентный дизайн-дуп;
+  (2) Save/Load неполный — позиция/события/реестр формаций не восстанавливаются;
+  (3) применение бонусов без зоны/цели противоречит доке, а состояние живёт
+  дольше мира (нет ResetWorld). Рекомендуемый порядок фиксов: F-1 → F-2 →
+  F-4 → F-3. Всё с file:line в checkpoints/09_11_audit_formation.md.
+
+---
+Task ID: AUDIT-GENERATOR-0911
+Agent: formationgenerator-audit-agent (Z.ai Code субагент)
+Task: Глубокий аудит модуля Generator (READ-ONLY)
+
+Work Log:
+- Скоуп: Modules/Generator — все 13 файлов (EquipmentGenerator 471, ItemGenerator
+  Service 530, TechniqueGeneratorService 677, FormationGeneratorService 250,
+  DeduplicationService, VerificationService, ItemDatabaseService, QiStoneSeeder,
+  ClassicLootSeeder, GeneratorModule, ModuleServices, TechniqueRegistry,
+  IFormationGeneratorService) + Core/Data (GeneratorTables, EquipmentGeneration
+  Tables, ItemData/EquipmentData/QiStoneData, Constants 482-519, LevelBoundaries)
+  + стыки: NPCAssemblyService (легаси-экипировка NPC), StartingGearPhase (сеятели
+  и стартовый набор), GeneratorModule.Start, SceneOrchestrator/
+  AbstractSceneAssemblyPhase (SkipOnLoad-семантика), GameSession.LoadGame,
+  InventoryService (сейв по ItemId), CheatPanel; docs_v2: PRE_GENERATION,
+  GENERATORS_SYSTEM §9-10, 06_player/EQUIPMENT_SYSTEM §4-8, чекпоинт
+  2026-08-26_epic_legendary_overcap.
+- Цели: «матрёшка» (промо 20%/оверкап 18% vs канон), WeaponClassId R15 (7
+  классов), тирание материалов, ItemId-уникальность (Interlocked),
+  сид-детерминизм, границы статов, дедуп, ItemDatabase (фантомные ID R13 —
+  регресс?), сеятели, Save/Load round-trip.
+- Программные проверки: grep-карта потребителей легаси-генератора —
+  NPCAssemblyService:241-278 остался на modulo-1000 ID (основа P1 G-1);
+  вероятностная оценка коллизий birthday по 1000 (60 предметов L1 → ~83%);
+  трассировка QiStoneSeeder.Seed/ClassicLootSeeder.Seed вызовов (единственный
+  вызов камней — StartingGearPhase, SkipOnLoad=true → P1 G-2); InventoryService
+  CaptureState хранит только itemId+count → фантомы при cold-load; Clean
+  (FormationRegistry) — no-op (у FormationRegistry нет Remove); сверка всех
+  таблиц GradeProfiles/EquipmentGradeWeightsByLevel/материалов/энчантов с
+  EQUIPMENT_SYSTEM — дословное совпадение; канон 0.20/0.18/×3.0 = Constants.
+- 13 находок: P1×2 (G-1 modulo-1000 коллизии легаси-ID → подмена/дюп
+  экипировки NPC; G-2 cold-load: QiStoneSeeder/материалы/расходники/стрелы/
+  генерированная экипировка не регистрируются при LoadGame — фантомные ID,
+  R13-паттерн на уровне каталога, QA не ловит — один процесс), P2×3 (счётчики
+  ID не персистентны; Dedup.Clean(FormationRegistry) — no-op-имитация; NPC
+  оружие без WeaponClassId — R15 не покрывает легаси-путь), P3×8 (double-register
+  стартового набора; дедуп без окна/порога — fingerprint-точность; Heavy нет в
+  SizePool — даунгрейд мёртв; 16-бит хеш сида в ID; верификатор не видит
+  легаси-предметы; легаси Coverage без клампа + QiFlowPenalty двойная
+  семантика; легендарки не в docs_v2 + §4.1 «Эффектов 20/50/80%» не
+  реализовано; seed=TickCount — недетерминизм мира признан докой + реестры
+  не сбрасываются при пересборке мира). Проверено чисто: промо/оверкап/value канон ✓ и rng-дисциплина
+  ✓; «Матрёшка» §2/§4.1/§4.2/§5/§8 ✓; WeaponClassId 7/7 ✓; тирание ✓ (T5 void
+  фикс держится); Interlocked ✓; границы статов ✓; PreGen-контур ✓; камни Ци
+  канон 1024/см³ ✓; ClassicLootSeeder R13 ✓ (для своих 4 ID). Код НЕ изменялся.
+
+Stage Summary:
+- Генераторное ядро («Матрёшка», техники, формации) детерминировано и
+  соответствует канону; легендарки честны (0.20/0.18/×3). Системные дыры —
+  в жизненном цикле ID: (1) NPC-сборка не мигрирована с легаси modulo-1000
+  ID → вероятные коллизии/подмены/дюпы; (2) каталог предметов не
+  восстанавливается при cold-load (сеятели привязаны к SkipOnLoad-фазе,
+  инвентарь хранит только ID, счётчики не в сейве). Рекомендуемый порядок:
+  G-1 (миграция NPCAssemblyService на IEquipmentGenerator — заодно закрывает
+  G-5) → G-2 (персистентность каталога: ISaveable ItemDatabase или DTO-снимок
+  + NEXT-ID в save_meta — закрывает G-3) → G-4 (FormationRegistry.Remove) →
+  G-8 → P3. Всё с file:line в checkpoints/09_11_audit_generator.md.
+
+---
+Task ID: AUDIT-PLAYER-0911
+Agent: playerquest-audit-agent (Z.ai Code субагент)
+Task: Аудит модуля Player
+
+Work Log:
+- Скоуп READ-ONLY, HEAD d0b065d: модуль Player целиком (9 файлов ~1.5k
+  строк, все прочитаны полностью) + стыки: PlayerContracts/StatContracts,
+  BodyService (BodyCriticalEvent-публикация) + BodyModule (StatChangedEvent
+  → RecalculateHPFromVitality), CombatService (fatal-ветка 850-853,
+  ExecuteDefense 897-906, статы атакёра 676-690), StatProviderAdapter,
+  TechniqueChargeService (drain), QiBufferService (Activate),
+  QiService (consume/add-фильтры), InputAdapter + InputMapInitializer
+  (полный клавишный реестр), GameWorldController (OnPlayerDeath/
+  RespawnAfterDeath 1921-1970, HandleStickyInput 1135-1209, модальность
+  1228-1238, HandleFreeMovement, слоты 3-9 1655-1674), NPCService
+  (GetNearbyNPCIds-метрика), docs_v2: DEATH_AND_LOOT §3-4,
+  TECHNIQUE_SYSTEM §5.4, STAT_THRESHOLD_SYSTEM, 06_player/ (ls: 8 файлов,
+  доки сна/статов отсутствуют).
+- Аудит целей: смерть игрока (Die→OnBodyCritical→PlayerDeathEvent→
+  авто-респавн 3с), IsAlive-семантика (Heart-only vs D8-правило тел —
+  BOD-2-пересечение), сон/отдых (мёртвая механика), статы (инициализация,
+  бонусы, стекинг, StatChangedEvent), Space-таргетинг (NPC∪животные, LOS,
+  ammo — проводки D1/R16), техники (таргетинг/прерывания/Qi-списание/
+  эффекты), аура (декей/рассеивание), слоты 3-9 (биндинг+save),
+  клавиши (дубли/конфликты/модальные гварды).
+- Программная верификация: rg-трассировка вызовов SetBaseStat/ModifyStat/
+  SetStat/AddBonus/AddVirtualDelta/ConsolidateSleep (0 вызовов — основа
+  PLR-2), StartSleep/WakeUp (0 внешних), Dissipate (2 вызова),
+  StatChangedEvent (0 публикаторов), InputDisabled (0 сеттеров),
+  QiChangedEvent-публикаторы (только QiService), HeldTechniqueChangedEvent
+  (только QA), StoreItem/AbandonQuest (0 вызовов).
+- Deliverables: checkpoints/09_11_audit_player.md (15 находок: P1×2,
+  P2×7, P3×6); работа append'ом в этот worklog; код НЕ изменялся.
+
+Stage Summary:
+- Player-модуль структурно здоров (таргетинг D1, спам-гейты, аура-декей,
+  слоты 3-9 с save, клавишный реестр без дублей), но два системных P1:
+  (1) смерть игрока покрывает ТОЛЬКО Heart-Disabled — Head RedHP→0 не
+  убивает (PlayerService.cs:184 матчит Heart+Disabled; CombatService.cs:851
+  `!isPlayerTarget` исключает игрока из D8-правила IsEntityAlive —
+  BOD-2 подтверждён с Player-стороны; Die-гейт `if(!IsAlive)return` вдобавок
+  блокирует публикацию при Heart-Severed); (2) StatService никогда не
+  инициализируется — 0 вызовов writers → статы игрока = 0 во всём бою
+  (STR/AGI/INT/Luck), AGI-ускорение атаки §8.2 мёртво, бонусы
+  экипировки не подключены (EquipmentStatAggregator.GetStatBonuses —
+  0 вызовов), StatChangedEvent/RecalculateHPFromVitality — мёртвая
+  проводка VIT→HP.
+- P2-пачка: Defense-техника двойного списания Ци (зарядка QiCost +
+  активация буфера invest — уточнение к QI-1, qi-аudit считал её
+  одинарной); сон/отдых R — мёртвая механика (IsRestPressed не
+  экспонирован); модальность неполная (Space/Z/G/X при открытых окнах,
+  InputDisabled — мёртвый флаг); рывок без клампов/проходимости;
+  «В ауре» → ложный тост «Техника применено»; техника-каст не видит
+  животных (CMB-5 подтверждён). P3: Dissipate не зовётся при смерти
+  (дока §5.4 обещает), кулдаун вхолостую при «Цель исчезла», евклид-vs-
+  Chebyshev в таргетинге, мёртвый код PlayerModule/PlayerConfig (8/12
+  полей), дубликат техники в слотах. Doc-drift DEATH_AND_LOOT: экран
+  смерти/выбор/респавн-на-месте/Ци-макс — 4 расхождения с кодом.
+  Приоритет: PLR-1 → PLR-2(+9) → PLR-7 → PLR-4/3 → остальное. Всё с
+  file:line в checkpoints/09_11_audit_player.md.
+
+---
+Task ID: AUDIT-QUEST-0911
+Agent: playerquest-audit-agent (Z.ai Code субагент)
+Task: Аудит модуля Quest
+
+Work Log:
+- Скоуп READ-ONLY, HEAD d0b065d: модуль Quest целиком (5 файлов модуля +
+  Data/ 3 файла, ~1.1k строк, все прочитаны полностью) + стыки:
+  QuestContracts, SaveModule (реестр ISaveable) + все Register<ISaveable>
+  по репо, DialogueService (dialogue-quest link: QuestIdsToStart 188-198,
+  дефолтный диалог 385-400), NPCService.OnNPCInteracted (RoleId),
+  GWC (E-путь 1676-1729, квест-окно Q 1477-1490), QuestWindow (203-219
+  кнопка «Принять»), InventoryService/SpiritStorageService (источники
+  ItemAddedEvent), CombatService (EnemyKilledEvent — виктим-центричный),
+  QiService (QiAddRequestEvent), QuestSimDebug/SaveLoadSimDebug (QA);
+  docs_v2: SAVE_SYSTEM.md:222, DIALOGUE_SYSTEM, JOURNAL_SYSTEM.
+- Аудит целей: полный цикл (диалог→принятие→semantic targets→гейты→
+  награды), дублирование прогресса, двойные награды, несостоятельные
+  цели, Save/Load round-trip, Expire/Fail/Abandon-ветки, doc-drift.
+- Программная верификация: rg-трассировка подписчиков всех 7
+  квест-событий (живой только QuestCompletedEvent→QuestRewardService),
+  вызовов AbandonQuest/FailQuest (0 внешних / только внутренний expire),
+  ItemAddedEvent-публикаторов (6 источников), StartQuest-вызывателей
+  (диалог+UI+QA).
+- Deliverables: checkpoints/09_11_audit_quest.md (8 находок: P1×1,
+  P2×3, P3×4); работа append'ом в этот worklog; код НЕ изменялся.
+
+Stage Summary:
+- Живой квест-цикл в сессии работает чисто: принятие из диалога с
+  тостами и честными причинами отказов (гейты MaxActive/предквест/
+  уровень культивации), semantic targets 09-08 держатся (animal_wolf_N→
+  wolf, material_iron_ore, RoleId=Elder), двойного прогресса/двойных
+  наград нет (AreRewardsGranted + Status-гейты + item-валидация до
+  MarkRewardsGranted).
+- Главный P1: квесты НЕ сохраняются — QuestService не ISaveable,
+  реестр SaveModule без блока «quests» (SAVE_SYSTEM.md:222 обещает):
+  после load все квесты NotStarted, прогресс потерян, квесты можно
+  перевзять → повторные награды (в связке с QI-2). P2: техника-награды
+  помечают квест выданным при молча потерянной награде (MarkRewardsGranted
+  безусловно); quest_talk_elder не выдаётся старейшиной (только кнопкой
+  в окне Q — нарративный seam); UpdateObjectiveProgress спамит события
+  по завершённым целям. P3: FailQuest/AbandonQuest недостижимы
+  (TimeLimitDays=0 у всех), 4 квест-события без подписчиков
+  (JOURNAL_SYSTEM обещает), «сбор»=покупка (семантика gather),
+  тихий отказ кнопки «Принять». Приоритет: QST-1 (единым сейв-эпизодом
+  с QI-2) → QST-2 → QST-3/4 → P3. Всё с file:line в
+  checkpoints/09_11_audit_quest.md.
+
+---
+Task ID: AUDIT-INTERACTION-0911
+Agent: tradeinteraction-save-audit-agent (Z.ai Code субагент)
+Task: Глубокий аудит модуля Interaction (READ-ONLY)
+
+Work Log:
+- Скоуп READ-ONLY, HEAD d0b065d: модуль Interaction целиком (9 файлов,
+  ~1.4k строк, все прочитаны полностью: DialogueService/DialoguePresenter/
+  DialogueTypewriter/InteractionService/InteractionConfig/InteractionModule/
+  InteractionModuleServices + Data/2) + стыки: DialogueWindow (351 стр.
+  полностью), GWC (E-путь 1676-1735, HandleNpcTalk 2195-2236, Esc 1537-
+  1543, OnDialogueEnded 1978-1984, модальность SetOverUI 1711-1726),
+  DialogueContracts/UIContracts, NPCService.OnNPCInteracted,
+  QuestService.OnQuestStartRequested (квест-линк), GameBoot._PhysicsProcess
+  (double-tick-гипотеза), docs_v2 DIALOGUE_SYSTEM.md.
+- rg-верификация мёртвости: RegisterInteractable/UIInteractRequestEvent/
+  InteractionCompletedEvent (0 вызывателей/паблишеров), DialoguePresenter
+  (0 регистраций в DI), NPCInteractedEvent (единственный паблишер — GWC
+  ПОСЛЕ старта диалога → ветка OnNPCInteracted недостижима),
+  ConditionId (0 читателей).
+- Deliverables: checkpoints/09_11_audit_interaction.md (8 находок: P2×2,
+  P3×5, OK×1); append в этот worklog; код НЕ изменялся.
+
+Stage Summary:
+- Живое ядро диалогов ЧИСТО: дерево (узлы/выборы/линейка), квест-линк
+  (QuestStartRequestedEvent до перехода, гейты на стороне QuestService),
+  sentinel open_trade с корректным порядком EndDialogue→TradeRequested,
+  модальность (пауза при старте, единая точка резюма DialogueEndedEvent —
+  все пути закрытия сходятся), typewriter без double-tick (InteractionModule
+  тикает только при !IsPaused, DialogueWindow._Process — только при
+  IsPaused, S6-BUGFIX верен), повторные входы/Dispose — идемпотентны.
+- Мёртвым оказался инфраструктурный слой модуля: INT-1 [P2]
+  InteractionService — реестр интерактивных объектов пуст всегда
+  (RegisterInteractable 0 вызывателей) → TryInteract/InteractionCompleted-
+  Event/UIInteractRequestEvent мертвы → подписка DialogueService.
+  OnInteractionCompleted — балласт (рабочий E-путь целиком в GWC).
+  INT-2 [P2] DialoguePresenter не зарегистрирован в DI → его pub-события
+  UIAdvance/UISelectChoiceRequest мертвы → подписки Q13-E02 FIX в
+  DialogueService никогда не срабатывают; DialogueWindow инжектит
+  DialogueService напрямую (EVT-01 де-факто нарушен). P3: INT-3 ветка
+  «AI-talk» недостижима, INT-4 ConditionId мёртв, INT-5 sentinel magic
+  string, INT-6 выбор 1-9 до конца печати, INT-7 doc-drift
+  DIALOGUE_SYSTEM §1.1/§6 (InteractionRequestEvent-путь, мёртвые
+  слушатели). Приоритет: санация мёртвого слоя (INT-1/INT-2/INT-3)
+  при следующем заходе в модуль. Всё с file:line в
+  checkpoints/09_11_audit_interaction.md.
+
+---
+Task ID: AUDIT-TRADE-0911
+Agent: tradeinteraction-save-audit-agent (Z.ai Code субагент)
+Task: Глубокий аудит модуля Trade (READ-ONLY)
+
+Work Log:
+- Скоуч READ-ONLY, HEAD d0b065d: модуль Trade целиком (5 файлов ~0.8k
+  строк, все полностью: TradeService/CurrencyService/TradeConfig/
+  TradeModule/TradeModuleServices) + стыки: MerchantStockEntry,
+  TradeContracts, ITradeService/ICurrencyService, TradeWindow (618 стр.
+  полностью), GWC (OnTradeOpened/Closed 1991-2009, Esc 1527-1530,
+  модальность E 1684-1687), CorpseService (камни-осколки из трупов),
+  ClassicLootSeeder (Value осколков), ItemGeneratorService (ItemId
+  коллизии), InventoryService.HowManyCanFit, docs_v2 TRADE_SYSTEM.md.
+- rg-верификация: SetBalance (0 вызывов → валюта не восстанавливается),
+  Register<ISaveable, CurrencyService> (нет), TryBuy/TrySell транзакции
+  (свои стороны: цены/вес/стакинг/откат), Fnv1a-сид, FindEntry первый-матч.
+- Deliverables: checkpoints/09_11_audit_trade.md (9 находок: P1×1
+  латентно, P2×1, P3×4, OK-BY-DESIGN×2); append в этот worklog; код НЕ
+  изменялся.
+
+Stage Summary:
+- Транзакционное ядро ЧИСТО: TryBuy (строгая проверка баланса → Spend →
+  TryAddItem → откат Add(total) при провале; canFit-предрезка по объёму),
+  TrySell (снятие → начисление), идемпотентный OpenTrade, валидация
+  торговца (Merchant по Role/Disposition + IsAlive), Permil 1200/500
+  (мин 1/0), детерминированный FNV-1a-сид, модальность лавки:
+  TradeOpenedEvent → пауза, TradeClosedEvent → единая авторитетная точка
+  резюма (паттерн LootWindow подтверждён; Esc/E/подложка гейтятся).
+- TRD-1 [P1-латентно] Валюта НЕ сохраняется: CurrencyService не ISaveable,
+  SetBalance («для загрузки сейва») — 0 вызывов; после Load инвентарь
+  восстановлен, а баланс = StartStones(50) → дюп/потеря камней при
+  сейв-лоад-цикле. Сейчас скрыто Q8 (F5/F9 отключены, MainMenu ищет
+  недостижимый quicksave), но автосейв уже пишет слоты (SAV-2) и при
+  реактивации сейвов дюп материализуется немедленно. Фикс: ISaveable +
+  Register — единым коммитом с QI-2/QST-1.
+- TRD-2 [P2] Сток торговца не персистентен: после Load регенерируется тем
+  же сидом → выкупленное восстанавливается («ресток из воздуха»),
+  проданное исчезает из экономики. P3: TRD-3 FindEntry первый-матч (дубли
+  ItemId недоступны при конфиге >1), TRD-4 TradeFailedEvent-шум из
+  служебных веток, TRD-5 shallow-снапшот стока, TRD-6 doc-drift TRADE
+  §8.4 (объём реализован) + «вкладки»→колонки, TRD-9 Merchant-диспозиция
+  как запасной вход. OK-BY-DESIGN: камни int (ЗАПРЕТ 3.9, заморожено);
+  кошелёк ≠ предметные осколки (курс не специфицирован — открытый вопрос
+  доки). Приоритет: TRD-1 → TRD-2 → P3. Всё с file:line в
+  checkpoints/09_11_audit_trade.md.
+
+---
+Task ID: AUDIT-SAVE-0911
+Agent: tradeinteraction-save-audit-agent (Z.ai Code субагент)
+Task: Глубокий аудит модуля Save (READ-ONLY)
+
+Work Log:
+- Скоуп READ-ONLY, HEAD d0b065d: модуль Save целиком (6 файлов ~0.7k
+  строк, все полностью: SaveService/SaveDataAggregator/SaveFileHandler-
+  Modules/SaveJson/SaveModule/SaveConfig) + стыки: Adapter/Persistence/
+  SaveFileHandler (222 стр. полностью), GameBoot (override ISaveFileHandler
+  + тик-луп), GameSession (LoadGame-порядок, SaveAndQuit), GameEntryPoint/
+  Container.ResolveAll (порядок ISaveable), MainMenuController (Load-путь),
+  SaveContracts, все Register<ISaveable> по репо (7 прямых + formation
+  через impl-форвард), TechniqueChargeService/AuraHoldService (B5),
+  SaveLoadSimDebug v2 (QA), InventoryService/NPCService RestoreState
+  (порядок/события), docs_v2 SAVE_SYSTEM.md (540 стр. полностью).
+- rg-верификация: SaveRequested/LoadRequestedEvent (0 паблишеров),
+  SaveAndQuit (0 вызывателей), SetBalance (0 вызывов — валюта вне сейва),
+  SaveConfig-поля (читатели), автосейв-механика (tickCount%60, слоты
+  autosave_NNNN), FormationService:ISaveable без Register<ISaveable> →
+  проверка попадания через Container.ResolveAll.
+- Deliverables: checkpoints/09_11_audit_save.md (10 находок: P2×2, P3×8,
+  OK×2 из них; UI-сейвы отключены Q8 — большинство латентно); append в
+  этот worklog; код НЕ изменялся.
+
+Stage Summary:
+- Сериализационное ядро R11 ЧИСТО: типизированный round-trip (JsonElement
+  → StateType с null-гейтом), транзакционность Save (упал capture — файл
+  не пишется) и Load (упал restore — false с перечнем), честные
+  SaveCompleted/LoadCompletedEvent, единые IncludeFields-опции
+  (CamelCase/CaseInsensitive/WhenWritingNull/WriteIndented — оба хендлера),
+  B5: SaveStartedEvent до CaptureState → отмена кастов/аур с возвратом
+  50% Ци (живо для всех трёх путей вызова). Битый сейв = честный fail без
+  краша. 8 блоков реально собираются: body, inventory, formation (!),
+  techniques, npc, technique_slots, charger, save_meta — formation
+  попадает через impl-форвард DI (QA SaveLoadSim ≥8 + formation — PASS);
+  тезис контекста «формации не в сейве» устарел (верно для до-R11).
+- SAV-1 [P2] Запись НЕатомарна: File.WriteAllText в обоих хендлерах —
+  обрыв записи (краш/питание) = усечённый main.json, слот потерян; дока
+  §9.1 обещает tmp+rename, §9.2 rolling backups — нет. Автосейв уже
+  пишет → риск актуален. SAV-2 [P2] Автосейв: активен вопреки шапке доки
+  «автосейва нет» (решение Q8); SaveModule._config НЕ инжектится →
+  AutoSaveIntervalMinutes (5) реально = вкл/выкл, интервал жёстко 60
+  тиков (1 игровой час); слоты autosave_NNNN плодятся без чистки
+  (MaxSaveSlots=5 не enforced); гейта сессии нет — пишет и из главного
+  меню (тики идут, TimeService default Normal); побочно каждый автосейв
+  гасит активную зарядку (B5). P3: SAV-3 SaveRequested/LoadRequested —
+  0 паблишеров (подтверждение Core-аудита; реальный вход — прямые вызовы
+  GameSession/SaveModule.Tick/QA), SAV-4 SaveAndQuit мёртв (слот-сирота
+  Data.Id-GUID, MainMenu не видит), SAV-5 порядок RestoreState =
+  порядок Dictionary.Values (не контрактован; межблочных зависимостей
+  сейчас нет — InventoryService.RestoreState без событий), SAV-6 Version
+  пишется/не проверяется, миграций нет, SAV-7 DeleteSave без try/catch +
+  SaveInfo-нули, SAV-8 мёртвые поля SaveConfig/SaveService._config.
+  Приоритет: SAV-1+SAV-2 (до реактивации сейвов) → SAV-3/4 санация →
+  SAV-6. Всё с file:line в checkpoints/09_11_audit_save.md.
+
+---
+Task ID: AUDIT-ENTRY-0911
+Agent: entry-audit-agent (Z.ai Code субагент)
+Task: Аудит Entry-слоя (GameSession/Phases/Orchestrator)
+
+Work Log:
+- Скоуп READ-ONLY, HEAD d0b065d: Entry целиком — GameEntryPoint,
+  GameSession, GameLifetimeScope, SceneOrchestrator, SceneAssemblyRegistrar,
+  LocationCatalog, CoreProjectInfo + все 16 фаз Phases/ прочитаны полностью;
+  проводка: GameBoot (_Ready/_PhysicsProcess/_ExitTree), MainMenuController,
+  GameWorldController (точки входа фаз, _Ready-хуки QA, _ExitTree-токены),
+  SceneContracts, ISceneAssemblyPhase, IGameSession, Core DI Container/
+  ContainerAdapter, цепочка NPCModule.ResetWorld → Spawner/Corpse/Group,
+  AnimalService, WorldService/WorldModule (реестр локаций), TileModule,
+  SaveModule/SaveService + реестр ISaveable (8 блоков), TechniqueService,
+  ItemDatabaseService, InventoryService.RestoreState, ReAssemblySimDebug,
+  WeaponVisualCatalog; docs_v2: ARCHITECTURE §6.1/§6.2 (таблица 16 фаз),
+  FILE_TREE §4, TESTING_RULES §0.1 (33 хука). ~28 файлов.
+- Цели: NewGame vs LoadGame vs тёплый рестарт; механика SkipOnLoad как
+  система; единый ResetWorld-контракт (NpcDomainResetPhase как паттерн);
+  транзитивность порядка фаз; ошибки фаз (SceneAssemblyFailedEvent — кто
+  слушает); DI-порядок vs фазы; doc-drift по списку фаз; QA-гейты.
+- Программная верификация: rg-трассировка подписчиков всех 6 Scene*-
+  событий (0 подписчиков — паблишеры в пустоту); всех вызовов
+  GameLifetimeScope.Build (ровно 1 — GameBoot); ResetWorld/Clear* по src
+  (кто сбрасывается, кто нет); ISaveable-реестра (8 из ~20 доменных
+  сервисов); ResetTime/CurrentTime-присвоений (0 — часы не сбрасываются);
+  Session.Pause/AdvanceFrame вызовов (0 — мёртвый код).
+- Deliverables: checkpoints/09_11_audit_entry.md (10 находок: P2×4,
+  P3×6 + таблица фаз дока-vs-факт 16/16 ✓); работа append'ом в этот
+  worklog; код НЕ изменялся.
+
+Stage Summary:
+- Механика фаз как система ЗДОРОВА: Reset→SkipOnLoad-гейт→CanExecute→
+  Running→Completed/Failed + rethrow; стабильная сортировка; SkipOnLoad-
+  колонка ARCHITECTURE §6.1 совпадает с кодом 16/16; порядок фаз
+  согласован с зависимостями (NpcDomainReset(0) до спавнов 6/7/8,
+  StartingGear(5) до HumanNPCSpawn(7), PreGen(13) до Grant(14));
+  контейнер строится один раз, все резолвы после полной регистрации.
+- P2-системное: (E-1) сброс world-scoped доменов размазан и асимметричен —
+  LoadGame сбрасывает только NPC; TechniqueRegistry чистится только
+  WorldInitPhase (SkipOnLoad=true → на Load НЕ чистится); животные/игрок/
+  инвентарь/формации вообще без сброса — тёплая пересборка даёт второго
+  игрока-набора в старый инвентарь (фикс-паттерн: IWorldResettable +
+  ResolveAll в фазе 0); (E-3) SkipOnLoad заявляет «состояние из сейва»,
+  но Player/World/Tile/Animal/Time не ISaveable — после load игрок на
+  (25,25) от фолбэка, Data.WorldId хардкод test_polygon (сейв из
+  large_world грузится на грид 50×50), время = 06:00+uptime; корень
+  G-2/NPC-1/QST-1; (E-2) GameSession глотает исключение фазы, а
+  MainMenuController безусловно делает ChangeSceneToFile → полусобранный
+  мир + тикает дальше; (E-4) тик-луп не гейтится Session.State — мир
+  симулирует и автосейвит (autosave_NNNN от fallback-мира) прямо в
+  главном меню; NewGame не сбрасывает часы.
+- P3: SceneAssemblyCompletedWithErrorsEvent и все Scene*-события — 0
+  подписчиков (ContinueOnError не существует); doc-drift «10/15 фаз»
+  (SceneOrchestrator.cs:16, GameLifetimeScope.cs:93, ARCHITECTURE:135,
+  FILE_TREE §4 с фантомными SceneAssemblyConfig/Logger/MessagingRegistrar
+  и без LocationCatalog); нет валидации уникальности Order и таймаутов;
+  Pause/Resume/AdvanceFrame — мёртвый код + doc-ложь про GamePausedEvent;
+  NpcDomainResetPhase тянет Adapter.Scene (Entry→Adapter — обратное
+  направление слоёв); GameBoot._ExitTree не диспозит контейнер.
+- Проверено чисто: R16-стектрейс в GameEntryPoint; CoreValidation на Load;
+  LocationCatalog self-consistent (WT-3 — в WorldService-реестре, не в
+  каталоге); QA-гейты §0.1 = код (симы гейтятся полной сборкой,
+  SaveLoadSimDebug минует RunAssembly осознанно); _ExitTree GWC — 16
+  токенов попарно; замороженные решения не нарушены. Приоритет фиксов:
+  E-1 → E-3 → E-2 → E-4 → P3. Всё с file:line в
+  checkpoints/09_11_audit_entry.md.
+
+---
+Task ID: AUDIT-ADAPTER-0911
+Agent: adapter-audit-agent (Z.ai Code субагент)
+Task: Аудит Adapter-слоя (Scene/UI/Input/Di/Persistence)
+
+Work Log:
+- Скоуп READ-ONLY, HEAD d0b065d: Adapter целиком (62 файла, ~22.5k строк).
+  Полностью: GameWorldController (2515), InputAdapter + InputMapInitializer,
+  LootWindow, InventoryWindow, HotkeysWindow, NPCSpriteRenderer,
+  CorpseSpriteRenderer, StrikeFxRenderer, DamageNumberRenderer,
+  WeaponVisualCatalog, ContainerAdapter, GameBoot, GameSettings,
+  SaveFileHandler, SceneBuilder(+BiomeTileRenderer), ReAssemblySimDebug,
+  PlayerInputService (мост). Выборочно (Grep): остальные рендереры, окна
+  (Trade/Quest/EventLog/Cultivation/Dialogue/ItemContextMenu+SplitStack/
+  CharacterDollPanel/MainMenu/HotbarPanel), UIFactory/ParchmentTheme,
+  SimDebug-гейты, стыки (InventoryModule.OnEquipmentChanged, BodyService
+  GetAllParts-кэш, NpcDomainResetPhase.ResetCache).
+- Программная верификация: Grep-трассы подписчиков/паблишеров
+  (CultivationWindowToggleRequestedEvent — 0 паблишеров; InputDisabled —
+  0 сеттеров; TestItemSeeder — 0 вызовов), замороженных Godot-запретов
+  (SetStyleBox/TileMap/Connect — 0), QueueRedraw-паттернов, диспозов
+  токенов (GWC 16/16, все окна парно).
+- Deliverables: checkpoints/09_11_audit_adapter.md (10 находок: P2×2,
+  P3×8, инвентарь регрессов D9/R13/R15/P1-4/D5-фиксов — пуст); работа
+  append'ом в этот worklog; код НЕ изменялся.
+
+Stage Summary:
+- Слой в хорошей форме: правило «подписки в _Ready после DI-инъекции»
+  выдержано во ВСЕХ нодах; парный диспоз в _ExitTree полный (включая
+  16 токенов GWC — P1-4 ревью-1 держится); LootWindow-фиксы R13-аудита
+  без рецидива (CurrentCorpseId/Closed/CorpseRemoved); D9-телепорт и
+  респавн синкают _visualPosition+SetPosition; HUD-легенда удалена без
+  остатков, F1-канон актуален; замороженные Godot-запреты не нарушены.
+- P2-1 (ADP-1): вложенные модальные окна ломают единый флаг
+  _wasPausedBeforeInventory → пауза залипает после закрытия внешнего
+  окна (B/C/T/F1/J/Q/E при открытом диалоге/лавке; гарды R13 P2-2
+  закрыли только лут). P2-2 (ADP-2): цифры 1-9 в диалоге — двойное
+  действие (выбор ответа + каст слота 3-9/режим боя 1-2/пояс Shift+N;
+  SetInputAsHandled не останавливает polling InputAdapter).
+- P3-пачка: GWC не мигрирован на имена животных (killfeed-тост
+  «Существо», атрибуция «?», нет стрелки направления — D6-фикс есть
+  только в EventLogWindow); CMB-14 подтверждён (StrikeFx/GWC-замах без
+  IAnimalService при D5-фиксе цифр); лог-спам 10 Гц из _Draw трёх
+  тайловых рендереров; Zero-GC-нарушения (Corpse/NPC нейм-плейты, 5
+  HUD-лейблов на кадр); словари facing/lastX NPC не чистятся при смерти;
+  K-окно вне Esc-цепочки + мёртвое событие-тоггл; ПКМ-меню по индексу
+  рендера (отступление от R10); TestItemSeeder 363 строки мёртвого кода,
+  X без модального гейта. Приоритет: ADP-1 → ADP-2 → ADP-3/4 (одним
+  животным-эпизодом) → ADP-5/6 → остальное. Всё с file:line в
+  checkpoints/09_11_audit_adapter.md.
