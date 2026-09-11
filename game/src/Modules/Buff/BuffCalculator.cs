@@ -54,6 +54,28 @@ namespace CultivationGame.Modules.Buff
         }
 
         /// <summary>
+        /// AUDIT-0911 BUF-1 FIX: аддитивная сумма ПРОЦЕНТНЫХ модификаторов
+        /// стата (в долях: +20% и −30% → −0.1). Для боевого пайплайна
+        /// (BuffService.GetStatModifierPermil → DamageService слои 3a/3b):
+        /// множитель = (1000 + percentSum×1000) / 1000.
+        /// ЗАЧЕМ ОТДЕЛЬНО ОТ CalculateStatModifier: та формула
+        /// (flatSum×(1+percentSum) + baseValue×percentSum) при baseValue=0
+        /// и flatSum=0 (ЧИСТО процентные баффы — AttackBoost/Slow/шок/перки)
+        /// возвращает 0 → все процентные баффы не влияли на бой.
+        /// </summary>
+        public static float CalculatePercentSum(List<ActiveBuff> buffs, StatType stat)
+        {
+            float percentSum = 0f;
+            for (int i = 0; i < buffs.Count; i++)
+            {
+                var buff = buffs[i];
+                if (buff.AffectedStat != stat || !buff.IsPercentage) continue;
+                percentSum += buff.TotalValue;
+            }
+            return percentSum;
+        }
+
+        /// <summary>
         /// Применить мягкий кап к бонусу.
         /// Формула: effectiveBonus = cap × (1 - e^(-bonus / (cap × decayRate)))
         /// Источник: ALGORITHMS.md §6

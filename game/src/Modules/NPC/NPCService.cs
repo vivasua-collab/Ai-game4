@@ -593,9 +593,19 @@ namespace CultivationGame.Modules.NPC
                 {
                     _bodyDataProvider.SetBodyParts(entry.NpcId, npcState.BodyParts);
                     _qiDataProvider.SetQiState(entry.NpcId, npcState.CurrentQi, npcState.MaxQi, npcState.Conductivity);
+                    // AUDIT-0911 NPC-3 FIX: SetEquipment сам резолвит ID → EquipmentData
+                    // и пересчитывает кэши брони/урона/coverage (грейд-множители).
+                    // Раньше: SetTotalArmor(BaseDefense)/SetTotalDamage(BaseDamage)
+                    // ЗАТИРАЛИ вычисленное → после КАЖДОЙ загрузки сейва NPC терял
+                    // урон оружия и броню экипировки (NPC слабел с каждым load'ом).
                     _equipmentDataProvider.SetEquipment(entry.NpcId, npcState.EquipmentIds);
-                    _equipmentDataProvider.SetTotalArmor(entry.NpcId, npcState.BaseDefense);
-                    _equipmentDataProvider.SetTotalDamage(entry.NpcId, npcState.BaseDamage);
+                    _equipmentDataProvider.SetTotalArmor(entry.NpcId,
+                        _equipmentDataProvider.GetTotalArmor(entry.NpcId) + npcState.BaseDefense);
+                    _equipmentDataProvider.SetTotalDamage(entry.NpcId,
+                        _equipmentDataProvider.GetTotalDamage(entry.NpcId) + npcState.BaseDamage);
+                    // CMB-1: естественная броня без носимой — покрывает всегда.
+                    if (_equipmentDataProvider.GetArmorCoverage(entry.NpcId) <= 0 && npcState.BaseDefense > 0)
+                        _equipmentDataProvider.SetArmorCoverage(entry.NpcId, 100);
                 }
             }
         }

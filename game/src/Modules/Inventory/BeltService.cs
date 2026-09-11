@@ -131,10 +131,23 @@ public sealed class BeltService : IDisposable
         if (slot.Count <= 0) return false;
         if (!_itemDb.TryGetItem(slot.ItemId, out var item)) return false;
 
-        if (!_inventory.TryAddItem(item, slot.Count))
+        // AUDIT-0911 INV-3 FIX: раньше 2-arg TryAddItem возвращал true даже при
+        // ЧАСТИЧНОМ добавлении (volume limit), а слот пояса очищался ЦЕЛИКОМ —
+        // (count − addedCount) расходников терялись бесследно. Теперь остаток
+        // остаётся в слоте пояса (валидное хранилище), инвентарь получает
+        // столько, сколько реально влезло.
+        if (!_inventory.TryAddItem(item, slot.Count, out int addedCount) || addedCount <= 0)
         {
-            // Инвентарь не принял даже с дропом — оставляем в слоте.
+            // Инвентарь ничего не принял — оставляем в слоте.
             return false;
+        }
+
+        if (addedCount < slot.Count)
+        {
+            // Частичный возврат: остаток живёт в слоте пояса.
+            slot.Count -= addedCount;
+            _slotsChangedPub.Publish(new BeltSlotsChangedEvent(slotIndex, slot.ItemId, slot.Count));
+            return true;
         }
 
         slot.ItemId = string.Empty;

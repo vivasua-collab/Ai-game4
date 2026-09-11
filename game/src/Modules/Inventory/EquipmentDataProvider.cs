@@ -118,7 +118,16 @@ namespace CultivationGame.Modules.Inventory
         /// <summary>
         /// Установить экипировку для сущности (при создании NPC).
         /// Хранит строковые ID экипировки по слотам.
-        /// Не резолвит ID → EquipmentData (нужен IItemDatabaseService).
+        ///
+        /// AUDIT-0911 CMB-1/NPC-3 FIX: резолвит ID → EquipmentData (через
+        /// IItemDatabaseService) и пересчитывает кэши брони/урона/coverage с
+        /// грейд-множителями. Раньше: только строки — резолв откладывался на
+        /// «SetTotalArmor из NPCAssemblyService», который (а) никогда не
+        /// устанавливал coverage → слой брони 6-7 был МЁРТВ для всех (после
+        /// P2-6.2 default coverage 0), (б) на RestoreState писал только
+        /// BaseDefense/BaseDamage → урон оружия/броня NPC терялись при
+        /// загрузке сейва. Вызывающие SetTotalArmor/SetTotalDamage теперь
+        /// ДОПУКЮТ (суммируют natural/base поверх вычисленного тут).
         /// </summary>
         public void SetEquipment(string entityId, Dictionary<EquipmentSlot, string> equipmentIds)
         {
@@ -133,6 +142,19 @@ namespace CultivationGame.Modules.Inventory
             // Копируем словарь, чтобы внешние мутации не влияли на хранилище
             var copy = new Dictionary<EquipmentSlot, string>(equipmentIds);
             _entityEquipmentIds[entityId] = copy;
+
+            // AUDIT-0911: пересчёт агрегатов из резолвнутых предметов.
+            if (_itemDatabase != null)
+            {
+                var resolved = new Dictionary<EquipmentSlot, EquipmentData>();
+                foreach (var kvp in copy)
+                {
+                    if (string.IsNullOrEmpty(kvp.Value)) continue;
+                    if (_itemDatabase.TryGetItem(kvp.Value, out var item) && item is EquipmentData eq)
+                        resolved[kvp.Key] = eq;
+                }
+                RecomputeAggregatesFromData(entityId, resolved);
+            }
         }
 
         /// <summary>
@@ -300,6 +322,11 @@ namespace CultivationGame.Modules.Inventory
         /// Установить экипировку сущности напрямую (полные EquipmentData).
         /// Путь игрока (Phase 8): EquipmentService пушит свой словарь после
         /// каждого equip/unequip. Пересчитывает суммарные кэши урона/брони.
+        ///
+        /// AUDIT-0911 INV-5 FIX: раньше кэши — raw сумма Defense/Damage БЕЗ
+        /// грейд-множителей (до 2× расхождение с UI/агрегатором) и coverage
+        /// вообще не записывался (→ слой брони игрока не работал). Теперь:
+        /// грейд-множители + честный coverage (средний по броневым предметам).
         /// </summary>
         public void SetEquipmentData(string entityId, Dictionary<EquipmentSlot, EquipmentData> equipment)
         {
@@ -313,17 +340,59 @@ namespace CultivationGame.Modules.Inventory
 
             _entityEquipmentData[entityId] = new Dictionary<EquipmentSlot, EquipmentData>(equipment);
 
-            // Пересчёт суммарных кэшей из агрегатора (консистентность с NPC-путём).
+            // AUDIT-0911: агрегаты с грейд-множителями (как EquipmentStatAggregator
+            // для UI, БЕЗ coverage-взвешивания — попадание решает отдельный
+            // coverage-roll в DamageService слой 6).
+            RecomputeAggregatesFromData(entityId, equipment);
+        }
+
+        /// <summary>
+        /// AUDIT-0911 CMB-1/INV-5/NPC-3: пересчёт кэшей брони/урона/coverage из
+        /// полных данных предметов (общий алгоритм для игрока и NPC):
+        /// • totalDamage = Σ(weapon.Damage × gradeMult)
+        /// • totalArmor  = Σ(armor.Defense × gradeMult)
+        /// • coverage    = средний Coverage броневых предметов (Defense > 0);
+        ///   нет брони → 0 (сущность без брони не получает бесплатного покрытия).
+        /// Естественная броня (BaseDefense NPC) — снаружи через SetTotalArmor,
+        /// её «покрытие» — забота вызывающего (NPCSpawnerService: 100 при
+        /// отсутствии носимой брони).
+        /// </summary>
+        private void RecomputeAggregatesFromData(string entityId, Dictionary<EquipmentSlot, EquipmentData> equipment)
+        {
+            if (entityId == null || equipment == null) return;
+
             float totalArmor = 0f, totalDamage = 0f;
+            float coverageSum = 0f;
+            int armorPieces = 0;
+
             foreach (var kvp in equipment)
             {
-                if (kvp.Value == null) continue;
-                totalArmor += kvp.Value.Defense;
-                totalDamage += kvp.Value.Damage;
+                var item = kvp.Value;
+                if (item == null) continue;
+
+                float gradeMult = GetGradeMultiplier(item.Grade);
+
+                if (item.Damage > 0)
+                    totalDamage += item.Damage * gradeMult;
+
+                if (item.Defense > 0)
+                {
+                    totalArmor += item.Defense * gradeMult;
+                    coverageSum += item.Coverage;
+                    armorPieces++;
+                }
             }
-            _cachedTotalArmor[entityId] = totalArmor;
+
             _cachedTotalDamage[entityId] = totalDamage;
+            _cachedTotalArmor[entityId] = totalArmor;
+            _cachedArmorCoverage[entityId] = armorPieces > 0
+                ? (int)System.Math.Round(coverageSum / armorPieces)
+                : 0;
         }
+
+        /// <summary>Грейд-множитель предмета (EQUIPMENT_SYSTEM §2.1; 1.0 при отсутствии).</summary>
+        private static float GetGradeMultiplier(EquipmentGrade grade)
+            => GameConstants.EquipmentGradeMultipliers.TryGetValue(grade, out var mult) ? mult : 1f;
 
         // === Вспомогательные ===
 

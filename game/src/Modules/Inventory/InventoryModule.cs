@@ -11,6 +11,7 @@ using System;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Events;
+using CultivationGame.Core.Helpers;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Core.Messaging.Contracts;
 
@@ -78,7 +79,18 @@ public class InventoryModule : IModule
 
         if (_itemDatabase.TryGetItem(e.ItemId, out var itemData))
         {
-            _inventoryServiceImpl.TryAddItem(itemData, e.Amount);
+            // AUDIT-0911 INV-17 FIX: раньше 2-arg TryAddItem — при volume-full
+            // ресурс ИСЧЕЗАЛ бесследно (тайл уже истощён до публикации —
+            // TileService исчерпывает ДО события, откатить нельзя). Тот же
+            // компенсирующий overflow-паттерн, что в OnItemAddRequest/
+            // OnCraftCompleted (Review этап 4 P1-4): остаток — на землю.
+            bool added = _inventoryServiceImpl.TryAddItem(itemData, e.Amount, out int addedCount);
+            int overflow = e.Amount - addedCount;
+            if (overflow > 0)
+            {
+                DropItemsNearPlayer(e.ItemId, overflow);
+                Console.WriteLine($"[InventoryModule] Harvest '{e.ItemId}': {addedCount} в инвентарь, {overflow} на землю (инвентарь полон)");
+            }
         }
         else
         {
@@ -132,12 +144,27 @@ public class InventoryModule : IModule
     private void OnEquipmentChanged(in EquipmentChangedEvent e)
     {
         if (string.IsNullOrEmpty(e.OldItemId)) return;
-        if (e.EntityId != "player") return;
+        // AUDIT-0911: PlayerIdResolver вместо строгого == "player" (хрупко
+        // при смешении алиасов; Adapter-аudit кросс-слойное замечание).
+        if (!PlayerIdResolver.IsPlayer(e.EntityId)) return;
 
         if (_itemDatabase.TryGetItem(e.OldItemId, out var oldItem))
         {
-            _inventoryServiceImpl.TryAddItem(oldItem, 1);
-            Console.WriteLine($"[InventoryModule] Возврат предмета '{e.OldItemId}' в инвентарь из слота {e.Slot}");
+            // AUDIT-0911 INV-2 FIX: unequip/замена экипировки при volume-full:
+            // 2-arg TryAddItem молча возвращал false → снятый предмет ИСЧЕЗАЛ
+            // (комментарий CharacterDollPanel «дропнет излишек на землю» — ложь).
+            // Теперь: сколько влезло — в инвентарь, остаток — на землю рядом
+            // с игроком (снятое нельзя потерять).
+            bool added = _inventoryServiceImpl.TryAddItem(oldItem, 1, out int addedCount);
+            if (addedCount < 1)
+            {
+                DropItemsNearPlayer(e.OldItemId, 1);
+                Console.WriteLine($"[InventoryModule] Возврат предмета '{e.OldItemId}' из слота {e.Slot}: инвентарь полон — выброшен на землю");
+            }
+            else
+            {
+                Console.WriteLine($"[InventoryModule] Возврат предмета '{e.OldItemId}' в инвентарь из слота {e.Slot}");
+            }
         }
     }
 

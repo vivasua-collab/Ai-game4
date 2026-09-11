@@ -226,13 +226,26 @@ namespace CultivationGame.Modules.Buff
 
         /// <summary>
         /// Аудит CRIT-1: модификатор в промилле (ЗАПРЕТ 3.9).
-        /// Конвертирует float-результат GetStatModifier в промилле: 0.2 → 200, -0.3 → -300.
-        /// Для боево1 пайплайна: (1000 + modPermil) / 1000 = множитель.
+        /// AUDIT-0911 BUF-1 FIX: боевой пайплайн (DamageService слои 3a/3b)
+        /// ждёт АДДИТИВНЫЙ ПРОЦЕНТ: множитель = (1000 + modPermil)/1000
+        /// (контракт «1200 = ×1.2»). Раньше конвертировался результат
+        /// CalculateStatModifier — при baseValue=0/flatSum=0 (чисто процентные
+        /// баффы: AttackBoost +20%, Slow −30%, шок, перки) он ВСЕГДА 0 →
+        /// слои баффов урона/защиты не работали вовсе. Теперь честная
+        /// сумма процентных модификаторов (BuffCalculator.CalculatePercentSum),
+        /// с клампом в разумный диапазон множителей (−90%…+300%).
         /// </summary>
         public int GetStatModifierPermil(string entityId, StatType stat)
         {
-            float mod = GetStatModifier(entityId, stat);
-            return (int)(mod * 1000f);
+            var buffs = GetBuffList(entityId);
+            if (buffs == null || buffs.Count == 0) return 0;
+
+            float percentSum = BuffCalculator.CalculatePercentSum(buffs, stat);
+            // Кламп множителя: полная остановка урона — максимум −90%,
+            // раздувание от стаков — максимум +300% (мягкий санити-кап).
+            if (percentSum < -0.9f) percentSum = -0.9f;
+            if (percentSum > 3.0f) percentSum = 3.0f;
+            return (int)(percentSum * 1000f);
         }
 
         // BF-A04: Исправлена inconsystency единиц — оба типа в диапазоне 0.0-1.0
@@ -399,6 +412,17 @@ namespace CultivationGame.Modules.Buff
         /// Создать ActiveBuff из ID баффа.
         /// В будущем будет загружать из BuffData ScriptableObject или JSON.
         /// Пока — создаёт по ID с эвристикой.
+        ///
+        /// AUDIT-0911 (BUF-2/3/4/5, BOD-4): нормализация potency-семантики
+        /// продюсеров. Раньше: (а) duration&lt;0 → «30 сек» вместо Permanent
+        /// (ампутационные дебаффы истекали!); (б) producer-potency игнорировался
+        /// маппингом: combat_bleed → «AttackBoost +10%» вместо DoT (кровотечение
+        /// не ранило), combat_shock/elemental_void_pierce → бафф +урона
+        /// раненому; (в) DoT-тики хардкодом (poison 10/burn 15) вместо
+        /// 5% maxHP/5% урона продюсера; (г) Value×Potency двойной учёт:
+        /// elemental_slow(Value=−0.3, Potency=300) → TotalValue=−90 = −9000%.
+        /// Теперь маппинг вбирает producer-potency в Value/TickDamage,
+        /// а buff.Potency = 1 (множитель нейтрален; стеки умножают отдельно).
         /// </summary>
         private ActiveBuff CreateBuffFromId(string buffId, string entityId, float duration, float potency)
         {
@@ -416,11 +440,21 @@ namespace CultivationGame.Modules.Buff
                 Element = Element.Neutral
             };
 
-            // Устанавливаем длительность
+            // Устанавливаем длительность.
+            // AUDIT-0911 BUF-5 FIX: duration < 0 = Permanent (контракт
+            // IBuffService.ApplyBuff: default −1 = «длитcя пока не снят явно»;
+            // SeveredDebuffSystem шлёт −1 — ампутационные дебаффы обязаны жить
+            // до приживления, а не 30 тиков). duration == 0 — легаси-дефолт 30.
             if (duration > 0)
             {
                 buff.Duration = duration;
                 buff.RemainingDuration = duration;
+            }
+            else if (duration < 0)
+            {
+                buff.Application = BuffApplication.Permanent;
+                buff.Duration = 0f;
+                buff.RemainingDuration = 0f;
             }
             else
             {
@@ -428,11 +462,13 @@ namespace CultivationGame.Modules.Buff
                 buff.RemainingDuration = buff.Duration;
             }
 
-            // Маппинг ID → тип/стата (упрощённый для прототипа)
-            MapBuffIdToType(buffId, buff);
+            // Маппинг ID → тип/статы; producer-potency вбирается в Value/TickDamage.
+            MapBuffIdToType(buffId, buff, potency);
 
-            // BF-A02: Сохраняем potency в отдельном поле
-            buff.Potency = potency;
+            // BF-A02: Potency — множитель мощности НАЛОЖЕНИЯ. Маппинг уже
+            // учёл producer-potency (см. комментарий метода) → нейтральный 1.
+            // Стеки по-прежнему умножают эффект (TotalValue / TickDamage×Stacks).
+            buff.Potency = 1f;
 
             return buff;
         }
@@ -440,10 +476,86 @@ namespace CultivationGame.Modules.Buff
         /// <summary>
         /// Маппинг ID баффа на тип и характеристики.
         /// Упрощённая версия — в продакшене заменить на загрузку из BuffData SO.
+        ///
+        /// AUDIT-0911: potency-семантика продюсеров (см. CreateBuffFromId):
+        /// DoT (bleed/burn/poison) — HP урона за тик; проценты (slow/shock/
+        /// void_pierce) — промилле (300 = 30%); ампутации (severed_*) — доля
+        /// (−0.15); перки — доля (+0.30 проводимости).
         /// </summary>
-        private static void MapBuffIdToType(string buffId, ActiveBuff buff)
+        private static void MapBuffIdToType(string buffId, ActiveBuff buff, float potency)
         {
             string id = buffId.ToLowerInvariant();
+
+            // === Ампутационные дебаффы (SeveredDebuffSystem, BOD-4) ===
+            // potency несёт величину (доля, отрицательная); суффикс — стат.
+            if (id.Contains("severed"))
+            {
+                buff.IsDebuff = true;
+                buff.IsPercentage = true;
+                if (id.EndsWith("_str"))
+                {
+                    buff.Type = BuffType.AttackReduction;
+                    buff.AffectedStat = StatType.Strength;
+                }
+                else if (id.EndsWith("_vit"))
+                {
+                    buff.Type = BuffType.DefenseReduction;
+                    buff.AffectedStat = StatType.Vitality;
+                }
+                else // _agi и прочие — ловкость (таблица: 90% записей)
+                {
+                    buff.Type = BuffType.SpeedReduction;
+                    buff.AffectedStat = StatType.Agility;
+                }
+                buff.Value = potency != 0f ? potency : -0.15f;
+                return;
+            }
+
+            // === Перки проводимости (PerkService) — проводимость, не урон ===
+            if (id.Contains("perk") || id.Contains("conductivity"))
+            {
+                buff.Type = BuffType.CastSpeed; // косметика типа; реальный эффект ведёт PerkService (IQiDataProvider)
+                buff.AffectedStat = StatType.Conductivity;
+                buff.IsPercentage = true;
+                buff.Value = potency != 0f ? potency : 0.1f;
+                return;
+            }
+
+            // === Кровотечение (CombatConsequencesService, BUF-2) ===
+            // Раньше не распознавалось → «AttackBoost +10%» IsDebuff=false:
+            // кровотечение не наносило урона и не снималось Purify.
+            if (id.Contains("bleed"))
+            {
+                buff.Type = BuffType.Bleed;
+                buff.IsDebuff = true;
+                buff.HasTickEffect = true;
+                buff.TickInterval = 3f;
+                buff.TickDamage = potency > 0f ? potency : 5f; // 5% maxHP/тик от продюсера
+                return;
+            }
+
+            // === Шок (CombatConsequencesService, BUF-3) ===
+            // Раненая сущность (<30% HP): −20% к урону (РАНЬШЕ — +10% бафф!).
+            if (id.Contains("shock"))
+            {
+                buff.Type = BuffType.AttackReduction;
+                buff.AffectedStat = StatType.Damage;
+                buff.IsDebuff = true;
+                buff.IsPercentage = true;
+                buff.Value = potency > 0f ? -potency / 1000f : -0.2f; // продюсер: 200‰ = −20%
+                return;
+            }
+
+            // === Пробитие брони Void (ElementalEffectService, BUF-3) ===
+            if (id.Contains("void_pierce") || id.Contains("pierce"))
+            {
+                buff.Type = BuffType.DefenseReduction;
+                buff.AffectedStat = StatType.Armor;
+                buff.IsDebuff = true;
+                buff.IsPercentage = true;
+                buff.Value = potency > 0f ? -potency / 1000f : -0.3f; // продюсер: 300‰ = −30% брони
+                return;
+            }
 
             if (id.Contains("attack_boost") || id.Contains("rage"))
             {
@@ -472,7 +584,8 @@ namespace CultivationGame.Modules.Buff
                 buff.IsDebuff = true;
                 buff.HasTickEffect = true;
                 buff.TickInterval = 1f;
-                buff.TickDamage = 10f;
+                // AUDIT-0911 BUF-4: тик из продюсера (3% maxHP), не хардкод 10.
+                buff.TickDamage = potency > 0f ? potency : 10f;
             }
             else if (id.Contains("burn") || id.Contains("fire_dot"))
             {
@@ -481,7 +594,8 @@ namespace CultivationGame.Modules.Buff
                 buff.Element = Element.Fire;
                 buff.HasTickEffect = true;
                 buff.TickInterval = 1f;
-                buff.TickDamage = 15f;
+                // AUDIT-0911 BUF-4: тик из продюсера (5% урона атаки), не хардкод 15.
+                buff.TickDamage = potency > 0f ? potency : 15f;
             }
             else if (id.Contains("stun"))
             {
@@ -493,7 +607,9 @@ namespace CultivationGame.Modules.Buff
                 buff.Type = BuffType.Slow;
                 buff.IsDebuff = true;
                 buff.AffectedStat = StatType.Speed;
-                buff.Value = -0.3f;
+                // AUDIT-0911: продюсер шлёт промилле (300 = −30%) — раньше
+                // Value=−0.3 × Potency=300 → TotalValue=−90 (−9000%!).
+                buff.Value = potency > 0f ? -potency / 1000f : -0.3f;
                 buff.IsPercentage = true;
             }
             else if (id.Contains("health_regen") || id.Contains("regen"))
@@ -501,14 +617,14 @@ namespace CultivationGame.Modules.Buff
                 buff.Type = BuffType.HealthRegen;
                 buff.HasTickEffect = true;
                 buff.TickInterval = 2f;
-                buff.TickHealing = 5f;
+                buff.TickHealing = potency > 0f ? potency : 5f;
             }
             else if (id.Contains("qi_restoration") || id.Contains("qi_flux"))
             {
                 buff.Type = BuffType.QiRestoration;
                 buff.HasTickEffect = true;
                 buff.TickInterval = 5f;
-                buff.TickHealing = 50f;
+                buff.TickHealing = potency > 0f ? potency : 50f;
             }
             else if (id.Contains("shield"))
             {

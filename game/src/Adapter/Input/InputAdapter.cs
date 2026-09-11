@@ -135,27 +135,35 @@ public partial class InputAdapter : Node
         // Цикл ищет нажатую цифру 1..9 и маршрутизирует:
         //   Shift+N → belt slot (попадает в hotbarSlot для BeltService);
         //   1 → weapon_melee; 2 → weapon_ranged; 3..9 → technique_slot_N.
-        for (int i = 1; i <= 9; i++)
+        // AUDIT-0911 ADP-2 FIX: гейт !_isOverUI (симметрично attack/defend/
+        // cast_technique выше) — раньше цифры 1-9 при открытом диалоге/окне
+        // давали ДВОЙНОЕ действие: выбор реплики (DialogueWindow) + смена
+        // режима боя/каст техники слота («2. Покажи товары» → тост
+        // «Режим: дальний бой» поверх диалога).
+        if (!_isOverUI)
         {
-            if (GodotInput.IsActionJustPressed($"hotbar_{i}"))
+            for (int i = 1; i <= 9; i++)
             {
-                if (shiftHeld)
+                if (GodotInput.IsActionJustPressed($"hotbar_{i}"))
                 {
-                    hotbarSlot = i;  // belt slot — пойдёт в InputFrameData.HotbarSlot
+                    if (shiftHeld)
+                    {
+                        hotbarSlot = i;  // belt slot — пойдёт в InputFrameData.HotbarSlot
+                    }
+                    else if (i == 1)
+                    {
+                        _stickyKeys.Add("weapon_melee");
+                    }
+                    else if (i == 2)
+                    {
+                        _stickyKeys.Add("weapon_ranged");
+                    }
+                    else
+                    {
+                        _stickyKeys.Add($"technique_slot_{i}");
+                    }
+                    break;
                 }
-                else if (i == 1)
-                {
-                    _stickyKeys.Add("weapon_melee");
-                }
-                else if (i == 2)
-                {
-                    _stickyKeys.Add("weapon_ranged");
-                }
-                else
-                {
-                    _stickyKeys.Add($"technique_slot_{i}");
-                }
-                break;
             }
         }
 

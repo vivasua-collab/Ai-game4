@@ -16,6 +16,14 @@ namespace CultivationGame.Core.Interfaces
         void ModifyStat(StatType type, float delta);
         void SetStat(StatType type, float value);
 
+        // === Lifecycle ===
+        /// <summary>
+        /// AUDIT-0911 PLR-2: задать врождённые статы (идемпотентно, не
+        /// затирает существующие). Вызывается владельцем домена при старте
+        /// (PlayerModule.Start для игрока).
+        /// </summary>
+        void InitializeDefaults(string entityId);
+
         // === Домены (П.23) ===
         StatDomain GetStatDomain(StatType type);
 

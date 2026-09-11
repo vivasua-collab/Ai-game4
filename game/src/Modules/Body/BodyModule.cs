@@ -149,7 +149,9 @@ public class BodyModule : IModule
         if (e.StatType != StatType.Vitality) return;
         // P1-08 FIX: guard для пустого EntityId (до Initialize)
         if (string.IsNullOrEmpty(_bodyService.EntityId)) return;
-        if (e.EntityId != _bodyService.EntityId) return;
+        // AUDIT-0911: алиас-безопасное сравнение (StatService шлёт Body-домен
+        // "player"; строгое == ломалось бы при смешении алиасов "player_0").
+        if (!CultivationGame.Core.Helpers.PlayerIdResolver.AreSameEntity(e.EntityId, _bodyService.EntityId)) return;
 
         // Делегируем пересчёт BodyService
         _bodyService.RecalculateHPFromVitality(e.OldValue, e.NewValue);

@@ -172,13 +172,25 @@ namespace CultivationGame.Modules.NPC
             // Без этого NPC невидим для боевой системы, формаций и регенерации Ци
             _bodyDataProvider.SetBodyParts(npcId, state.BodyParts);
             _qiDataProvider.SetQiState(npcId, state.CurrentQi, state.MaxQi, state.Conductivity);
+            // AUDIT-0911 CMB-1/NPC-3 FIX: SetEquipment теперь сам резолвит ID →
+            // EquipmentData и пересчитывает кэши брони/урона/coverage с
+            // грейд-множителями (раньше: только строки; урон оружия шёл через
+            // _generatedDamage-кэш raw-значением, броня — «+5 за предмет»,
+            // coverage НЕ устанавливался ВООБЩЕ → слой брони 6-7 был мёртв
+            // для всех после P2-6.2 default coverage 0).
             _equipmentDataProvider.SetEquipment(npcId, state.EquipmentIds);
-            // Спринт 8 C12: TotalArmor = equipment armor + BaseDefense (NaturalArmor)
-            int equipmentArmor = CalculateEquipmentArmor(state);
+            // Спринт 8 C12: TotalArmor = equipment armor (из предметов) + BaseDefense (NaturalArmor)
+            int equipmentArmor = (int)_equipmentDataProvider.GetTotalArmor(npcId);
             int totalArmor = equipmentArmor + state.BaseDefense;
             _equipmentDataProvider.SetTotalArmor(npcId, totalArmor);
-            _equipmentDataProvider.SetTotalDamage(npcId, state.BaseDamage + _generatedDamage.GetValueOrDefault(npcId));
-            _generatedDamage.Remove(npcId);
+            // Урон: BaseDamage + урон оружия (уже вычислен из EquipmentData).
+            int weaponDamage = (int)_equipmentDataProvider.GetTotalDamage(npcId);
+            _equipmentDataProvider.SetTotalDamage(npcId, state.BaseDamage + weaponDamage);
+            // AUDIT-0911 CMB-1: coverage — из носимой брони (уже в кэше);
+            // естественная броня (BaseDefense > 0 без носимой) покрывает всегда.
+            int coverage = _equipmentDataProvider.GetArmorCoverage(npcId);
+            if (coverage <= 0 && state.BaseDefense > 0)
+                _equipmentDataProvider.SetArmorCoverage(npcId, 100);
 
             // Регистрация точки спавна в сервисе движения
             _movementService.RegisterSpawnPosition(npcId, position);
@@ -305,7 +317,9 @@ namespace CultivationGame.Modules.NPC
             {
                 var weapon = _equipmentGenerator.GenerateWeapon(weaponLevel, null, seed);
                 state.EquipmentIds[EquipmentSlot.WeaponMain] = weapon.ItemId;
-                _generatedDamage[state.NpcId] = weapon.Damage;
+                // AUDIT-0911: _generatedDamage-кэш удалён — урон оружия резолвится
+                // из EquipmentData в EquipmentDataProvider.SetEquipment
+                // (грейд-множители учитываются автоматически).
 
                 // Armor: 60% шанс, торс или голова.
                 var equipRng = new SeededRandom(seed ^ 0x5EED);
@@ -403,17 +417,19 @@ namespace CultivationGame.Modules.NPC
         // === Вспомогательные методы (Задача 1.9) ===
 
         /// <summary>
-        /// Спринт 8 C12: Рассчитать броню экипировки NPC.
-        /// Пока IItemDatabaseService не доступен — используем упрощённую формулу:
-        /// каждая надетая броня +5, каждое оружие +0.
-        /// В будущем: разрешить item ID через IItemDatabaseService для получения точных значений.
+        /// AUDIT-0911 CMB-1: метод больше НЕ используется основным путём —
+        /// броня NPC вычисляется из РЕАЛЬНЫХ EquipmentData (Defense × грейд)
+        /// в EquipmentDataProvider.SetEquipment (раньше здесь был расчёт
+        /// «+5 за предмет» — упрощение времён отсутствия ItemDatabase).
+        /// Сохранён как fallback для нестандартных путей.
         /// </summary>
         private int CalculateEquipmentArmor(NPCState state)
         {
+            // Сохранён как безопасный fallback для нестандартных путей
+            // (использует только факт наличия брони в броневых слотах).
             int armor = 0;
             if (state.EquipmentIds == null) return 0;
 
-            // Броневые слоты: Head, Torso, Legs, Feet
             var armorSlots = new[] {
                 EquipmentSlot.Head,
                 EquipmentSlot.Torso,
@@ -426,7 +442,7 @@ namespace CultivationGame.Modules.NPC
                 if (state.EquipmentIds.ContainsKey(slot) &&
                     !string.IsNullOrEmpty(state.EquipmentIds[slot]))
                 {
-                    armor += 5; // Упрощённо: +5 за каждый надетый предмет брони
+                    armor += 5;
                 }
             }
 

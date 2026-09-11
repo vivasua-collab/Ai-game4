@@ -19,6 +19,15 @@ namespace CultivationGame.Core.Interfaces
     public interface IInventoryService
     {
         bool TryAddItem(ItemData item, int count = 1);
+
+        /// <summary>
+        /// AUDIT-0911 INV-3: транзакционная форма — сколько реально влезло при
+        /// volume/maxStack-лимитах. Возвращает false только если не влезло
+        /// НИЧЕГО; partial — true с addedCount &lt; count.
+        /// Реализация — InventoryService (использовалась только внутри модуля;
+        /// теперь и потребителям: BeltService/Trade — честный частичный возврат).
+        /// </summary>
+        bool TryAddItem(ItemData item, int count, out int addedCount);
         bool TryRemoveItem(string itemId, int count = 1);
         int GetItemCount(string itemId);
         IReadOnlyList<InventorySlot> GetAllSlots();

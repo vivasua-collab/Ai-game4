@@ -30,6 +30,10 @@ public sealed class PlayerService : IPlayerService, IDisposable
     private readonly CharacterData _data = new();
     private readonly List<string> _assignedTechniques = new();
     private bool _spawned;
+    // AUDIT-0911 BOD-2: честный флаг «смерть объявлена» — вместо гейта
+    // `!IsAlive` в Die() (при vital-смерти IsAlive уже false → PlayerDeathEvent
+    // никогда бы не опубликовался; флаг сбрасывается Revive()).
+    private bool _deathAnnounced;
 
     // Cached cultivation info mirrored from QiChangedEvent (zero polling).
     private CultivationLevel _cachedCultivationLevel = CultivationLevel.None;
@@ -50,8 +54,11 @@ public sealed class PlayerService : IPlayerService, IDisposable
     public Position2D Position => _data.Position;
     /// <summary>
     /// IsAlive delegates to BodyService (Q4: единая HP система).
-    /// Player is alive if Heart is not severed. Falls back to _data.Health
-    /// if BodyService is not yet initialized (before Spawn).
+    /// AUDIT-0911 BOD-2/PLR-1 FIX: единое правило тел (как для NPC/зверей
+    /// D8-фикс): vital Head/Heart RedHP ≤ 0 = мёртв. Раньше — «сердце не
+    /// ампутировано» (сердце НЕ ампутируется по дизайну тел — IsVital без
+    /// порога ампутации) → IsAlive был ВСЕГДА true → игрок «жил» с
+    /// разрушенной головой. Fallback _data.Health — до инициализации тела.
     /// </summary>
     public bool IsAlive
     {
@@ -59,8 +66,7 @@ public sealed class PlayerService : IPlayerService, IDisposable
         {
             if (_bodyService != null && !string.IsNullOrEmpty(_bodyService.EntityId))
             {
-                // Heart severed = dead. Also check if any vital part is disabled.
-                return !_bodyService.IsPartSevered(BodyPartType.Heart);
+                return _bodyService.IsEntityAlive(_bodyService.EntityId);
             }
             // Fallback before BodyService initialized.
             return _data.Health > 0f;
@@ -148,7 +154,10 @@ public sealed class PlayerService : IPlayerService, IDisposable
 
     public void Die(string cause)
     {
-        if (!IsAlive) return;
+        // AUDIT-0911 BOD-2: флаг вместо `!IsAlive` — при vital-смерти
+        // (Head RedHP→0) IsAlive УЖЕ false, старый гейт глотал PlayerDeathEvent.
+        if (_deathAnnounced) return;
+        _deathAnnounced = true;
         _data.Health = 0f;
         Stance = PlayerStance.Normal;
         if (SleepState != PlayerSleepState.Awake) WakeUp();
@@ -158,6 +167,7 @@ public sealed class PlayerService : IPlayerService, IDisposable
 
     public void Revive()
     {
+        _deathAnnounced = false;
         _data.Health = 100f;
         Stance = PlayerStance.Normal;
         _revivePub.Publish(new PlayerReviveEvent());
@@ -170,8 +180,11 @@ public sealed class PlayerService : IPlayerService, IDisposable
     }
 
     /// <summary>
-    /// Handle BodyCriticalEvent — if Heart is disabled/severed, player dies.
+    /// Handle BodyCriticalEvent — vital part disabled/severed → player dies.
     /// Q4: единая HP система, смерть через BodyService events.
+    /// AUDIT-0911 BOD-2/PLR-1 FIX: раньше только Heart+Disabled —
+    /// разрушение Head (RedHP→0) игрока НЕ убивало (в отличие от NPC/зверей
+    /// после D8-фикса). Единое правило тел: vital Head|Heart × Disabled|Severed.
     /// </summary>
     private void OnBodyCritical(in BodyCriticalEvent e)
     {
@@ -180,10 +193,13 @@ public sealed class PlayerService : IPlayerService, IDisposable
         // (исторические алиасы "player_0" и "player" — см. PlayerIdResolver).
         if (!PlayerIdResolver.AreSameEntity(e.EntityId, _data.Id)) return;
 
-        // Heart disabled/severed = death.
-        if (e.Part == BodyPartType.Heart && e.State == BodyPartState.Disabled)
+        // Vital-часть уничтожена/ампутирована = смерть (единое правило тел).
+        bool vitalDestroyed = (e.Part == BodyPartType.Heart || e.Part == BodyPartType.Head)
+            && (e.State == BodyPartState.Disabled || e.State == BodyPartState.Severed);
+        if (vitalDestroyed)
         {
-            Die($"Сердце остановлено ({e.HealthRatio:P0} HP)");
+            string partName = e.Part == BodyPartType.Heart ? "Сердце остановлено" : "Голова разрушена";
+            Die($"{partName} ({e.HealthRatio:P0} HP)");
         }
     }
 

@@ -28,9 +28,15 @@ public sealed class ResourceService : IResourceService, IDisposable
     private readonly List<DepletedResource> _depleted = new();
     private IDisposable? _dayChangedToken;
 
+    /// <summary>
+    /// AUDIT-0911 WT-1 FIX: подписка DayChangedEvent — РАНЬШЕ Initialize()
+    /// никто не вызывал (TileModule стартовал только TileService.Initialize):
+    /// респаун ресурсов был МЁРТВ в живой игре (вскрывался только QA-симом,
+    /// который звал RespawnCheck напрямую). Идемпотентен.
+    /// </summary>
     public void Initialize()
     {
-        _dayChangedToken = _dayChangedSub.Subscribe(OnDayChanged);
+        _dayChangedToken ??= _dayChangedSub.Subscribe(OnDayChanged);
     }
 
     // === IResourceService ===
@@ -89,6 +95,14 @@ public sealed class ResourceService : IResourceService, IDisposable
     public void RegisterDepletedResource(int x, int y, in GameTile tile)
     {
         if (string.IsNullOrEmpty(tile.ResourceId)) return;
+
+        // AUDIT-0911 WT-7 FIX: задержка респауна — из ObjectDefaults
+        // («единый источник истины»: берёза 5, куст 3, камень 14, руда 30,
+        // трава 2), не хардкод 7. RespawnDays == 0 — не респаунится вовсе.
+        int respawnDays = 7;
+        if (ObjectDefaults.TryGet(tile.Object, out var objInfo) && objInfo.RespawnDays > 0)
+            respawnDays = objInfo.RespawnDays;
+
         _depleted.Add(new DepletedResource
         {
             X = x,
@@ -96,14 +110,29 @@ public sealed class ResourceService : IResourceService, IDisposable
             ResourceId = tile.ResourceId,
             ResourceMax = tile.ResourceMax,
             OriginalObject = tile.Object,
-            DayDepleted = _timeService.CurrentDay,
-            RespawnDayDelay = 7, // V1: 7 days respawn default
+            // AUDIT-0911 WT-2 FIX: АБСОЛЮТНЫЙ день (TotalMinutes/1440), НЕ
+            // день месяца: CurrentDay оборачивается 30→1 — ресурс, истощённый
+            // ≥24-го числа, не респаунился НИКОГДА (разность уходила в минус).
+            DayDepleted = AbsoluteDay(),
+            RespawnDayDelay = respawnDays,
         });
     }
 
-    private void OnDayChanged(in DayChangedEvent e) => RespawnCheck(e.Day);
+    private int AbsoluteDay() => _timeService.CurrentTime.TotalMinutes / 60 / 24;
 
-    /// <summary>Check depleted resources for respawn. Public for testing.</summary>
+    private void OnDayChanged(in DayChangedEvent e)
+    {
+        // AUDIT-0911 WT-2: e.Day — день МЕСЯЦА (оборачивается); сверяем по
+        // абсолютному дню (см. RegisterDepletedResource).
+        RespawnCheck(AbsoluteDay());
+    }
+
+    /// <summary>
+    /// Check depleted resources for respawn. Public for testing.
+    /// AUDIT-0911 WT-2: currentDay — АБСОЛЮТНЫЙ день (дней от старта мира,
+    /// TotalMinutes/1440). День месяца (1–30, с оборотом) давал вечное
+    /// «не.respawится» для ресурсов, истощённых в конце месяца.
+    /// </summary>
     public void RespawnCheck(int currentDay)
     {
         for (int i = _depleted.Count - 1; i >= 0; i--)

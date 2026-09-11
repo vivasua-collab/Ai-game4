@@ -34,6 +34,12 @@ public sealed class PlayerModule : IModule
 
     public void Start()
     {
+        // AUDIT-0911 PLR-2 FIX: врождённые статы игрока (раньше никто не
+        // вызывал SetBaseStat → GetStat=0 всегда → бой без STR/AGI/INT/Luck,
+        // «AGI-ускорение атаки» §8.2 мертво). Идемпотентно: тёплый рестарт
+        // не сбрасывает рост. "player" — Body-домен (BodyService.EntityId).
+        _statService.InitializeDefaults("player");
+
         // Spawn player at centre of test polygon (25, 25) if not already spawned.
         if (_playerService is PlayerService ps && !ps.IsSpawned)
         {

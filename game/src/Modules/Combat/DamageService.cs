@@ -66,9 +66,12 @@ namespace CultivationGame.Modules.Combat
 
         // EVT-01: подписки на кросс-модульные события (вместо инъекции IQiBufferService/IEquipmentService)
         private readonly ISubscriber<QiBufferStateChangedEvent> _qiBufferStateChangedSub;
-        private readonly ISubscriber<EquipmentChangedEvent> _equipmentChangedSub;
         private readonly ISubscriber<QiChangedEvent> _qiChangedSub;
         private readonly IPublisher<QiConsumeRequestEvent> _qiConsumeRequestPub;
+        // AUDIT-0911 CMB-4: EquipmentChangedEvent-подписка и кэш брони игрока
+        // удалены — броня цели читается per-entity из IEquipmentDataProvider
+        // (игрок зарегистрирован через SetEquipmentData); кэш был фолбэком,
+        // выдававшим доспех игрока незарегистрированным сущностям (зверям).
 
         // Фаза 3 (3.M): per-entity armor через IEquipmentDataProvider
         private readonly IEquipmentDataProvider _equipmentDataProvider;
@@ -85,11 +88,9 @@ namespace CultivationGame.Modules.Combat
         private QiBufferMode _cachedBufferMode;
         private long _cachedBufferQiInvested;
         private long _cachedCurrentQi; // для расчёта буфера
-        private int _cachedTotalArmor; // ЗАПРЕТ 3.9: int вместо float, конвертация на границе EquipmentChangedEvent
 
         // IDisposable для подписок
         private IDisposable _qiBufferStateChangedSubscription;
-        private IDisposable _equipmentChangedSubscription;
         private IDisposable _qiChangedSubscription;
 
         // === Конструктор (VContainer) ===
@@ -107,7 +108,6 @@ namespace CultivationGame.Modules.Combat
         {
             _damageAppliedPub = damageAppliedPub;
             _qiBufferStateChangedSub = qiBufferStateChangedSub;
-            _equipmentChangedSub = equipmentChangedSub;
             _qiChangedSub = qiChangedSub;
             _qiConsumeRequestPub = qiConsumeRequestPub;
             _equipmentDataProvider = equipmentDataProvider; // Фаза 3 (3.M)
@@ -123,10 +123,9 @@ namespace CultivationGame.Modules.Combat
                 _cachedBufferQiInvested = e.QiInvested;
             });
 
-            // EVT-01: подписка на кэш брони
-            _equipmentChangedSubscription = _equipmentChangedSub.Subscribe((in EquipmentChangedEvent e) => {
-                _cachedTotalArmor = (int)e.TotalArmor; // ЗАПРЕТ 3.9: конвертация на границе события
-            });
+            // AUDIT-0911 CMB-4: подписка на кэш брони игрока удалена
+            // (см. комментарий у полей — брония per-entity из провайдера).
+            _ = equipmentChangedSub; // параметр сохранён в сигнатуре для DI-стабильности
 
             // EVT-01: подписка на кэш текущего Ци (для расчёта буфера)
             _qiChangedSubscription = _qiChangedSub.Subscribe((in QiChangedEvent e) => {
@@ -199,6 +198,17 @@ namespace CultivationGame.Modules.Combat
             // Уклонение — полный промах
             if (attackResult == CombatAttackResult.Dodge)
             {
+                // AUDIT-0911 CMB-3 FIX: ранний return глотал событие — уклонение
+                // было невидимо (мёртвая ветка «уклонение» в DamageNumberRenderer,
+                // молчаливый лог). Публикуем честное событие с Damage=0 и
+                // Result=Dodge: BodyService применит 0 (безопасно), цифры-рендер
+                // покажет «уклонение», StrikeFxRenderer фильтрует Dodge by-design.
+                var dodgeSubtype = GetCombatSubtypeFromRequest(request);
+                _damageAppliedPub.Publish(new DamageAppliedEvent(
+                    request.AttackerId, request.TargetId,
+                    0, request.Type, request.Element,
+                    hitPart, CombatAttackResult.Dodge, dodgeSubtype));
+
                 return new DamageResult(0, 0, 0, hitPart, CombatAttackResult.Dodge, false);
             }
 
@@ -270,7 +280,13 @@ namespace CultivationGame.Modules.Combat
             }
             else
             {
-                armorValue = _cachedTotalArmor; // ЗАПРЕТ 3.9: уже int
+                // AUDIT-0911 CMB-4 FIX: незарегистрированная в провайдере цель
+                // (животные и пр.) получала броню ИГРОКА из кэша событий
+                // (_cachedTotalArmor) — зверь «носил» доспех игрока. Игрок
+                // всегда зарегистрирован (SetEquipmentData → HasEntity), так
+                // что фолбэк достаётся только чужим сущностям: 0 (защита —
+                // только материал тела, DefenseProcessor слой материала).
+                armorValue = 0;
             }
 
             // Спринт 2 B2: Бафф на защиту защищающегося
@@ -485,8 +501,7 @@ namespace CultivationGame.Modules.Combat
         {
             _qiBufferStateChangedSubscription?.Dispose();
             _qiBufferStateChangedSubscription = null;
-            _equipmentChangedSubscription?.Dispose();
-            _equipmentChangedSubscription = null;
+            // AUDIT-0911 CMB-4: equipment-подписка удалена
             _qiChangedSubscription?.Dispose();
             _qiChangedSubscription = null;
         }

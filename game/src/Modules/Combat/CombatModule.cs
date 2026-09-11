@@ -173,6 +173,14 @@ public class CombatModule : IModule
     {
         if (!_isConfigured) return;
 
+        // AUDIT-0911 CMB-2 FIX: стрелы — только для выстрелов ОРУЖИЕМ.
+        // Оружейный интент публикует PlayerCombatAdapter с TechniqueId
+        // "basic_attack" (лук/арбалет: стрела — материя, CombatService §Phase8
+        // комментарий). Ци-техники Ranged* (PlayerTechniqueCaster) несут
+        // TechniqueId реальной техники — их снаряды Ци, колчан не требуют
+        // (раньше Ци-техника отклонялась «нет стрел» и не выполнялась).
+        bool isWeaponShot = string.IsNullOrEmpty(e.TechniqueId) || e.TechniqueId == "basic_attack";
+
         // Phase 8 ч.3: гейт дальнего боя. Каст в процессе → пропускаем
         // гейт (стрелу НЕ тратим), ExecuteAttack сам отклонит по C-5.
         // Пустой TargetId (легаси авто-выбор) — гейт не нужен: цель
@@ -183,11 +191,12 @@ public class CombatModule : IModule
             {
                 _attackRejectedPub.Publish(new AttackRejectedEvent(
                     e.AttackerId, e.TechniqueId,
-                    "нет линии огня — препятствие на пути стрелы"));
+                    "нет линии огня — препятствие на пути"));
                 return;
             }
-            // Review этап 3 (P1-3): проверяем НАЛИЧИЕ стрел — без списания.
-            if (!_rangeGate.HasRangedAmmo(e.AttackerId))
+            // Review этап 3 (P1-3): проверяем НАЛИЧИЕ стрел — без списания
+            // (только оружейные выстрелы; Ци-снаряды — см. CMB-2 выше).
+            if (isWeaponShot && !_rangeGate.HasRangedAmmo(e.AttackerId))
             {
                 _attackRejectedPub.Publish(new AttackRejectedEvent(
                     e.AttackerId, e.TechniqueId,
@@ -205,8 +214,9 @@ public class CombatModule : IModule
             e.AttackerId, e.TechniqueId, e.TargetId, e.IsRanged, e.PotencyPermil, e.IsCharged);
 
         // Review этап 3 (P1-3): списание стрелы — ТОЛЬКО после принятия атаки
-        // (единая authoritative точка; NPC — безлимит как раньше).
-        if (acceptance == AttackAcceptance.Accepted && e.IsRanged)
+        // (единая authoritative точка; NPC — безлимит как раньше; Ци-техники
+        // стрел не расходуют — AUDIT-0911 CMB-2).
+        if (acceptance == AttackAcceptance.Accepted && e.IsRanged && isWeaponShot)
         {
             _rangeGate.TryConsumeRangedAmmo(e.AttackerId);
         }

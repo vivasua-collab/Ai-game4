@@ -189,14 +189,37 @@ namespace CultivationGame.Modules.NPC
             }
         }
 
-        /// <summary>Источник максимальной угрозы (или null).</summary>
+        /// <summary>
+        /// AUDIT-0911 NPC-7 FIX: раньше возвращал любой ключ Threats с макс.
+        /// значением — включая ФАНТОМНЫЕ («sever_unknown» от ампутации;
+        /// «dot:{buffId}» от DoT-тиков: BodyModule публикует DamageAppliedEvent
+        /// с SourceId="dot:…"). После таймаута Fleeing NPC выбирал фантом как
+        /// TargetId → движение «не-NPC = игрок» → NPC преследовал и БИЛ игрока
+        /// без всякого агро. Теперь ключ обязан быть реальной живой целью:
+        /// игрок или живой NPC (DoT-урон от яда не должен провоцировать атаку
+        /// на игрока — месть от REAL ударов уже работает через DamageApplied).
+        /// </summary>
         private string? GetTopThreatId(NPCState state)
         {
             string? topId = null;
             float max = 0f;
             foreach (var kvp in state.Threats)
             {
-                if (kvp.Value > max) { max = kvp.Value; topId = kvp.Key; }
+                if (kvp.Value <= max) continue;
+
+                // Валидация цели: игрок или ЖИВОЙ NPC.
+                if (CultivationGame.Core.Helpers.PlayerIdResolver.IsPlayer(kvp.Key))
+                {
+                    // игрок — валидная цель (если жив)
+                }
+                else
+                {
+                    var threatState = _npcService.GetNPCState(kvp.Key);
+                    if (threatState == null || !threatState.IsAlive) continue; // фантом/мёртвый — пропускаем
+                }
+
+                max = kvp.Value;
+                topId = kvp.Key;
             }
             return topId;
         }
@@ -578,14 +601,19 @@ namespace CultivationGame.Modules.NPC
 
         /// <summary>
         /// Обработчик BodyPartSeveredEvent — принудительное бегство.
+        /// AUDIT-0911 NPC-7 FIX: фантомная угроза «sever_unknown» УДАЛЕНА —
+        /// событие не знает атакующего, а ключ-фантом позже выбирался
+        /// топ-угрозой → Attacking на несуществующую цель → фолбэк движения
+        /// «не-NPC = игрок» → безагровая атака игрока. Бегство (смысл
+        /// обработчика) сохранено; угрозу от РЕАЛЬНОГО атакующего вносит
+        /// OnDamageApplied (месть R16).
         /// </summary>
         private void OnBodyPartSevered(in BodyPartSeveredEvent e)
         {
             var state = _npcService.GetNPCState(e.EntityId);
             if (state == null || !state.IsAlive) return;
 
-            // Отрубленная часть — максимальная угроза, принудительное бегство
-            state.Threats["sever_unknown"] = 100f;
+            // Отрубленная часть — принудительное бегство
             _npcService.SetAIState(state.NpcId, NPCAIState.Fleeing);
         }
 

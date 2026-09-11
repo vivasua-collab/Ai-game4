@@ -17,6 +17,8 @@ public sealed class TileModule : IModule
     public string ModuleName => "Tile";
 
     [Inject] private readonly ITileService _tileService = null!;
+    // AUDIT-0911 WT-1: инъекция ResourceService для Initialize (DayChanged-подписка).
+    [Inject] private readonly IResourceService _resourceService = null!;
     [Inject] private readonly ISubscriber<LocationChangedEvent> _locationChangedSub = null!;
     [Inject] private readonly IPublisher<TileMapGeneratedEvent> _mapGenPublisher = null!;
     // R11 P2-World/Tile (review): единый источник геометрии карты — АКТИВНАЯ
@@ -35,6 +37,13 @@ public sealed class TileModule : IModule
         // (восстановление истощённых ресурсов в grid).
         if (_tileService is TileService ts)
             ts.Initialize();
+
+        // AUDIT-0911 WT-1 FIX: ResourceService.Initialize — ЕДИНСТВЕННАЯ
+        // подписка DayChangedEvent → RespawnCheck. Раньше НИКТО его не
+        // вызывал: респаун ресурсов был мёртв в живой игре (QA-сим звал
+        // RespawnCheck напрямую и маскировал баг).
+        if (_resourceService is ResourceService rs)
+            rs.Initialize();
 
         // R11 P2-World/Tile (review): атомарная связка CurrentLocation ↔
         // CurrentGrid. Раньше геометрия бралась из дубля констант TileConfig

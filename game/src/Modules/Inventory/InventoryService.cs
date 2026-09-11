@@ -168,8 +168,13 @@ namespace CultivationGame.Modules.Inventory
 
                         // R10 P1-SlotId: увеличение существующего стака —
                         // идентичность кучки сохраняется (WithCount).
+                        // AUDIT-0911 INV-1 FIX: при мульти-кучках (сплит R10)
+                        // присваивание newCount занижало кэш до размера одной
+                        // кучки → крафт/продажа/перенос видели не весь запас.
+                        // Зеркалим ветку заполнения стака (строки выше): +count.
                         _slots[i] = _slots[i].WithCount(newCount);
-                        _itemCountCache[item.ItemId] = newCount;
+                        _itemCountCache[item.ItemId] = _itemCountCache.TryGetValue(item.ItemId, out var cachedCount)
+                            ? cachedCount + count : newCount;
                         _itemAddedPub.Publish(new ItemAddedEvent(item.ItemId, count));
                         return true;
                     }

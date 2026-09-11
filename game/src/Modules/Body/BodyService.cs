@@ -451,7 +451,9 @@ namespace CultivationGame.Modules.Body
         /// </summary>
         private void OnCultivationLevelChanged(in CultivationLevelChangedEvent e)
         {
-            if (e.EntityId != _entityId) return;  // Фильтруем по EntityId
+            // AUDIT-0911 BOD-10: алиас-безопасно (QiService публикует "player_0",
+            // BodyService владеет "player" — строгое != пропускало обновление уровня).
+            if (!PlayerIdResolver.AreSameEntity(e.EntityId, _entityId)) return;
             _cachedCultivationLevel = e.NewLevel;
         }
 
@@ -818,7 +820,8 @@ namespace CultivationGame.Modules.Body
         {
             if (entityId == null) return false;
             // A2 FIX: Игрок тоже существует в провайдере
-            if (entityId == _entityId) return _isInitialized;
+            // AUDIT-0911 BOD-10: алиас-безопасно (Combat-домен шлёт "player_0")
+            if (PlayerIdResolver.AreSameEntity(entityId, _entityId)) return _isInitialized;
             return _entityBodyParts.ContainsKey(entityId);
         }
 
@@ -839,7 +842,8 @@ namespace CultivationGame.Modules.Body
         public int GetCurrentHealth(string entityId)
         {
             // A2 FIX: Игрок — части тела в _parts, а не в _entityBodyParts
-            if (entityId == _entityId)
+            // AUDIT-0911 BOD-10: алиас-безопасно (Combat-домен шлёт "player_0")
+            if (PlayerIdResolver.AreSameEntity(entityId, _entityId))
             {
                 int playerTotal = 0;
                 foreach (var kvp in _parts)
@@ -871,7 +875,8 @@ namespace CultivationGame.Modules.Body
         public int GetMaxHealth(string entityId)
         {
             // A2 FIX: Игрок — части тела в _parts, а не в _entityBodyParts
-            if (entityId == _entityId)
+            // AUDIT-0911 BOD-10: алиас-безопасно (Combat-домен шлёт "player_0")
+            if (PlayerIdResolver.AreSameEntity(entityId, _entityId))
             {
                 int playerTotal = 0;
                 foreach (var kvp in _parts)
@@ -904,7 +909,9 @@ namespace CultivationGame.Modules.Body
         public bool IsEntityAlive(string entityId)
         {
             // Игрок
-            if (entityId == _entityId)
+            // AUDIT-0911 BOD-10: алиас-безопасно (Combat-домен шлёт "player_0";
+            // раньше строгий == проваливался в NPC-ветку → «не найден = мёртв»)
+            if (PlayerIdResolver.AreSameEntity(entityId, _entityId))
             {
                 foreach (var kvp in _parts)
                 {

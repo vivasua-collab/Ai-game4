@@ -630,61 +630,93 @@ namespace CultivationGame.Core.Data
                 Morphology.Humanoid, BodyPartHitChancesPermil
             },
             {
+                // AUDIT-0911 BOD-1 FIX: таблица ретаргетнута на ФАКТИЧЕСКИЕ части
+                // тела зверя (BodyTemplateProvider.CreateQuadrupedTemplate:
+                // FrontLeftLeg/FrontRightLeg/BackLeftLeg/BackRightLeg/Tail).
+                // Раньше оперировала гуманоидными LeftArm/RightArm/LeftHand/
+                // RightHand/LeftLeg/RightLeg (460‰ = 46% всех попаданий!) —
+                // части не существовали → фолбэк ResolveEntityTarget всё
+                // сваливал в Torso: ноги зверя были НЕДОСТИЖИМЫ (ампутации
+                // ног невозможны), 81% ударов в торс.
                 Morphology.Quadruped, new Dictionary<BodyPartType, int>
                 {
                     { BodyPartType.Head, 30 },            // 3%
-                    { BodyPartType.Torso, 350 },           // 35%
-                    { BodyPartType.Heart, 10 },            // 1%
-                    { BodyPartType.LeftArm, 50 },          // 5% (передняя левая)
-                    { BodyPartType.RightArm, 50 },         // 5% (передняя правая)
-                    { BodyPartType.LeftLeg, 150 },         // 15% (задняя левая)
-                    { BodyPartType.RightLeg, 150 },        // 15% (задняя правая)
-                    { BodyPartType.LeftHand, 30 },         // 3%
-                    { BodyPartType.RightHand, 30 },        // 3%
-                    { BodyPartType.Tail, 150 }             // 15% (хвост)
+                    { BodyPartType.Torso, 345 },          // 34.5%
+                    { BodyPartType.Heart, 10 },           // 1%
+                    { BodyPartType.FrontLeftLeg, 120 },   // 12% (передняя левая)
+                    { BodyPartType.FrontRightLeg, 120 },  // 12% (передняя правая)
+                    { BodyPartType.BackLeftLeg, 125 },    // 12.5% (задняя левая)
+                    { BodyPartType.BackRightLeg, 125 },   // 12.5% (задняя правая)
+                    { BodyPartType.Tail, 125 }            // 12.5% (хвост)
                 }
             },
             {
+                // AUDIT-0911 BOD-1 FIX: ретаргет на фактические части птицы
+                // (LeftWing/RightWing/BirdTail). Раньше крылья значились
+                // LeftArm/RightArm, хвост Tail — 43% попаданий фолбэком в Torso.
                 Morphology.Bird, new Dictionary<BodyPartType, int>
                 {
                     { BodyPartType.Head, 50 },            // 5%
                     { BodyPartType.Torso, 310 },           // 31% (P0-8.1 FIX: было 300, сумма=990→1000)
                     { BodyPartType.Heart, 10 },            // 1%
-                    { BodyPartType.LeftArm, 150 },         // 15% (левое крыло)
-                    { BodyPartType.RightArm, 150 },        // 15% (правое крыло)
+                    { BodyPartType.LeftWing, 150 },        // 15% (левое крыло)
+                    { BodyPartType.RightWing, 150 },       // 15% (правое крыло)
                     { BodyPartType.LeftLeg, 100 },         // 10%
                     { BodyPartType.RightLeg, 100 },        // 10%
-                    { BodyPartType.Tail, 130 }             // 13% (хвост)
+                    { BodyPartType.BirdTail, 130 }         // 13% (хвост)
                 }
             },
             {
+                // AUDIT-0911 BOD-1 FIX: хвост 500‰ ретаргетнут на фактические
+                // сегменты (BodySegment1/2 + SerpentineTail — шаблон
+                // CreateSerpentineTemplate). Раньше Tail не существовал →
+                // 50% попаданий фолбэком в Torso.
                 Morphology.Serpentine, new Dictionary<BodyPartType, int>
                 {
                     { BodyPartType.Head, 80 },            // 8%
                     { BodyPartType.Torso, 400 },           // 40%
                     { BodyPartType.Heart, 20 },            // 2%
-                    { BodyPartType.Tail, 500 }             // 50% (хвост = большая часть тела)
+                    { BodyPartType.BodySegment1, 150 },    // 15%
+                    { BodyPartType.BodySegment2, 150 },    // 15%
+                    { BodyPartType.SerpentineTail, 200 }   // 20%
                 }
             },
             {
+                // AUDIT-0911 BOD-1 FIX: КРИТИЧНЫЙ случай — паук вообще НЕ ИМЕЕТ
+                // Torso (головогрудь Cephalothorax + Abdomen + Leg1-8 +
+                // Pedipalps + Chelicerae). Раньше 500‰ (LeftLeg/RightLeg/
+                // LeftArm/RightArm/Tail) падали мимо → фолбэк: Torso нет →
+                // VITAL-PRIORITY → СЕРДЦЕ (24 HP) → паук умирал от пары ударов.
+                // Ретаргет: головогрудь 8%, брюшко 40%, сердце 2%, 8 ног по
+                // 5%, педипальпы 5%, хелицеры 5%.
                 Morphology.Arthropod, new Dictionary<BodyPartType, int>
                 {
-                    { BodyPartType.Head, 80 },             // 8%
-                    { BodyPartType.Torso, 400 },            // 40% (головогрудь)
-                    { BodyPartType.Heart, 20 },             // 2%
-                    { BodyPartType.LeftLeg, 100 },          // 10% (усреднённо)
-                    { BodyPartType.RightLeg, 100 },         // 10%
-                    { BodyPartType.LeftArm, 50 },           // 5% (педипальпы)
-                    { BodyPartType.RightArm, 50 },          // 5%
-                    { BodyPartType.Tail, 200 }              // 20% (брюшко)
+                    { BodyPartType.Cephalothorax, 80 },    // 8% (головогрудь)
+                    { BodyPartType.Abdomen, 400 },         // 40% (брюшко)
+                    { BodyPartType.Heart, 20 },            // 2%
+                    { BodyPartType.Leg1, 50 },             // 5%
+                    { BodyPartType.Leg2, 50 },             // 5%
+                    { BodyPartType.Leg3, 50 },             // 5%
+                    { BodyPartType.Leg4, 50 },             // 5%
+                    { BodyPartType.Leg5, 50 },             // 5%
+                    { BodyPartType.Leg6, 50 },             // 5%
+                    { BodyPartType.Leg7, 50 },             // 5%
+                    { BodyPartType.Leg8, 50 },             // 5%
+                    { BodyPartType.Pedipalps, 50 },        // 5% (педипальпы)
+                    { BodyPartType.Chelicerae, 50 }        // 5% (хелицеры)
                 }
             },
             {
+                // AUDIT-0911 BOD-1 FIX: тело духа = Core (vital, 100 HP) +
+                // Essence (200 HP) — БЕЗ Torso. Раньше Torso 500‰ не
+                // существовал → фолбэк: Torso нет → vital-приоритет → Core?
+                // нет (VitalPriority = Head/Heart) → ResolveEntityTarget
+                // возвращал null → 50% ударов по призраку ТЕРЯЛИСЬ.
+                // Ретаргет: Core 10% (vital-якорь), Essence 90% (плащ).
                 Morphology.Amorphous, new Dictionary<BodyPartType, int>
                 {
-                    { BodyPartType.Core, 100 },            // 10% (ядро)
-                    { BodyPartType.Torso, 500 },            // 50% (эфирное тело)
-                    { BodyPartType.Essence, 400 }           // 40% (сущность)
+                    { BodyPartType.Core, 100 },            // 10% (ядро — vital)
+                    { BodyPartType.Essence, 900 }          // 90% (сущность)
                 }
             },
             // Гибридные формы — используют базовую Humanoid таблицу

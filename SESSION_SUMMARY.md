@@ -1,15 +1,50 @@
 # Сводка сессий (обновляется при завершении каждой сессии)
 
-Обновлено: 2026-09-11 07:00 UTC (облачный агент Z.ai Code)
+Обновлено: 2026-09-11 11:30 UTC (облачный агент Z.ai Code)
 
 ## Проект
 Cultivation World Simulator (Ai-game4), Godot 4.7.1 .NET, C#
 Репозиторий: https://github.com/vivasua-collab/Ai-game4 (публичный)
-HEAD: см. `git ls-remote origin main` (фикс боя с животными запушен)
+HEAD: см. `git ls-remote origin main` (полный аудит + P1-фиксы запушены)
 
 ---
 
 ## Последние сессии
+
+### 2026-09-11 №9 (ПОЛНЫЙ АУДИТ: 18 чекпоинтов + P1-пакет 14 фиксов)
+- **Метод:** 4 волны / 9 параллельных аудита-агентов (READ-ONLY), каждый
+  модуль целиком; каждый верифицирован в коде перед фиксом; аудит
+  закоммичен ОТДЕЛЬНО (2072fde) до фиксов. Чекпоинт:
+  checkpoints/09_11_full_audit_and_p1_fixes.md (сводка+решения+очередь).
+- **Итог аудита: P1×19, P2×85+, P3×137+** (~200 файлов). Чекпоинт на
+  КАЖДЫЙ модуль: checkpoints/09_11_audit_{core_layer,world_tile,body,buff,
+  qi,charger,inventory,combat,npc,formation,generator,player,quest,
+  interaction,trade,save,entry,adapter}.md — evidence-based, file:line.
+- **P1-пакет закрыт (14 дефектов + BOD-10 попутно):** статы игрока всегда
+  0 (InitializeDefaults + StatChangedEvent → VIT→HP ожил); смерть игрока
+  по правилу тел (Head|Heart × Disabled|Severed, IsAlive=IsEntityAlive,
+  defenderDead без !isPlayerTarget, алиас-безопасный BodyService);
+  хит-таблицы зверей ретаргетнуты на реальные части (паук больше не умирает
+  от 2 ударов в «сердце», призрак не теряет 50% ударов); баффы: GetStat-
+  ModifierPermil = аддитивный процент (слои 3a/3b урона работали в 0),
+  bleed/shock/void_pierce/severed_* честные ветки, DoT-тики из potency,
+  duration<0=Permanent, potency-нормализация (slow −9000% бомба);
+  слой брони 6-7 оживлён для всех (coverage из предметов, грейд-
+  множители, NPC-агрегаты переживают load); двойное списание Ци за щит G
+  (было 50%, стало 25%); 3 точки потери предметов при volume-full
+  (unequip/пояс/harvest); itemCount-кэш при мульти-кучках; Ци-техники не
+  требуют стрелы; Dodge публикует событие («уклонение» в цифрах);
+  респавн ресурсов оживлён (Initialize из TileModule + абсолютный день +
+  RespawnDays из ObjectDefaults); техники видят зверей (D1-паттерн);
+  фантомная угроза sever_unknown/dot:* (NPC бил игрока без агро); цифры
+  1-9 в диалоге — одинарное действие.
+- **QA: build 0 err; регрессия 15/15 PASS** (COMBAT_SIM/COMBATAI/ANIMALQA/
+  LOOT/DOT/SAVELOAD/KILLFEED/QUEST/STORAGE/HOTBAR/TRASHDROP/CONTEXT/
+  WEAPONVIS/REASSEMBLY/CHARGE).
+- **Решение:** P1-семья «полнота сейва» (QI-2 Qi вне сейва, QST-1 квесты,
+  TRD-1 валюта, INV-4 кукла/пояс → дюп, G-2 фантомные ID cold-load, NPC-1
+  звери переживают Load, E-3 SkipOnLoad-контракт, WT-5 время) — ОТЛОЖЕНА
+  отдельным эпизодом R17; G-1+NPC-6 (один генератор экипировки NPC) — R18.
 
 ### 2026-09-11 №8 (Бой с животными: 9 дефектов; легенда клавиш → F1)
 - **Жалоба:** «бегу с посохом за волком — результата 0». **D1 (ПРИЧИНА):**
@@ -30,9 +65,7 @@ HEAD: см. `git ls-remote origin main` (фикс боя с животными �
 - **Легенда клавиш с HUD УДАЛЕНА** — канон F1 (HotkeysWindow; легенда
   к тому же врала: M/N-карты не реализованы, F1 ≠ чит-меню).
 - QA: ANIMALQA (новый хук, 7 тестов) PASS; регрессия 14/14 PASS; build 0
-  err. Чекпоинт: checkpoints/09_11_animal_combat_fix.md (детальные
-  чекпоинты — новое правило по требованию пользователя: сервис зависает,
-  состояние обязано переживать обрывы).
+  err. Чекпоинт: checkpoints/09_11_animal_combat_fix.md.
 
 ### 2026-09-10 №7 (Аудит R14–R16: 9 дефектов исправлено, REASSEMBLY QA усилен)
 - **R14:** P2-1 — NPC-домен переживал пересборку мира (double-spawn,

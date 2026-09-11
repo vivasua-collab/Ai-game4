@@ -1979,3 +1979,67 @@ Stage Summary:
   X без модального гейта. Приоритет: ADP-1 → ADP-2 → ADP-3/4 (одним
   животным-эпизодом) → ADP-5/6 → остальное. Всё с file:line в
   checkpoints/09_11_audit_adapter.md.
+
+---
+Task ID: FULLAUDIT-P1FIX-0911
+Agent: main-agent (Z.ai Code, сессия 2026-09-11 №9)
+Task: Полный аудит проекта по запросу пользователя («последовательно каждый
+модуль, для каждого модуля свой файл чекпоинт») + исправление P1-пакета.
+
+Work Log:
+- Восстановлен контекст (START_PROMPT/SESSION_CONTEXT/SESSION_SUMMARY),
+  build 0 err, main == origin/main, обе задачи прошлой сессии уже закрыты
+  (d0b065d animal fix + F1-легенда).
+- Аудит выполнен 4 волнами 9 параллельных агентов (READ-ONLY, glm-5.3):
+  Волна 1 Core + World/Tile + Body/Buff; Волна 2 Qi/Charger + Inventory +
+  Combat; Волна 3 NPC + Formation/Generator + Player/Quest; Волна 4
+  Interaction/Trade/Save + Entry + Adapter. ~200 файлов прочитано целиком.
+- Каждый модуль — отдельный чекпоинт (18 файлов checkpoints/09_11_audit_*.md)
+  в формате аудита-3 (2026-08-26): evidence-based, file:line, P1/P2/P3.
+  Аудит закоммичен ОТДЕЛЬНО до фиксов (2072fde).
+- Итог аудита: P1×19, P2×85+, P3×137+. Ключевые P1: статы игрока всегда 0
+  (PLR-2), смерть игрока не по правилу тел (BOD-2/PLR-1), хит-таблицы зверей
+  мимо частей (BOD-1), баффы-проценты = 0 (BUF-1), bleed не распознан (BUF-2),
+  слой брони мёртв (CMB-1/INV-5), двойное Ци за щит (QI-1), Qi/квесты/валюта/
+  кукла вне сейва (QI-2/QST-1/TRD-1/INV-4), потери предметов при volume-full
+  (INV-2/3/17), легаси-ID коллизии (G-1), фантомные ID cold-load (G-2),
+  респавн мёртв (WT-1), квесты не в сейве (QST-1).
+- P1-пакет 14 дефектов + BOD-10 реализован (каждый верифицирован в коде
+  перед фиксом): StatService.InitializeDefaults(10/10/10/10, Luck 5) +
+  публикация StatChangedEvent (оживление VIT→HP П.24); PlayerService смерть
+  (Head|Heart × Disabled|Severed, IsAlive=IsEntityAlive, _deathAnnounced) +
+  CombatService.defenderDead без !isPlayerTarget + BodyService алиас-безопасен
+  (AreSameEntity в 5 точках); Constants.MorphologyHitTables ретаргет 5 таблиц
+  на реальные части тел; BuffService/BuffCalculator (CalculatePercentSum,
+  bleed/shock/void_pierce/severed/perk-ветки, Permanent, potency-нормализация,
+  кламп ±90/300%); EquipmentDataProvider.RecomputeAggregatesFromData (грейд-
+  множители + coverage) + SetEquipment NPC резолвит ID + NPCSpawner/NPCService
+  агрегаты поверх + DamageService фолбэк 0; CombatService QI-1 (одинарное
+  списание щита); InventoryService кэш +=; InventoryModule/BeltService
+  overflow-паттерн (3-arg + DropItemsNearPlayer); IInventoryService 3-arg
+  перегрузка; CombatModule isWeaponShot (Ци-техники без стрел); DamageService
+  Dodge-событие (0 урона); ResourceService (Initialize из TileModule,
+  абсолютный день, RespawnDays из ObjectDefaults); PlayerTechniqueCaster
+  IAnimalService (техники видят зверей); NPCAIService (валидация topThreat,
+  фантом sever_unknown удалён); InputAdapter ADP-2 (цифры 1-9 гейт UI).
+- QA: build 0 errors (384 warnings — базовый уровень); полная регрессия
+  15/15 VERDICT: PASS (COMBAT_SIM/COMBATAI/ANIMALQA/LOOT/DOT/SAVELOAD/
+  KILLFEED/QUEST/STORAGE/HOTBAR/TRASHDROP/CONTEXT/WEAPONVIS/REASSEMBLY/
+  CHARGE); bleed-ветка DOT-сима подтверждена.
+- Сводный чекпоинт checkpoints/09_11_full_audit_and_p1_fixes.md (решения +
+  очередь R17/R18); SESSION_SUMMARY/SESSION_CONTEXT обновлены.
+
+Stage Summary:
+- Полный аудит проекта завершён впервые с 2026-08-26: 18 модульных
+  чекпоинтов, ~240 находок, P1×19. Аудит и фиксы — раздельные коммиты.
+- P1-пакет 14 фиксов закрыт с полной QA-регрессией 15/15 PASS.
+- Архитектурное решение: P1-семья «полнота сейва» (8 дефектов) выделена в
+  отдельный эпизод R17 (единый ISaveable-контракт + ResetWorld-фаза по
+  паттерну NpcDomainResetPhase + расширение SaveLoadSimDebug) — чинить
+  россыпью = повторить R14-патчинг вслепую.
+- Паттерн на будущее: (1) новые источники баффов обязаны поставлять
+  potency-семантику из документированного набора (HP-тик/промилле/доля) —
+  маппинг в CreateBuffFromId нормализует; (2) хит-таблицы морфологий
+  сверять с BodyTemplateProvider при добавлении видов; (3) агрегаты
+  экипировки per-entity пересчитываются в провайдере, вызывающие — только
+  ДОБАВЛЯЮТ natural/base поверх.

@@ -16,6 +16,15 @@ namespace CultivationGame.Core.Interfaces
         BodyPartState GetPartState(BodyPartType type);
         bool IsPartSevered(BodyPartType type);
         bool IsPartDisabled(BodyPartType type);
+
+        /// <summary>
+        /// AUDIT-0911 BOD-2/PLR-1: единое правило тел — vital Head/Heart
+        /// RedHP ≤ 0 = мёртв (реализация BodyService уже существует —
+        /// IBodyDataProvider.IsEntityAlive; интерфейс теперь честно его
+        /// экспортирует и для consumers IBodyService, например
+        /// PlayerService.IsAlive).
+        /// </summary>
+        bool IsEntityAlive(string entityId);
         float GetPartHealthRatio(BodyPartType type);
         void ApplyDamage(BodyPartType target, int totalDamage);
         void HealPart(BodyPartType target, int amount);

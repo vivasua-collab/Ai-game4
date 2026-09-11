@@ -76,7 +76,9 @@ namespace CultivationGame.Modules.Combat
         // EVT-01: подписки на кросс-модульные события (вместо инъекции IQiService/IQiBufferService)
         private readonly ISubscriber<QiChangedEvent> _qiChangedSub;
         private readonly ISubscriber<QiBufferStateChangedEvent> _qiBufferStateChangedSub;
-        private readonly IPublisher<QiConsumeRequestEvent> _qiConsumeRequestPub;
+        // AUDIT-0911 QI-1: QiConsumeRequestEvent-publisher удалён — стойка щита
+        // списывает Ци ровно один раз (через QiBufferActivateRequestEvent →
+        // QiBufferService.Activate → TryConsumeQi).
         private readonly IPublisher<QiBufferActivateRequestEvent> _qiBufferActivateReqPub;
         private readonly IPublisher<QiBufferDeactivateRequestEvent> _qiBufferDeactivateReqPub;
 
@@ -188,7 +190,6 @@ namespace CultivationGame.Modules.Combat
             ISubscriber<QiDepletedEvent> qiDepletedSub,
             ISubscriber<QiChangedEvent> qiChangedSub,
             ISubscriber<QiBufferStateChangedEvent> qiBufferStateChangedSub,
-            IPublisher<QiConsumeRequestEvent> qiConsumeRequestPub,
             IPublisher<QiBufferActivateRequestEvent> qiBufferActivateReqPub,
             IPublisher<QiBufferDeactivateRequestEvent> qiBufferDeactivateReqPub,
             IQiDataProvider qiDataProvider, // Фаза 3 (3.I)
@@ -207,7 +208,6 @@ namespace CultivationGame.Modules.Combat
             _qiDepletedSub = qiDepletedSub;
             _qiChangedSub = qiChangedSub;
             _qiBufferStateChangedSub = qiBufferStateChangedSub;
-            _qiConsumeRequestPub = qiConsumeRequestPub;
             _qiBufferActivateReqPub = qiBufferActivateReqPub;
             _qiBufferDeactivateReqPub = qiBufferDeactivateReqPub;
             _qiDataProvider = qiDataProvider; // Фаза 3 (3.I)
@@ -840,15 +840,20 @@ namespace CultivationGame.Modules.Combat
 
             // Проверяем результат боя
             // 2026-09-11 (аудит боя, «сущности неубиваемы»): смерть
-            // защитника-НЕ-игрока — не только IsFatalHit (Head/Heart ≥ 50
-            // урона за удар), но и РЕАЛЬНОЕ состояние тела после удара:
-            // жизненно важная часть уничтожена (BODY_SYSTEM: RedHP ≤ 0 —
+            // защитника — не только IsFatalHit (Head/Heart ≥ 50 урона за
+            // удар), но и РЕАЛЬНОЕ состояние тела после удара: жизненно
+            // важная часть уничтожена (BODY_SYSTEM: RedHP ≤ 0 —
             // IsEntityAlive) либо полный дренаж HP. Раньше домены смерти
             // (NPCCombatAdapter/AnimalService) ждали «суммарный HP ≤ 0» —
             // при per-part floor (урон в мёртвую часть теряется) это
             // практически недостижимо → волк/NPC «бессмертны» в бою.
+            // AUDIT-0911 PLR-1/BOD-2 FIX: правило тел теперь покрывает И
+            // ИГРОКА (раньше !isPlayerTarget исключал игрока → разрушение
+            // Head не завершало бой за игрока). Алиас-безопасность
+            // BodyService (BOD-10) обеспечивает корректный резолв
+            // "player_0" → ветка игрока (не «не найден = мёртв»).
             bool defenderDead = result.IsFatal
-                || (!isPlayerTarget && _bodyDataProvider != null
+                || (_bodyDataProvider != null
                     && _bodyDataProvider.HasEntity(defenderId)
                     && !_bodyDataProvider.IsEntityAlive(defenderId));
             if (defenderDead)
@@ -899,9 +904,13 @@ namespace CultivationGame.Modules.Combat
                 long shieldQi = _cachedCurrentQi / 4; // 25% Ци на щит (EVT-01: из кэша)
                 if (shieldQi >= GameConstants.MIN_QI_FOR_BUFFER)
                 {
-                    // P0-X1 FIX: передаём EntityId в QiConsumeRequestEvent для корректного списания Ци
-                    _qiConsumeRequestPub.Publish(new QiConsumeRequestEvent(shieldQi, "Combat", defenderId));
-                    // EVT-01: запрашиваем активацию буфера через событие вместо _qiBufferService.Activate
+                    // AUDIT-0911 QI-1/PLR-3 FIX: было ДВОЙНОЕ списание 25% Ци за
+                    // стойку щита — явный QiConsumeRequestEvent (QiService.
+                    // OnQiConsumeRequest → TryConsumeQi) ПОВЕРХ активации буфера
+                    // (QiBufferActivateRequestEvent → Activate → TryConsumeQi) =
+                    // 50% Ци за одно действие. Убираем явный publish: активация
+                    // буфера сама инвестирует (и возвращает остаток при Deactivate,
+                    // QI-A05). EVT-01-проводка сохранена.
                     _qiBufferActivateReqPub.Publish(new QiBufferActivateRequestEvent(shieldQi, QiBufferMode.Shield));
                 }
             }

@@ -35,6 +35,10 @@ public sealed class PlayerTechniqueCaster : IDisposable
 {
     [Inject] private readonly IPlayerService _player = null!;
     [Inject] private readonly INPCService _npcs = null!;
+    // AUDIT-0911 CMB-5/PLR-6 FIX (D1-паттерн из PlayerCombatAdapter):
+    // техники (Z/панель 3-9) видели только NPC — волки живут в
+    // AnimalService → FindTargetInRange молча возвращал «цель исчезла».
+    [Inject] private readonly IAnimalService? _animals = null;
     [Inject] private readonly IBodyService _body = null!;
     [Inject] private readonly TechniqueService _techniques = null!;
     [Inject] private readonly TechniqueChargeService _chargeService = null!;
@@ -297,23 +301,42 @@ public sealed class PlayerTechniqueCaster : IDisposable
         return 1000 + svc.GetFormationBonusPermil(StatType.Damage);
     }
 
-    /// <summary>Ближайший живой NPC в радиусе техники (Chebyshev, тайлы).</summary>
+    /// <summary>
+    /// Ближайшая живая цель в радиусе техники (Чебышёв, тайлы): NPC ∪ животные.
+    /// AUDIT-0911 CMB-5/PLR-6 FIX (D1-паттерн): раньше только NPC — звери были
+    /// невидимы для Ци-техник («посох→волк» чинился только для Space-атаки).
+    /// </summary>
     private string? FindTargetInRange(LearnedTechnique tech)
     {
         float rangeTiles = Math.Max(MinAttackRangeTiles, tech.Range / GameConstants.TILE_SIZE_M);
-        var nearby = _npcs.GetNearbyNPCIds(_player.Position, rangeTiles);
-        if (nearby == null || nearby.Count == 0) return null;
+        var pos = _player.Position;
         string? best = null;
         int bestDist = int.MaxValue;
-        var pos = _player.Position;
-        foreach (var id in nearby)
+
+        // Кандидаты-NPC
+        var nearby = _npcs.GetNearbyNPCIds(pos, rangeTiles);
+        if (nearby != null)
         {
-            if (!_npcs.IsAlive(id)) continue;
-            var npc = _npcs.GetNPC(id);
-            if (npc == null) continue;
-            int dist = Math.Max(Math.Abs(npc.Position.X - pos.X), Math.Abs(npc.Position.Y - pos.Y));
-            if (dist < bestDist) { bestDist = dist; best = id; }
+            foreach (var id in nearby)
+            {
+                if (!_npcs.IsAlive(id)) continue;
+                var npc = _npcs.GetNPC(id);
+                if (npc == null) continue;
+                int dist = Math.Max(Math.Abs(npc.Position.X - pos.X), Math.Abs(npc.Position.Y - pos.Y));
+                if (dist < bestDist) { bestDist = dist; best = id; }
+            }
         }
+
+        // Кандидаты-животные (D1-паттерн)
+        if (_animals != null)
+        {
+            foreach (var animal in _animals.GetAliveAnimalsInRange(pos, rangeTiles))
+            {
+                int dist = Math.Max(Math.Abs(animal.Position.X - pos.X), Math.Abs(animal.Position.Y - pos.Y));
+                if (dist < bestDist) { bestDist = dist; best = animal.EntityId; }
+            }
+        }
+
         return best;
     }
 
