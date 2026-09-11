@@ -54,6 +54,11 @@ public static class NPCModuleServices
         // Body assembly uses IBodyFactory + IBodyDataProvider (registered in
         // BodyModuleServices); ITileService (TileModule); SpeciesRegistry (Body).
         builder.Register<AnimalService>(Lifetime.Singleton);
+        // 2026-09-11 (аудит боя с животными): Core-интерфейс для чужих модулей —
+        // таргетинг Space (PlayerCombatAdapter), трупы (CorpseService), статы
+        // вида (StatProviderAdapter), имена UI (DamageNumberRenderer/EventLog).
+        // До интерфейса волки были невидимы для боевого таргетинга (D1).
+        builder.Register<IAnimalService, AnimalService>(Lifetime.Singleton);
 
         // === GROUP-SPAWN: группы NPC (патруль, escort, guard area, hunting pack) ===
         // NPCGroupService — Singleton; управляет составом групп и обновляет

@@ -30,6 +30,9 @@ public partial class EventLogWindow : Control
     private const int MaxEntries = 60;
 
     [Inject] private readonly INPCService? _npcService = null;
+    // 2026-09-11 (аудит D6): имена животных для killfeed («☠ Волк повержен»,
+    // раньше — «??? повержен»).
+    [Inject] private readonly IAnimalService? _animalService = null;
     [Inject] private readonly ITimeService? _timeService = null;
     [Inject] private readonly ISubscriber<CombatStartedEvent> _combatStartedSub = null!;
     [Inject] private readonly ISubscriber<CombatEndedEvent> _combatEndedSub = null!;
@@ -207,7 +210,11 @@ public partial class EventLogWindow : Control
     {
         if (IsPlayer(entityId)) return "Вы";
         var st = _npcService?.GetNPCState(entityId);
-        return st?.DisplayName ?? "???";
+        if (st != null) return st.DisplayName;
+        // 2026-09-11 (D6): животное → имя вида («Волк»).
+        var animalName = _animalService?.GetDisplayName(entityId);
+        if (!string.IsNullOrEmpty(animalName)) return animalName;
+        return "???";
     }
 
     private static string RuItem(string itemId)

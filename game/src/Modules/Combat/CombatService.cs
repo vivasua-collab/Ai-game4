@@ -69,6 +69,9 @@ namespace CultivationGame.Modules.Combat
         private readonly IPublisher<AttackRejectedEvent> _attackRejectedPub; // C-5 (аудит-3): событие отклонения атаки
         private readonly ISubscriber<QiDepletedEvent> _qiDepletedSub;
         private readonly IQiDataProvider _qiDataProvider; // Фаза 3 (3.I): уровни NPC
+        // 2026-09-11 (аудит боя): смерть защитника-не-игрока по правилам тел
+        // (vital-разрушение/полный дренаж — IsEntityAlive), а не только IsFatalHit.
+        private readonly IBodyDataProvider? _bodyDataProvider;
 
         // EVT-01: подписки на кросс-модульные события (вместо инъекции IQiService/IQiBufferService)
         private readonly ISubscriber<QiChangedEvent> _qiChangedSub;
@@ -158,9 +161,14 @@ namespace CultivationGame.Modules.Combat
         public void AbandonCombat(string entityId)
         {
             if (!_isInCombat) return;
-            if (string.IsNullOrEmpty(entityId) || !IsParticipant(entityId)) return;
+            if (string.IsNullOrEmpty(entityId) || !IsParticipant(entityId))
+            {
+                Console.WriteLine($"[Combat] AbandonCombat('{entityId}'): не участник (instigator={_instigatorId}, target={_currentTargetId}) — игнор");
+                return;
+            }
 
             _currentStage = CombatStage.Flee;
+            Console.WriteLine($"[Combat] AbandonCombat('{entityId}'): бой завершён стадией Flee");
             EndCombat();
         }
 
@@ -183,7 +191,8 @@ namespace CultivationGame.Modules.Combat
             IPublisher<QiConsumeRequestEvent> qiConsumeRequestPub,
             IPublisher<QiBufferActivateRequestEvent> qiBufferActivateReqPub,
             IPublisher<QiBufferDeactivateRequestEvent> qiBufferDeactivateReqPub,
-            IQiDataProvider qiDataProvider) // Фаза 3 (3.I)
+            IQiDataProvider qiDataProvider, // Фаза 3 (3.I)
+            IBodyDataProvider? bodyDataProvider = null) // 2026-09-11 (аудит боя): смерть защитника по правилам тел
         {
             _damageService = damageService;
             _techniqueService = techniqueService;
@@ -202,6 +211,7 @@ namespace CultivationGame.Modules.Combat
             _qiBufferActivateReqPub = qiBufferActivateReqPub;
             _qiBufferDeactivateReqPub = qiBufferDeactivateReqPub;
             _qiDataProvider = qiDataProvider; // Фаза 3 (3.I)
+            _bodyDataProvider = bodyDataProvider; // 2026-09-11 (аудит боя)
 
             // EVT-01: подписка на кэш состояния Ци
             _qiChangedSubscription = _qiChangedSub.Subscribe((in QiChangedEvent e) => {
@@ -829,7 +839,19 @@ namespace CultivationGame.Modules.Combat
             _techniqueUsedPub.Publish(new TechniqueUsedEvent(attackerId, techniqueId, qiCost));
 
             // Проверяем результат боя
-            if (result.IsFatal)
+            // 2026-09-11 (аудит боя, «сущности неубиваемы»): смерть
+            // защитника-НЕ-игрока — не только IsFatalHit (Head/Heart ≥ 50
+            // урона за удар), но и РЕАЛЬНОЕ состояние тела после удара:
+            // жизненно важная часть уничтожена (BODY_SYSTEM: RedHP ≤ 0 —
+            // IsEntityAlive) либо полный дренаж HP. Раньше домены смерти
+            // (NPCCombatAdapter/AnimalService) ждали «суммарный HP ≤ 0» —
+            // при per-part floor (урон в мёртвую часть теряется) это
+            // практически недостижимо → волк/NPC «бессмертны» в бою.
+            bool defenderDead = result.IsFatal
+                || (!isPlayerTarget && _bodyDataProvider != null
+                    && _bodyDataProvider.HasEntity(defenderId)
+                    && !_bodyDataProvider.IsEntityAlive(defenderId));
+            if (defenderDead)
             {
                 // 2026-08-26 (аудит-3 C-1): ВИКТИМ-ЦЕНТРИЧНАЯ логика (была
                 // «attackerId == _instigatorId» = игрок): при гибели игрока от

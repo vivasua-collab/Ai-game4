@@ -3,6 +3,10 @@
 // Редактировано: 2026-05-22 04:14:49 UTC — Спринт 3 B6: GetElement/GetMaterial реализация
 // Редактировано: 2026-05-22 07:55:00 UTC — Аудит MED-1: INPCService вместо NPCService (DI compliance)
 // Редактировано: 2026-05-22 11:30:00 UTC — Спринт 8 C10: GetMorphology реализация
+// Редактировано: 2026-09-11 — аудит боя с животными D7: ветка животных
+//   (IAnimalService): статы вида (волк STR 8/AGI 14), Quadruped-морфология
+//   для таблицы попадания. Раньше неизвестная сущность (животное) получала
+//   статы ИГРОКА — додж волка считался по AGI игрока, морфология Humanoid.
 // Спринт 2 B3: Адаптер единого доступа к статам для CombatService.
 // Скрывает источник данных (IStatService для игрока, INPCService для NPC)
 // за единым интерфейсом IStatProvider.
@@ -23,6 +27,7 @@ namespace CultivationGame.Modules.Combat
     /// Логика:
     /// - Если entityId = "player" или зарегистрирован в IStatService → IStatService
     /// - Иначе если entityId найден в INPCService → NPCState.Strength/Agility/...
+    /// - Иначе если entityId — животное (IAnimalService) → статы вида (SpeciesRegistry)
     /// - Иначе → 0 (сущность не найдена)
     ///
     /// MED-1 FIX: Теперь инжектит INPCService вместо конкретного NPCService.
@@ -32,11 +37,15 @@ namespace CultivationGame.Modules.Combat
     {
         private readonly IStatService _playerStatService;
         private readonly INPCService _npcService; // MED-1: интерфейс вместо конкретного класса
+        // 2026-09-11 (D7): статы животных (SpeciesRegistry: волк STR 8/AGI 14/VIT 10/INT 4).
+        private readonly IAnimalService? _animalService;
 
-        public StatProviderAdapter(IStatService playerStatService, INPCService npcService)
+        public StatProviderAdapter(IStatService playerStatService, INPCService npcService,
+            IAnimalService? animalService = null)
         {
             _playerStatService = playerStatService;
             _npcService = npcService;
+            _animalService = animalService;
         }
 
         /// <summary>
@@ -61,6 +70,20 @@ namespace CultivationGame.Modules.Combat
                 };
             }
 
+            // 2026-09-11 (D7): животное — статы вида (SpeciesRegistry), не игрока.
+            var animal = _animalService?.TryGetAnimal(entityId);
+            if (animal != null)
+            {
+                return type switch
+                {
+                    StatType.Strength => animal.Value.Strength,
+                    StatType.Agility => animal.Value.Agility,
+                    StatType.Vitality => animal.Value.Vitality,
+                    StatType.Intelligence => animal.Value.Intelligence,
+                    _ => 0
+                };
+            }
+
             // Игрок — IStatService.GetStat() возвращает float, кастуем к int (ЗАПРЕТ 3.9)
             float rawValue = _playerStatService.GetStat(type);
             return (int)rawValue;
@@ -77,7 +100,7 @@ namespace CultivationGame.Modules.Combat
             var npcState = _npcService.GetNPCState(entityId);
             if (npcState != null)
                 return npcState.InnateElement;
-            return Element.Neutral; // Игрок — Neutral
+            return Element.Neutral; // Игрок и животные — Neutral
         }
 
         /// <summary>
@@ -91,6 +114,11 @@ namespace CultivationGame.Modules.Combat
             var npcState = _npcService.GetNPCState(entityId);
             if (npcState != null)
                 return npcState.BodyMaterial;
+            // 2026-09-11 (D7): животное — материал вида (Quadruped → Organic;
+            // будущие призраки/големы дадут иное).
+            var animal = _animalService?.TryGetAnimal(entityId);
+            if (animal != null)
+                return animal.Value.Material;
             return BodyMaterial.Organic; // Игрок — Organic
         }
 
@@ -105,6 +133,11 @@ namespace CultivationGame.Modules.Combat
             var npcState = _npcService.GetNPCState(entityId);
             if (npcState != null)
                 return npcState.Morphology;
+            // 2026-09-11 (D7): животное — Quadruped: таблица попадания по
+            // частям тела зверя (голова/торс/ноги), не гуманоидная раскладка.
+            var animal = _animalService?.TryGetAnimal(entityId);
+            if (animal != null)
+                return animal.Value.Morphology;
             return Morphology.Humanoid; // Игрок — Humanoid
         }
     }

@@ -238,8 +238,16 @@ namespace CultivationGame.Modules.NPC
                 : 0f;
             _npcDamagedPub.Publish(new NPCDamagedEvent(e.TargetId, e.SourceId, e.Damage, healthRatio));
 
-            // Проверка смерти: CurrentHealth должен обновляться из BodyParts
-            if (state.CurrentHealth <= 0 && state.IsAlive)
+            // Проверка смерти: 2026-09-11 (аудит боя) — ЕДИНОЕ правило тел
+            // (BODY_SYSTEM): смерть = жизненно важная часть уничтожена
+            // (Head/Heart RedHP ≤ 0 — IsEntityAlive) ИЛИ полный дренаж HP.
+            // Раньше ждали только CurrentHealth ≤ 0 — при per-part floor
+            // (урон в мёртвую часть теряется) сумма практически не обнуляется
+            // → NPC «бессмертен» в честном бою, труп не создавался.
+            bool bodyDead = _bodyDataProvider.HasEntity(e.TargetId)
+                && (!_bodyDataProvider.IsEntityAlive(e.TargetId)
+                    || _bodyDataProvider.GetCurrentHealth(e.TargetId) <= 0);
+            if (bodyDead && state.IsAlive)
             {
                 state.IsAlive = false;
                 state.IsInCombat = false;

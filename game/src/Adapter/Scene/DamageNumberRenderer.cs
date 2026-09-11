@@ -26,6 +26,9 @@ public partial class DamageNumberRenderer : Node2D
     [Inject] private ISubscriber<Core.Messaging.Contracts.DamageAppliedEvent>? _damageSub;
     [Inject] private INPCService? _npcService;
     [Inject] private IPlayerService? _playerService;
+    // 2026-09-11 (аудит D5): позиция животного для цифр урона (раньше — null:
+    // «результата 0» без визуального фидбека при ударах по волку).
+    [Inject] private IAnimalService? _animalService;
 
     private System.IDisposable? _damageToken;
 
@@ -160,10 +163,18 @@ public partial class DamageNumberRenderer : Node2D
     {
         float tile = GameConstants.TILE_PIXELS;
 
-        // NPC (включая животных — их Id тоже в NPCService? нет: AnimalService отдельный).
+        // NPC.
         var npc = _npcService?.GetNPC(entityId);
         if (npc != null)
             return new Vector2(npc.Position.X * tile + tile / 2f, npc.Position.Y * tile + tile / 2f);
+
+        // 2026-09-11 (D5): животные (волк/олень/кролик) — цифры урона над
+        // зверем, как у NPC (позиция — боевой профиль IAnimalService).
+        var animal = _animalService?.TryGetAnimal(entityId);
+        if (animal != null)
+            return new Vector2(
+                animal.Value.Position.X * tile + tile / 2f,
+                animal.Value.Position.Y * tile + tile / 2f);
 
         // Игрок (оба исторических ID).
         if (IsPlayer(entityId) && _playerService != null)
@@ -171,7 +182,7 @@ public partial class DamageNumberRenderer : Node2D
                 _playerService.Position.X * tile + tile / 2f,
                 _playerService.Position.Y * tile + tile / 2f);
 
-        return null; // животные/неизвестные — без позиционирования пока
+        return null; // неизвестные сущности — без позиционирования
     }
 
     private static bool IsPlayer(string id) => id == "player" || id == "player_0";

@@ -4,6 +4,13 @@
 // Без AI-комбата, без pathfinding — только случайное блуждание в радиусе 5 тайлов.
 // Body parts регистрируются в IBodyDataProvider per-entity (как у NPC).
 // Источник: checkpoints/08_22_body_impl_plan.md Phase C
+//
+// 2026-09-11 (аудит боя с животными D1–D7): IAnimalService — боевой профиль
+// для чужих модулей (таргетинг Space, трупы, статы вида, имена UI);
+// OnDamageApplied — детект смерти (NPCDeathEvent → CorpseService §5
+// DEATH_AND_LOOT: труп-контейнер с духовными камнями); месть волка —
+// ЧЕЙЗ игрока + атака только вплотную + de-aggro за 5 тайлов (ANIMALS §5);
+// кролик мирный — не мстит (ANIMALS §5.5).
 using System;
 using System.Collections.Generic;
 using CultivationGame.Core.Data;
@@ -35,7 +42,7 @@ namespace CultivationGame.Modules.NPC
     ///     Clears any existing animals first.
     ///   * ITickable.Tick() — drives wandering at 1/5/15 Hz depending on TimeSpeed.
     /// </summary>
-    public sealed class AnimalService : IStartable, ITickable
+    public sealed class AnimalService : IStartable, ITickable, IAnimalService
     {
         // === DI dependencies ===
         private readonly IBodyDataProvider _bodyDataProvider;
@@ -44,6 +51,13 @@ namespace CultivationGame.Modules.NPC
         private readonly SpeciesRegistry _speciesRegistry;
         private readonly ISubscriber<DamageAppliedEvent> _damageAppliedSub;
         private readonly IPublisher<AttackIntentEvent> _attackIntentPub;
+        // 2026-09-11 (D2/D4): смерть животного → NPCDeathEvent (труп/killfeed);
+        // позиция и канонический ID игрока для честной мести (чейз/смежность);
+        // de-aggro → CombatDisengageEvent (симметрия с leash NPC R16 — бой
+        // не должен «висеть» вечно, когда зверь отстал).
+        private readonly IPublisher<NPCDeathEvent> _npcDeathPub;
+        private readonly IPublisher<CombatDisengageEvent> _combatDisengagePub;
+        private readonly IPlayerService _playerService;
 
         // === State ===
         private readonly List<AnimalEntity> _animals = new();
@@ -74,6 +88,19 @@ namespace CultivationGame.Modules.NPC
         private const int MaxSpawnAttempts = 200;
 
         /// <summary>
+        /// Радиус агро мести: игрок дальше — животное отстаёт и возвращается
+        /// к блужданию (ANIMALS.md §5.4 «прекращение retaliation»).
+        /// </summary>
+        private const int RetaliationAgroRadius = 5;
+
+        /// <summary>
+        /// Дистанция укуса (Чебышёв, тайлы) — мстящее животное атакует ТОЛЬКО
+        /// вплотную (ANIMALS.md §5.2: «пока цель в зоне досягаемости»).
+        /// До R16-аудита интент публиковался с ЛЮБОЙ дистанции.
+        /// </summary>
+        private const int AnimalAttackRangeTiles = 2;
+
+        /// <summary>
         /// Construct AnimalService. Resolved by DI; constructor injection picks
         /// up IBodyDataProvider, IBodyFactory, ITileService, SpeciesRegistry.
         /// </summary>
@@ -83,7 +110,10 @@ namespace CultivationGame.Modules.NPC
             ITileService tileService,
             SpeciesRegistry speciesRegistry,
             ISubscriber<DamageAppliedEvent> damageAppliedSub,
-            IPublisher<AttackIntentEvent> attackIntentPub)
+            IPublisher<AttackIntentEvent> attackIntentPub,
+            IPublisher<NPCDeathEvent> npcDeathPub,
+            IPublisher<CombatDisengageEvent> combatDisengagePub,
+            IPlayerService playerService)
         {
             _bodyDataProvider = bodyDataProvider ?? throw new ArgumentNullException(nameof(bodyDataProvider));
             _bodyFactory = bodyFactory ?? throw new ArgumentNullException(nameof(bodyFactory));
@@ -91,6 +121,9 @@ namespace CultivationGame.Modules.NPC
             _speciesRegistry = speciesRegistry ?? throw new ArgumentNullException(nameof(speciesRegistry));
             _damageAppliedSub = damageAppliedSub ?? throw new ArgumentNullException(nameof(damageAppliedSub));
             _attackIntentPub = attackIntentPub ?? throw new ArgumentNullException(nameof(attackIntentPub));
+            _npcDeathPub = npcDeathPub ?? throw new ArgumentNullException(nameof(npcDeathPub));
+            _combatDisengagePub = combatDisengagePub ?? throw new ArgumentNullException(nameof(combatDisengagePub));
+            _playerService = playerService ?? throw new ArgumentNullException(nameof(playerService));
         }
 
         // === IStartable ===
@@ -187,12 +220,15 @@ namespace CultivationGame.Modules.NPC
         /// <summary>
         /// Clear all animals (used by AnimalSpawnPhase before re-spawning for
         /// a new location). Also removes their BodyParts from IBodyDataProvider.
+        /// 2026-09-11 (аудит): заодно чистим hostile-реестр — месть животных
+        /// прошлого мира не должна переживать пересборку.
         /// </summary>
         public void ClearAnimals()
         {
             foreach (var a in _animals)
                 _bodyDataProvider.RemoveEntity(a.EntityId);
             _animals.Clear();
+            _hostileAnimals.Clear();
         }
 
         /// <summary>
@@ -259,6 +295,76 @@ namespace CultivationGame.Modules.NPC
         /// <summary>Get all animals (snapshot for renderer). Read-only view.</summary>
         public IReadOnlyList<AnimalEntity> GetAllAnimals() => _animals;
 
+        // === IAnimalService (2026-09-11, аудит D1–D7) ===
+
+        /// <summary>
+        /// Живые животные в радиусе (Чебышёв, тайлы) — кандидаты таргетинга
+        /// Space-атак игрока. Мёртвые исключаются (труп — отдельная сущность).
+        /// </summary>
+        public IReadOnlyList<AnimalInfo> GetAliveAnimalsInRange(Position2D center, float rangeTiles)
+        {
+            int range = (int)Math.Ceiling(rangeTiles);
+            var result = new List<AnimalInfo>(_animals.Count);
+            foreach (var a in _animals)
+            {
+                if (!a.IsAlive) continue;
+                int dist = Math.Max(Math.Abs(a.Position.X - center.X), Math.Abs(a.Position.Y - center.Y));
+                if (dist > range) continue;
+                result.Add(ToAnimalInfo(a));
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Профиль животного по ID (null — не животное/не найдено). Статы вида
+        /// из SpeciesRegistry (волк STR 8/AGI 14) — для боевого пайплайна.
+        /// </summary>
+        public AnimalInfo? TryGetAnimal(string entityId)
+        {
+            if (string.IsNullOrEmpty(entityId)) return null;
+            var a = _animals.Find(x => x.EntityId == entityId);
+            return a == null ? null : ToAnimalInfo(a);
+        }
+
+        /// <summary>
+        /// Отображаемое имя животного для killfeed/трупа/цифр урона.
+        /// Не-животное → null (вызывающий остаётся на своём резолве).
+        /// </summary>
+        public string? GetDisplayName(string entityId)
+        {
+            var a = _animals.Find(x => x.EntityId == entityId);
+            return a == null ? null : SpeciesDisplayName(a.Species);
+        }
+
+        /// <summary>QA-геттер (AnimalCombatSimDebug): животное сейчас мстит?</summary>
+        public bool IsHostile(string entityId) => _hostileAnimals.Contains(entityId);
+
+        /// <summary>Снимок боевого профиля из сущности + статов вида.</summary>
+        private AnimalInfo ToAnimalInfo(AnimalEntity a)
+        {
+            var data = _speciesRegistry.GetSpecies(a.Species);
+            return new AnimalInfo(
+                a.EntityId,
+                a.Species,
+                a.Position,
+                a.Morphology,
+                a.Material,
+                a.IsAlive,
+                data != null ? (int)data.BaseStrength : 8,
+                data != null ? (int)data.BaseAgility : 10,
+                data != null ? (int)data.BaseVitality : 10,
+                data != null ? (int)data.BaseIntelligence : 2);
+        }
+
+        /// <summary>Вид → имя для UI («wolf» → «Волк»).</summary>
+        private static string SpeciesDisplayName(string species) => species switch
+        {
+            "wolf"   => "Волк",
+            "deer"   => "Олень",
+            "rabbit" => "Кролик",
+            _        => species,
+        };
+
         // === ITickable ===
 
         /// <summary>
@@ -296,25 +402,67 @@ namespace CultivationGame.Modules.NPC
                 var a = _animals[i];
                 if (!a.IsAlive) continue;
 
-                // === Combat: hostile animals attack player if adjacent ===
+                // === Combat: hostile animals chase & bite the player ===
+                // 2026-09-11 (аудит D4): честная месть по ANIMALS.md §5.2/5.4 —
+                // ЧЕЙЗ игрока (раньше стоял на месте и «кусал» через всю карту:
+                // интент уходил с любой дистанции, никто его не гейтил);
+                // атака — только вплотную (Чебышёв ≤ 2); игрок дальше 5 тайлов —
+                // de-aggro, возврат к блужданию.
                 if (_hostileAnimals.Contains(a.EntityId))
                 {
-                    // Hostile animal: attack player every few ticks.
-                    // We don't have player position directly, but AttackIntentEvent
-                    // is processed by CombatService which checks range.
+                    var playerPos = _playerService.Position;
+                    int dist = Math.Max(
+                        Math.Abs(a.Position.X - playerPos.X),
+                        Math.Abs(a.Position.Y - playerPos.Y));
+
+                    if (dist > RetaliationAgroRadius)
+                    {
+                        // §5.4: цель ушла — месть прекращается. Бой (если был)
+                        // завершаем честно — симметрия с leash NPC (R16 D3):
+                        // CombatDisengageEvent → CombatModule.OnCombatDisengage →
+                        // AbandonCombat — иначе 1v1-бой «висит» вечно (игрок
+                        // остаётся в боевой стойке/гейтах).
+                        _hostileAnimals.Remove(a.EntityId);
+                        a.Target = null;
+                        a.MoveCooldownTicks = 5; // ~5 тиков «успокаивается»
+                        _combatDisengagePub.Publish(new CombatDisengageEvent(
+                            a.EntityId, $"animal-deaggro: игрок дальше {RetaliationAgroRadius} тайлов"));
+                        Console.WriteLine($"[AnimalService] {a.Species}#{a.EntityId}: игрок ушёл ({dist} тайлов, " +
+                            $"wolf=({a.Position.X},{a.Position.Y}) player=({playerPos.X},{playerPos.Y})) → de-aggro, wander");
+                        continue;
+                    }
+
                     if (a.CombatCooldownTicks > 0)
                     {
                         a.CombatCooldownTicks--;
+                        // Кулдаун укуса ≠ кулдаун бега: во время ожидания
+                        // продолжаем ЧЕЙЗ (шаг к игроку), не стоим.
+                        a.Target = new Position2D(playerPos.X, playerPos.Y);
+                        StepTowardsTarget(a);
+                        continue;
+                    }
+
+                    if (dist <= AnimalAttackRangeTiles)
+                    {
+                        // Канонический ID игрока (раньше — литерал "player",
+                        // алиас работал через PlayerIdResolver, но источник
+                        // должен быть честным).
+                        _attackIntentPub.Publish(new AttackIntentEvent(
+                            a.EntityId, _playerService.PlayerId, string.Empty, false));
+                        // Аудит: 2 тика (НЕ 3 как в ANIMALS §5.3): окно чужого хода
+                        // CombatService — 2.5с (EnemyTurnTimeout), 3-й тик ВСЕГДА
+                        // опаздывает в чужой ход → укус отклонялся бы вечно.
+                        // 2 тика ≈ 2с < 2.5с — месть работает; темп медленнее
+                        // NPC-людей (1.6с) — дух спеки сохранён.
+                        a.CombatCooldownTicks = 2;
                     }
                     else
                     {
-                        // Publish attack intent towards player.
-                        // CombatService will check if player is in range.
-                        _attackIntentPub.Publish(new AttackIntentEvent(
-                            a.EntityId, "player", string.Empty, false));
-                        a.CombatCooldownTicks = 3; // 3-tick cooldown
+                        // Не дотянулся — сближаемся.
+                        a.Target = new Position2D(playerPos.X, playerPos.Y);
+                        StepTowardsTarget(a);
                     }
-                    continue; // Don't wander while hostile
+                    continue; // Не блуждаем, пока мстим
                 }
 
                 // === Normal wandering ===
@@ -350,7 +498,12 @@ namespace CultivationGame.Modules.NPC
 
         /// <summary>
         /// Handle damage applied to an animal — mark as hostile, track attacker.
-        /// Animals retaliate by moving towards and attacking the player.
+        /// 2026-09-11 (аудит D2): + детект смерти — BodyService уже применил урон
+        /// к частям тела (подписка раньше нашей: Body-модуль стартует до NPC),
+        /// HP ≤ 0 → IsAlive=false + NPCDeathEvent → CorpseService (труп-контейнер,
+        /// DEATH_AND_LOOT §5) + killfeed. Раньше смерть животного не детектилась
+        /// НИКЕМ: волк «жил» на 0 HP, трупа и записи в журнале не было.
+        /// Кролик мирный (ANIMALS §5.5): месть не включает — просто убегает.
         /// </summary>
         private void OnDamageApplied(in DamageAppliedEvent e)
         {
@@ -361,6 +514,29 @@ namespace CultivationGame.Modules.NPC
             // Check if target is one of our animals.
             var animal = _animals.Find(a => a.EntityId == targetId);
             if (animal == null || !animal.IsAlive) return;
+
+            // Смерть: 2026-09-11 (аудит боя, «сущности неубиваемы») — ЕДИНОЕ
+            // правило тел (BODY_SYSTEM, как у NPCCombatAdapter): жизненно
+            // важная часть уничтожена (IsEntityAlive) ИЛИ полный дренаж HP.
+            // HP пересчитывается из BodyParts (единая система тел).
+            if (_bodyDataProvider.HasEntity(animal.EntityId)
+                && (!_bodyDataProvider.IsEntityAlive(animal.EntityId)
+                    || _bodyDataProvider.GetCurrentHealth(animal.EntityId) <= 0))
+            {
+                animal.IsAlive = false;
+                _hostileAnimals.Remove(animal.EntityId);
+                animal.Target = null;
+                _npcDeathPub.Publish(new NPCDeathEvent(animal.EntityId, sourceId));
+                Console.WriteLine($"[AnimalService] {animal.Species}#{animal.EntityId} погиб от {sourceId} → NPCDeathEvent (труп через CorpseService)");
+                return;
+            }
+
+            // Кролик не мстит (мирный вид) — урон не делает его hostile.
+            if (animal.Species == "rabbit")
+            {
+                Console.WriteLine($"[AnimalService] {animal.Species}#{animal.EntityId} hit by {sourceId} → мирный вид, бежит");
+                return;
+            }
 
             // Mark as hostile (retaliate).
             _hostileAnimals.Add(animal.EntityId);

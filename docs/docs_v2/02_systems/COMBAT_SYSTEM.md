@@ -80,6 +80,20 @@
   PlayerCombatAdapter сбрасывает `CurrentDefenseStance=None` на
   `CombatEndedEvent` (синхронизация с `_lastPlayerDefense` CombatService —
   иначе G-цикл нового боя шёл от «призрачной» стойки).
+- **Смерть защитника-не-игрока = ЕДИНОЕ правило тел (2026-09-11, аудит
+  боя с животными):** IsFatalHit (Head/Heart ≥ 50 урона) ИЛИ реальное
+  состояние тела после удара — жизненно важная часть уничтожена
+  (`IBodyDataProvider.IsEntityAlive`: Head/Heart RedHP ≤ 0) ИЛИ полный
+  дренаж HP → Victory/EndCombat. Раньше домены смерти (NPC/AnimalService)
+  ждали «суммарный HP ≤ 0» — при per-part floor (урон в уже мёртвую часть
+  теряется) сумма практически не обнуляется → сущности «бессмертны» в
+  честном бою. Тот же фикс в NPCCombatAdapter/AnimalService.OnDamageApplied
+  → NPCDeathEvent (труп/killfeed).
+- **Животные — легитимные участники боя (2026-09-11):** Space-таргетинг
+  игрока видит волка/оленя/кроля (NPC ∪ животные, IAnimalService); статы
+  вида (SpeciesRegistry), Quadruped-морфология (таблица попаданий);
+  месть — чейз + укус вплотную (кулдаун 2 тика < EnemyTurnTimeout);
+  de-aggro → CombatDisengageEvent → AbandonCombat. См. ANIMALS.md §5.
 
 #### 1.4.2. Стойка защиты игрока (R16)
 

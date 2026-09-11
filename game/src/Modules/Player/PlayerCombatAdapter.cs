@@ -34,6 +34,10 @@ public sealed class PlayerCombatAdapter : IDisposable
     [Inject] private readonly IPlayerService _player = null!;
     [Inject] private readonly IPlayerInputService _input = null!;
     [Inject] private readonly INPCService _npcs = null!;
+    // 2026-09-11 (аудит боя с животными D1): животные — легитимные цели Space
+    // (волк/олень/кролик НЕ регистрируются в NPCService — живут в AnimalService).
+    // Без этой инъекции атака по животному молча не находила цель.
+    [Inject] private readonly IAnimalService? _animals = null;
     [Inject] private readonly IStatProvider _stats = null!;
     [Inject] private readonly IEquipmentDataProvider _equipment = null!;
     // Phase 8 ч.3: LOS-фильтр цели (паттерн «sanctioned exceptions»)
@@ -289,6 +293,11 @@ public sealed class PlayerCombatAdapter : IDisposable
     /// линии огня (CombatLos: Bresenham, блок — дерево/камень); melee без
     /// изменений (ближний бой сквозь препятствие не бывает — дистанция 2.5).
     /// blockedByLos: сколько целей в радиусе отброшено по LOS (для тоста).
+    /// 2026-09-11 (аудит D1): кандидаты = NPC ∪ ЖИВОТНЫЕ (AnimalService) —
+    /// строго ближайший живой. Животные видны тем же Chebyshev/LOS-фильтром;
+    /// ДИКОЙ разрыв был: волки не регистрируются в NPCService → Space молча
+    /// возвращал «нет цели» (жалоба пользователя: «бегу с посохом за волком —
+    /// результата 0»).
     /// </summary>
     private string? FindNearestTarget(float rangeTiles, bool requireLos, out int blockedByLos)
     {
@@ -296,33 +305,61 @@ public sealed class PlayerCombatAdapter : IDisposable
         if (_npcs == null || _player == null) return null;
 
         var playerPos = _player.Position;
-        var nearby = _npcs.GetNearbyNPCIds(playerPos, rangeTiles);
-        if (nearby == null || nearby.Count == 0) return null;
 
         string? best = null;
         int bestDist = int.MaxValue;
-        foreach (var id in nearby)
+        int blocked = 0; // локальный счётчик (out-параметр нельзя в локальной функции)
+
+        // Проверка одного кандидата: дистанция → строго ближе → LOS (ranged).
+        void Consider(string id, Position2D pos)
         {
-            var npc = _npcs.GetNPC(id);
-            if (npc == null || !_npcs.IsAlive(id)) continue;
-
             int dist = Math.Max(
-                Math.Abs(npc.Position.X - playerPos.X),
-                Math.Abs(npc.Position.Y - playerPos.Y));
-            if (dist >= bestDist) continue; // строго ближе — иначе дёшево
+                Math.Abs(pos.X - playerPos.X),
+                Math.Abs(pos.Y - playerPos.Y));
+            if (dist >= bestDist) return; // строго ближе — иначе дёшево
 
-            // Phase 8 ч.3: LOS-фильтр (только ranged).
             if (requireLos && !CombatLos.HasLineOfSight(
-                    _tiles, playerPos.X, playerPos.Y, npc.Position.X, npc.Position.Y))
+                    _tiles, playerPos.X, playerPos.Y, pos.X, pos.Y))
             {
-                blockedByLos++;
-                continue;
+                blocked++;
+                return;
             }
             bestDist = dist;
             best = id;
         }
+
+        // 1. NPC-кандидаты (реестр NPCService).
+        var nearby = _npcs.GetNearbyNPCIds(playerPos, rangeTiles);
+        if (nearby != null)
+        {
+            foreach (var id in nearby)
+            {
+                var npc = _npcs.GetNPC(id);
+                if (npc == null || !_npcs.IsAlive(id)) continue;
+                Consider(id, npc.Position);
+            }
+        }
+
+        // 2. Животные-кандидаты (D1): волк/олень/кролик — живые, в радиусе.
+        if (_animals != null)
+        {
+            foreach (var animal in _animals.GetAliveAnimalsInRange(playerPos, rangeTiles))
+            {
+                Consider(animal.EntityId, animal.Position);
+            }
+        }
+
+        blockedByLos = blocked;
         return best;
     }
+
+    /// <summary>
+    /// QA (AnimalCombatSimDebug): ближайшая цель Space-таргетинга —
+    /// NPC ∪ ЖИВОТНЫЕ — БЕЗ ввода (головной прогон таргетинга D1:
+    /// волк должен резолвиться так же, как человек-NPC).
+    /// </summary>
+    public string? DebugFindNearestTarget(float rangeTiles = AttackRangeTiles)
+        => FindNearestTarget(rangeTiles, false, out _);
 
     private void OnCombatEnded(in CombatEndedEvent e)
     {

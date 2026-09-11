@@ -984,3 +984,63 @@ Stage Summary:
   повторный NewGame, загрузка сейва с NPC).
 - Next-кандидаты R17: авто-замедление времени в бою (§1.2), PNG-ассеты,
   броня-слои, спинальный AI/Brain.
+
+---
+Task ID: ANIMAL-COMBAT-0911
+Agent: main-agent (Z.ai Code, сессия 2026-09-11 №8; одно зависание сервиса —
+работа восстановлена, детальный чекпоинт ведётся в
+checkpoints/09_11_animal_combat_fix.md по требованию пользователя)
+Task: Жалоба пользователя: «Бегу с посохом за волком, пытаюсь его бить, а
+результата 0. Как будто не проходит регистрация урона» — аудит контура
+игрок↔животное + вторая задача: легенда клавиш на главном окне → перенести
+в F1-справку (просьба многих итераций назад).
+
+Work Log:
+- Аудит нашёл 9 дефектов (детали — checkpoints/09_11_animal_combat_fix.md):
+  D1 таргетинг Space не видел животных (FindNearestTarget только NPCService;
+  волки живут в AnimalService) — ПРИЧИНА жалобы; D2 смерть животных
+  не детектировалась никем; D3 CorpseService не создавал труп животного;
+  D4 месть фантомная (удар через всю карту, без чейза/de-aggro, литерал
+  "player"); D5 цифры урона не позиционировались; D6 killfeed «???»;
+  D7 статы волка = статы игрока (Humanoid-морфология); D8 «сущности
+  неубиваемы» (животные И NPC): домены смерти ждали «суммарный HP ≤ 0»
+  при per-part floor — практически недостижимо; IsFatalHit не вёл к смерти;
+  IBodyDataProvider.IsEntityAlive существовал с 2026-05 и не использовался;
+  D9 QA-телепорт игрока откатывался (GWC _PhysicsProcess синк к
+  _visualPosition).
+- ФИКСЫ: новый Core-интерфейс IAnimalService + AnimalInfo (боевой профиль);
+  AnimalService: IAnimalService-реализация, честная месть (чейз + укус
+  только при Чебышёв ≤ 2, кулдаун 2 тика < EnemyTurnTimeout 2.5с, ID
+  игрока канонический), de-aggro > 5 тайлов → CombatDisengageEvent →
+  AbandonCombat, смерть = ЕДИНОЕ правило тел (vital-разрушение IsEntityAlive
+  ИЛИ дренаж) → NPCDeathEvent; кролик мирный; ClearAnimals чистит hostile.
+- PlayerCombatAdapter: кандидаты Space = NPC ∪ животные; CorpseService:
+  TryCreateAnimalCorpse (труп «Волк», NpcLevel=1, камни 1–3, дедуп);
+  StatProviderAdapter: ветка животных (статы вида/материал/Quadruped);
+  DamageNumberRenderer + EventLogWindow: животные (позиция/имя).
+- Смерть NPC: NPCCombatAdapter + CombatService — то же единое правило тел
+  (CombatService + инъекция IBodyDataProvider; Victory при смерти
+  защитника по телу, не только IsFatalHit).
+- HUD-легенда (жалоба №2): _hudLabel (HudHint) УДАЛЁН с главного экрана —
+  канон справки F1 (HotkeysWindow, решение пользователя 2026-08-28);
+  легенда к тому же врала (нереализованные M/N, «F1 — чит-меню»).
+- Новый QA: AnimalCombatSimDebug (GODOT_ANIMALQA_DEBUG=1) — 7 тестов:
+  таргетинг/урон/месть/смерть→труп+Victory/killfeed-имя/de-aggro/
+  мирный кролик. GWC.DEBUG_TeleportPlayer (логика+визуал — фикс D9).
+- QA: build 0 errors; ANIMALQA PASS 7/7; полная регрессия 15 хуков PASS
+  (COMBAT_SIM/COMBATAI/LOOT/SAVELOAD/KILLFEED/CHARGE/QUEST/STORAGE/
+  HOTBAR/DOT/TRASHDROP/CONTEXT/WEAPONVIS/REASSEMBLY).
+- docs_v2 sync: ANIMALS §5.2–5.5, DEATH_AND_LOOT §5, MODULE_STRUCTURE
+  §2.4/§2.7, COMBAT_SYSTEM §1.4.1, TESTING_RULES §0.1 (+ANIMALQA).
+
+Stage Summary:
+- Контур игрок↔животное заработал ЦЕЛИКООМ: посох→волк→урон (цифры над
+  зверем)→месть (чейз/укусы)→смерть→труп «Волк» (обыск E, камни)→killfeed.
+- СИСТЕМНЫЙ баг D8 закрыт для животных И NPC: «бессмертие» сущностей в
+  честном бою (смерть теперь = разрушение vital-части тела, как в
+  BODY_SYSTEM — доки были правы, код ждал недостижимого суммарного нуля).
+- Паттерн на будущее: новые типы сущностей (не-NPC) обязаны давать
+  IAnimalService-подобный Core-профиль + ветки в StatProvider/Corpse/
+  рендерах (иначе «невидимость» для боевых потребителей, как волки D1).
+- Пользователю: живой QA на ПК (посох→волк полный флоу, месть, уход от
+  погони, F1-справка без легенды на HUD).

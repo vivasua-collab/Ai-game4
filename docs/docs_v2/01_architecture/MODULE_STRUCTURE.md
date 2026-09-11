@@ -193,6 +193,16 @@ Modules/Xxx/
 > проводки NPCDefenseSelector в реальном бою. P3: PlayerCombatAdapter
 > сбрасывает CurrentDefenseStance на CombatEnded (синхронизация с
 > _lastPlayerDefense); пустые подписки CombatStarted/DamageApplied удалены.
+>
+> 2026-09-11 (аудит боя с животными, «сущности неубиваемы»): смерть
+> защитника-не-игрока — ЕДИНОЕ правило тел (BODY_SYSTEM): IsFatalHit
+> (Head/Heart ≥ 50 урона) ИЛИ реальное состояние тела после удара —
+> жизненно важная часть уничтожена (`IBodyDataProvider.IsEntityAlive`) ИЛИ
+> полный дренаж HP. Инъекция IBodyDataProvider в CombatService. Раньше
+> домены смерти ждали «суммарный HP ≤ 0» — при per-part floor (урон в
+> мёртвую часть теряется) сумма практически не обнуляется → волк/NPC
+> «бессмертны» в честном бою, труп не создавался. Тот же фикс — в
+> NPCCombatAdapter.OnDamageApplied и AnimalService.OnDamageApplied.
 
 **Особенности:**
 - Полная реализация 11-слойного пайплайна урона (см. `09_workflow/ALGORITHMS.md` §5).
@@ -286,6 +296,7 @@ Modules/Xxx/
 - NPCAIService — упрощённый Behaviour Tree; R16: боевые переходы ДО гейта IsInCombat — месть на агрессию (Attacking/Fleeing по личности), бегство HP≤20% в активном бою, leash AggroRadius×3 (aggro-drop), публикация CombatDisengageEvent; раненый NPC не пере-агрится (гейт healthRatio на пути угроз — анти-flip-flop)
 - NPCCombatAdapter — адаптер боя через шину (НЕ прямая ссылка на CombatService); R16: MarkNpcCombatStarted помечает состояния напрямую (фантомный publish CombatStartedEvent удалён — единственный источник события теперь CombatService), OnCombatDisengage сбрасывает IsInCombat/TargetId участников, OnCombatEnded null-безопасен для Flee-финала
 - NPCMovementService — упрощённая навигация (grid pathfinding, без NavMesh); R16: kiting дальнобойных NPC (AttackRange>2: dist<3 → отход, в зоне обстрела — стоит). Аудит R14 (P2-2): якорь блуждания для NPC, восстановленных из сейва (RestoreState пишет позицию, но не якорь) — блуждание вокруг ТЕКУЩЕЙ позиции, не дрейф к (0,0)
+- AnimalService (Phase C) — простые животные (волк/олень/кролик): спавн с телом Quadruped (IBodyDataProvider), wander; 2026-09-11 (аудит боя): реализует IAnimalService (Core) — боевой профиль AnimalInfo для чужих модулей: таргетинг Space (PlayerCombatAdapter: NPC ∪ животные), статы вида в StatProviderAdapter, трупы животных в CorpseService (TryCreateAnimalCorpse: камни, DEATH_AND_LOOT §5), имена UI (DamageNumberRenderer/EventLogWindow). Месть: чейз + укус только вплотную (Чебышёв ≤ 2, кулдаун 2 тика < EnemyTurnTimeout 2.5с), de-aggro > 5 тайлов → CombatDisengageEvent → AbandonCombat; смерть = ЕДИНОЕ правило тел (vital-разрушение ИЛИ дренаж); кролик мирный (не hostile). ClearAnimals чистит hostile-реестр при пересборке
 
 **Сброс домена при пересборке (аудит R13/R14):** `NPCModule.ResetWorld()` =
 Spawner.ResetWorld + CorpseService.ResetWorld + NPCGroupService.ResetWorld

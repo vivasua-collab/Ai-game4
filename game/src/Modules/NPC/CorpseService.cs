@@ -15,6 +15,11 @@
 // InventoryModule обрабатывает внутренне; переполнение инвентаря игрока
 // уходит на землю (overflow-путь InventoryModule). CorpseService НЕ инжектит
 // IInventoryService. SlotId-адресность — паттерн R10 (TOCTOU-защита).
+//
+// 2026-09-11 (аудит боя с животными D3): животные при смерти проходят тот же
+// CorpseService (DEATH_AND_LOOT §5): труп-контейнер, негуманоиды без
+// экипировки/инвентаря → только духовные камни (уровень вида = 1, таблица 4.1).
+// Источник смерти — AnimalService.OnDamageApplied (HP ≤ 0 → NPCDeathEvent).
 using System;
 using System.Collections.Generic;
 using CultivationGame.Core.Data;
@@ -38,6 +43,8 @@ namespace CultivationGame.Modules.NPC
         private readonly IPublisher<CorpseLootedEvent> _corpseLootedPub;
         private readonly IPublisher<ItemAddRequestEvent> _itemAddPub;
         private readonly IItemDatabaseService? _itemDatabase; // редкость экипировки (опционально)
+        // 2026-09-11 (аудит D3): животные (волк/олень/кролик) — тот же full-loot.
+        private readonly IAnimalService? _animalService;
 
         // === Идентификаторы духовных камней (таблица фазы 4.1) ===
         private const string SpiritStoneShardId = "spirit_stone_shard";
@@ -56,7 +63,8 @@ namespace CultivationGame.Modules.NPC
             IPublisher<CorpseRemovedEvent> corpseRemovedPub,
             IPublisher<CorpseLootedEvent> corpseLootedPub,
             IPublisher<ItemAddRequestEvent> itemAddPub,
-            IItemDatabaseService? itemDatabase = null)
+            IItemDatabaseService? itemDatabase = null,
+            IAnimalService? animalService = null)
         {
             _npcService = npcService ?? throw new ArgumentNullException(nameof(npcService));
             _timeService = timeService;
@@ -66,6 +74,7 @@ namespace CultivationGame.Modules.NPC
             _corpseLootedPub = corpseLootedPub;
             _itemAddPub = itemAddPub;
             _itemDatabase = itemDatabase;
+            _animalService = animalService;
         }
 
         /// <summary>Подписка на смерти NPC. Вызывается из NPCModule.Start().</summary>
@@ -227,6 +236,11 @@ namespace CultivationGame.Modules.NPC
             var state = _npcService.GetNPCState(e.NpcId);
             if (state == null)
             {
+                // 2026-09-11 (аудит D3): не найден в NPC-реестре — возможно,
+                // это ЖИВОТНОЕ (AnimalService публикует тот же NPCDeathEvent).
+                // DEATH_AND_LOOT §5: животные проходят через тот же труп-контейнер.
+                if (TryCreateAnimalCorpse(e)) return;
+
                 // NPC мог быть деспавнут/не найден — труп не создаём.
                 Console.WriteLine($"[CorpseService] NPCDeathEvent: состояние '{e.NpcId}' не найдено — труп не создан");
                 return;
@@ -275,6 +289,70 @@ namespace CultivationGame.Modules.NPC
 
             Console.WriteLine($"[CorpseService] Труп '{corpse.DisplayName}' ({corpse.CorpseId}) " +
                       $"на ({corpse.Position.X},{corpse.Position.Y}): {corpse.ItemCount} записей лута");
+        }
+
+        /// <summary>
+        /// 2026-09-11 (аудит D3): труп ЖИВОТНОГО (волк/олень/кролик) —
+        /// DEATH_AND_LOOT §5: тот же труп-контейнер, негуманоиды без
+        /// экипировки/инвентаря → только духовные камни. Уровень вида = 1
+        /// (таблица 4.1: 1–3 осколка). Возвращает false, если e.NpcId —
+        /// не животное (или сервис животных не проводен) — вызывающий
+        /// продолжает ветку обычного NPC/отказ.
+        /// </summary>
+        private bool TryCreateAnimalCorpse(in NPCDeathEvent e)
+        {
+            var animal = _animalService?.TryGetAnimal(e.NpcId);
+            if (animal == null || animal.Value.IsAlive)
+                return false; // не животное, либо «смерть» живого (QA-баг)
+
+            // Дедуп — тот же контракт, что для NPC-трупов.
+            for (int i = 0; i < _corpses.Count; i++)
+            {
+                if (_corpses[i].NpcId == e.NpcId)
+                {
+                    Console.WriteLine($"[CorpseService] Дедуп: труп животного '{e.NpcId}' уже существует ({_corpses[i].CorpseId})");
+                    return true;
+                }
+            }
+
+            var corpse = new CorpseData
+            {
+                CorpseId = $"corpse_{_nextCorpseSeq++}",
+                NpcId = e.NpcId,
+                DisplayName = _animalService!.GetDisplayName(e.NpcId) ?? animal.Value.SpeciesId,
+                SpeciesId = animal.Value.SpeciesId,
+                Position = animal.Value.Position,
+                KillerId = e.KillerId ?? "",
+                DiedAtGameSeconds = _timeService?.TotalTime ?? 0f,
+                NpcLevel = 1, // звери без культивации — камни таблицы 4.1 (L1-2)
+                Items = BuildAnimalCorpseItems(e.NpcId),
+            };
+
+            _corpses.Add(corpse);
+
+            _corpseCreatedPub?.Publish(new CorpseCreatedEvent(
+                corpse.CorpseId, corpse.NpcId, corpse.DisplayName,
+                corpse.Position.X, corpse.Position.Y, corpse.ItemCount));
+
+            Console.WriteLine($"[CorpseService] Труп животного '{corpse.DisplayName}' ({corpse.CorpseId}) " +
+                      $"на ({corpse.Position.X},{corpse.Position.Y}): {corpse.ItemCount} записей лута (камни, DEATH_AND_LOOT §5)");
+            return true;
+        }
+
+        /// <summary>
+        /// Лут с животного (DEATH_AND_LOOT §5): только духовные камни
+        /// (1–3 осколка, детерминированно от npcId — тот же паттерн, что
+        /// BuildCorpseItems §3). Видовой лут (шкура/клыки/мясо) — TODO
+        /// генератора (ANIMALS.md §5, «не реализован»).
+        /// </summary>
+        private List<CorpseItem> BuildAnimalCorpseItems(string npcId)
+        {
+            var rng = new SeededRandom(npcId.GetHashCode());
+            int count = rng.Next(1, 4); // 1..3 осколков (L1-2, таблица 4.1)
+            return new List<CorpseItem>
+            {
+                new(Guid.NewGuid(), SpiritStoneShardId, count, ItemRarity.Rare, "spirit_stones"),
+            };
         }
 
         // === Сбор содержимого трупа ===

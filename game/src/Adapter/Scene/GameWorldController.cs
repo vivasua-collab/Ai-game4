@@ -152,7 +152,6 @@ public partial class GameWorldController : Node2D
     private System.IDisposable? _defenseIntentToken;
     private CanvasLayer   _hudCanvas     = null!;
     private Label         _timeLabel     = null!;
-    private Label         _hudLabel      = null!;
 
     // 2026-09-04 S2: тост-стек — несколько сообщений одновременно (было: один
     // Label, новое сообщение затирало предыдущее). Повторы агрегируются ×N,
@@ -224,6 +223,21 @@ public partial class GameWorldController : Node2D
 
     /// <summary>QA: принудительный facing (headless — ввода нет).</summary>
     public void DEBUG_SetFacingLeft(bool left) => _facingLeft = left;
+
+    /// <summary>
+    /// QA (AnimalCombatSimDebug): программный телепорт игрока — ЛОГИКА и
+    /// ВИЗУАЛ. Прямой PlayerService.SetPosition «не прилипает»: _PhysicsProcess
+    /// каждый кадр синхронизирует логику к _visualPosition (визуал — источник
+    /// истины движения) → позиция откатывается к визуальной в тот же кадр.
+    /// </summary>
+    public void DEBUG_TeleportPlayer(int tileX, int tileY)
+    {
+        _visualPosition = new Vector2(
+            tileX * GameConstants.TILE_PIXELS + GameConstants.TILE_PIXELS / 2f,
+            tileY * GameConstants.TILE_PIXELS + GameConstants.TILE_PIXELS / 2f);
+        _mouseTarget = null;
+        Player?.SetPosition(new Position2D(tileX, tileY));
+    }
 
     // === R13 FULL-LOOT: QA-доступ (GODOT_LOOT_DEBUG) ===
 
@@ -495,6 +509,15 @@ public partial class GameWorldController : Node2D
         {
             var combatAiSim = new CombatAISimDebug { Name = "CombatAISimDebug" };
             AddChild(combatAiSim);
+        }
+        // 2026-09-11 (аудит боя с животными): headless-верификация контура
+        // игрок↔животное (GODOT_ANIMALQA_DEBUG=1) — таргетинг Space по волку,
+        // урон/месть/чейз, смерть → труп «Волк» (DEATH_AND_LOOT §5), de-aggro,
+        // мирный кролик.
+        if (System.Environment.GetEnvironmentVariable("GODOT_ANIMALQA_DEBUG") == "1")
+        {
+            var animalQaSim = new AnimalCombatSimDebug { Name = "AnimalCombatSimDebug" };
+            AddChild(animalQaSim);
         }
         GD.Print("[GameWorldController] Ready");
     }
@@ -824,24 +847,11 @@ public partial class GameWorldController : Node2D
         _meditationLabel.Text = "☯ Медитация — поглощение Ци (движение прерывает)";
         _hudCanvas.AddChild(_meditationLabel);
 
-        // Hotkey legend — BOTTOM of screen, black color.
-        _hudLabel = new Label
-        {
-            Name = "HudHint",
-            Text = "WASD — движение | Shift — бег | ЛКМ — идти к точке | Колесо — зум\n" +
-                   "Esc — пауза | PageUp/PageDown — скорость\n" +
-                   "E — обыск трупа / разговор / подбор | B — инвентарь | F — добыча | V — медитация | Z — каст | X — выбор техники\n" +
-                   "C — персонаж | J — журнал | T — техники | Q — квесты | M — карта | N — миникарта"
-#if DEBUG
-                   + "\nF1 — чит-меню (dev)"
-#endif
-            ,
-        };
-        _hudLabel.AddThemeFontSizeOverride("font_size", 14);
-        _hudLabel.AddThemeColorOverride("font_color", new Color(0.1f, 0.08f, 0.05f));  // near-black
-        _hudLabel.AddThemeColorOverride("font_shadow_color", new Color(0.9f, 0.87f, 0.8f, 0.7f));  // светл. тень — отделяет от тёмных участков
-        _hudLabel.Position = new Vector2(20, 1020);  // bottom of 1080p screen
-        _hudCanvas.AddChild(_hudLabel);
+        // 2026-09-11: легенда клавиш (HudHint) УДАЛЕНА с главного экрана —
+        // решение пользователя 2026-08-28: ВСЕ подсказки клавиш живут в окне
+        // справки F1 (HotkeysWindow, полный канонический перечень).
+        // Легенда к тому же протухла: рекламировала нереализованные M/N-карты
+        // и называла F1 чит-меню (F1 — справка, чит-меню — F2 с 2026-08-28).
 
         // 2026-09-04 S2: тост-стек (top-center): до 5 сообщений одновременно,
         // новое появляется снизу, старые поднимаются вверх и затухают.
