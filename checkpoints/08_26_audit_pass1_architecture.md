@@ -141,4 +141,4 @@ TechniqueGrant granted=6.
 ---
 
 *Аудит-1 завершён. Следующий проход (аудит-2): архитектура + модуль мира
-(World/Tile/NPC-спавн) — файл `2026-08-26_audit_pass2_worldgen.md`.*
+(World/Tile/NPC-спавн) — файл `08_26_audit_pass2_worldgen.md`.*

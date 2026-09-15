@@ -3,7 +3,7 @@
 **Дата:** 2026-08-27 (MSK, UTC+3)
 **Сессия:** основная, режим без субагентов
 **HEAD на старте:** `41201b7`
-**План-компаньон:** `checkpoints/plans/2026-08-27_generators_verification_plan.md`
+**План-компаньон:** `checkpoints/plans/08_27_generators_verification_plan.md`
 
 ---
 

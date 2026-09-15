@@ -2,7 +2,7 @@
 
 **Дата:** 2026-08-26 (СР, старт 12:49 MSK)
 **HEAD на старте:** `31d679b` (synced с origin/main)
-**Чекпоинт-компаньон:** `checkpoints/2026-08-26_epic_legendary_overcap_checkpoint.md`
+**Чекпоинт-компаньон:** `checkpoints/08_26_epic_legendary_overcap_checkpoint.md`
 
 ---
 
@@ -10,7 +10,7 @@
 
 1. **Синхронизация и контекст** — push 5 незапушенных коммитов прошлой сессии
    (выполнено: `41201b7..31d679b` → origin/main), чтение чекпоинта
-   `2026-08-27_generators_verification_checkpoint.md`, аудит текущего кода
+   `08_27_generators_verification_checkpoint.md`, аудит текущего кода
    генераторов (прочитаны: EquipmentGenerator, LevelBoundaries,
    VerificationService, GeneratorTables, CheatPanel, GeneratorModule).
 
@@ -25,11 +25,11 @@
    потоке ИИ, с каждым проходом захватывая новые модули:
    - **Проход 1 — Архитектура** (Core: DI, interfaces, messaging/events,
      module system, Entry phases, Adapter-граница) → свой файл чекпоинта
-     `2026-08-26_audit_pass1_architecture.md`.
+     `08_26_audit_pass1_architecture.md`.
    - **Проход 2 — Архитектура + модуль мира** (WorldGen/карта/тайлы/биомы,
-     NPC-спавн) → `2026-08-26_audit_pass2_worldgen.md`.
+     NPC-спавн) → `08_26_audit_pass2_worldgen.md`.
    - **Проход 3 — Архитектура + мир + боевой контур** (Combat, Qi,
-     Techniques, Formations, Body) → `2026-08-26_audit_pass3_combat_qi.md`.
+     Techniques, Formations, Body) → `08_26_audit_pass3_combat_qi.md`.
    Каждый проход: чтение кода → фиксация проблем (critical/major/minor) →
    точечные исправления критичных → коммит. Аудит fresh: код сильно вырос
    после аудитов 08-21 (добавились Qi, техники, формации, культивация,

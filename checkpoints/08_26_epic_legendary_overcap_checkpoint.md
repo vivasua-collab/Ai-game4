@@ -3,14 +3,14 @@
 **Дата:** 2026-08-26 (СР), старт 12:49 MSK
 **Сессия:** основная, без субагентов
 **HEAD на старте:** `31d679b` ( synced с origin/main, push 5 коммитов выполнен )
-**План-компаньон:** `checkpoints/plans/2026-08-26_epic_legendary_overcap_and_audit_plan.md`
-**Чекпоинты аудитов:** `2026-08-26_audit_pass1_architecture.md` (и др. по мере прохождения)
+**План-компаньон:** `checkpoints/plans/08_26_epic_legendary_overcap_and_audit_plan.md`
+**Чекпоинты аудитов:** `08_26_audit_pass1_architecture.md` (и др. по мере прохождения)
 
 ---
 
 ## Контекст (состояние на старте)
 
-- Прошлая сессия (чекпоинт `2026-08-27_generators_verification_checkpoint.md`)
+- Прошлая сессия (чекпоинт `08_27_generators_verification_checkpoint.md`)
   завершила: LevelBoundaries.cs, VerificationService, DeduplicationService,
   PreGenTechniquePhase, расширение CheatPanel (экипировка/расходники/формации),
   docs_v2 (CHEAT_PANEL, LEVEL_BOUNDARIES, VERIFICATION_SYSTEM, PRE_GENERATION).
@@ -179,7 +179,7 @@
 
 ## Phase E — Аудит проход 1: Архитектура ✅
 
-(отдельный файл `2026-08-26_audit_pass1_architecture.md`)
+(отдельный файл `08_26_audit_pass1_architecture.md`)
 - [x] E1. Прочитать/аудит Core: DI-контейнер (292 стр, OK), EventBus (239,
   OK + минор ThreadStatic), interfaces (нарушение A-2 найдено), messaging.
 - [x] E2. Прочитать/аудит Entry: 16 фаз (порядки — баг A-1), boot
@@ -193,7 +193,7 @@
 
 ## Phase F — Аудит проход 2: + Модуль мира (WorldGen/NPC) ✅
 
-(отдельный файл `2026-08-26_audit_pass2_worldgen.md`)
+(отдельный файл `08_26_audit_pass2_worldgen.md`)
 - [x] F1. Аудит World/Tile (полностью, 988 строк) + NPC-спавн-контур
   (3 фазы + AnimalService/NPCSpawnerService структура).
 - [x] F2. Фиксы: травы chance 1→100 (двойной ролл 0.01%!),
@@ -203,7 +203,7 @@
 
 ## Phase G — Аудит проход 3: + Боевой контур (Combat/Qi/Formation/Body/Trade) ✅
 
-(отдельный файл `2026-08-26_audit_pass3_combat_qi.md`)
+(отдельный файл `08_26_audit_pass3_combat_qi.md`)
 - [x] G1. Аудит Combat (CombatService 805 строк полностью), Qi, Formation,
   Body, Trade (целевые проверки), PlayerIdResolver-миграция Combat.
   6 находок, вкл. CRITICAL-баг инверсии ролей игрока при NPC-инстагаторе.

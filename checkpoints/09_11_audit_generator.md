@@ -10,7 +10,7 @@ QiStoneData, Constants (482-519), LevelBoundaries; стыки: NPCAssemblyServic
 StartingGearPhase, GeneratorModule.Start, SceneOrchestrator/SkipOnLoad,
 GameSession.LoadGame, InventoryService, CheatPanel; docs_v2: PRE_GENERATION,
 GENERATORS_SYSTEM §9-10, 06_player/EQUIPMENT_SYSTEM §4-8, чекпоинт
-2026-08-26_epic_legendary_overcap.
+08_26_epic_legendary_overcap.
 **Заморожено (не репортится):** промо 20%/оверкап 18% — канон; Qi=long; Permil;
 Element.Poison.
 

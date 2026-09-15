@@ -63,8 +63,8 @@
 ## Точка восстановления (для следующего запуска)
 
 Если среда упадёт — следующий запуск:
-1. Прочитать `checkpoints/plans/2026-08-27_generators_verification_plan.md` (этот файл) — общее направление.
-2. Прочитать `checkpoints/2026-08-27_generators_verification_checkpoint.md` — детали и решения.
+1. Прочитать `checkpoints/plans/08_27_generators_verification_plan.md` (этот файл) — общее направление.
+2. Прочитать `checkpoints/08_27_generators_verification_checkpoint.md` — детали и решения.
 3. `git log --oneline -5` — сверить HEAD.
 4. Продолжить с последней `[x]` в чекпоинте.
 
@@ -74,4 +74,4 @@
 ---
 
 *План создан в основном потоке. Подробный чекпоинт с подэтапами — в
-`checkpoints/2026-08-27_generators_verification_checkpoint.md`.*
+`checkpoints/08_27_generators_verification_checkpoint.md`.*

@@ -118,4 +118,4 @@ V1-стаб (задокументирован в коде). Для тест-по
 
 *Аудит-2 завершён. Следующий проход (аудит-3): + боевой контур
 (Combat / Qi / Techniques / Formation / Body / Trade) — файл
-`2026-08-26_audit_pass3_combat_qi.md`.*
+`08_26_audit_pass3_combat_qi.md`.*
