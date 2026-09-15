@@ -2,6 +2,14 @@
 // Создано: 2026-08-25 — NPC_COMBAT_PREP Phase 4: реализация ICurrencyService.
 // Духовные камни игрока (UI-2). Баланс — int (ЗАПРЕТ 3.9).
 // CurrencyChangedEvent уже существует в PlayerContracts.cs — публикуем его.
+//
+// R17 (аудит-0911 TRD-1): кошелёк НЕ сохранялся (класс без ISaveable;
+// SetBalance «для загрузки сейва» — 0 вызывов). LoadGame восстанавливал
+// инвентарь, но баланс — дефолтные 50 → дюп камней (купил→сейв→лоад:
+// предметы на месте И камни вернулись) / потеря заработанного. Теперь:
+// блок "currency" + IWorldResettable (ленивая ре-инициализация стартового
+// баланса при пересборке мира).
+using System;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Events;
 using CultivationGame.Core.Interfaces;
@@ -14,7 +22,7 @@ namespace CultivationGame.Modules.Trade
     /// Публикует CurrencyChangedEvent при каждом изменении баланса
     /// (UI-лавка и HUD обновляют индикатор по этому событию).
     /// </summary>
-    public sealed class CurrencyService : ICurrencyService
+    public sealed class CurrencyService : ICurrencyService, ISaveable, IWorldResettable
     {
         [Inject] private readonly IPublisher<CurrencyChangedEvent> _changedPub = null!;
         [Inject] private readonly TradeConfig _config = null!;
@@ -72,6 +80,42 @@ namespace CultivationGame.Modules.Trade
             int delta = spiritStones - _spiritStones;
             _spiritStones = spiritStones;
             _changedPub.Publish(new CurrencyChangedEvent(_spiritStones, delta));
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        // R17 (TRD-1): ISaveable — блок "currency"
+        // ══════════════════════════════════════════════════════════════
+
+        /// <summary>Типизированный state-блок для round-trip десериализации.</summary>
+        public sealed class CurrencySaveState
+        {
+            public int SpiritStones;
+        }
+
+        public string SaveKey => "currency";
+        public Type StateType => typeof(CurrencySaveState);
+
+        public object CaptureState()
+        {
+            EnsureInitialized();
+            return new CurrencySaveState { SpiritStones = _spiritStones };
+        }
+
+        public void RestoreState(object state)
+        {
+            if (state is not CurrencySaveState data || data == null) return;
+            // SetBalance публикует CurrencyChangedEvent → HUD/лавка обновятся.
+            SetBalance(Math.Max(0, data.SpiritStones));
+            Console.WriteLine($"[CurrencyService] RestoreState: баланс {data.SpiritStones} камней");
+        }
+
+        // R17 (E-1): IWorldResettable — пересборка мира = новый практик со
+        // стартовым балансом. Сброс ленивой инициализации + событие для HUD.
+        public void ResetWorld()
+        {
+            _initialized = false;
+            EnsureInitialized();
+            _changedPub.Publish(new CurrencyChangedEvent(_spiritStones, 0));
         }
     }
 }

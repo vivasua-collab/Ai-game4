@@ -18,7 +18,7 @@ namespace CultivationGame.Modules.Player;
 /// No direct injection of IQiService/IBodyService/ICombatService. Qi level
 /// is cached via <see cref="QiChangedEvent"/> subscription.
 /// </summary>
-public sealed class PlayerService : IPlayerService, IDisposable
+public sealed class PlayerService : IPlayerService, ISaveable, IWorldResettable, IDisposable
 {
     [Inject] private readonly IPublisher<PlayerDeathEvent> _deathPub = null!;
     [Inject] private readonly IPublisher<PlayerReviveEvent> _revivePub = null!;
@@ -209,5 +209,98 @@ public sealed class PlayerService : IPlayerService, IDisposable
         _qiChangedToken = null;
         _bodyCriticalToken?.Dispose();
         _bodyCriticalToken = null;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // R17 (аудит-0911 E-3): ISaveable — блок "player" (позиция + состояние
+    // аватара). Раньше позиция игрока НЕ сохранялась: cold-load ставил
+    // игрока на (25,25) — фолбэк PlayerModule.Start, а не место из сейва.
+    // ══════════════════════════════════════════════════════════════
+
+    /// <summary>Типизированный state-блок для round-trip десериализации.</summary>
+    public sealed class PlayerSaveState
+    {
+        public bool Spawned;
+        public int PosX;
+        public int PosY;
+        public int Facing;
+        public int SleepState;
+        public int Stance;
+        public bool DeathAnnounced;
+    }
+
+    public string SaveKey => "player";
+    public Type StateType => typeof(PlayerSaveState);
+
+    public object CaptureState()
+    {
+        return new PlayerSaveState
+        {
+            Spawned = _spawned,
+            PosX = _data.Position.X,
+            PosY = _data.Position.Y,
+            Facing = (int)_data.Facing,
+            SleepState = (int)SleepState,
+            Stance = (int)Stance,
+            DeathAnnounced = _deathAnnounced,
+        };
+    }
+
+    public void RestoreState(object state)
+    {
+        if (state is not PlayerSaveState data || data == null) return;
+        if (!data.Spawned) return; // игрока не было в сейве — не трогаем
+
+        // Сброс мира уже прошёл (IWorldResettable до RestoreState):
+        // Spawn заново подписывает QiChanged/BodyCritical и публикует
+        // начальную позицию (NPC AI/движение узнают, где игрок).
+        var pos = new Position2D(data.PosX, data.PosY);
+        if (!_spawned)
+        {
+            Spawn(pos);
+        }
+        else
+        {
+            SetPosition(pos);
+        }
+
+        if (Enum.IsDefined(typeof(Direction), data.Facing))
+            _data.Facing = (Direction)data.Facing;
+
+        if (Enum.IsDefined(typeof(PlayerSleepState), data.SleepState))
+            SleepState = (PlayerSleepState)data.SleepState;
+        if (Enum.IsDefined(typeof(PlayerStance), data.Stance))
+            Stance = (PlayerStance)data.Stance;
+        _deathAnnounced = data.DeathAnnounced;
+
+        Console.WriteLine($"[PlayerService] RestoreState: позиция ({data.PosX},{data.PosY}), " +
+                          $"sleep={SleepState}, stance={Stance}, dead={_deathAnnounced}");
+    }
+
+    // R17 (E-1): IWorldResettable — пересборка мира = аватар не заспавнен
+    // (PlayerSpawnPhase заспавнит заново; LoadGame-путь вернёт из сейва).
+    public void ResetWorld()
+    {
+        _qiChangedToken?.Dispose();
+        _qiChangedToken = null;
+        _bodyCriticalToken?.Dispose();
+        _bodyCriticalToken = null;
+
+        _spawned = false;
+        _deathAnnounced = false;
+        SleepState = PlayerSleepState.Awake;
+        Stance = PlayerStance.Normal;
+        _assignedTechniques.Clear();
+        _cachedCultivationLevel = CultivationLevel.None;
+        _cachedCurrentQi = 0;
+
+        _data.Id = string.Empty;
+        _data.Name = string.Empty;
+        _data.Position = default;
+        _data.Health = 100f;
+        _data.CultivationLevel = 1;
+        _data.CurrentQi = 0;
+        _data.Age = 16;
+        _data.Facing = Direction.South;
     }
 }

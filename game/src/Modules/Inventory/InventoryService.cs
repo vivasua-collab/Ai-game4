@@ -33,7 +33,10 @@ namespace CultivationGame.Modules.Inventory
     ///
     /// INV6-E01 FIX: Подписка на ItemAddRequestEvent перенесена в InventoryModule.
     /// </summary>
-    public class InventoryService : IInventoryService, ISaveable, IDisposable
+    // R17 (E-1): + IWorldResettable — инвентарь НЕ сбрасывался при пересборке
+    // мира: тёплая NewGame #2 наследовала рюкзак прошлого мира, а
+    // StartingGearPhase ДОБАВЛЯЛА второй стартовый набор поверх.
+    public class InventoryService : IInventoryService, ISaveable, IWorldResettable, IDisposable
     {
         // === Зависимости (DI через конструктор) ===
         private readonly IPublisher<ItemAddedEvent> _itemAddedPub;
@@ -589,6 +592,15 @@ namespace CultivationGame.Modules.Inventory
                         _itemCountCache[slotSave.itemId] = slotSave.count;
                 }
             }
+        }
+
+        // R17 (E-1): IWorldResettable — пересборка мира = пустой рюкзак.
+        // (RestoreState и так чистит перед наполнением, но LoadGame-путь
+        // резолвит сброс ДО чтения сейва — единый контракт IWorldResettable.)
+        public void ResetWorld()
+        {
+            _slots.Clear();
+            _itemCountCache.Clear();
         }
 
         // === IDisposable ===

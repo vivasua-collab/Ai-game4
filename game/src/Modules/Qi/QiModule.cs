@@ -24,7 +24,7 @@ namespace CultivationGame.Modules.Qi;
 /// Инициализирует QiService конфигурацией и запускает регенерацию.
 /// BD-42 урок: Использует ITimeService.DeltaTime вместо UnityEngine.Time.deltaTime.
 /// </summary>
-public class QiModule : IModule, IDisposable
+public class QiModule : IModule, IWorldResettable, IDisposable
 {
     [Inject] private readonly IQiService _qiService = null!;
     [Inject] private readonly QiService _qiServiceImpl = null!;
@@ -52,6 +52,16 @@ public class QiModule : IModule, IDisposable
     private float _gatheringEnvironmentMult = 1f; // Этап 5: ×2 при активной Gathering-формации
 
     public string ModuleName => "Qi";
+
+    // R17 (аудит-0911 F-4): формация прошлого мира не должна действовать в
+    // новом — сброс Gathering-множителя и медитации при пересборке мира.
+    // (QiService.ResetWorld сбрасывает само ядро Ци.)
+    public void ResetWorld()
+    {
+        _gatheringEnvironmentMult = 1f;
+        if (_meditationActive) SetMeditation(false);
+        _meditationAccumulator = 0.0;
+    }
 
     public void Start()
     {

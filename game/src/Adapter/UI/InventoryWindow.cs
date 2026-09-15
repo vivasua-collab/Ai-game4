@@ -237,6 +237,17 @@ public partial class InventoryWindow : Control
 
     // Note: B and Esc handling done by GameWorldController.HandleStickyInput.
 
+    /// <summary>
+    /// INP-1 (2026-09-16): закрытие окна ЛЮБЫМ путём — B/Esc через GWC ИЛИ
+    /// клик по тёмному фону (OnBackgroundClick → Toggle() мимо GWC).
+    /// GameWorldController подписан — единая авторитетная точка резюма
+    /// тиков (паттерн LootWindow.Closed, R13-audit P1-2). Без этого
+    /// bg-click-закрытие оставляло мир запаузенным: Time.IsPaused висел,
+    /// HandleFreeMovement гейтился — движение (клавиши И мышь) умирало
+    /// до Esc/PageUp или перезапуска.
+    /// </summary>
+    public event Action? Closed;
+
     /// <summary>Toggle inventory visibility.</summary>
     public void Toggle()
     {
@@ -253,6 +264,7 @@ public partial class InventoryWindow : Control
             // Закрываем попапы вместе с окном (меню/диалог не живут в скрытом окне).
             CloseSplitDialog();
             CloseContextMenu();
+            Closed?.Invoke();
             GD.Print("[Inventory] Closed");
         }
     }

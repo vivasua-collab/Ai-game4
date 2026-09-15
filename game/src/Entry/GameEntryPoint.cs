@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Interfaces;
+using CultivationGame.Modules.World;
 
 namespace CultivationGame.Entry;
 
@@ -75,6 +76,27 @@ public sealed class GameEntryPoint : IStartable, ITickable
             {
                 Console.WriteLine($"[GameEntryPoint] Startable {s.GetType().Name} threw: {ex.GetType().Name}: {ex.Message}");
             }
+        }
+
+        // R17 (аудит-0911 WT-3): полный каталог локаций — в реестр WorldService.
+        // Entry-слой — законное место для LocationCatalog (Core ← Modules ← Entry);
+        // WorldModule регистрирует только fallback test_polygon. Без этого
+        // SetActiveLocation("large_world") тихо проваливался (NOT FOUND), а блок
+        // "world" при LoadGame не мог восстановить локацию сейва (E-3).
+        try
+        {
+            // Конкретный тип: RegisterLocation — на WorldService, не на
+            // интерфейсе (реестр — процесс-scoped контент, IWorldService —
+            // только потребительский контракт).
+            var worldService = _resolver.Resolve<WorldService>();
+            foreach (var loc in LocationCatalog.GetAll())
+                worldService.RegisterLocation(loc);
+            var ids = string.Join(", ", System.Linq.Enumerable.Select(LocationCatalog.GetAll(), l => l.Id));
+            Console.WriteLine($"[GameEntryPoint] Location catalog registered: {LocationCatalog.GetAll().Count} locations [{ids}]");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[GameEntryPoint] Location catalog registration FAILED: {ex.GetType().Name}: {ex.Message}");
         }
 
         Console.WriteLine(

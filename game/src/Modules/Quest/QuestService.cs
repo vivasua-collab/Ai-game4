@@ -24,8 +24,14 @@ namespace CultivationGame.Modules.Quest;
 /// Все кросс-модульные взаимодействия — ТОЛЬКО через EventBus:
 /// - QuestStartedEvent, QuestCompletedEvent, QuestFailedEvent, QuestAbandonedEvent — публикация
 /// - EnemyKilledEvent, ItemAddedEvent, LocationChangedEvent и др. — подписка (через QuestProgressTracker)
+///
+/// R17 (аудит-0911 QST-1): квесты НЕ сохранялись (нет ISaveable) — сейв/лоад
+/// сбрасывал все квесты в NotStarted/прогресс 0/_rewardedQuestIds пуст →
+/// квест можно было перевзять и получить награду повторно (фарм-цикл
+/// take→complete→save→load). Теперь: блок "quests" (статусы + прогресс целей
+/// + StartDay + выданные награды + текущий день) + IWorldResettable.
 /// </summary>
-public class QuestService : IQuestService, IDisposable
+public class QuestService : IQuestService, ISaveable, IWorldResettable, IDisposable
 {
     // === EventBus: паблишеры ===
     [Inject] private readonly IPublisher<QuestStartedEvent> _questStartedPub = null!;
@@ -448,5 +454,108 @@ public class QuestService : IQuestService, IDisposable
         _activeQuestIds.Clear();
         _allQuests.Clear();
         _rewardedQuestIds.Clear();
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // R17 (QST-1): ISaveable — блок "quests"
+    // ════════════════════════════════════════════════════════════════
+
+    /// <summary>Типизированный state-блок для round-trip десериализации.</summary>
+    public sealed class QuestsSaveState
+    {
+        public List<QuestSaveEntry> Quests = new();
+        public List<string> RewardedQuestIds = new();
+        public int CurrentDay;
+    }
+
+    public sealed class QuestSaveEntry
+    {
+        public string QuestId = "";
+        public int Status;
+        public int StartDay;
+        public List<ObjectiveSaveEntry> Objectives = new();
+    }
+
+    public sealed class ObjectiveSaveEntry
+    {
+        public string ObjectiveId = "";
+        public int Progress;
+    }
+
+    public string SaveKey => "quests";
+    public Type StateType => typeof(QuestsSaveState);
+
+    public object CaptureState()
+    {
+        var data = new QuestsSaveState
+        {
+            CurrentDay = _currentDay,
+            RewardedQuestIds = new List<string>(_rewardedQuestIds),
+        };
+        foreach (var kvp in _allQuests)
+        {
+            var q = kvp.Value;
+            var entry = new QuestSaveEntry
+            {
+                QuestId = q.QuestId,
+                Status = (int)q.Status,
+                StartDay = q.StartDay,
+            };
+            foreach (var obj in q.Objectives)
+                entry.Objectives.Add(new ObjectiveSaveEntry { ObjectiveId = obj.ObjectiveId, Progress = obj.Progress });
+            data.Quests.Add(entry);
+        }
+        return data;
+    }
+
+    public void RestoreState(object state)
+    {
+        if (state is not QuestsSaveState data || data == null) return;
+
+        // Шаблоны уже зарегистрированы Initialize→RegisterDefaultQuests
+        // (QiModule-паттерн: RestoreState накладывает состояние поверх шаблонов).
+        int restored = 0;
+        _activeQuestIds.Clear();
+        foreach (var entry in data.Quests)
+        {
+            if (string.IsNullOrEmpty(entry.QuestId)) continue;
+            if (!_allQuests.TryGetValue(entry.QuestId, out var quest)) continue;
+
+            var status = (QuestStatus)entry.Status;
+            if (!Enum.IsDefined(typeof(QuestStatus), status)) status = QuestStatus.NotStarted;
+            quest.Status = status;
+            quest.StartDay = entry.StartDay;
+
+            foreach (var objEntry in entry.Objectives)
+            {
+                var obj = quest.FindObjective(objEntry.ObjectiveId);
+                if (obj == null) continue;
+                obj.Progress = Math.Clamp(objEntry.Progress, 0, Math.Max(1, obj.Target));
+            }
+
+            if (status == QuestStatus.Active && !_activeQuestIds.Contains(quest.QuestId))
+                _activeQuestIds.Add(quest.QuestId);
+            restored++;
+        }
+
+        _rewardedQuestIds.Clear();
+        if (data.RewardedQuestIds != null)
+            foreach (var id in data.RewardedQuestIds) _rewardedQuestIds.Add(id);
+
+        _currentDay = data.CurrentDay;
+
+        Console.WriteLine($"[QuestService] RestoreState: {restored}/{data.Quests.Count} квестов, " +
+                          $"active={_activeQuestIds.Count}, rewarded={_rewardedQuestIds.Count}, day={_currentDay}");
+    }
+
+    // R17 (E-1): IWorldResettable — пересборка мира = квесты прошлого мира
+    // недействительны: свежие шаблоны NotStarted, без прогресса/наград.
+    public void ResetWorld()
+    {
+        _allQuests.Clear();
+        _activeQuestIds.Clear();
+        _rewardedQuestIds.Clear();
+        _currentDay = 0;
+        RegisterDefaultQuests();
     }
 }

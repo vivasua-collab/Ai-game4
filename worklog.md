@@ -2043,3 +2043,76 @@ Stage Summary:
   сверять с BodyTemplateProvider при добавлении видов; (3) агрегаты
   экипировки per-entity пересчитываются в провайдере, вызывающие — только
   ДОБАВЛЯЮТ natural/base поверх.
+
+---
+## R17 «Полнота сейва» — save/load всех world-scoped доменов (2026-09-15 → 09-16)
+
+Task: P1-семья аудита-0911 «state не в сейве / не сбрасывается» — единый
+эпизод: ISaveable-контракт для всех доменов + ResetWorld-фаза + атомарная
+запись + автосейв + порядок восстановления.
+
+Work Log:
+- Сессия 09-15 оборвалась на Фазе B5 (Formation/Charger/Animal) — окружение
+  умерло; фазы A–B4 выжили в рабочем дереве (21 файл), B5 и инфраструктура
+  (C) дописаны с нуля по плану после восстановления.
+- 16 дефектов: QI-2/QST-1/TRD-1/INV-4/G-2/G-3 (Qi/квесты/валюта/кукла+пояс/
+  каталог предметов/счётчики ID), NPC-1 (ghost-звери), E-1/E-3/E-4
+  (IWorldResettable-контракт + WorldDomainResetPhase фаза 0 вместо
+  NpcDomainResetPhase; PlayerService/WorldService/TimeService в сейве,
+  хардкод TestPolygon/06:00 из LoadGame удалён; гейт тиков/автосейва
+  SessionState.Playing), WT-5/WT-3 (время; large_world в реестре — из
+  GameEntryPoint, дисциплина слоёв), SAV-1/2/5/7 (tmp→rename атомарность;
+  автосейв гейтится Playing, единый слот `autosave`, интервал из конфига;
+  RestoreOrder-контракт 19 блоков; Delete с try/catch), CH-2 (ResetLiveState
+  зарядника), F-2/F-4 (формация: позиция+пере-публикация событий,
+  ResetWorld).
+- Реестр сейва 8 → 19 блоков; RestoreOrder: world→world_time→item_db→
+  player→stats→body→qi→inventory→equipment→belt→techniques→
+  technique_slots→formation→npc→animals→quests→currency→charger→save_meta.
+- Ловушки, пойманные QA: FormationService.ResetWorld обнулял кэш Ци (кэши —
+  зеркала process-scoped состояния, в сбросе мира не трогаются);
+  AbandonQuest→Abandoned; композиция зверей — относительный ассерт.
+- QA: build 0 err; SAVELOAD v3 PASS (19 ISaveable, round-trip 18/18,
+  integrity-мутации 12/12); REASSEMBLY PASS (16/16 фаз + звери/время).
+
+Stage Summary:
+- Чекпоинт: checkpoints/09_15_r17_save_completeness.md; docs_v2
+  SAVE_SYSTEM.md (§4.4–4.6, §6.1, §9.1). 33 файла.
+- R18-очередь: F-5, CH-4, SAV-4, SAV-6, G-1+NPC-6, NPC-2, трупы/предметы
+  на земле вне сейва (V1-осознанно).
+
+---
+## INP-1 — bg-click-закрытие инвентаря замораживало мир (2026-09-16)
+
+Task: баг-репорт пользователя: после открытия и закрытия инвентаря не
+работает НИКАКОЕ движение (клавиши+мышь), персонаж стоит.
+
+Work Log:
+- Диагноз: InventoryWindow.OnBackgroundClick → Toggle() внутри окна мимо
+  GameWorldController → Time.Resume() не вызывается → Time.IsPaused висит →
+  HandleFreeMovement выходит на первом гварде. Тот же скрытый путь у
+  CharacterSheetWindow (C). Сопутствующее: stacked-окна перетирали
+  снапшот _wasPausedBeforeInventory (диалог поверх инвентаря → фриз после
+  закрытия обоих).
+- Фикс (паттерн R13-audit P1-2): Closed-события у Inventory/CharacterSheet
+  (fire в Toggle на закрытии) + подписка GWC; центральные хелперы
+  AnyModalWindowOpen (9 окон) / HandleModalPauseOnOpen (снапшот только при
+  входе ПЕРВОГО окна стека) / HandleModalResumeOnClose (резюм только при
+  опустевшем стеке, идемпотентен) — заменили 15+ inline-блоков во всех
+  путях (B/C/E/F1/J/Q/T, Esc-каскад, E→обыск/диалог, Trade/DialogueEnded/
+  CorpseRemoved, DialogueDebugOpen).
+- Esc-каскад: + ветка листа персонажа; финальная пауза гейтится
+  !AnyModalWindowOpen() (раньше только инвентарь). modalOpen в
+  _UnhandledInput: + Q/J окна (утечка зума).
+- Build 0 err (395 warnings — базовый уровень R17); HOTKEYS.md §Esc
+  синхронизирован (полный каскад + семантика INP-1).
+
+Stage Summary:
+- Чекпоинт: checkpoints/09_16_inp1_modal_freeze.md.
+- Инвариант после фикса: пауза ⇔ (стек модальных окон непуст) ∨ (Esc
+  игрока); закрытие окна ЛЮБЫМ путём (клавиша/Esc/фон) доходит до одной
+  точки резюма.
+- Раннер регрессии tools/qa_regression.sh: kill-таймаут
+  `timeout -k 5 150` + вердикт grep'ом по всему выводу (сим может не
+  завершать процесс после VERDICT — мир тикает; exit 124/137 от timeout —
+  норма при напечатанном вердикте).

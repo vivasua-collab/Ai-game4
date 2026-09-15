@@ -204,26 +204,73 @@ public class SaveDataAggregator
 
 ### 4.4 Зарегистрированные системы (SaveKey → система)
 
+**R17 «Полнота сейва» (2026-09-15): фактический реестр — 20 блоков.**
+Таблица ниже — из дизайн-документа Unity-итерации (историческая);
+фактические блоки (жирным — новые R17):
+
 | SaveKey | Система | Описание |
 |---------|---------|---------|
-| `"session"` | GameSession | Метаданные сессии |
-| `"player"` | CharacterManager | Данные игрока |
-| `"time"` | TimeManager | Игровое время |
-| `"qi"` | QiManager | Состояние Ци |
-| `"body"` | BodyManager | Состояние тела |
-| `"inventory"` | InventoryManager | Инвентарь |
-| `"equipment"` | EquipmentManager | Экипировка |
-| `"techniques"` | TechniqueManager | Изученные техники |
-| `"formations"` | FormationManager | Активные формации |
-| `"buffs"` | BuffManager | Активные баффы |
-| `"charger"` | ChargerManager | Зарядник |
-| `"npcs"` | NPCManager | NPC сессии |
-| `"world"` | WorldManager | Текущая локация |
-| `"quests"` | QuestManager | Журнал квестов |
-| `"journal"` | JournalManager | Журнал игрока |
-| `"tiles"` | TileSaveManager | Изменённые тайлы (delta) |
-| `"worldmap"` | WorldMapManager | Карта мира, фог войны |
-| `"factions"` | FactionManager | Отношения фракций |
+| **`"world"`** | **WorldService** | **Идентичность активной локации (E-3)** |
+| **`"world_time"`** | **TimeService** | **Календарь + тики (WT-5)** |
+| **`"item_db"`** | **ItemDatabaseService** | **Каталог предметов + счётчики ID генераторов (G-2/G-3)** |
+| **`"player"`** | **PlayerService** | **Позиция/сон/стойка/флаг смерти (E-3)** |
+| **`"stats"`** | **StatService** | **Базовые статы/виртуальная дельта/пороги** |
+| `"body"` | BodyService | Части тела игрока (HP/состояния) |
+| **`"qi"`** | **QiService** | **Уровень/подуровень/качество ядра/Ци/ампутация сердца (QI-2)** |
+| `"inventory"` | InventoryService | Слоты рюкзака |
+| **`"equipment"`** | **EquipmentService** | **Кукла игрока: слот → itemId (INV-4)** |
+| **`"belt"`** | **BeltService** | **Слоты пояса 0-6 (INV-4)** |
+| `"techniques"` | TechniqueService | Изученные техники |
+| `"technique_slots"` | TechniqueSlotService | Назначения слотов 1-9 |
+| `"formation"` | FormationService | Активная формация (+позиция — R17 F-2) |
+| `"npc"` | NPCService | NPC (статы/экипировка/тела) |
+| **`"animals"`** | **AnimalService** | **Звери: вид/позиция/HP-тел/враждебность (NPC-1)** |
+| **`"quests"`** | **QuestService** | **Статусы/прогресс/награды/день (QST-1)** |
+| **`"currency"`** | **CurrencyService** | **Баланс духовных камней (TRD-1)** |
+| `"charger"` | ChargerService | Слоты камней/буфер/тепло/режим |
+| `"save_meta"` | SaveService | Версия формата + время сейва |
+
+Вне сейва (осознанно, V1): предметы на земле (GROUND_ITEM_SYSTEM §6 —
+исчезают при перезагрузке; сбрасываются IWorldResettable при пересборке),
+трупы (R13-домен — реестр на сессию), баффы (пересчёт из источников).
+
+### 4.5 Порядок восстановления (RestoreOrder) — контракт R17
+
+`SaveDataAggregator` восстанавливает блоки в ЯВНОМ порядке
+(SAV-5: не в порядке регистраций DI — рефакторинг регистраций больше
+не меняет семантику загрузки):
+
+```
+world → world_time → item_db → player → stats → body → qi →
+inventory → equipment → belt → techniques → technique_slots →
+formation → npc → animals → quests → currency → charger → save_meta
+```
+
+Ключевые зависимости:
+- `item_db` ДО `equipment`/`belt`/`npc` — они резолвят itemId через каталог;
+- `world`/`world_time` первыми — GameSession читает локацию/время после Load;
+- блоки вне списка (будущие модули) — после, в порядке регистраций;
+- отсутствующие в сейве ключи пропускаются (форвард-совместимость).
+
+Плюс сброс world-scoped доменов ДО RestoreState (IWorldResettable —
+см. §4.6): GameSession.LoadGame резолвит все домены и сбрасывает —
+сейв остаётся единственным источником истины (warm-load без «призраков»
+прошлого мира; паттерн R14-P2-1, расширенный с NPC-домена на все домены).
+
+### 4.6 IWorldResettable — сброс world-scoped доменов (R17 E-1)
+
+Домены, чьё состояние привязано к миру (не к процессу), реализуют
+`Core.Interfaces.IWorldResettable.ResetWorld()` (идемпотентен):
+
+- NewGame: `WorldDomainResetPhase` (фаза 0) — `ResolveAll<IWorldResettable>`;
+- LoadGame: `GameSession.LoadGame` — тот же сброс ДО RestoreState.
+
+Реализаторы (15): NPCModule (реестр/трупы/группы), AnimalService,
+FormationService, ChargerService, QiService+QiModule, PlayerService,
+StatService, QuestService, CurrencyService, InventoryService,
+EquipmentService, BeltService, GroundItemService, WorldService,
+TimeService. Процесс-scoped контент (ItemDatabaseService — каталог,
+реестр локаций) НЕ сбрасывается.
 
 ---
 
@@ -344,19 +391,28 @@ class NPCSaveData
 
 ### 6.1 Автосохранение
 
-| Событие | Действие |
+**R17 (SAV-2, 2026-09-15):** автосейв — ТОЛЬКО в активной игровой
+сессии (`SessionState.Playing`): тик-луп загейчен в GameBoot (E-4),
+плюс страховочный гейт в SaveModule.Tick — из главного меню мир не
+симулирует и не автосейвит (раньше плодились слоты `autosave_NNNN` от
+fallback-мира меню, без чистки).
+
+| Параметр | Значение |
+|---------|----------|
+| Слот | Единый `autosave` (перезапись, не плодится) |
+| Интервал | `SaveConfig.AutoSaveIntervalMinutes` = 30 игровых минут (1 тик = 1 игровая минута; ≤0 — выкл) |
+| Гейт | `SessionState.Playing` (двойной: GameBoot-луп + SaveModule.Tick) |
+| normal (1 тик/сек) | каждые 30 реальных секунд |
+| fast (5 тик/сек) | каждые 6 реальных секунд |
+| quick (15 тик/сек) | каждые 2 реальных секунды |
+
+Событийные триггеры из таблицы ниже — план V2 (не реализованы):
+
+| Событие | Действие (план) |
 |---------|----------|
 | Смена локации | Сохранить текущее состояние |
-| Получение техники | Сохранить персонажа |
-| Получение важного предмета | Сохранить инвентарь |
 | Прорыв уровня | Сохранить персонажа |
 | Завершение боя | Сохранить состояние боя |
-| Каждые 60 тиков | Периодическое сохранение |
-
-**Каденция 60 тиков = 1 игровой час:**
-- normal (1 тик/сек): каждые 60 реальных секунд.
-- fast (5 тик/сек): каждые 12 реальных секунд.
-- quick (15 тик/сек): каждые 4 реальных секунды.
 
 ### 6.2 Ручное сохранение
 
@@ -488,13 +544,20 @@ public class SaveMigrator
 
 ### 9.1 Атомарная запись
 
+**R17 (SAV-1, 2026-09-15): РЕАЛИЗОВАНО** в обоих хендлерах
+(SaveFileHandler Module + Adapter):
+
 ```
-1. Запись во временный файл (main.sav.tmp)
-2. fsync (убедиться, что данные на диске)
-3. Переименование main.sav.tmp → main.sav (атомарная операция ОС)
+1. Сериализация в память (JSON)
+2. Запись во временный файл (main.json.tmp)
+3. File.Move(tmp → main.json, overwrite: true) — атомарная операция ОС
 ```
 
-Это гарантирует, что при сбое (потеря питания, краш) сохранение не будет повреждено.
+Гарантия: обрыв записи (краш/потеря питания) оставляет либо старый
+слот целиком, либо новый целиком — усечённый main.json невозможен.
+(fsync-этап опущен — V1-допущение, окно риска < секунды.)
+Удаление слота (Delete) — тоже безопасное: try/catch с честным
+результатом вместо IOException наружу (SAV-7).
 
 ### 9.2 Rolling backups
 

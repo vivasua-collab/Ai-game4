@@ -29,7 +29,13 @@ namespace CultivationGame.Modules.Charger
     /// Зависимости: ITimeService — через конструктор (stub в Core).
     /// Кросс-модульные вызовы (Qi) — через MessagePipe события.
     /// </summary>
-    public class ChargerService : IChargerService, ISaveable, IDisposable
+    // R17 (аудит-0911 CH-2): + IWorldResettable — Configure() вызывается один
+    // раз за процесс (guard GameEntryPoint), а RestoreState мержил поверх
+    // живого состояния: warm-load занимал слоты камнями прошлой сессии
+    // (InsertStone тихо false — камни из сейва молча терялись), буфер
+    // накапливался поверх, перегрев оставался. ResetLiveState() — единая
+    // точка сброса (начала RestoreState + пересборка мира).
+    public class ChargerService : IChargerService, ISaveable, IWorldResettable, IDisposable
     {
         // === Зависимости (DI через конструктор) ===
         // CH-11: [Inject] убраны — VContainer использует конструктор
@@ -480,17 +486,25 @@ namespace CultivationGame.Modules.Charger
         /// Десериализовать состояние зарядника.
         /// Восстанавливаем: режим, буфер, тепло, камни в слотах.
         /// Предполагается, что Configure() уже вызван (слоты созданы).
+        /// R17 (аудит-0911 CH-2): ПЕРВЫМ делом — сброс живого состояния
+        /// (слоты/буфер/тепло/режим): Configure() зовётся один раз за процесс,
+        /// warm-load мержил сейв поверх прошлой сессии (двойное зачисление
+        /// буфера, занятые слоты → камни из сейва молча потеряны).
         /// </summary>
         public void RestoreState(object state)
         {
             if (state is not ChargerSaveData data || data == null) return;
+
+            // R17 (CH-2): сброс ДО восстановления — сейв становится
+            // единственным источником истины (а не «накладка» поверх живого).
+            ResetLiveState();
 
             // Восстанавливаем режим
             _mode = (ChargerMode)data.mode;
 
             // Восстанавливаем буфер — добавляем сохранённое Ци
             // (Configure() уже сбросил буфер в 0)
-            long bufferQiVal = long.Parse(data.bufferQi);
+            long bufferQiVal = long.TryParse(data.bufferQi, out var parsedBuffer) ? parsedBuffer : 0;
             if (bufferQiVal > 0)
             {
                 _buffer.AddQi(bufferQiVal);
@@ -528,7 +542,8 @@ namespace CultivationGame.Modules.Charger
 
                     // Извлекаем разницу, чтобы получить сохранённое текущее Ци
                     // (конструктор создаёт камень с полным Ци)
-                    long stoneCurrentQiVal = long.Parse(slotSave.stoneCurrentQi);
+                    // R17 (CH-2): TryParse — кривой сейв не роняет загрузку.
+                    long stoneCurrentQiVal = long.TryParse(slotSave.stoneCurrentQi, out var parsedStone) ? parsedStone : 0;
                     long diff = stone.MaxQi - stoneCurrentQiVal;
                     if (diff > 0)
                     {
@@ -540,6 +555,38 @@ namespace CultivationGame.Modules.Charger
                 }
             }
         }
+
+        /// <summary>
+        /// R17 (аудит-0911 CH-2): полный сброс живого состояния зарядника —
+        /// слоты пусты, буфер разряжен, тепло сброшено, режим Off.
+        /// Вызывается в начале RestoreState (сейв — единственный источник
+        /// истины) и из ResetWorld (пересборка мира). Идемпотентен.
+        /// </summary>
+        private void ResetLiveState()
+        {
+            // Слоты: извлечь камни через публичный API (честные события
+            // ChargerStateChangedEvent → UI-панель обновится).
+            for (int i = 0; i < _slots.Count; i++)
+            {
+                if (_slots[i].InsertedStone != null)
+                    RemoveStone(i);
+            }
+
+            // Буфер: разрядить в ноль (событие ChargerBufferChangedEvent).
+            if (_buffer.CurrentQi > 0)
+                _buffer.ExtractQi(_buffer.CurrentQi);
+
+            // Тепло/перегрев/кулдаун/бой — в «холодное» состояние.
+            _heat.Reset();
+
+            // Режим — Off (RestoreState выставит из сейва).
+            _mode = ChargerMode.Off;
+        }
+
+        // R17 (E-1): IWorldResettable — пересборка мира = пустой холодный
+        // зарядник (Configure() одноразовый за процесс, без сброса камни/
+        // буфер/тепло прошлого мира переживали бы NewGame #2).
+        public void ResetWorld() => ResetLiveState();
 
         // === IDisposable ===
 

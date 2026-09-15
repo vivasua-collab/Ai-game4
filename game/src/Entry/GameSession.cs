@@ -31,8 +31,13 @@ public sealed class GameSession : IGameSession
     [Inject] private readonly ISaveService _save = null!;
     [Inject] private readonly IPublisher<GamePausedEvent> _pausedPub = null!;
     [Inject] private readonly IPublisher<GameResumedEvent> _resumedPub = null!;
-    // R13/R14-аудит: сброс NPC-домена при тёплой загрузке (до RestoreState).
-    [Inject] private readonly Modules.NPC.NPCModule _npcModule = null!;
+    // R17 (аудит-0911 E-1): сброс ВСЕХ world-scoped доменов при тёплой
+    // загрузке (до RestoreState) — контракт IWorldResettable.
+    [Inject] private readonly IResolver _resolver = null!;
+    // R17 (E-3): идентичность мира/время — из восстановленного состояния,
+    // а не хардкод TestPolygon/06:00.
+    [Inject] private readonly IWorldService _worldService = null!;
+    [Inject] private readonly ITimeService _timeService = null!;
 
     private long _frameCounter;
 
@@ -133,28 +138,42 @@ public sealed class GameSession : IGameSession
         Console.WriteLine($"[GameSession] LoadGame slot='{slot}' — loading...");
         try
         {
-            // R14-аудит (P2-1): сброс NPC-домена ДО RestoreState — в этом же
-            // процессе мог жить прошлый мир (NewGame → меню → LoadGame):
-            // реестр NPC/трупы/группы/провайдеры должны быть пусты ДО того,
-            // как сейв наполнит их заново. RestoreState делает merge (не
-            // чистит реестр) — «призраки» прошлого мира иначе остаются.
-            // Аналог NpcDomainResetPhase (фаза 0, NewGame-режим): на Load
-            // фазы идут ПОСЛЕ восстановления — сброс в фазе опоздал бы.
-            _npcModule.ResetWorld();
+            // R14-аудит (P2-1) → R17 (E-1): сброс ВСЕХ world-scoped доменов
+            // ДО RestoreState — в этом же процессе мог жить прошлый мир
+            // (NewGame → меню → LoadGame): реестры/провайдеры/домены должны
+            // быть пусты ДО того, как сейв наполнит их заново (RestoreState
+            // делает merge, не чистит). Аналог WorldDomainResetPhase (фаза 0,
+            // NewGame-режим): на Load фазы идут ПОСЛЕ восстановления —
+            // сброс в фазе опоздал бы. Раньше сбрасывался только NPC-домен:
+            // звери/формации/зарядник/инвентарь/кукла/время/квесты/валюта
+            // прошлого мира «переживали» загрузку.
+            int resetCount = 0;
+            foreach (var domain in _resolver.ResolveAll<IWorldResettable>())
+            {
+                domain.ResetWorld();
+                resetCount++;
+            }
+            Console.WriteLine($"[GameSession] LoadGame: {resetCount} world-scoped доменов сброшено до RestoreState");
 
             // ISaveService.Load triggers ISaveable.RestoreState on every
-            // registered saveable. GameSession.Data is refreshed minimally
-            // here; full restoration happens inside the save module.
+            // registered saveable (порядок — контракт RestoreOrder в
+            // SaveDataAggregator: мир → время → каталог → …). GameSession.Data
+            // обновляется из ВОССТАНОВЛЕННОГО состояния ниже.
             _save.Load(slot);
 
+            // R17 (E-3): идентичность мира — из блока "world" (раньше
+            // хардкод TestPolygon: сейв из large_world грузился на сетку
+            // 50×50 чужой локации). Время — из блока "world_time" (раньше
+            // 06:00 дня 1 независимо от сейва).
+            var restoredLocation = _worldService.CurrentLocation ?? LocationCatalog.TestPolygon;
             Data = new GameSessionData
             {
                 Id = slotName,
-                WorldId = LocationCatalog.TestPolygon.Id,
-                WorldName = LocationCatalog.TestPolygon.Name,
+                WorldId = restoredLocation.Id,
+                WorldName = restoredLocation.Name,
                 StartVariant = 1,
-                WorldTime = new WorldTime(GameConstants.START_YEAR, 1, 1, 6, 0),
-                DaysSinceStart = 0,
+                WorldTime = _timeService.CurrentTime,
+                DaysSinceStart = Math.Max(0, _timeService.CurrentTime.Day - 1),
                 IsPaused = false,
             };
 

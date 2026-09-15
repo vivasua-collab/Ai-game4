@@ -20,7 +20,11 @@ namespace CultivationGame.Modules.NPC;
 /// Точка входа модуля NPC.
 /// Инициализирует сервисы конфигурацией и обрабатывает тики.
 /// </summary>
-public class NPCModule : IModule
+// R17 (аудит-0911 E-1): + IWorldResettable — сброс NPC-домена входит в
+// единый контракт world-scoped сброса (ResolveAll<IWorldResettable> в
+// WorldDomainResetPhase/GameSession.LoadGame) вместо точечного вызова
+// из NpcDomainResetPhase/LoadGame.
+public class NPCModule : IModule, IWorldResettable
 {
     [Inject] private readonly NPCService _npcServiceImpl = null!;
     [Inject] private readonly NPCAIService _aiService = null!;
@@ -109,11 +113,12 @@ public class NPCModule : IModule
 
     /// <summary>
     /// R13-аудит (P2-4) + R14-аудит (P2-1): сброс NPC-домена при пересборке
-    /// мира в том же процессе. Вызывается NpcDomainResetPhase (фаза 0,
-    /// NewGame — до спавн-фаз 6/7/8) и GameSession.LoadGame (до RestoreState
-    /// из сейва — фазы идут ПОСЛЕ восстановления). Чистит: реестр NPC +
-    /// per-entity провайдеры + баффы + якоря блуждания + отношения (полный
-    /// путь DespawnNPC), трупы (с CorpseRemovedEvent на каждый), группы.
+    /// мира в том же процессе. R17: вызывается через IWorldResettable из
+    /// WorldDomainResetPhase (фаза 0, NewGame — до спавн-фаз 6/7/8) и
+    /// GameSession.LoadGame (до RestoreState из сейва — фазы идут ПОСЛЕ
+    /// восстановления). Чистит: реестр NPC + per-entity провайдеры + баффы +
+    /// якоря блуждания + отношения (полный путь DespawnNPC), трупы (с
+    /// CorpseRemovedEvent на каждый), группы.
     /// </summary>
     public void ResetWorld()
     {

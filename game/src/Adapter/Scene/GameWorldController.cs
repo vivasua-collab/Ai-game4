@@ -258,8 +258,8 @@ public partial class GameWorldController : Node2D
         if (string.IsNullOrEmpty(npcId)) return false;
         if (!dialogueSvc.TryStartNpcDialogue(npcId)) return false;
 
-        _wasPausedBeforeInventory = Time is { IsPaused: true };
-        if (Time is { IsPaused: false }) Time.Pause();
+        // INP-1: центральный хелпер (снапшот только при входе первого окна).
+        HandleModalPauseOnOpen(AnyModalWindowOpen());
         _dialogueWindow.Open(npcId);
         return true;
     }
@@ -287,7 +287,10 @@ public partial class GameWorldController : Node2D
     /// <summary>Max Chebyshev distance (tiles) for E-key NPC talk. Phase 2.</summary>
     private const float TalkRangeTiles = 2.5f;
     private bool _positionInitialized;
-    private bool _wasPausedBeforeInventory; // track if game was paused before opening inventory
+    // INP-1 (2026-09-16): семантика флага — «мир уже был запаузен ВНЕ стека
+    // модальных окон в момент открытия ПЕРВОГО окна стека». Снапшот и резюм —
+    // только через HandleModalPauseOnOpen / HandleModalResumeOnClose.
+    private bool _wasPausedBeforeInventory;
     private System.IDisposable? _dialogueEndedToken;
     private System.IDisposable? _tradeOpenedToken;
     private System.IDisposable? _tradeClosedToken;
@@ -297,6 +300,57 @@ public partial class GameWorldController : Node2D
     // Minimum 1 real second between speed changes.
     private float _speedChangeCooldown;
     private const float SpeedChangeCooldownSec = 1.0f;
+
+    // === INP-1 (2026-09-16): модальная пауза — единая точка ===
+    // Баг-репорт пользователя: инвентарь, закрытый кликом по тёмному фону
+    // (OnBackgroundClick → Toggle() мимо GameWorldController), НЕ снимал
+    // паузу тиков — мир оставался заморожен: движение (клавиши И мышь)
+    // мертво, персонаж стоит (HandleFreeMovement гейтится Time.IsPaused).
+    // Тот же путь у листа персонажа (C). Плюс stacked-окна (диалог поверх
+    // инвентаря и т.п.) перетирали флаг-снапшот — закрытие стека не
+    // снимало паузу. Фикс по паттерну R13-audit P1-2 (LootWindow.Closed):
+    // (1) Closed-события у окон с внутренними путями закрытия;
+    // (2) снапшот флага ТОЛЬКО при входе первого окна стека;
+    // (3) резюм ТОЛЬКО когда стек опустел и пауза ставилась ради окон.
+
+    /// <summary>Открыто ли хоть одно модальное окно, паузящее мир.</summary>
+    private bool AnyModalWindowOpen() =>
+        (_inventoryWindow is { Visible: true })
+        || (_characterSheetWindow is { Visible: true })
+        || (_questWindow is { Visible: true })
+        || (_eventLogWindow is { Visible: true })
+        || (_hotkeysWindow is { Visible: true })
+        || (_techniqueBook is { Visible: true })
+        || (_lootWindow is { IsOpen: true })
+        || (_tradeWindow is { IsOpen: true })
+        || (_dialogueWindow is { IsOpen: true });
+
+    /// <summary>
+    /// Открытие модального окна: пауза тиков, если ещё не стоит. Снапшот
+    /// «мир был запаузен до окон» делается только при входе ПЕРВОГО окна
+    /// стека (otherModalAlreadyOpen=false) — открытие поверх существующих
+    /// окон флаг НЕ перетирает, иначе закрытие стека не сняло бы паузу.
+    /// </summary>
+    private void HandleModalPauseOnOpen(bool otherModalAlreadyOpen)
+    {
+        if (!otherModalAlreadyOpen)
+            _wasPausedBeforeInventory = Time is { IsPaused: true };
+        if (Time is { IsPaused: false })
+            Time.Pause();
+    }
+
+    /// <summary>
+    /// Закрытие модального окна (ЛЮБОЙ путь: клавиша, Esc, клик по фону,
+    /// событие шины). Резюм тиков — только когда стек окон опустел и пауза
+    /// ставилась ради окон (не игроком Esc'ом до их открытия). Идемпотентен:
+    /// безопасно вызывать из нескольких точек одного закрытия
+    /// (Closed-событие окна + inline-ветка клавиши).
+    /// </summary>
+    private void HandleModalResumeOnClose()
+    {
+        if (!AnyModalWindowOpen() && !_wasPausedBeforeInventory && Time is { IsPaused: true })
+            Time.Resume();
+    }
 
     // NOTE: Movement is handled by PlayerModule.Tick() — tied to the tick system,
     // NOT to _PhysicsProcess. This ensures movement scales with TimeSpeed
@@ -874,11 +928,16 @@ public partial class GameWorldController : Node2D
         _hudCanvas.AddChild(_dmgDirIndicator);
 
         // Inventory window (opens with B key) — must be created AFTER _hudCanvas.
+        // INP-1: Closed-событие — окно закрывается и кликом по тёмному фону
+        // (OnBackgroundClick мимо GWC) — резюм тиков из единой точки.
         _inventoryWindow = new InventoryWindow { Name = "InventoryWindow" };
+        _inventoryWindow.Closed += HandleModalResumeOnClose;
         _hudCanvas.AddChild(_inventoryWindow);
 
         // Character sheet window (opens with C key).
+        // INP-1: Closed-событие — то же (bg-click-закрытие без ведома GWC).
         _characterSheetWindow = new CharacterSheetWindow { Name = "CharacterSheetWindow" };
+        _characterSheetWindow.Closed += HandleModalResumeOnClose;
         _hudCanvas.AddChild(_characterSheetWindow);
 
         // Dialogue window (opens with E key near an NPC) — NPC_COMBAT_PREP Phase 2.
@@ -1150,16 +1209,12 @@ public partial class GameWorldController : Node2D
         if (PlayerInput is { IsTechniquesPressed: true } && _techniqueBook != null && Time != null
             && _lootWindow is not { IsOpen: true })
         {
+            bool otherModalOpen = AnyModalWindowOpen();
             _techniqueBook.Toggle();
             if (_techniqueBook.Visible)
-            {
-                _wasPausedBeforeInventory = Time.IsPaused;
-                if (!Time.IsPaused) Time.Pause();
-            }
-            else if (!_wasPausedBeforeInventory && Time.IsPaused)
-            {
-                Time.Resume();
-            }
+                HandleModalPauseOnOpen(otherModalOpen);
+            else
+                HandleModalResumeOnClose();
         }
         if (PlayerInput is { IsCycleTechniquePressed: true })
         {
@@ -1225,6 +1280,8 @@ public partial class GameWorldController : Node2D
         // ScrollContainer consumes wheel events only while it CAN scroll;
         // at the list end the event leaks to _UnhandledInput and used to
         // change the camera zoom (user report 2026-08-22).
+        // INP-1: + журнал заданий (Q) и журнал событий (J) — их оверлеи не
+        // всегда потребляют колесо (утечка зума при открытом окне).
         bool modalOpen = (_inventoryWindow is { Visible: true })
                       || (_characterSheetWindow is { Visible: true })
                       || (_dialogueWindow is { IsOpen: true })
@@ -1232,6 +1289,8 @@ public partial class GameWorldController : Node2D
                       || (_lootWindow is { IsOpen: true })
                       || (_techniqueBook is { Visible: true })
                       || (_hotkeysWindow is { Visible: true })
+                      || (_questWindow is { Visible: true })
+                      || (_eventLogWindow is { Visible: true })
 #if DEBUG
                       || (_cheatPanel is { Visible: true })
 #endif
@@ -1443,16 +1502,12 @@ public partial class GameWorldController : Node2D
         if (PlayerInput.IsHelpHotkeysPressed && _hotkeysWindow != null && Time != null
             && _lootWindow is not { IsOpen: true })
         {
+            bool otherModalOpen = AnyModalWindowOpen();
             _hotkeysWindow.Toggle();
             if (_hotkeysWindow.Visible)
-            {
-                _wasPausedBeforeInventory = Time.IsPaused;
-                if (!Time.IsPaused) Time.Pause();
-            }
-            else if (!_wasPausedBeforeInventory && Time.IsPaused)
-            {
-                Time.Resume();
-            }
+                HandleModalPauseOnOpen(otherModalOpen);
+            else
+                HandleModalResumeOnClose();
         }
 
         // 2026-09-04 S1: J — Журнал событий (модальное окно, пауза как F1).
@@ -1460,16 +1515,12 @@ public partial class GameWorldController : Node2D
         if (PlayerInput.IsJournalPressed && _eventLogWindow != null && Time != null
             && _lootWindow is not { IsOpen: true })
         {
+            bool otherModalOpen = AnyModalWindowOpen();
             _eventLogWindow.Toggle();
             if (_eventLogWindow.Visible)
-            {
-                _wasPausedBeforeInventory = Time.IsPaused;
-                if (!Time.IsPaused) Time.Pause();
-            }
-            else if (!_wasPausedBeforeInventory && Time.IsPaused)
-            {
-                Time.Resume();
-            }
+                HandleModalPauseOnOpen(otherModalOpen);
+            else
+                HandleModalResumeOnClose();
         }
 
         // 2026-09-04 S1: Q — Журнал заданий (модальное окно, пауза как F1).
@@ -1477,44 +1528,36 @@ public partial class GameWorldController : Node2D
         if (PlayerInput.IsQuestLogPressed && _questWindow != null && Time != null
             && _lootWindow is not { IsOpen: true })
         {
+            bool otherModalOpen = AnyModalWindowOpen();
             _questWindow.Toggle();
             if (_questWindow.Visible)
-            {
-                _wasPausedBeforeInventory = Time.IsPaused;
-                if (!Time.IsPaused) Time.Pause();
-            }
-            else if (!_wasPausedBeforeInventory && Time.IsPaused)
-            {
-                Time.Resume();
-            }
+                HandleModalPauseOnOpen(otherModalOpen);
+            else
+                HandleModalResumeOnClose();
         }
 
         // 2026-08-28: Esc сначала закрывает окна новой волны (справка/книга/чит).
         if (PlayerInput.IsPausePressed && _hotkeysWindow is { Visible: true })
         {
             _hotkeysWindow.Close();
-            if (!_wasPausedBeforeInventory && Time is { IsPaused: true })
-                Time.Resume();
+            HandleModalResumeOnClose(); // INP-1: центральный резюм
         }
         // 2026-09-04 S1: Esc закрывает журнал событий (J).
         else if (PlayerInput.IsPausePressed && _eventLogWindow is { Visible: true })
         {
             _eventLogWindow.Toggle();
-            if (!_wasPausedBeforeInventory && Time is { IsPaused: true })
-                Time.Resume();
+            HandleModalResumeOnClose(); // INP-1: центральный резюм
         }
         // 2026-09-04 S1: Esc закрывает окно квестов (Q).
         else if (PlayerInput.IsPausePressed && _questWindow is { Visible: true })
         {
             _questWindow.Toggle();
-            if (!_wasPausedBeforeInventory && Time is { IsPaused: true })
-                Time.Resume();
+            HandleModalResumeOnClose(); // INP-1: центральный резюм
         }
         else if (PlayerInput.IsPausePressed && _techniqueBook is { Visible: true })
         {
             _techniqueBook.Close();
-            if (!_wasPausedBeforeInventory && Time is { IsPaused: true })
-                Time.Resume();
+            HandleModalResumeOnClose(); // INP-1: центральный резюм
         }
 #if DEBUG
         else if (PlayerInput.IsPausePressed && _cheatPanel is { Visible: true })
@@ -1538,11 +1581,19 @@ public partial class GameWorldController : Node2D
         else if (PlayerInput.IsPausePressed && _dialogueWindow is { IsOpen: true })
         {
             _dialogueWindow.Close();
-            if (!_wasPausedBeforeInventory && Time is { IsPaused: true })
-                Time.Resume();
+            HandleModalResumeOnClose(); // INP-1: центральный резюм
         }
-        // Esc (sticky "escape") → toggle pause (but not when inventory is open).
-        else if (PlayerInput.IsPausePressed && (_inventoryWindow == null || !_inventoryWindow.Visible))
+        // INP-1: Esc закрывает лист персонажа (C) — раньше Esc под этим окном
+        // снимал паузу (ветка ниже), окно висело поверх бегущего мира.
+        else if (PlayerInput.IsPausePressed && _characterSheetWindow is { Visible: true })
+        {
+            _characterSheetWindow.Toggle();
+            HandleModalResumeOnClose();
+        }
+        // Esc (sticky "escape") → toggle pause. INP-1: только когда НЕ открыто
+        // ни одного модального окна (раньше гард проверял только инвентарь —
+        // Esc под Q/J/F1/T снимал паузу под висящим окном).
+        else if (PlayerInput.IsPausePressed && !AnyModalWindowOpen())
         {
             if (Time.IsPaused) Time.Resume();
             else               Time.Pause();
@@ -1560,9 +1611,8 @@ public partial class GameWorldController : Node2D
             else
             {
                 _inventoryWindow.Toggle();
-                // Resume game time when closing inventory via Esc (same as B-close path).
-                if (!_wasPausedBeforeInventory && Time != null && Time.IsPaused)
-                    Time.Resume();
+                // INP-1: центральный резюм (то же, что B-close и bg-click).
+                HandleModalResumeOnClose();
             }
         }
 
@@ -1571,25 +1621,16 @@ public partial class GameWorldController : Node2D
         // перезаписывается и мир остаётся заморожен после закрытия окон.
         if (PlayerInput.IsInventoryPressed && _lootWindow is not { IsOpen: true })
         {
-            _inventoryWindow?.Toggle();
-            // Pause game time when inventory opens, resume when closes.
+            // INP-1: пауза/резюм — центральные хелперы. Закрытие кликом по
+            // фону резюмит через Closed-событие окна ещё до этой ветки
+            // (идемпотентно); флаг-снапшот не перетирается поверх других окон.
             // Rationale: inventory management is a planning activity (like Kenshi/RimWorld).
-            // Player should be able to examine items, equip, drag&drop without time pressure.
-            // This does NOT affect real-time input (mouse, keyboard) — only tick-based simulation.
-            if (_inventoryWindow != null && Time != null)
-            {
-                if (_inventoryWindow.Visible)
-                {
-                    _wasPausedBeforeInventory = Time.IsPaused;
-                    if (!Time.IsPaused) Time.Pause();
-                }
-                else
-                {
-                    // Only resume if we paused for inventory (not if already paused before).
-                    if (!_wasPausedBeforeInventory && Time.IsPaused)
-                        Time.Resume();
-                }
-            }
+            bool otherModalOpen = AnyModalWindowOpen();
+            _inventoryWindow?.Toggle();
+            if (_inventoryWindow is { Visible: true })
+                HandleModalPauseOnOpen(otherModalOpen);
+            else
+                HandleModalResumeOnClose();
         }
 
         // F key: harvest resource from tile under cursor (within distance).
@@ -1602,21 +1643,14 @@ public partial class GameWorldController : Node2D
         // R13-audit (P2-2): гвард модальности обыска (см. комментарий у T).
         if (PlayerInput.IsCharacterSheetPressed && _lootWindow is not { IsOpen: true })
         {
+            bool otherModalOpen = AnyModalWindowOpen();
             _characterSheetWindow?.Toggle();
-            // Pause game when character sheet opens (same as inventory).
-            if (_characterSheetWindow != null && Time != null)
-            {
-                if (_characterSheetWindow.Visible)
-                {
-                    _wasPausedBeforeInventory = Time.IsPaused;
-                    if (!Time.IsPaused) Time.Pause();
-                }
-                else
-                {
-                    if (!_wasPausedBeforeInventory && Time.IsPaused)
-                        Time.Resume();
-                }
-            }
+            // INP-1: центральные пауза/резюм (bg-click-закрытие — через
+            // Closed-событие окна).
+            if (_characterSheetWindow is { Visible: true })
+                HandleModalPauseOnOpen(otherModalOpen);
+            else
+                HandleModalResumeOnClose();
         }
 
         // D (2026-08-26): K — окно Культивации Ци (3 вкладки + слоты техник 3-9).
@@ -1692,8 +1726,8 @@ public partial class GameWorldController : Node2D
             else if (_dialogueWindow != null && _dialogueWindow.IsOpen)
             {
                 _dialogueWindow.Advance();
-                if (_dialogueWindow is { IsOpen: false } && !_wasPausedBeforeInventory && Time is { IsPaused: true })
-                    Time.Resume();
+                if (_dialogueWindow is { IsOpen: false })
+                    HandleModalResumeOnClose(); // INP-1: центральный резюм
             }
             else if (!HandleCorpseSearchOrNpcTalk())
             {
@@ -1979,8 +2013,7 @@ public partial class GameWorldController : Node2D
     {
         if (_dialogueWindow is { IsOpen: true })
             _dialogueWindow.Close();
-        if (!_wasPausedBeforeInventory && Time is { IsPaused: true })
-            Time.Resume();
+        HandleModalResumeOnClose(); // INP-1: резюм только при опустевшем стеке
     }
 
     /// <summary>
@@ -1990,9 +2023,10 @@ public partial class GameWorldController : Node2D
     /// </summary>
     private void OnTradeOpened(in Core.Messaging.Contracts.TradeOpenedEvent e)
     {
-        _wasPausedBeforeInventory = Time is { IsPaused: true };
-        if (Time is { IsPaused: false })
-            Time.Pause();
+        // INP-1: окно могло уже пометить себя открытым (порядок подписок на
+        // TradeOpenedEvent не гарантирован) — исключаем его из проверки стека.
+        bool otherModalOpen = AnyModalWindowOpen() && _tradeWindow is not { IsOpen: true };
+        HandleModalPauseOnOpen(otherModalOpen);
         GD.Print($"[GameWorld] Trade opened: {e.NpcId} — ticks paused");
     }
 
@@ -2003,8 +2037,7 @@ public partial class GameWorldController : Node2D
     /// </summary>
     private void OnTradeClosed(in Core.Messaging.Contracts.TradeClosedEvent e)
     {
-        if (!_wasPausedBeforeInventory && Time is { IsPaused: true })
-            Time.Resume();
+        HandleModalResumeOnClose(); // INP-1: резюм только при опустевшем стеке
         GD.Print("[GameWorld] Trade closed — ticks resumed");
     }
 
@@ -2034,8 +2067,7 @@ public partial class GameWorldController : Node2D
     /// </summary>
     private void OnLootWindowClosed()
     {
-        if (!_wasPausedBeforeInventory && Time is { IsPaused: true })
-            Time.Resume();
+        HandleModalResumeOnClose(); // INP-1: резюм только при опустевшем стеке
     }
 
     // === R15: оружие в руке игрока (WeaponVisualCatalog) ===
@@ -2176,9 +2208,8 @@ public partial class GameWorldController : Node2D
                 return true; // труп в радиусе — E не падает в подбор предметов
             }
 
-            _wasPausedBeforeInventory = Time is { IsPaused: true };
-            if (Time is { IsPaused: false })
-                Time.Pause();
+            // INP-1: центральный хелпер (снапшот только при входе первого окна).
+            HandleModalPauseOnOpen(AnyModalWindowOpen());
             _lootWindow.Open(corpse.CorpseId);
             return true;
         }
@@ -2229,8 +2260,8 @@ public partial class GameWorldController : Node2D
             npcServiceImpl.OnNPCInteracted(best, Player?.PlayerId ?? "player", "talk");
         }
 
-        _wasPausedBeforeInventory = Time is { IsPaused: true };
-        if (Time is { IsPaused: false }) Time.Pause();
+        // INP-1: центральный хелпер (снапшот только при входе первого окна).
+        HandleModalPauseOnOpen(AnyModalWindowOpen());
         _dialogueWindow.Open(best);
         return true;
     }

@@ -21,6 +21,15 @@ using CultivationGame.Modules.Body;
 
 namespace CultivationGame.Modules.NPC
 {
+    // ──────────────────────────────────────────────────────────────────
+    // R17 (аудит-0911 NPC-1 + E-1): животные — world-scoped домен.
+    // ДО R17: не ISaveable (позиции/HP/вид не переживали сейв; LoadGame
+    // оставлял зверей прошлого мира — ghost-animals, вкл. мёртвых: при
+    // смерти нет RemoveEntity, IsAlive=false навсегда в _animals), не
+    // IWorldResettable (LoadGame-путь не чистил — AnimalSpawnPhase
+    // SkipOnLoad=true). Теперь: блок "animals" (полный снимок зверей с
+    // телами, паттерн NPCService flat-массивов) + ClearAnimals в сбросе.
+    // ──────────────────────────────────────────────────────────────────
     /// <summary>
     /// Manages simple wandering animals (wolf, deer, rabbit) on the test polygon.
     ///
@@ -42,7 +51,7 @@ namespace CultivationGame.Modules.NPC
     ///     Clears any existing animals first.
     ///   * ITickable.Tick() — drives wandering at 1/5/15 Hz depending on TimeSpeed.
     /// </summary>
-    public sealed class AnimalService : IStartable, ITickable, IAnimalService
+    public sealed class AnimalService : IStartable, ITickable, IAnimalService, ISaveable, IWorldResettable
     {
         // === DI dependencies ===
         private readonly IBodyDataProvider _bodyDataProvider;
@@ -638,5 +647,191 @@ namespace CultivationGame.Modules.NPC
                 _        => _wanderRng.Next(3, 6),
             };
         }
+
+        // ════════════════════════════════════════════════════════════════
+        // R17 (аудит-0911 NPC-1): ISaveable — блок "animals"
+        // ════════════════════════════════════════════════════════════════
+
+        /// <summary>Типизированный state-блок для round-trip десериализации.</summary>
+        public sealed class AnimalsSaveState
+        {
+            public List<AnimalSaveEntry> Animals = new();
+        }
+
+        /// <summary>
+        /// Один зверь: идентичность, позиция, боевые/блуждательные поля,
+        /// враждебность + плоские массивы тела (паттерн NPCService Decision A:
+        /// BodyPart имеет private-set свойства — сериализуем примитивами).
+        /// </summary>
+        public sealed class AnimalSaveEntry
+        {
+            public string EntityId = "";
+            public string Species = "";
+            public int PosX;
+            public int PosY;
+            public bool HasTarget;
+            public int TargetX;
+            public int TargetY;
+            public bool IsAlive;
+            public bool IsHostile;
+            public int MoveCooldownTicks;
+            public int MoveSpeedTilesPerTick = 1;
+            public int CombatCooldownTicks;
+            public string LastAttackerId = "";
+
+            // Тело — плоские массивы (как NPCSaveEntry).
+            public int BodyPartCount;
+            public int[] BodyPartTypes = Array.Empty<int>();
+            public int[] BodyPartRedHP = Array.Empty<int>();
+            public int[] BodyPartBlackHP = Array.Empty<int>();
+            public int[] BodyPartMaxRedHP = Array.Empty<int>();
+            public int[] BodyPartIsVital = Array.Empty<int>();
+        }
+
+        public string SaveKey => "animals";
+        public Type StateType => typeof(AnimalsSaveState);
+
+        public object CaptureState()
+        {
+            var data = new AnimalsSaveState();
+            foreach (var a in _animals)
+            {
+                var entry = new AnimalSaveEntry
+                {
+                    EntityId = a.EntityId,
+                    Species = a.Species,
+                    PosX = a.Position.X,
+                    PosY = a.Position.Y,
+                    HasTarget = a.Target.HasValue,
+                    TargetX = a.Target?.X ?? 0,
+                    TargetY = a.Target?.Y ?? 0,
+                    IsAlive = a.IsAlive,
+                    IsHostile = _hostileAnimals.Contains(a.EntityId),
+                    MoveCooldownTicks = a.MoveCooldownTicks,
+                    MoveSpeedTilesPerTick = a.MoveSpeedTilesPerTick,
+                    CombatCooldownTicks = a.CombatCooldownTicks,
+                    LastAttackerId = a.LastAttackerId,
+                };
+
+                // Тело — плоские массивы (null-провайдер = зверь без тела:
+                // сохраняем пустой набор, restore соберёт тело заново).
+                if (_bodyDataProvider.HasEntity(a.EntityId))
+                {
+                    var parts = _bodyDataProvider.GetBodyParts(a.EntityId);
+                    if (parts != null && parts.Count > 0)
+                    {
+                        entry.BodyPartCount = parts.Count;
+                        entry.BodyPartTypes = new int[parts.Count];
+                        entry.BodyPartRedHP = new int[parts.Count];
+                        entry.BodyPartBlackHP = new int[parts.Count];
+                        entry.BodyPartMaxRedHP = new int[parts.Count];
+                        entry.BodyPartIsVital = new int[parts.Count];
+                        for (int i = 0; i < parts.Count; i++)
+                        {
+                            entry.BodyPartTypes[i] = (int)parts[i].Type;
+                            entry.BodyPartRedHP[i] = parts[i].CurrentRedHP;
+                            entry.BodyPartBlackHP[i] = parts[i].CurrentBlackHP;
+                            entry.BodyPartMaxRedHP[i] = parts[i].MaxRedHP;
+                            entry.BodyPartIsVital[i] = parts[i].IsVital ? 1 : 0;
+                        }
+                    }
+                }
+
+                data.Animals.Add(entry);
+            }
+            return data;
+        }
+
+        public void RestoreState(object state)
+        {
+            if (state is not AnimalsSaveState data || data == null) return;
+
+            // Мир уже сброшен (IWorldResettable до RestoreState) — но
+            // ClearAnimals идемпотентен и защищает от двойного вызова.
+            ClearAnimals();
+
+            int restored = 0;
+            foreach (var entry in data.Animals)
+            {
+                if (entry == null || string.IsNullOrEmpty(entry.Species)) continue;
+
+                var speciesData = _speciesRegistry.GetSpecies(entry.Species);
+                if (speciesData == null)
+                {
+                    Console.WriteLine($"[AnimalService] RestoreState: вид '{entry.Species}' не в реестре — пропущен");
+                    continue;
+                }
+
+                // Восстановление с СОХРАНЕНИЕМ EntityId (трупы/убийца/месть
+                // ссылаются на ID; генерация нового сломала бы ссылки).
+                var animal = new AnimalEntity(
+                    entry.EntityId,
+                    entry.Species,
+                    new Position2D(entry.PosX, entry.PosY),
+                    speciesData.Morphology,
+                    speciesData.Material,
+                    speciesData.Size)
+                {
+                    Target = entry.HasTarget ? new Position2D(entry.TargetX, entry.TargetY) : null,
+                    IsAlive = entry.IsAlive,
+                    MoveCooldownTicks = entry.MoveCooldownTicks,
+                    MoveSpeedTilesPerTick = Math.Max(1, entry.MoveSpeedTilesPerTick),
+                    CombatCooldownTicks = entry.CombatCooldownTicks,
+                    LastAttackerId = entry.LastAttackerId ?? "",
+                };
+
+                // Тело: сохранённые части — точный HP; пустой блок —
+                // телу быть (BodyFactory), зверь без тела = неубиваем.
+                List<BodyPart> parts;
+                if (entry.BodyPartCount > 0 && entry.BodyPartTypes != null
+                    && entry.BodyPartTypes.Length == entry.BodyPartCount)
+                {
+                    parts = new List<BodyPart>(entry.BodyPartCount);
+                    for (int i = 0; i < entry.BodyPartCount; i++)
+                    {
+                        bool isVital = entry.BodyPartIsVital != null && i < entry.BodyPartIsVital.Length
+                            && entry.BodyPartIsVital[i] != 0;
+                        int maxRed = i < entry.BodyPartMaxRedHP.Length ? entry.BodyPartMaxRedHP[i] : 1;
+                        var bp = new BodyPart((BodyPartType)entry.BodyPartTypes[i], maxRed, isVital);
+                        int red = i < entry.BodyPartRedHP.Length ? entry.BodyPartRedHP[i] : bp.CurrentRedHP;
+                        int black = i < entry.BodyPartBlackHP.Length ? entry.BodyPartBlackHP[i] : bp.CurrentBlackHP;
+                        bp.SetHP(red, black);
+                        parts.Add(bp);
+                    }
+                }
+                else
+                {
+                    parts = _bodyFactory.CreateBody(speciesData.Morphology, speciesData.Size, speciesData.BaseVitality);
+                }
+                _bodyDataProvider.SetBodyParts(animal.EntityId, parts);
+
+                if (entry.IsHostile)
+                    _hostileAnimals.Add(animal.EntityId);
+
+                _animals.Add(animal);
+                restored++;
+            }
+
+            // R17 (G-3-паттерн): счётчик ID — за максимальный восстановленный
+            // суффикс, новые звери не коллидируют с восстановленными.
+            foreach (var a in _animals)
+            {
+                int lastUnderscore = a.EntityId.LastIndexOf('_');
+                if (lastUnderscore >= 0 && lastUnderscore + 1 < a.EntityId.Length
+                    && int.TryParse(a.EntityId[(lastUnderscore + 1)..], out var suffix))
+                {
+                    if (suffix >= _nextId) _nextId = suffix + 1;
+                }
+            }
+
+            Console.WriteLine($"[AnimalService] RestoreState: {restored}/{data.Animals.Count} зверей " +
+                              $"(живых: {_animals.FindAll(a => a.IsAlive).Count}, враждебных: {_hostileAnimals.Count}), nextId={_nextId}");
+        }
+
+        // R17 (E-1/NPC-1): IWorldResettable — пересборка мира = зверей
+        // прошлого мира нет (ghost-animals, вкл. мёртвых, больше не
+        // переживают LoadGame/NewGame). ClearAnimals чистит _animals,
+        // _hostileAnimals и per-entity тела в провайдере.
+        public void ResetWorld() => ClearAnimals();
     }
 }

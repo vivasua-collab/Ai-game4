@@ -32,8 +32,14 @@ public sealed class BeltSlot
 /// Слоты быстрого доступа пояса. Слоты 0-6 соответствуют хотбару 3-9.
 /// Без пояса все операции Assign/Use возвращают false, слоты пусты.
 /// При снятии пояса содержимое возвращается в инвентарь (overflow — на землю).
+///
+/// R17 (аудит-0911 INV-4): содержимое пояса НЕ сохранялось и НЕ сбрасывалось
+/// при пересборке мира → те же дюп/потери, что у куклы (предмет вне сейва и
+/// вне инвентаря). Теперь: блок "belt" (слоты itemId+count; предметы в поясе
+/// ИЗЪЯТЫ из инвентаря — TryAssign списывает, restore кладёт обратно в слот
+/// без инвентаря) + IWorldResettable.
 /// </summary>
-public sealed class BeltService : IDisposable
+public sealed class BeltService : ISaveable, IWorldResettable, IDisposable
 {
     public const int SlotCount = 7;          // хотбар 3-9
     public const int HotbarFirstIndex = 3;   // хотбар-индекс первого слота пояса
@@ -228,5 +234,89 @@ public sealed class BeltService : IDisposable
     {
         _equipChangedToken?.Dispose();
         _equipChangedToken = null;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // R17 (INV-4): ISaveable — блок "belt"
+    // ══════════════════════════════════════════════════════════════
+
+    /// <summary>Типизированный state-блок для round-trip десериализации.</summary>
+    public sealed class BeltSaveState
+    {
+        public List<BeltSaveEntry> Slots = new();
+    }
+
+    public sealed class BeltSaveEntry
+    {
+        public int SlotIndex;
+        public string ItemId = "";
+        public int Count;
+    }
+
+    public string SaveKey => "belt";
+    public Type StateType => typeof(BeltSaveState);
+
+    public object CaptureState()
+    {
+        var data = new BeltSaveState();
+        for (int i = 0; i < SlotCount; i++)
+        {
+            if (_slots[i].Count <= 0 || string.IsNullOrEmpty(_slots[i].ItemId)) continue;
+            data.Slots.Add(new BeltSaveEntry
+            {
+                SlotIndex = i,
+                ItemId = _slots[i].ItemId,
+                Count = _slots[i].Count,
+            });
+        }
+        return data;
+    }
+
+    public void RestoreState(object state)
+    {
+        if (state is not BeltSaveState data || data == null) return;
+
+        // Очистить текущее содержимое БЕЗ возврата в инвентарь: сейв-инвентарь
+        // сам по себе полный источник истины (в поясе предметы уже изъяты).
+        for (int i = 0; i < SlotCount; i++)
+        {
+            _slots[i].ItemId = string.Empty;
+            _slots[i].Count = 0;
+        }
+
+        int restored = 0;
+        foreach (var entry in data.Slots)
+        {
+            if (entry.SlotIndex < 0 || entry.SlotIndex >= SlotCount) continue;
+            if (string.IsNullOrEmpty(entry.ItemId) || entry.Count <= 0) continue;
+            // Фантомный ID (старый сейв без item_db) — слот остаётся пустым;
+            // Use() лениво резолвит предмет, здесь проверяем каталог.
+            if (!_itemDb.TryGetItem(entry.ItemId, out _))
+            {
+                Console.WriteLine($"[BeltService] RestoreState: предмет '{entry.ItemId}' не найден в каталоге — слот {entry.SlotIndex} пропущен");
+                continue;
+            }
+            _slots[entry.SlotIndex].ItemId = entry.ItemId;
+            _slots[entry.SlotIndex].Count = entry.Count;
+            _slotsChangedPub.Publish(new BeltSlotsChangedEvent(entry.SlotIndex, entry.ItemId, entry.Count));
+            restored++;
+        }
+
+        Console.WriteLine($"[BeltService] RestoreState: {restored}/{data.Slots.Count} слотов пояса");
+    }
+
+    // R17 (E-1): IWorldResettable — пересборка мира = пустой пояс.
+    // Возврата в инвентарь НЕТ: ResetWorld вызывается до RestoreState
+    // (LoadGame) или до StartingGearPhase (NewGame) — инвентарь будет
+    // наполнен заново из сейва/стартового набора.
+    public void ResetWorld()
+    {
+        for (int i = 0; i < SlotCount; i++)
+        {
+            if (_slots[i].Count <= 0) continue;
+            _slots[i].ItemId = string.Empty;
+            _slots[i].Count = 0;
+            _slotsChangedPub.Publish(new BeltSlotsChangedEvent(i, string.Empty, 0));
+        }
     }
 }

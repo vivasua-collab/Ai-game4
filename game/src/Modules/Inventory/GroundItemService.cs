@@ -17,7 +17,11 @@ namespace CultivationGame.Modules.Inventory
     /// Хранит список выпавших предметов, управляет drop/pickup.
     /// Публикует ItemDroppedEvent / ItemPickedUpEvent для рендерера.
     /// </summary>
-    public class GroundItemService : IGroundItemService
+    // R17 (аудит-0911 INV-4/E-1): + IWorldResettable — предметы на земле
+    // переживали пересборку мира (E-подбор «фантомного» лута прошлого мира;
+    // GROUND_ITEM_SYSTEM §6 «исчезают при перезагрузке» — теперь честно).
+    // В сейв НЕ пишутся (осознанное решение V1, док-контракт без изменений).
+    public class GroundItemService : IGroundItemService, IWorldResettable
     {
         private readonly IPublisher<ItemDroppedEvent> _droppedPub;
         private readonly IPublisher<ItemPickedUpEvent> _pickedUpPub;
@@ -104,5 +108,12 @@ namespace CultivationGame.Modules.Inventory
         }
 
         public IReadOnlyList<GroundItem> GetAllGroundItems() => _items.AsReadOnly();
+
+        // R17: пересборка мира = земля чистая. Счётчик _nextDropId НЕ
+        // сбрасываем (уникальность ID в рамках процесса важнее «красоты»).
+        public void ResetWorld()
+        {
+            _items.Clear();
+        }
     }
 }

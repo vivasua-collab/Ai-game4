@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using Godot;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Interfaces;
@@ -175,6 +176,15 @@ public partial class CharacterSheetWindow : Control
         }
     }
 
+    /// <summary>
+    /// INP-1 (2026-09-16): закрытие окна ЛЮБЫМ путём — C/Esc через GWC ИЛИ
+    /// клик по тёмному фону (OnBackgroundClick → Toggle() мимо GWC).
+    /// GameWorldController подписан — единая авторитетная точка резюма
+    /// тиков (паттерн LootWindow.Closed, R13-audit P1-2): bg-click-закрытие
+    /// раньше оставляло мир запаузенным — движение умирало до Esc.
+    /// </summary>
+    public event Action? Closed;
+
     /// <summary>Toggle character sheet visibility.</summary>
     public void Toggle()
     {
@@ -187,6 +197,7 @@ public partial class CharacterSheetWindow : Control
         }
         else
         {
+            Closed?.Invoke();
             GD.Print("[CharacterSheet] Closed");
         }
     }

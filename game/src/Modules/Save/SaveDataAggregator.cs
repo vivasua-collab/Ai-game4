@@ -41,6 +41,34 @@ public sealed class SaveDataAggregator
         _fileHandler = fileHandler ?? throw new ArgumentNullException(nameof(fileHandler));
     }
 
+    // ──────────────────────────────────────────────────────────────────
+    // R17 (аудит-0911 SAV-5 + G-2): ЯВНЫЙ порядок RestoreState.
+    //
+    // Прежде поведение: обход в порядке регистраций DI-контейнера
+    // (insertion-порядок Dictionary — деталь реализации .NET). Рефакторинг
+    // регистраций молча менял порядок; с появлением блока item_db это
+    // стало КРИТИЧНО: NPCService.RestoreState резолвит EquipmentIds через
+    // IItemDatabaseService (NPC-3-фикс) — каталог ДОЛЖЕН быть восстановлен
+    // ДО npc-блока, иначе экипировка NPC молча теряется.
+    //
+    // Порядок — теперь контракт (SAVE_SYSTEM §4.5):
+    //   мир → время → каталог предметов → игрок → статы → тело → Ци →
+    //   инвентарь → кукла → пояс → техники → слоты → формация → NPC →
+    //   звери → квесты → валюта → зарядник → мета.
+    // Блоки вне списка (будущие) восстанавливаются после, в порядке
+    // регистраций. Отсутствующие в сейве ключи пропускаются (форвард-
+    // совместимость старых файлов — без изменений).
+    // ──────────────────────────────────────────────────────────────────
+    private static readonly string[] RestoreOrder =
+    {
+        "world", "world_time", "item_db",
+        "player", "stats", "body", "qi",
+        "inventory", "equipment", "belt",
+        "techniques", "technique_slots", "formation",
+        "npc", "animals", "quests",
+        "currency", "charger", "save_meta",
+    };
+
     /// <summary>Ошибки последней Save/Load (пусто = успех). Порядок — как у блоков.</summary>
     public IReadOnlyList<string> LastErrors { get; private set; } = Array.Empty<string>();
 
@@ -102,21 +130,27 @@ public sealed class SaveDataAggregator
             return false;
         }
 
+        // R17: сначала — блоки из явного контракта RestoreOrder (в этом
+        // порядке), затем остальные (будущие модули) в порядке регистраций.
         var errors = new List<string>();
-        foreach (var s in _saveables)
+        var restored = new HashSet<ISaveable>(
+            System.Collections.Generic.ReferenceEqualityComparer.Instance);
+        foreach (var key in RestoreOrder)
         {
-            // Отсутствующий блок (модуль появился после записи сейва) — не
-            // ошибка: форвард-совместимость старых файлов.
-            if (!dict.TryGetValue(s.SaveKey, out var raw)) continue;
-            try
+            for (int i = 0; i < _saveables.Count; i++)
             {
-                var state = ConvertToStateType(raw, s.StateType, s.SaveKey);
-                s.RestoreState(state);
+                var s = _saveables[i];
+                if (restored.Contains(s) || s.SaveKey != key) continue;
+                restored.Add(s);
+                RestoreOne(s, dict, errors);
             }
-            catch (Exception ex)
-            {
-                errors.Add($"restore[{s.SaveKey}]: {ex.GetType().Name}: {ex.Message}");
-            }
+        }
+        for (int i = 0; i < _saveables.Count; i++)
+        {
+            var s = _saveables[i];
+            if (restored.Contains(s)) continue;
+            restored.Add(s);
+            RestoreOne(s, dict, errors);
         }
         LastErrors = errors;
 
@@ -129,6 +163,23 @@ public sealed class SaveDataAggregator
             return false;
         }
         return true;
+    }
+
+    /// <summary>Восстановить один блок (отсутствующий блок — не ошибка).</summary>
+    private void RestoreOne(ISaveable s, Dictionary<string, object> dict, List<string> errors)
+    {
+        // Отсутствующий блок (модуль появился после записи сейва) — не
+        // ошибка: форвард-совместимость старых файлов.
+        if (!dict.TryGetValue(s.SaveKey, out var raw)) return;
+        try
+        {
+            var state = ConvertToStateType(raw, s.StateType, s.SaveKey);
+            s.RestoreState(state);
+        }
+        catch (Exception ex)
+        {
+            errors.Add($"restore[{s.SaveKey}]: {ex.GetType().Name}: {ex.Message}");
+        }
     }
 
     public bool HasSave(string slotName) => _fileHandler.HasSave(slotName);

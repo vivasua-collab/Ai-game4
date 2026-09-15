@@ -2,11 +2,22 @@
 // Создано: 2026-05-18 17:58:25 UTC
 // Сервис базы данных предметов. Загружает предустановленные ScriptableObject-ы
 // из Resources/Items и позволяет регистрировать runtime-сгенерированные предметы.
+//
+// R17 (аудит-0911 G-2/G-3): каталог НЕ переживал cold-load — сеятели
+// (QiStoneSeeder/материалы/стрелы/экипировка стартового набора, генерация
+// NPC-экипировки) живут в фазах с SkipOnLoad=true → в новом процессе после
+// LoadGame ВСЕ предметы кроме 4 ClassicLoot — фантомы (TryGetItem=null,
+// вес fallback 0.5, использование/экипировка невозможны). Теперь: блок
+// "item_db" — типодискриминированный снапшот всех зарегистрированных
+// предметов + счётчики ID генераторов (восстанавливается ПЕРВЫМ после
+// мира/времени — контракт RestoreOrder в SaveDataAggregator).
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
 using CultivationGame.Core;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.Interfaces;
+using CultivationGame.Modules.Save;
 
 namespace CultivationGame.Modules.Generator
 {
@@ -16,7 +27,7 @@ namespace CultivationGame.Modules.Generator
     /// Предустановленные предметы загружаются из Resources/Items при Initialize().
     /// Runtime-сгенерированные предметы регистрируются через Register().
     /// </summary>
-    public class ItemDatabaseService : IItemDatabaseService
+    public class ItemDatabaseService : IItemDatabaseService, ISaveable
     {
         // === Основной словарь: itemId → ItemData ===
         private readonly Dictionary<string, ItemData> _itemsById = new Dictionary<string, ItemData>();
@@ -173,6 +184,118 @@ namespace CultivationGame.Modules.Generator
 
             _allItemsCache = new List<ItemData>(_itemsById.Values);
             _cacheDirty = false;
+        }
+
+        // ════════════════════════════════════════════════════════════
+        // R17 (G-2/G-3): ISaveable — блок "item_db"
+        // ════════════════════════════════════════════════════════════
+
+        /// <summary>Типизированный state-блок для round-trip десериализации.</summary>
+        public sealed class ItemDbSaveState
+        {
+            /// <summary>Предметы каталога (type-дискриминированные записи).</summary>
+            public List<ItemDbEntry> Items = new();
+
+            /// <summary>R17 (G-3): счётчик ID EquipmentGenerator (static).</summary>
+            public int EquipmentIdCounter;
+
+            /// <summary>R17 (G-3): счётчик генерации ItemGeneratorService (static).</summary>
+            public long ItemGenerationCounter;
+        }
+
+        /// <summary>
+        /// Одна запись каталога: тип-дискриминатор (ключ карты KnownTypes)
+        /// + JSON предмета конкретного типа. Полиморфная сериализация без
+        /// атрибутов на Core-моделях (ItemData/EquipmentData/QiStoneData —
+        /// engine-agnostic, System.Text.Json-атрибуты там не разводим).
+        /// </summary>
+        public sealed class ItemDbEntry
+        {
+            public string TypeKey = "";
+            public string Json = "";
+        }
+
+        /// <summary>Карта известных типов: дискриминатор → конкретный тип ItemData.</summary>
+        private static readonly Dictionary<string, Type> KnownTypes = new()
+        {
+            ["item"] = typeof(ItemData),
+            ["equipment"] = typeof(EquipmentData),
+            ["qi_stone"] = typeof(QiStoneData),
+        };
+
+        public string SaveKey => "item_db";
+        public Type StateType => typeof(ItemDbSaveState);
+
+        public object CaptureState()
+        {
+            var data = new ItemDbSaveState
+            {
+                EquipmentIdCounter = EquipmentGenerator.GetIdCounter(),
+                ItemGenerationCounter = ItemGeneratorService.GetGenerationCounter(),
+            };
+
+            foreach (var item in _itemsById.Values)
+            {
+                if (item == null || string.IsNullOrEmpty(item.ItemId)) continue;
+
+                string typeKey = "item";
+                if (item is EquipmentData) typeKey = "equipment";
+                else if (item is QiStoneData) typeKey = "qi_stone";
+
+                data.Items.Add(new ItemDbEntry
+                {
+                    TypeKey = typeKey,
+                    Json = JsonSerializer.Serialize(item, item.GetType(), SaveJson.Options),
+                });
+            }
+            return data;
+        }
+
+        public void RestoreState(object state)
+        {
+            if (state is not ItemDbSaveState data || data == null) return;
+
+            int restored = 0;
+            int skipped = 0;
+            if (data.Items != null)
+            {
+                foreach (var entry in data.Items)
+                {
+                    if (entry == null || string.IsNullOrEmpty(entry.Json)) continue;
+                    if (!KnownTypes.TryGetValue(entry.TypeKey ?? "", out var itemType))
+                    {
+                        skipped++;
+                        continue;
+                    }
+
+                    try
+                    {
+                        if (JsonSerializer.Deserialize(entry.Json, itemType, SaveJson.Options) is ItemData item
+                            && !string.IsNullOrEmpty(item.ItemId))
+                        {
+                            // Тихая регистрация: сотни строк лога на каталог не нужны.
+                            if (_itemsById.ContainsKey(item.ItemId))
+                                RemoveFromCategoryIndex(item.ItemId, item.Category);
+                            RegisterInternal(item);
+                            restored++;
+                        }
+                        else skipped++;
+                    }
+                    catch (JsonException)
+                    {
+                        skipped++;
+                    }
+                }
+            }
+
+            // R17 (G-3): счётчики ID — новые предметы не коллидируют с
+            // восстановленными из сейва.
+            EquipmentGenerator.SetIdCounter(data.EquipmentIdCounter);
+            ItemGeneratorService.SetGenerationCounter(data.ItemGenerationCounter);
+
+            Console.WriteLine($"[ItemDatabase] RestoreState: {restored} предметов восстановлено" +
+                              (skipped > 0 ? $", {skipped} пропущено" : "") +
+                              $"; счётчики ID: eq={data.EquipmentIdCounter}, gen={data.ItemGenerationCounter}");
         }
     }
 }

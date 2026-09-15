@@ -51,6 +51,16 @@ public sealed class WorldModule : IModule
                 QiDensity = 100,
                 QiFlowRate = 1,
             });
+
+            // R17 (аудит-0911 WT-3): полный каталог локаций регистрирует
+            // GameEntryPoint (Entry-слой) после Start-фазы модулей — здесь
+            // только канонический fallback test_polygon (Modules не тянет
+            // Entry.LocationCatalog: направление зависимостей Core ← Modules
+            // ← Entry). Раньше SetActiveLocation("large_world") тихо
+            // проваливался (NOT FOUND → return) — «Большой мир» из меню
+            // собирался из ДВУХ каталогов (спавн-фазы — LocationCatalog,
+            // WorldInit — пустой реестр модуля), а блок "world" при
+            // загрузке не мог восстановить локацию сейва.
             ws.SetActiveLocation("test_polygon");
         }
 

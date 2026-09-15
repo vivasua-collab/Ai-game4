@@ -59,6 +59,10 @@ public sealed class SaveFileHandler : ISaveFileHandler
     /// <summary>
     /// Serialise <paramref name="data"/> to JSON and write it to
     /// <c>{saveRoot}/{slotName}/{fileName}</c>. Creates directories as needed.
+    /// R17 (аудит-0911 SAV-1): запись АТОМАРНА — tmp-файл → rename поверх
+    /// старого. Обрыв записи (краш/питание) больше не может оставить
+    /// усечённый main.json: либо старый слот целиком, либо новый целиком
+    /// (SAVE_SYSTEM §9.1 обещала этот контракт с R11 — не был реализован).
     /// </summary>
     public void Write(string slotName, string fileName, object data)
     {
@@ -70,9 +74,11 @@ public sealed class SaveFileHandler : ISaveFileHandler
         var path = Path.Combine(dir, SanitizeFileName(fileName));
 
         var json = JsonSerializer.Serialize(data, data.GetType(), JsonOptions);
-        File.WriteAllText(path, json);
+        var tmpPath = path + ".tmp";
+        File.WriteAllText(tmpPath, json);
+        File.Move(tmpPath, path, overwrite: true);
 
-        GD.Print($"[SaveFileHandler] Written {path} ({json.Length} bytes)");
+        GD.Print($"[SaveFileHandler] Written {path} ({json.Length} bytes, atomic tmp→rename)");
     }
 
     /// <summary>
@@ -109,14 +115,22 @@ public sealed class SaveFileHandler : ISaveFileHandler
         return Directory.Exists(Path.Combine(_saveRoot, SanitizeSlotName(slotName)));
     }
 
-    /// <summary>Delete an entire save slot directory (recursive).</summary>
+    /// <summary>
+    /// Delete an entire save slot directory (recursive).
+    /// R17 (SAV-7): IOException не уходит наружу — честный false.
+    /// </summary>
     public void Delete(string slotName)
     {
         var dir = Path.Combine(_saveRoot, SanitizeSlotName(slotName));
-        if (Directory.Exists(dir))
+        if (!Directory.Exists(dir)) return;
+        try
         {
             Directory.Delete(dir, recursive: true);
             GD.Print($"[SaveFileHandler] Deleted slot {slotName}");
+        }
+        catch (Exception ex)
+        {
+            GD.PrintErr($"[SaveFileHandler] Delete slot '{slotName}' FAILED: {ex.Message}");
         }
     }
 

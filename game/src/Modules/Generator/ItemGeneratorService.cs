@@ -32,7 +32,17 @@ namespace CultivationGame.Modules.Generator
         private readonly IItemDatabaseService _itemDatabase;
 
         // === Счётчик для уникальных ID (на случай seed=0) ===
-        private long _generationCounter;
+        // R17 (G-3): static — сервис DI-синглтон, а счётчик должен
+        // переживать сейв/лоад БЕЗ инъекции генератора в ItemDatabaseService
+        // (инъция создала бы конструктивную цикличность: ItemGeneratorService
+        // сам принимает IItemDatabaseService в конструкторе).
+        private static long _generationCounter;
+
+        /// <summary>R17 (G-3): снапшот счётчика для блока item_db.</summary>
+        public static long GetGenerationCounter() => _generationCounter;
+
+        /// <summary>R17 (G-3): восстановление счётчика при LoadGame.</summary>
+        public static void SetGenerationCounter(long value) => _generationCounter = value < 0 ? 0 : value;
 
         // === Суффиксы грейда для русских названий ===
         private static readonly string[] GradeSuffixRu = new string[]
@@ -54,7 +64,6 @@ namespace CultivationGame.Modules.Generator
         public ItemGeneratorService(IItemDatabaseService itemDatabase)
         {
             _itemDatabase = itemDatabase ?? throw new ArgumentNullException(nameof(itemDatabase));
-            _generationCounter = 0;
         }
 
         // ===================================================================

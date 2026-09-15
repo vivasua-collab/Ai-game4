@@ -23,6 +23,11 @@ public partial class GameBoot : Node
 
     private GameEntryPoint? _entry;
     private ITimeService? _timeService;
+    // R17 (аудит-0911 E-4): гейт тик-лупа по состоянию сессии — симуляция
+    // (и автосейв) живут ТОЛЬКО в активной игровой сессии. Раньше тики шли
+    // с бутстрапа: в главном меню fallback-мир симулировал, SaveModule писал
+    // мусорные autosave-слоты, а NewGame наследовал время, проведённое в меню.
+    private IGameSession? _session;
 
     // Tick driving state.
     private float _tickAccumulator;
@@ -56,6 +61,9 @@ public partial class GameBoot : Node
 
         // Cache the time service so we can read Speed/IsPaused every physics frame.
         _timeService = Container.Resolve<ITimeService>();
+
+        // R17 (E-4): кэшируем сессию для гейта тиков (см. _PhysicsProcess).
+        _session = Container.Resolve<IGameSession>();
 
         // Start all IStartable modules.
         _entry.Start();
@@ -93,6 +101,13 @@ public partial class GameBoot : Node
     public override void _PhysicsProcess(double delta)
     {
         if (_entry == null || _timeService == null)
+            return;
+
+        // R17 (E-4): симуляция — только в активной сессии. MainMenu/Loading/
+        // Saving/Quitting — мир не тикает (раньше fallback-мир меню
+        // симулировал и автосейвил). Внутри игры паузы (Esc/окна) по-прежнему
+        // управляются TimeService.IsPaused ниже — сессия остаётся Playing.
+        if (_session != null && _session.State != SessionState.Playing)
             return;
 
         // Speed == 0 (TimeSpeed.Paused) means no ticks.

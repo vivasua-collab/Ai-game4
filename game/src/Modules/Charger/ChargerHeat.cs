@@ -72,6 +72,24 @@ namespace CultivationGame.Modules.Charger
             _cooledDownPublisher = cooledDownPublisher;
         }
 
+        /// <summary>
+        /// Полный сброс тепла в «холодное» состояние.
+        /// R17 (аудит-0911 CH-2): warm-load (LoadGame в том же процессе) мержил
+        /// RestoreState поверх живого состояния — перегрев/кулдаун прошлой
+        /// сессии оставались активными. Reset вызывается ChargerService перед
+        /// восстановлением из сейва и при пересборке мира.
+        /// </summary>
+        public void Reset()
+        {
+            bool wasHot = _currentHeat > 0f || _isOverheated;
+            _currentHeat = 0f;
+            _isOverheated = false;
+            _cooldownTimer = 0f;
+            _isInCombat = false;
+            if (wasHot)
+                _heatChangedPublisher.Publish(new ChargerHeatChangedEvent(0f, HeatState.Cool));
+        }
+
         // === Управление теплом ===
 
         /// <summary>

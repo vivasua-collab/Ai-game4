@@ -61,11 +61,19 @@ public partial class CombatAISimDebug : Node2D
     // Отслеживаемый NPC (счётчик урона по нему) — задаётся при выборе.
     private string? _trackedNpcId;
 
+    /// <summary>
+    /// GWC-родитель: телепорт игрока — только через DEBUG_TeleportPlayer
+    /// (логика+визуал; сырой PlayerService.SetPosition откатывается
+    /// _PhysicsProcess-синком GWC к _visualPosition — флаки-фикс 2026-09-16).
+    /// </summary>
+    private GameWorldController? _gwc;
+
     public override void _Ready()
     {
         var container = Scene.GameBoot.Container;
         if (container != null)
             ContainerAdapter.InjectProperties(this, container);
+        _gwc = GetParent() as GameWorldController;
 
         GD.Print($"[CombatAI] diag: intentPub={_attackIntentPub != null} defensePub={_defenseIntentPub != null} " +
                  $"dmgSub={_damageSub != null} disSub={_disengageSub != null} " +
@@ -239,11 +247,19 @@ public partial class CombatAISimDebug : Node2D
         _disengageCount = 0;
         npcState.IsInCombat = true;
         npcState.TargetId = PlayerCombatId;
-        // Игрок «убегает»: телепорт за радиус привязи (AggroRadius×3 = 15 тайлов).
+        // Игрок «убегает»: телепорт в ДАЛЬНИЙ от NPC угол карты — за радиус
+        // привязи (AggroRadius×3 = 15 тайлов). Флаки-фикс (2026-09-16):
+        // старая версия (npc+25, кламп 49) при NPC у верхне-правого края
+        // давала цель ВНУТРИ LeashRadius → leash легитимно не срабатывал
+        // → RNG-зависимый FAIL (NPC за тесты 1–4 дрейфует). Дальний угол
+        // гарантирует дистанцию ≥ 25√2 ≈ 35 тайлов при карте 50×50.
         var npcNow = npcState.Position;
-        int farX = System.Math.Min(npcNow.X + 25, 49);
-        int farY = System.Math.Min(npcNow.Y + 25, 49);
-        _playerService.SetPosition(new Position2D(farX, farY));
+        int farX = npcNow.X < 25 ? 49 : 0;
+        int farY = npcNow.Y < 25 ? 49 : 0;
+        // Флаки-фикс: только DEBUG_TeleportPlayer (логика+визуал) — сырой
+        // SetPosition откатывается в тот же кадр синком GWC к _visualPosition.
+        if (_gwc != null) _gwc.DEBUG_TeleportPlayer(farX, farY);
+        else _playerService.SetPosition(new Position2D(farX, farY));
         await ToSignal(GetTree().CreateTimer(1.5), SceneTreeTimer.SignalName.Timeout);
         bool leashOk = !npcState.IsInCombat && _disengageCount > 0;
         // R16-аудит (P1-1): после выхода из боя НИКАКОГО зависшего каста —
@@ -255,7 +271,8 @@ public partial class CombatAISimDebug : Node2D
                  $"AIState={npcState.AIState}, disengage={_disengageCount}, " +
                  $"staleCast={_combatServiceImpl.IsCasting} → {(leashOk ? "OK" : "FAIL")}");
         // Вернуть игрока (последующие хуки/визуал не должны «улететь»).
-        _playerService.SetPosition(playerPos);
+        if (_gwc != null) _gwc.DEBUG_TeleportPlayer(playerPos.X, playerPos.Y);
+        else _playerService.SetPosition(playerPos);
 
         // === 6. СТОЙКА ЗАЩИТЫ ИГРОКА (G) ===
         _defenseIntentPub!.Publish(new DefenseIntentEvent(PlayerCombatId, DefenseSubtype.Dodge));

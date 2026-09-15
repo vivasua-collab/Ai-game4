@@ -48,8 +48,14 @@ public sealed class SaveFileHandler : ISaveFileHandler
             // R11 P0-Save (review): единые опции конвейера — IncludeFields
             // (поля XxxSaveData!), CamelCase, case-insensitive чтение.
             var json = JsonSerializer.Serialize(data, SaveJson.Options);
-            File.WriteAllText(path, json);
-            Console.WriteLine($"[SaveFileHandler] Wrote {path} ({data.Count} sections)");
+            // R17 (аудит-0911 SAV-1): АТОМАРНАЯ запись — tmp → rename.
+            // Раньше File.WriteAllText обрывался на краше/питании →
+            // усечённый JSON → слот потерян без восстановления (дока
+            // SAVE_SYSTEM §9.1 обещала tmp+rename с самого R11).
+            var tmpPath = path + ".tmp";
+            File.WriteAllText(tmpPath, json);
+            File.Move(tmpPath, path, overwrite: true);
+            Console.WriteLine($"[SaveFileHandler] Wrote {path} ({data.Count} sections, atomic tmp→rename)");
             return true;
         }
         catch (Exception ex)
@@ -81,10 +87,19 @@ public sealed class SaveFileHandler : ISaveFileHandler
 
     public bool DeleteSave(string slotName)
     {
-        var path = SlotPath(slotName);
-        if (!File.Exists(path)) return false;
-        File.Delete(path);
-        return true;
+        // R17 (аудит-0911 SAV-7): IOException наружу — краш вызывающего.
+        try
+        {
+            var path = SlotPath(slotName);
+            if (!File.Exists(path)) return false;
+            File.Delete(path);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SaveFileHandler] DeleteSave FAILED for '{slotName}': {ex.Message}");
+            return false;
+        }
     }
 
     public IReadOnlyList<string> GetAllSaves()

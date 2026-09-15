@@ -34,14 +34,23 @@ namespace CultivationGame.Modules.Inventory
     /// АРХИТЕКТУРА: VContainer sibling scopes не видят регистрации друг друга.
     /// Межмодульное общение — ТОЛЬКО через MessagePipe (Hub-and-Spoke).
     /// Вместо этого EquipmentService кэширует заблокированные слоты на основе событий.
+    ///
+    /// R17 (аудит-0911 INV-4): кукла игрока НЕ сохранялась и НЕ сбрасывалась
+    /// при пересборке мира → дюп-окно: сессия A (меч надет, вне сейва) →
+    /// LoadGame сейва B (меч в рюкзаке) → надет меч A + в рюкзаке меч B →
+    /// снимаем → 2 меча. Теперь: блок "equipment" (слот → itemId; данные
+    /// резолвятся через каталог item_db, который восстанавливается РАНЬШЕ
+    /// по контракту RestoreOrder) + IWorldResettable.
     /// </summary>
-    public class EquipmentService : IEquipmentService, IDisposable
+    public class EquipmentService : IEquipmentService, ISaveable, IWorldResettable, IDisposable
     {
         // === Зависимости (DI через конструктор) ===
         private readonly IPublisher<EquipmentChangedEvent> _equipChangedPub;
         private readonly IPublisher<EquipmentBlockedEvent> _equipBlockedPub;
         private readonly ISubscriber<BodyPartSeveredEvent> _severedSub;
         private readonly IEquipmentDataProvider? _equipmentDataProvider;
+        // R17 (INV-4): резолв itemId → EquipmentData при RestoreState.
+        private readonly IItemDatabaseService? _itemDatabase;
 
         // === Состояние ===
         private readonly Dictionary<EquipmentSlot, EquipmentData> _equipment = new();
@@ -66,12 +75,14 @@ namespace CultivationGame.Modules.Inventory
             IPublisher<EquipmentChangedEvent> equipChangedPub,
             IPublisher<EquipmentBlockedEvent> equipBlockedPub,
             ISubscriber<BodyPartSeveredEvent> severedSub,
-            IEquipmentDataProvider? equipmentDataProvider = null)
+            IEquipmentDataProvider? equipmentDataProvider = null,
+            IItemDatabaseService? itemDatabase = null)
         {
             _equipChangedPub = equipChangedPub;
             _equipBlockedPub = equipBlockedPub;
             _severedSub = severedSub;
             _equipmentDataProvider = equipmentDataProvider;
+            _itemDatabase = itemDatabase;
         }
 
         /// <summary>
@@ -247,6 +258,93 @@ namespace CultivationGame.Modules.Inventory
                     _equipChangedPub.Publish(new EquipmentChangedEvent(_entityId, slot, null, unequippedItemId, GetTotalArmor()));
                 }
             }
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        // R17 (INV-4): ISaveable — блок "equipment" (кукла игрока)
+        // ══════════════════════════════════════════════════════════════
+
+        /// <summary>Типизированный state-блок для round-trip десериализации.</summary>
+        public sealed class EquipmentSaveState
+        {
+            public string EntityId = "";
+            public List<EquipmentSaveEntry> Equipped = new();
+        }
+
+        public sealed class EquipmentSaveEntry
+        {
+            public int Slot;
+            public string ItemId = "";
+        }
+
+        public string SaveKey => "equipment";
+        public Type StateType => typeof(EquipmentSaveState);
+
+        public object CaptureState()
+        {
+            var data = new EquipmentSaveState { EntityId = _entityId ?? "player" };
+            foreach (var kvp in _equipment)
+            {
+                if (kvp.Value == null) continue;
+                data.Equipped.Add(new EquipmentSaveEntry
+                {
+                    Slot = (int)kvp.Key,
+                    ItemId = kvp.Value.ItemId,
+                });
+            }
+            return data;
+        }
+
+        public void RestoreState(object state)
+        {
+            if (state is not EquipmentSaveState data || data == null) return;
+
+            if (!string.IsNullOrEmpty(data.EntityId)) _entityId = data.EntityId;
+
+            _equipment.Clear();
+            int restored = 0;
+            foreach (var entry in data.Equipped)
+            {
+                if (string.IsNullOrEmpty(entry.ItemId)) continue;
+                if (!Enum.IsDefined(typeof(EquipmentSlot), entry.Slot)) continue;
+
+                // Каталог предметов уже восстановлен (контракт RestoreOrder:
+                // item_db раньше equipment). Фантомный ID (старый сейв без
+                // item_db-блока) — пропускаем с логом, не роняем загрузку.
+                if (_itemDatabase == null || !_itemDatabase.TryGetItem(entry.ItemId, out var item))
+                {
+                    Console.WriteLine($"[EquipmentService] RestoreState: предмет '{entry.ItemId}' не найден в каталоге — слот {(EquipmentSlot)entry.Slot} пропущен");
+                    continue;
+                }
+
+                if (item is EquipmentData eq)
+                {
+                    _equipment[(EquipmentSlot)entry.Slot] = eq;
+                    restored++;
+                }
+            }
+
+            // Боевые статы (CombatService читает провайдера) + визуал куклы/
+            // хотбара — событиями (OldItemId=null → InventoryModule рано
+            // выходит, возврата предмета в инвентарь НЕ происходит).
+            SyncToProvider();
+            foreach (var kvp in _equipment)
+            {
+                _equipChangedPub.Publish(new EquipmentChangedEvent(
+                    _entityId, kvp.Key, kvp.Value.ItemId, null, GetTotalArmor()));
+            }
+
+            Console.WriteLine($"[EquipmentService] RestoreState: {restored}/{data.Equipped.Count} слотов куклы");
+        }
+
+        // R17 (E-1): IWorldResettable — пересборка мира = пустая кукла.
+        // Провайдер синхронизируем пустым набором (иначе CombatService
+        // видел бы оружие прошлого мира до первой экипировки).
+        public void ResetWorld()
+        {
+            _equipment.Clear();
+            _blockedSlots.Clear();
+            SyncToProvider();
         }
 
         // === IDisposable ===

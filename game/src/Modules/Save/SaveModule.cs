@@ -30,10 +30,18 @@ public sealed class SaveModule : IModule
     // SAVE-A1 FIX (аудит-4): сбор ISaveable из DI-контейнера.
     [Inject] private readonly SaveDataAggregator _aggregator = null!;
     [Inject] private readonly IResolver _resolver = null!;
+    // R17 (аудит-0911 SAV-2): конфиг ИНЖЕКТИТСЯ (раньше `new SaveConfig()` —
+    // поле AutoSaveIntervalMinutes читалось только как вкл/выкл), а гейт
+    // сессии останавливает автосейв в главном меню (раньше SaveModule.Tick
+    // писал autosave-слоты от fallback-мира меню — мусорные сейвы).
+    [Inject] private readonly SaveConfig _config = null!;
+    [Inject] private readonly IGameSession _session = null!;
 
     private IDisposable? _saveSubToken;
     private IDisposable? _loadSubToken;
-    private SaveConfig _config = new();
+
+    /// <summary>R17: единый слот автосейва (перезапись, не autosave_NNNN-плодовение).</summary>
+    private const string AutoSaveSlotName = "autosave";
 
     public void Start()
     {
@@ -58,11 +66,20 @@ public sealed class SaveModule : IModule
 
     public void Tick(int tickCount)
     {
-        // Autosave check every 60 ticks (per task brief)
-        if (tickCount % 60 != 0) return;
-        if (_config.AutoSaveIntervalMinutes <= 0) return;
+        // R17 (аудит-0911 SAV-2 + E-4): автосейв — ТОЛЬКО в активной игровой
+        // сессии. Тик-луп больше не гоняет симуляцию за главным меню (гейт
+        // в GameBoot), но и здесь страховочный гейт: MainMenu/Loading/Saving/
+        // Quitting — не пишем (раньше каждые 60 тиков плодились слоты
+        // autosave_NNNN от fallback-мира меню — без чистки, сотни каталогов).
+        if (_session.State != SessionState.Playing) return;
 
-        var slot = new SaveSlot($"autosave_{(tickCount / 60):D4}", SaveSlotType.AutoSave);
+        // Интервал — ИГРОВЫЕ минуты из конфига (1 тик = 1 игровая минута).
+        // 0/отрицательное значение — автосейв выключен.
+        int interval = _config.AutoSaveIntervalMinutes;
+        if (interval <= 0) return;
+        if (tickCount % interval != 0) return;
+
+        var slot = new SaveSlot(AutoSaveSlotName, SaveSlotType.AutoSave);
         // R11 P1-Save: результат автосейва не глотаем — лог при провале.
         if (!_saveService.Save(slot))
             Console.WriteLine($"[SaveModule] Autosave FAILED: {_saveService.LastError}");

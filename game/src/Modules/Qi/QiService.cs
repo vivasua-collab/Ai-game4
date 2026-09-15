@@ -23,8 +23,14 @@ namespace CultivationGame.Modules.Qi;
 /// Реализация IQiService.
 /// Управляет накоплением, расходом, регенерацией Ци и уровнями культивации.
 /// Публикует события через EventBus вместо C# events.
+///
+/// R17 (аудит-0911 QI-2): Qi-стейт игрока НЕ сохранялся (нет ISaveable) —
+/// cold-process LoadGame сбрасывал уровень/подуровень/качество ядра/текущее
+/// Ци/ампутацию сердца к дефолту QiConfig (L1.0, full) независимо от сейва;
+/// warm-load маскировал дефект (уровень оставался в памяти). Теперь:
+/// ISaveable (блок "qi") + IWorldResettable (пересборка мира = новый практик).
 /// </summary>
-public class QiService : IQiService, IDisposable
+public class QiService : IQiService, ISaveable, IWorldResettable, IDisposable
 {
     // === Зависимости (инжекция через конструктор) ===
     private readonly IPublisher<QiChangedEvent> _qiChangedPub;
@@ -35,6 +41,9 @@ public class QiService : IQiService, IDisposable
 
     // === Состояние ===
     private string _entityId = string.Empty;
+
+    /// <summary>R17: конфиг последней Initialize — источник дефолтов для ResetWorld.</summary>
+    private QiConfig? _initialConfig;
     private IDisposable? _severedSubscription;
     private IDisposable? _qiConsumeRequestSubscription;
     private IDisposable? _qiAddRequestSubscription;
@@ -113,6 +122,7 @@ public class QiService : IQiService, IDisposable
     /// </summary>
     public void Initialize(QiConfig config)
     {
+        _initialConfig = config; // R17: дефолты для ResetWorld
         _entityId = config.EntityId;
         _cultivationLevel = config.CultivationLevel;
         _subLevel = config.SubLevel;
@@ -120,6 +130,8 @@ public class QiService : IQiService, IDisposable
         _conductivityBonus = config.ConductivityBonus;
         _enablePassiveRegen = config.EnablePassiveRegen;
         _regenMultiplier = config.RegenMultiplier;
+        _heartSevered = false; // R17: Initialize = новый практик (ампутаций нет)
+        _dailyAccumulator = 0.0;
 
         RecalculateStats();
 
@@ -340,6 +352,82 @@ public class QiService : IQiService, IDisposable
         _qiConsumeRequestSubscription = null;
         _qiAddRequestSubscription?.Dispose();
         _qiAddRequestSubscription = null;
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // R17 (QI-2): ISaveable — блок "qi" (уровень/подуровень/качество/
+    // текущее Ци/ампутация сердца/бонус проводимости/пассивный реген).
+    // Раньше cold-load возвращал L1.0-full независимо от сейва.
+    // ════════════════════════════════════════════════════════════════
+
+    /// <summary>Типизированный state-блок для round-trip десериализации.</summary>
+    public sealed class QiSaveState
+    {
+        public string EntityId = "";
+        public int CultivationLevel;
+        public int SubLevel;
+        public int CoreQuality;
+        public long CurrentQi;
+        public bool HeartSevered;
+        public float ConductivityBonus;
+        public bool EnablePassiveRegen;
+    }
+
+    public string SaveKey => "qi";
+    public Type StateType => typeof(QiSaveState);
+
+    public object CaptureState()
+    {
+        return new QiSaveState
+        {
+            EntityId = _entityId,
+            CultivationLevel = _cultivationLevel,
+            SubLevel = _subLevel,
+            CoreQuality = (int)_coreQuality,
+            CurrentQi = _currentQi,
+            HeartSevered = _heartSevered,
+            ConductivityBonus = _conductivityBonus,
+            EnablePassiveRegen = _enablePassiveRegen,
+        };
+    }
+
+    public void RestoreState(object state)
+    {
+        if (state is not QiSaveState data || data == null) return;
+
+        if (!string.IsNullOrEmpty(data.EntityId)) _entityId = data.EntityId;
+        _cultivationLevel = Math.Clamp(data.CultivationLevel, 1, 10);
+        _subLevel = Math.Clamp(data.SubLevel, 0, 9);
+        _coreQuality = (CoreQuality)data.CoreQuality;
+        _conductivityBonus = Math.Clamp(data.ConductivityBonus, 0f, 2f);
+        _enablePassiveRegen = data.EnablePassiveRegen;
+
+        RecalculateStats();
+
+        // QI-C01: ампутация сердца — постоянный штраф регена. Семантика та же,
+        // что в OnBodyPartSevered (RecalculateStats перезаписывает множитель
+        // из таблицы — штраф применяется ПОСЛЕ пересчёта).
+        _heartSevered = data.HeartSevered;
+        if (_heartSevered) _regenMultiplier *= 0.5f;
+
+        _currentQi = Math.Clamp(data.CurrentQi, 0, _maxQiCapacity);
+        _dailyAccumulator = 0.0;
+        _isInitialized = true;
+
+        // Кэши подписчиков (CombatService/QuestService/Charger…) обновятся
+        // событием; PlayerService тоже зеркалит уровень отсюда.
+        PublishQiChanged();
+        Console.WriteLine($"[QiService] RestoreState: L{_cultivationLevel}.{_subLevel} {_coreQuality}, " +
+                          $"qi {_currentQi}/{_maxQiCapacity}, heartSevered={_heartSevered}");
+    }
+
+    // R17 (E-1): IWorldResettable — пересборка мира = новый практик с
+    // дефолтным конфигом (L1.0-full для стокового QiConfig). Вызывается
+    // WorldDomainResetPhase (NewGame) и GameSession.LoadGame (до RestoreState).
+    public void ResetWorld()
+    {
+        if (_initialConfig == null) return; // Initialize ещё не звался — нечего сбрасывать
+        Initialize(_initialConfig);
     }
 
     private void PublishQiChanged()

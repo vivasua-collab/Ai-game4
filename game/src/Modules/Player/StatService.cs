@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.Events;
@@ -24,7 +25,7 @@ namespace CultivationGame.Modules.Player;
 /// STAT_THRESHOLD_SYSTEM: базовые ~10 — порог floor(stat/10) от 10),
 /// мутации публикуют событие → пересчёт HP живёт.
 /// </summary>
-public sealed class StatService : IStatService
+public sealed class StatService : IStatService, ISaveable, IWorldResettable
 {
     private readonly Dictionary<StatType, float> _base = new();
     private readonly Dictionary<StatType, float> _bonus = new();
@@ -171,5 +172,87 @@ public sealed class StatService : IStatService
         if (_statChangedPub == null) return;
         if (oldValue.Equals(newValue)) return; // холостое событие не шумим
         _statChangedPub.Publish(new StatChangedEvent(_entityId, type, oldValue, newValue));
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // R17: ISaveable — блок "stats". Рост статов (сон ConsolidateSleep,
+    // перки, модификаторы) ДО R17 терялся при загрузке — статы
+    // сбрасывались к дефолтам InitializeDefaults. Бонусы экипировки НЕ
+    // храним: они пересчитываются из предмета при каждой экипировке
+    // (хранение = риск рассинхрона с фактически надетым).
+    // ══════════════════════════════════════════════════════════════
+
+    public sealed class StatsSaveState
+    {
+        public string EntityId = "";
+        public List<StatSaveEntry> Base = new();
+        public List<StatSaveEntry> VirtualDelta = new();
+        public List<StatSaveEntry> Threshold = new();
+    }
+
+    public sealed class StatSaveEntry
+    {
+        public int Stat;
+        public float Value;
+    }
+
+    public string SaveKey => "stats";
+    public Type StateType => typeof(StatsSaveState);
+
+    public object CaptureState()
+    {
+        var data = new StatsSaveState { EntityId = _entityId };
+        foreach (var kvp in _base)
+            data.Base.Add(new StatSaveEntry { Stat = (int)kvp.Key, Value = kvp.Value });
+        foreach (var kvp in _virtualDelta)
+            data.VirtualDelta.Add(new StatSaveEntry { Stat = (int)kvp.Key, Value = kvp.Value });
+        foreach (var kvp in _threshold)
+            data.Threshold.Add(new StatSaveEntry { Stat = (int)kvp.Key, Value = kvp.Value });
+        return data;
+    }
+
+    public void RestoreState(object state)
+    {
+        if (state is not StatsSaveState data || data == null) return;
+
+        if (!string.IsNullOrEmpty(data.EntityId)) _entityId = data.EntityId;
+
+        // Старые значения — для честных old→new событий (PublishStatChanged
+        // гасит холостые old==new; при сбросе в дефолт и восстановлении
+        // тех же значений событие и не нужно).
+        var oldBase = new Dictionary<StatType, float>(_base);
+
+        _base.Clear();
+        _virtualDelta.Clear();
+        _threshold.Clear();
+
+        foreach (var e in data.Base)
+            if (Enum.IsDefined(typeof(StatType), e.Stat))
+                _base[(StatType)e.Stat] = e.Value;
+        foreach (var e in data.VirtualDelta)
+            if (Enum.IsDefined(typeof(StatType), e.Stat))
+                _virtualDelta[(StatType)e.Stat] = e.Value;
+        foreach (var e in data.Threshold)
+            if (Enum.IsDefined(typeof(StatType), e.Stat))
+                _threshold[(StatType)e.Stat] = e.Value;
+
+        // События с РЕАЛЬНЫМ diff → BodyModule пересчитает VIT→HP (П.24).
+        foreach (var kvp in _base)
+        {
+            oldBase.TryGetValue(kvp.Key, out var oldVal);
+            PublishStatChanged(kvp.Key, oldVal, kvp.Value);
+        }
+
+        Console.WriteLine($"[StatService] RestoreState: base={_base.Count}, virtual={_virtualDelta.Count}, threshold={_threshold.Count}");
+    }
+
+    // R17 (E-1): пересборка мира = врождённые дефолты (10/10/10/10, Luck 5).
+    public void ResetWorld()
+    {
+        _base.Clear();
+        _bonus.Clear();
+        _virtualDelta.Clear();
+        _threshold.Clear();
+        InitializeDefaults(_entityId);
     }
 }

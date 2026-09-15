@@ -20,9 +20,11 @@ public static class SceneAssemblyRegistrar
         // Orchestrator
         builder.Register<SceneOrchestrator>(Lifetime.Singleton);
 
-        // R13/R14-аудит (2026-09-10): сброс NPC-домена перед пересборкой мира
-        // (фаза 0, NewGame-only; на LoadGame сброс делает GameSession.LoadGame).
-        builder.Register<NpcDomainResetPhase>(Lifetime.Singleton);
+        // R17 (аудит-0911 E-1, 2026-09-15): сброс ВСЕХ world-scoped доменов
+        // перед пересборкой мира (фаза 0, NewGame-only; на LoadGame тот же
+        // сброс делает GameSession.LoadGame). Замена NpcDomainResetPhase
+        // (сбрасывал только NPC-домен) — контракт IWorldResettable.
+        builder.Register<WorldDomainResetPhase>(Lifetime.Singleton);
 
         // Phases in execution order (orchestrator sorts by PhaseOrder at
         // runtime, so registration order here is purely cosmetic).

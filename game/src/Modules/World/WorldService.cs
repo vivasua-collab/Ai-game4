@@ -19,8 +19,14 @@ namespace CultivationGame.Modules.World;
 /// WorldModule calls it via a concrete cast (DI-cast allowed inside module).
 /// 2026-09-06 (аудит, санация мёртвого API): удалены C#-event'ы OnTick/OnTimeChanged —
 /// 0 подписчиков, живой паттерн — опрос через ITimeService.
+///
+/// R17 (аудит-0911 WT-5/E-3): игровое время НЕ сохранялось и НЕ сбрасывалось:
+/// LoadGame показывал время прошлой сессии процесса (cold-load маскировался
+/// совпадением дефолтов 06:00 день 1), тёплая NewGame #2 начиналась с днём
+/// прошлого мира, а время в меню шло вперёд. Теперь: блок "world_time" +
+/// IWorldResettable (новый мир = 06:00 день 1, tick 0).
 /// </summary>
-public sealed class TimeService : ITimeService
+public sealed class TimeService : ITimeService, ISaveable, IWorldResettable
 {
     [Inject] private readonly IPublisher<TimeSpeedChangedEvent> _speedChangedPub = null!;
 
@@ -89,13 +95,72 @@ public sealed class TimeService : ITimeService
         TotalTime += DeltaTime;
         CurrentTime = CurrentTime.AddMinutes(GameConstants.TICKS_PER_MINUTE);
     }
+
+    // ══════════════════════════════════════════════════════════════
+    // R17 (WT-5): ISaveable — блок "world_time" (календарь + тики).
+    // RestoreOrder: восстанавливается ВТОРЫМ (после world) — все
+    // остальные блоки и модули живут уже с правильными часами.
+    // ══════════════════════════════════════════════════════════════
+
+    public sealed class WorldTimeSaveState
+    {
+        public int Year;
+        public int Month;
+        public int Day;
+        public int Hour;
+        public int Minute;
+        public int TickCount;
+        public float TotalTime;
+    }
+
+    public string SaveKey => "world_time";
+    public Type StateType => typeof(WorldTimeSaveState);
+
+    public object CaptureState()
+    {
+        return new WorldTimeSaveState
+        {
+            Year = CurrentTime.Year,
+            Month = CurrentTime.Month,
+            Day = CurrentTime.Day,
+            Hour = CurrentTime.Hour,
+            Minute = CurrentTime.Minute,
+            TickCount = TickCount,
+            TotalTime = TotalTime,
+        };
+    }
+
+    public void RestoreState(object state)
+    {
+        if (state is not WorldTimeSaveState data || data == null) return;
+
+        CurrentTime = new WorldTime(data.Year, data.Month, data.Day, data.Hour, data.Minute);
+        TickCount = Math.Max(0, data.TickCount);
+        TotalTime = Math.Max(0f, data.TotalTime);
+        DeltaTime = 1f;
+        Console.WriteLine($"[TimeService] RestoreState: {CurrentTime}, tick {TickCount}");
+    }
+
+    // R17 (E-1): пересборка мира — часы на 06:00 дня 1 (канон NewGame).
+    public void ResetWorld()
+    {
+        CurrentTime = new WorldTime(GameConstants.START_YEAR, 1, 1, 6, 0);
+        TickCount = 0;
+        TotalTime = 0f;
+    }
 }
 
 /// <summary>
 /// WorldService — registry of locations + current active location.
 /// Uses LocationData (Core data model). Implements <see cref="IWorldService"/>.
+///
+/// R17 (аудит-0911 E-3): активная локация НЕ сохранялась (GameSession.LoadGame
+/// хардкодил TestPolygon!) — сейв из large_world грузился на чужую локацию.
+/// Теперь: блок "world" (CurrentLocationId; реестр локаций — процесс-scoped
+/// контент, заполняется WorldModule.Start из LocationCatalog) +
+/// IWorldResettable (сброс активной локации; реестр не трогаем).
 /// </summary>
-public sealed class WorldService : IWorldService
+public sealed class WorldService : IWorldService, ISaveable, IWorldResettable
 {
     [Inject] private readonly IPublisher<LocationChangedEvent> _locationChangedPub = null!;
 
@@ -242,5 +307,47 @@ public sealed class WorldService : IWorldService
     public void DiscoverSector(string sectorId)
     {
         if (!string.IsNullOrEmpty(sectorId)) _discoveredSectors.Add(sectorId);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // R17 (E-3): ISaveable — блок "world" (идентичность локации).
+    // RestoreOrder: ПЕРВЫЙ блок — GameSession читает CurrentLocationId
+    // для Data.WorldId ПОСЛЕ Load, а TileMapGenPhase генерирует сетку
+    // правильного размера из сида локации.
+    // ══════════════════════════════════════════════════════════════
+
+    public sealed class WorldSaveState
+    {
+        public string LocationId = "";
+    }
+
+    public string SaveKey => "world";
+    public Type StateType => typeof(WorldSaveState);
+
+    public object CaptureState()
+    {
+        return new WorldSaveState { LocationId = _current?.Id ?? string.Empty };
+    }
+
+    public void RestoreState(object state)
+    {
+        if (state is not WorldSaveState data || data == null) return;
+        if (string.IsNullOrEmpty(data.LocationId)) return;
+
+        // Неизвестный ID (реестр пуст/урезан) — оставляем текущую локацию:
+        // GameSession.LoadGame сфолбэчит на TestPolygon.
+        if (_locations.ContainsKey(data.LocationId))
+            SetActiveLocation(data.LocationId);
+        else
+            Console.WriteLine($"[WorldService] RestoreState: локация '{data.LocationId}' не в реестре — оставлена текущая ({_current?.Id ?? "нет"})");
+    }
+
+    // R17 (E-1): пересборка мира — активной локации нет (WorldInitPhase
+    // установит её из сессии на NewGame; LoadGame — из блока "world").
+    // Реестр локаций — контент процесса, НЕ сбрасываем.
+    public void ResetWorld()
+    {
+        _current = null;
+        _discoveredSectors.Clear();
     }
 }

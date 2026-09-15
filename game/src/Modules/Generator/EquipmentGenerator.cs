@@ -39,6 +39,14 @@ public sealed class EquipmentGenerator : IEquipmentGenerator
     private readonly IItemDatabaseService _itemDatabase;
     private static int _idCounter;
 
+    /// <summary>R17 (аудит-0911 G-3): снапшот счётчика ID для блока item_db
+    /// (между сессиями ID не воспроизводимы — счётчик сбрасывался с процессом;
+    /// восстановленный счётчик гарантирует уникальность новых ID).</summary>
+    public static int GetIdCounter() => _idCounter;
+
+    /// <summary>R17 (G-3): восстановление счётчика при LoadGame.</summary>
+    public static void SetIdCounter(int value) => _idCounter = value < 0 ? 0 : value;
+
     // §7.1 — пул бонусов для ролла по грейду (combat/defense/qi).
     private static readonly string[] BonusPool =
     {

@@ -35,7 +35,10 @@ namespace CultivationGame.Modules.Formation
     /// Singleton устранён: FormationService создаётся через VContainer.
     /// Статическое изменяемое состояние устранено: FormationEffects — instance-based.
     /// </summary>
-    public class FormationService : IFormationService, ISaveable, IDisposable
+    // R17 (аудит-0911 F-4): + IWorldResettable — состояние формации НЕ
+    // сбрасывалось при пересборке мира: формация мира A действовала в мире B
+    // (бонусы через DamageService-pull, ×2 медитация QiModule, тик пула).
+    public class FormationService : IFormationService, ISaveable, IWorldResettable, IDisposable
     {
         // === Зависимости (MessagePipe) ===
         private readonly IPublisher<FormationActivatedEvent> _activatedPub;
@@ -620,13 +623,23 @@ namespace CultivationGame.Modules.Formation
                 qiPoolCurrent = QiPoolCurrent.ToString(),
                 qiPoolMax = QiPoolMax.ToString(),
                 participants = participantsStr,
-                casterId = _casterId ?? ""
+                casterId = _casterId ?? "",
+                // R17 (аудит-0911 F-2): позиция формации переживает сейв/лоад
+                posX = _positionX,
+                posY = _positionY,
+                autoFillAccumulator = (float)_autoFillAccumulator,
             };
             return data;
         }
 
         /// <summary>
         /// Восстановить состояние формации.
+        /// R17 (аудит-0911 F-2): + позиция формации и аккумулятор автонаполнения;
+        /// события активации/смены стадии пере-публикуются (FormationVisualRenderer,
+        /// QiModule ×2-медитация, PlayerTechniqueCaster-зона живут ТОЛЬКО по
+        /// событиям — раньше после LoadGame активная формация была невидима и
+        /// без бонусов); long.TryParse + валидация enum — кривой сейв не роняет
+        /// загрузку (раньше long.Parse кидал FormatException → restore-fail).
         /// </summary>
         public void RestoreState(object state)
         {
@@ -642,7 +655,14 @@ namespace CultivationGame.Modules.Formation
 
             // Находим данные формации по ID
             var formationData = FindFormationData(data.activeFormationId);
-            if (formationData == null) return;
+            if (formationData == null)
+            {
+                // R17 (F-5 оговорка): реестр генерируемых формаций пуст в новом
+                // процессе — честный лог вместо тихого return (сам блок F-5 —
+                // снимок FormationData — R18).
+                Console.WriteLine($"[FormationService] RestoreState: формация '{data.activeFormationId}' не найдена в реестре — пропущена");
+                return;
+            }
 
             // Восстанавливаем текущую формацию и создателя
             _currentFormation = formationData;
@@ -663,12 +683,23 @@ namespace CultivationGame.Modules.Formation
 
             // Восстанавливаем пул Ци: инициализируем (задаёт maxQi), затем добавляем текущее значение
             _qiPool.Initialize(data.activeFormationId, formationData.RequiredLevel, formationData.Size);
-            long qiPoolCurrentVal = long.Parse(data.qiPoolCurrent);
+            // R17 (F-2): кривой сейв не роняет загрузку — TryParse вместо Parse
+            long qiPoolCurrentVal = long.TryParse(data.qiPoolCurrent, out var parsedCurrent) ? parsedCurrent : 0;
             if (qiPoolCurrentVal > 0)
                 _qiPool.AddQi(qiPoolCurrentVal);
 
-            // Восстанавливаем стадию
-            _currentStage = (FormationStage)data.currentStage;
+            // R17 (F-2): стадия с валидацией — неизвестный int → None (не краш)
+            var restoredStage = Enum.IsDefined(typeof(FormationStage), data.currentStage)
+                ? (FormationStage)data.currentStage
+                : FormationStage.None;
+            var previousStage = _currentStage;
+            _currentStage = restoredStage;
+
+            // R17 (F-2): позиция формации — без неё зона Amplification считалась
+            // от (0,0), а визуализатор рисовал не там, где формация ставилась
+            _positionX = data.posX;
+            _positionY = data.posY;
+            _autoFillAccumulator = data.autoFillAccumulator;
 
             // Инициализируем эффекты формации (необходимо перед Activate)
             _effects.Initialize(_currentFormation);
@@ -677,8 +708,51 @@ namespace CultivationGame.Modules.Formation
             if (_currentStage == FormationStage.Active)
                 _effects.Activate();
 
-            // Помечаем кэши грязными
-            // (нет кэша, но на всякий случай помечаем логическое соответствие)
+            // R17 (F-2): пере-публикация событий — подписчики (FormationVisualRenderer,
+            // QiModule gathering ×2, PlayerTechniqueCaster Amplification-зона,
+            // GameWorldController-тосты) живут по событиям и НЕ опрашивают
+            // FormationService — без публикации активная формация после Load
+            // невидима и не даёт бонусов медитации/зоны.
+            if (previousStage != _currentStage)
+            {
+                _stageChangedPub.Publish(new FormationStageChangedEvent(
+                    _currentFormation.Id, previousStage, _currentStage));
+            }
+            if (_currentStage == FormationStage.Active)
+            {
+                _activatedPub.Publish(new FormationActivatedEvent(
+                    _currentFormation.Id, _casterId,
+                    _currentFormation.FormationType, _positionX, _positionY,
+                    _currentFormation.EffectRadiusMeters));
+            }
+        }
+
+        /// <summary>
+        /// R17 (аудит-0911 F-4): IWorldResettable — пересборка мира = формаций
+        /// прошлого мира нет. DeactivateFormation публикует FormationDeactivatedEvent
+        /// → QiModule сбрасывает gathering-множитель, FormationVisualRenderer
+        /// скрывает визуал — единая авторитетная точка очистки.
+        /// Вызывается WorldDomainResetPhase (NewGame, фаза 0) и
+        /// GameSession.LoadGame (до RestoreState — сейв вернёт свою формацию).
+        /// </summary>
+        public void ResetWorld()
+        {
+            if (_currentStage != FormationStage.None)
+                DeactivateFormation();
+
+            // Дефенсивный сброс полей (F-9 «грязного» StartDrawing-остатка).
+            // Кэши Qi (_cachedConductivity/_cachedCultivationLevel/_cachedCurrentQi)
+            // НЕ трогаем: это зеркала ЖИВОГО состояния QiService (процесс-scoped
+            // игрок), обновляемые QiChangedEvent. QiService.ResetWorld в той же
+            // фазе публикует событие — порядок сбросов доменов не должен влиять
+            // на валидность кэша (QA-ловушка: сброс Qi → publish 1000 → сброс
+            // формации → кэш 0 → StartDrawing «недостаточно Ци»).
+            _currentFormation = null;
+            _casterId = null;
+            _participants.Clear();
+            _positionX = 0;
+            _positionY = 0;
+            _autoFillAccumulator = 0.0;
         }
 
         public void Dispose()
@@ -718,5 +792,15 @@ namespace CultivationGame.Modules.Formation
 
         // ID создателя формации
         public string casterId;
+
+        // R17 (аудит-0911 F-2): позиция центра формации (тайлы) — без неё зона
+        // Amplification после LoadGame считается от (0,0), а визуализатор
+        // рисует формацию не там, где она была поставлена.
+        public int posX;
+        public int posY;
+
+        // R17 (F-2): аккумулятор автонаполнения (double → float для сейва;
+        // погрешность < 1 Ци-чанка несущественна).
+        public float autoFillAccumulator;
     }
 }
