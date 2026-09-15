@@ -11,6 +11,7 @@
 // Паттерн: HotkeysWindow (модальное окно, пауза из GameWorldController).
 // Ring-buffer на 60 записей; при открытии — прокрутка вниз.
 using Godot;
+using System;
 using System.Collections.Generic;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Data;
@@ -93,7 +94,15 @@ public partial class EventLogWindow : Control
     {
         Visible = !Visible;
         if (Visible) ScrollToBottom();
+        else Closed?.Invoke();
     }
+
+    /// <summary>
+    /// Аудит-0915 A2 (INP1-1): закрытие ЛЮБЫМ путём — J/Esc через GWC ИЛИ
+    /// клик «×» — доходит до единой точки резюма тиков (паттерн
+    /// InventoryWindow.Closed, INP-1).
+    /// </summary>
+    public event Action? Closed;
 
     // === Event handlers (анти-спам: только события с игроком) ===
 
@@ -312,7 +321,7 @@ public partial class EventLogWindow : Control
         header.AddChild(_countLabel);
 
         var closeBtn = new Button { Text = "×" };
-        closeBtn.Pressed += () => Visible = false;
+        closeBtn.Pressed += Toggle;
         header.AddChild(closeBtn);
         root.AddChild(header);
 

@@ -14,7 +14,7 @@
 печатают вердикт `VERDICT: PASS/FAIL` (строка ищется в логе). Регрессия = полный
 прогон всех хуков + `dotnet build` с 0 errors.
 
-### 0.1. Реестр env-хуков (33)
+### 0.1. Реестр env-хуков (34)
 
 | Хук | Сцена/файл | Что проверяет |
 |---|---|---|
@@ -35,14 +35,15 @@
 | `GODOT_DIALOGUE_HOLD=1` | DialogueSimDebug | Держать диалог (скриншоты) |
 | `GODOT_TRADEUX_HOLD=1` | TradeUXSimDebug | Держать лавку UX |
 | `GODOT_FORMATION_TEST=1` | TechniqueGrantPhase | Формационный тест (этап формаций) |
-| `GODOT_REASSEMBLY_DEBUG=1` | ReAssemblySimDebug | Ревью-1: повторная сборка в одном процессе — Reset фаз оркестратора + world-scoped реестры (16/16 Completed, техники не ×2). Аудит R13/R14: + ассерты NPC-домена — QA-смерть NPC (труп) и QA-группа в мире 1 НЕ переживают пересборку (NpcDomainResetPhase), реестр NPC не ×2 (double-spawn), ghost-NPC отсутствует; harness-гейт (QA-грязь обязана быть создана) |
+| `GODOT_REASSEMBLY_DEBUG=1` | ReAssemblySimDebug | Ревью-1: повторная сборка в одном процессе — Reset фаз оркестратора + world-scoped реестры (16/16 Completed, техники не ×2). Аудит R13/R14: + ассерты NPC-домена — QA-смерть NPC (труп) и QA-группа в мире 1 НЕ переживают пересборку (R17: WorldDomainResetPhase), реестр NPC не ×2 (double-spawn), ghost-NPC отсутствует; R17: + звери/время (WorldDomainResetPhase вместо NpcDomainResetPhase); harness-гейт (QA-грязь обязана быть создана) |
 | `GODOT_STORAGE_DEBUG=1` | StorageSimDebug | Ревью-этап-4: инвентарные транзакции — spirit retrieve/stacking (P0-1/P1-2), ring Qi (P1-3), craft overflow (P1-4), pickup unknown/граница (P1-5/P2-6) |
 | `GODOT_DOT_DEBUG=1` | DotSimDebug | Ревью-этап-5: DoT (Poison/Burn/Bleed/Freeze) наносит реальный урон через DamageAppliedEvent (игрок + NPC, P1-4) |
 | `GODOT_RESPAWN_DEBUG=1` | RespawnSimDebug | Ревью-этап-6: respawn ресурсов (истощение→7 дней→восстановление тайла), честный TryTravel, TimeChangedEvent.Delta == DeltaTime |
 | `GODOT_QUEST_DEBUG=1` | QuestSimDebug | Ревью-этап-7: полный цикл квестов — accept (через реальный диалог старейшины) → событие → complete → reward; гейт RequiredCultivationLevel |
 | `GODOT_TRASHDROP_DEBUG=1` | TrashDropSimDebug | Баг-репорт 09-08: инвентарный drag&drop в корзину — материалы draggable (раньше пустой Variant), корзина выбрасывает весь стек, кукла отклоняет не-экипировку, чужой source отвергается |
 | `GODOT_CONTEXT_DEBUG=1` | ContextMenuSimDebug | Запрос 09-09: ПКМ-контекстное меню — окно свойств, «Разделить стак…» (слайдер −/+ с двумя числами), множественные кучки одного ItemId, слот-адресный выброс кучки в корзину, Esc-приоритет попапов (8/8); ревью-R10 SlotId: stale drop при мутации в полёте, stale split → отказ, split при дрейфе индексов (11/11). Сим сам завершает процесс (GetTree().Quit) — без HOLD |
-| `GODOT_SAVELOAD_DEBUG=1` | SaveLoadSimDebug | Ревью-R11: Save/Load round-trip — типизация (IncludeFields), честный success, РЕАЛЬНЫЕ мутации до/после (анти-тривиальность), 8 блоков, домен 5/5, integrity |
+| `GODOT_MODALQA_DEBUG=1` | ModalSimDebug | Аудит-0915 A8 (P2-3): модальные окна — инвариант «пауза ⇔ стек окон ∨ Esc»: «×»/bg-click всех 6 окон (B/C/Q/J/F1/T) доходит до резюма тиков (Input.ActionPress эмуляция клавиш headless), идемпотентность двойного резюма (GWC-ветка + Closed), стек инвентарь+лавка не вешает паузу (A3) |
+| `GODOT_SAVELOAD_DEBUG=1` | SaveLoadSimDebug | Ревью-R11 → R17: Save/Load round-trip — типизация (IncludeFields), честный success, РЕАЛЬНЫЕ мутации до/после (анти-тривиальность), R17: 19 блоков + R17-ключи 11/11, integrity-мутации 12/12 |
 | `GODOT_LOOT_DEBUG=1` | LootSimDebug | R13 full-loot: генерация состава населения (12 NPC/6 ролей/детерминизм), труп-контейнер, окно обыска, SlotId-взятие, double-take отказ, full loot, TTL; R14: популяция в сессии НЕ восполняется (выбитая — остаётся выбитой) + ивент-спаун TrySpawnEventNpc(Caravan) работает |
 | `GODOT_WEAPONVIS_DEBUG=1` | WeaponVisSimDebug | R15 «оружие в руках»: WeaponClassId у генерации (7/7), fallback-парсинг ItemId/unknown→sword, спрайты icon(32)/hand(48) + различимость классов/тиров/редкости, композит игрока (стартовый кинжал→копьё→анэкип→меч), иконки хотбара 1-2, overlay NPC (12 NPC), facing-зеркалирование |
 | `GODOT_COMBATAI_DEBUG=1` | CombatAISimDebug | R16 боевой ИИ: месть NPC на атаку игрока (Attacking/Fleeing по личности), двусторонний урон, селектор защит NPC (щит→Block/силовик→Parry/прочие→Dodge — детерминированные кейсы), бегство HP<20% в бою (CombatDisengageEvent), leash AggroRadius×3, стойка игрока (DefenseIntentEvent→CurrentPlayerDefense), счётчики StrikeFX (swipes/strikes) |
@@ -54,13 +55,23 @@
 | `GODOT_SCREENSHOT_MENU=<путь>` | ContextMenuSimDebug | Скриншот окна ПКМ-свойств |
 | `GODOT_SCREENSHOT_SPLIT=<путь>` | ContextMenuSimDebug | Скриншот слайдера разделения стака |
 
-### 0.2. Типовой прогон регрессии
+### 0.2. Прогон регрессии — `tools/qa_regression.sh` (2026-09-15)
+
+Раннер регрессии — `bash tools/qa_regression.sh [sim…]` из корня репо (без
+аргументов — все 16 симов реестра; аргумент — имя сима `COMBAT_SIM` или пара
+`NAME:VAR`). Семантика (важно — симы НЕ завершают процесс после VERDICT,
+мир продолжает тикать):
+- «сторож»: kill -9 через 3с ПОСЛЕ появления вердикта в логе;
+- жёсткий потолок `QA_CEILING` сек (по умолчанию 240) без вердикта = FAIL;
+- вердикт — ПОСЛЕДНЯЯ строка `VERDICT: (PASS|FAIL)` в выводе (не первая);
+- trap INT/TERM/EXIT — прерывание не оставляет сироту-godot и хвосты в /tmp.
 
 ```bash
 cd game && dotnet build                                # 0 errors обязательно
-GODOT_NEWGAME=1 timeout 25 "$GODOT" --headless --path "$PWD" scenes/MainMenu.tscn
-GODOT_NEWGAME=1 GODOT_COMBAT_SIM=1 ... (и т.д. по реестру)
-# Каждый хук: ждём «VERDICT: PASS» / отсутствие исключений в логе.
+bash tools/qa_regression.sh                            # все симы (~2-3 мин)
+bash tools/qa_regression.sh COMBAT_SIM QUEST           # подмножество
+QA_CEILING=120 bash tools/qa_regression.sh SAVELOAD    # свой потолок
+# Итог: «N/N PASS» + список FAILED; exit 1 при любом FAIL.
 ```
 
 > Правило: **новая фича = новый хук** (паттерн S1-S6). Скриншот + VLM — для

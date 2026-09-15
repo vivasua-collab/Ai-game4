@@ -300,7 +300,7 @@ Modules/Xxx/
 
 **Сброс домена при пересборке (аудит R13/R14):** `NPCModule.ResetWorld()` =
 Spawner.ResetWorld + CorpseService.ResetWorld + NPCGroupService.ResetWorld
-(реестр групп + членство). Вызывается `NpcDomainResetPhase` (фаза 0, NewGame —
+(реестр групп + членство). Вызывается `WorldDomainResetPhase` (фаза 0, NewGame —
 до спавн-фаз 6/7/8) и `GameSession.LoadGame` (ДО RestoreState — фазы на Load
 идут ПОСЛЕ восстановления, сброс в фазе опоздал бы). Ди-синглтоны переживают
 мир — без сброса повторная сборка даёт double-spawn, трупы/группы прошлого
@@ -616,7 +616,7 @@ hand-спрайта к цели (sin-кривая 0.42с, инверсия dx п
 
 ### 3.2. GameSession
 
-Не модуль, а управление жизненным циклом сессии. NewGame/LoadGame/Pause/Resume/SaveAndQuit/QuitWithoutSaving. Подписывается на `GamePausedEvent`/`GameResumedEvent`/`SaveCompletedEvent`/`LoadCompletedEvent`.
+Не модуль, а управление жизненным циклом сессии. NewGame/LoadGame/Pause/Resume/SaveAndQuit/QuitWithoutSaving. Подписывается на `SaveCompletedEvent`/`LoadCompletedEvent` (GamePaused/Resumed-события — мёртвый API R17-аудита: без подписчиков).
 
 ---
 

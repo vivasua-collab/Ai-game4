@@ -140,7 +140,19 @@ public partial class TechniqueBookWindow : Control
         RebuildAll();
     }
 
-    public void Close() => Visible = false;
+    /// <summary>
+    /// Аудит-0915 A2 (INP1-1): закрытие ЛЮБЫМ путём — T/Esc через GWC ИЛИ
+    /// клик «×» — доходит до единой точки резюма тиков (паттерн
+    /// InventoryWindow.Closed, INP-1).
+    /// </summary>
+    public event Action? Closed;
+
+    public void Close()
+    {
+        if (!Visible) return;
+        Visible = false;
+        Closed?.Invoke();
+    }
 
     public void Toggle()
     {

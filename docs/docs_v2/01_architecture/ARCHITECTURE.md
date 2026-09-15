@@ -257,7 +257,7 @@ public static class ChargerModuleServices
 
 | # | Фаза | Что делает | SkipOnLoad |
 |---|------|------------|------------|
-| 0 | NpcDomainResetPhase | Сброс NPC-домена перед пересборкой (реестр NPC + per-entity провайдеры/баффы/якоря/отношения, трупы с CorpseRemovedEvent, группы, кэш спрайтов оружия) — анти-double-spawn. 2026-09-10 (аудит R13/R14); на LoadGame сброс делает GameSession.LoadGame ДО RestoreState (фазы идут ПОСЛЕ восстановления) | true (ген.) |
+| 0 | WorldDomainResetPhase | Сброс ВСЕХ world-scoped доменов перед пересборкой (`ResolveAll<IWorldResettable>`, R17: 16 реализаций — реестр NPC + per-entity провайдеры/баффы/якоря/отношения, трупы с CorpseRemovedEvent, группы, звери, формации, зарядник, игрок, статы, Ци, квесты, валюта, инвентарь, кукла, пояс, земля, мир, время) — анти-double-spawn/ghost-state. 2026-09-10 (аудит R13/R14, тогда NpcDomainResetPhase) → R17 расширен; на LoadGame сброс делает GameSession.LoadGame ДО RestoreState (фазы идут ПОСЛЕ восстановления) | true (ген.) |
 | 1 | CoreValidationPhase | Проверка DI-резолва всех интерфейсов ядра | false (wiring) |
 | 2 | TileMapGenPhase | Генерация тайловой карты | true (ген.) |
 | 3 | WorldInitPhase | Инициализация мира + world-scoped сброс TechniqueRegistry | true (ген.) |
@@ -406,7 +406,7 @@ Modules/Xxx/
 | Система | Период |
 |---------|--------|
 | Qi-регенерация | Каждые 10 тиков |
-| Автосохранение | Каждые 60 тиков (по триггерам — см. Save) |
+| Автосохранение | Каждые 30 игровых минут (`SaveConfig.AutoSaveIntervalMinutes`, слот `autosave`, гейт SessionState.Playing — R17) |
 | Spinal AI | Каждый тик (1–10 мс) |
 | Neural Router | Каждые ~3 тика (10–50 мс) |
 | Brain Controller | Каждые ~10 тиков (100–500 мс) |

@@ -21,6 +21,7 @@ ALL_SIMS=(
   "HOTBAR:GODOT_HOTBAR_DEBUG"
   "TRASHDROP:GODOT_TRASHDROP_DEBUG"
   "CONTEXT:GODOT_CONTEXT_DEBUG"
+  "MODALQA:GODOT_MODALQA_DEBUG"
   "WEAPONVIS:GODOT_WEAPONVIS_DEBUG"
   "REASSEMBLY:GODOT_REASSEMBLY_DEBUG"
   "CHARGE:GODOT_CHARGE_SIM"
@@ -48,6 +49,14 @@ fi
 declare -A RESULTS
 FAILED=()
 LOG="/tmp/qa_sim_$$.log"
+# Аудит-0915 P3: trap — прерывание (Ctrl-C / таймаут сессии) не должно
+# оставлять сироту-godot и хвост в /tmp.
+SIM_PID=""
+cleanup() {
+  [ -n "$SIM_PID" ] && kill -9 "$SIM_PID" 2>/dev/null
+  rm -f "$LOG"
+}
+trap cleanup INT TERM EXIT
 # Потолок на один сим (сек): VERDICT обычно приходит за 30-120с; если за
 # CEILING секунд вердикта нет — сим завис/сломан, kill + FAIL.
 CEILING="${QA_CEILING:-240}"
@@ -62,6 +71,7 @@ for entry in "${SIMS[@]}"; do
   : > "$LOG"
   env GODOT_NEWGAME=1 "$var=1" "$GODOT" --headless --path . scenes/MainMenu.tscn > "$LOG" 2>&1 &
   PID=$!
+  SIM_PID="$PID"
   (
     i=0
     while kill -0 "$PID" 2>/dev/null; do
@@ -80,9 +90,10 @@ for entry in "${SIMS[@]}"; do
   ) &
   WATCHDOG=$!
   wait "$PID" 2>/dev/null || true
+  SIM_PID=""
   kill "$WATCHDOG" 2>/dev/null; wait "$WATCHDOG" 2>/dev/null || true
-  VERDICT=$(grep -E "VERDICT" "$LOG" | head -1)
-  if echo "$VERDICT" | grep -q "PASS"; then
+  VERDICT=$(grep -E "VERDICT: (PASS|FAIL)" "$LOG" | tail -1)
+  if echo "$VERDICT" | grep -q "VERDICT: PASS"; then
     RESULTS[$name]="PASS"
     echo "  ✅ $VERDICT"
   else
@@ -104,7 +115,6 @@ for entry in "${SIMS[@]}"; do
 done
 echo "────────────────────────────────────────"
 echo "  $OK/$TOTAL PASS"
-rm -f "$LOG"
 if [ ${#FAILED[@]} -gt 0 ]; then
   echo "  FAILED: ${FAILED[*]}"
   exit 1

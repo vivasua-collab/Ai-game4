@@ -28,7 +28,7 @@
 - Формат: **JSON** (текстовый, читаемый, легко отлаживается). Опционально — бинарный формат (×3–4 сжатие) + GZIP (×2–3 сжатие).
 - Паттерн: **ISaveable** (SaveKey / CaptureState / RestoreState).
 - Агрегатор: **SaveDataAggregator** собирает данные от всех систем.
-- Триггеры: автосохранение (каждые 60 тиков), ручное (F5/F9), событийное.
+- Триггеры: автосохранение (каждые 30 игровых минут — `SaveConfig.AutoSaveIntervalMinutes`, R17), ручное, событийное.
 - Структура: `main.sav` + `chunks/` + `locations/` + `metadata.sav`.
 
 > Реализация сохранений — pure C#, без движко-специфичных зависимостей. Сериализатор — `System.Text.Json` (или эквивалентный). Чтение/запись файлов — стандартный `File IO`. Концепция инвариантна относительно движка.
@@ -204,7 +204,7 @@ public class SaveDataAggregator
 
 ### 4.4 Зарегистрированные системы (SaveKey → система)
 
-**R17 «Полнота сейва» (2026-09-15): фактический реестр — 20 блоков.**
+**R17 «Полнота сейва» (2026-09-15): фактический реестр — 19 блоков.**
 Таблица ниже — из дизайн-документа Unity-итерации (историческая);
 фактические блоки (жирным — новые R17):
 
@@ -265,7 +265,7 @@ formation → npc → animals → quests → currency → charger → save_meta
 - NewGame: `WorldDomainResetPhase` (фаза 0) — `ResolveAll<IWorldResettable>`;
 - LoadGame: `GameSession.LoadGame` — тот же сброс ДО RestoreState.
 
-Реализаторы (15): NPCModule (реестр/трупы/группы), AnimalService,
+Реализаторы (16): NPCModule (реестр/трупы/группы), AnimalService,
 FormationService, ChargerService, QiService+QiModule, PlayerService,
 StatService, QuestService, CurrencyService, InventoryService,
 EquipmentService, BeltService, GroundItemService, WorldService,
@@ -583,7 +583,7 @@ public class SaveMigrator
 1. **JSON-формат** (с опциональным бинарным + GZIP).
 2. **ISaveable pattern** — каждая система реализует SaveKey/CaptureState/RestoreState.
 3. **SaveDataAggregator** — оркестратор, не система знает, как себя сохранить.
-4. **Автосохранение каждые 60 тиков** (= 1 игровой час), плюс событийные триггеры.
+4. **Автосохранение каждые 30 игровых минут** (`SaveConfig.AutoSaveIntervalMinutes`, слот `autosave`, гейт SessionState.Playing — R17), плюс событийные триггеры.
 5. **F5 / F9** — ручные quicksave / quickload.
 6. **Чанковая структура:** `main.sav` + `chunks/` + `locations/` + `metadata.sav`.
 7. **Атомарная запись** + rolling backups для безопасности.
@@ -598,5 +598,5 @@ public class SaveMigrator
 | `WORLD_SAVE_SYSTEM.md` | Чанковое сохранение мира, seed+delta для тайлов |
 | `DATA_MODELS.md` | Структуры данных для сериализации |
 | `CONFIGURATIONS.md` | Пресеты (НЕ сохраняются, загружаются из data resources) |
-| `03_world/TIME_SYSTEM.md` | Автосохранение каждые 60 тиков |
+| `03_world/TIME_SYSTEM.md` | Тики/время (автосейв-интервал — см. §6.1) |
 | `01_architecture/PERFORMANCE_STRATEGY.md` | Производительность сериализации |

@@ -9,6 +9,7 @@
 //
 // Паттерн: HotkeysWindow (модальное окно, пауза из GameWorldController).
 using Godot;
+using System;
 using System.Collections.Generic;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Data;
@@ -42,7 +43,16 @@ public partial class QuestWindow : Control
     {
         Visible = !Visible;
         if (Visible) Rebuild();
+        else Closed?.Invoke();
     }
+
+    /// <summary>
+    /// Аудит-0915 A2 (INP1-1): закрытие ЛЮБЫМ путём — Q/Esc через GWC ИЛИ
+    /// клик «×» — доходит до единой точки резюма тиков (паттерн
+    /// InventoryWindow.Closed, INP-1). Без этого «×» оставлял мир
+    /// запаузенным — тот же фриз, что в исходном INP-1.
+    /// </summary>
+    public event Action? Closed;
 
     private void Rebuild()
     {
@@ -110,7 +120,7 @@ public partial class QuestWindow : Control
         var spacer = new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         header.AddChild(spacer);
         var closeBtn = new Button { Text = "×" };
-        closeBtn.Pressed += () => Visible = false;
+        closeBtn.Pressed += Toggle;
         header.AddChild(closeBtn);
         root.AddChild(header);
 

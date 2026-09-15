@@ -8,6 +8,7 @@
 // Источник перечня: InputMapInitializer.cs (канонический реестр действий).
 // Окно модальное, паузит игру (справочник — чтение, не бой).
 using Godot;
+using System;
 using System.Collections.Generic;
 
 namespace CultivationGame.Adapter.UI;
@@ -33,7 +34,19 @@ public partial class HotkeysWindow : Control
         Visible = true;
     }
 
-    public void Close() => Visible = false;
+    /// <summary>
+    /// Аудит-0915 A2 (INP1-1): закрытие ЛЮБЫМ путём — F1/Esc через GWC ИЛИ
+    /// клик «×» — доходит до единой точки резюма тиков (паттерн
+    /// InventoryWindow.Closed, INP-1).
+    /// </summary>
+    public event Action? Closed;
+
+    public void Close()
+    {
+        if (!Visible) return;
+        Visible = false;
+        Closed?.Invoke();
+    }
 
     public void Toggle()
     {

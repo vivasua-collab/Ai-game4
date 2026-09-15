@@ -247,6 +247,16 @@ public partial class GameWorldController : Node2D
     /// <summary>Инвентарное окно (GODOT_TRASHDROP_DEBUG).</summary>
     public UI.InventoryWindow? InventoryWindowForQA => _inventoryWindow;
 
+    // === Аудит-0915 A8 (INP1-QA): доступ к модальным окнам для
+    // GODOT_MODALQA_DEBUG — верификация инварианта «пауза ⇔ стек окон ∨
+    // Esc»: «×»-закрытие (мимо GWC-веток) обязано доходить до единой
+    // точки резюма тиков. ===
+    public UI.CharacterSheetWindow? CharacterSheetWindowForQA => _characterSheetWindow;
+    public UI.QuestWindow? QuestWindowForQA => _questWindow;
+    public UI.EventLogWindow? EventLogWindowForQA => _eventLogWindow;
+    public UI.HotkeysWindow? HotkeysWindowForQA => _hotkeysWindow;
+    public UI.TechniqueBookWindow? TechniqueBookWindowForQA => _techniqueBook;
+
     /// <summary>
     /// Открыть диалог с NPC по QA-пути (пауза+окно) — те же действия,
     /// что и HandleNpcTalk, без поиска ближнего NPC (GODOT_DIALOGUE_DEBUG).
@@ -323,6 +333,26 @@ public partial class GameWorldController : Node2D
         || (_techniqueBook is { Visible: true })
         || (_lootWindow is { IsOpen: true })
         || (_tradeWindow is { IsOpen: true })
+        || (_dialogueWindow is { IsOpen: true });
+
+    /// <summary>
+    /// Аудит-0915 A3 (INP1-2): предикат «модальное окно открыто КРОМЕ лавки».
+    /// Прежнее выражение в OnTradeOpened `AnyModalWindowOpen() &amp;&amp;
+    /// _tradeWindow is not { IsOpen: true }` было инвертировано: TradeWindow
+    /// подписан на TradeOpenedEvent РАНЬШЕ GWC (EventBus синхронный, порядок
+    /// подписок) → к моменту хендлера IsOpen уже true → второй операнд
+    /// всегда false → снапшот снимался ВСЕГДА, и после закрытия стека
+    /// «диалог+лавка» мир оставался заморожен. Правильная семантика —
+    /// перечислить остальные 8 окон явно.
+    /// </summary>
+    private bool AnyModalWindowOpenExceptTrade() =>
+        (_inventoryWindow is { Visible: true })
+        || (_characterSheetWindow is { Visible: true })
+        || (_questWindow is { Visible: true })
+        || (_eventLogWindow is { Visible: true })
+        || (_hotkeysWindow is { Visible: true })
+        || (_techniqueBook is { Visible: true })
+        || (_lootWindow is { IsOpen: true })
         || (_dialogueWindow is { IsOpen: true });
 
     /// <summary>
@@ -477,6 +507,14 @@ public partial class GameWorldController : Node2D
         {
             var trashDropSim = new TrashDropSimDebug { Name = "TrashDropSimDebug" };
             AddChild(trashDropSim);
+        }
+        // Аудит-0915 A8 (P2-3): модальные окна — верификация инварианта
+        // «пауза ⇔ стек окон ∨ Esc» (GODOT_MODALQA_DEBUG=1): «×»/bg-click
+        // всех 6 окон, идемпотентность резюма, стек инвентарь+лавка.
+        if (System.Environment.GetEnvironmentVariable("GODOT_MODALQA_DEBUG") == "1")
+        {
+            var modalSim = new ModalSimDebug { Name = "ModalSimDebug" };
+            AddChild(modalSim);
         }
         // 2026-09-04 S2: headless-верификация виньетки опасности
         // (GODOT_LOWHP_DEBUG=1) — alpha/пульс оверлея при HP < 35%/15%.
@@ -966,20 +1004,29 @@ public partial class GameWorldController : Node2D
 
         // 2026-08-28: Книга Техник (T) — матрица вкладки-уровни / блоки-типы /
         // строки-стихии + свитки + архив. Заменяет HUD-панель техник.
+        // Аудит-0915 A2 (INP1-1): Closed — «×»-закрытие доходит до единой
+        // точки резюма тиков (пауза T-окна больше не переживает закрытие).
         _techniqueBook = new UI.TechniqueBookWindow { Name = "TechniqueBookWindow" };
+        _techniqueBook.Closed += HandleModalResumeOnClose;
         _hudCanvas.AddChild(_techniqueBook);
 
         // 2026-08-28: окно-справка горячих клавиш (F1).
+        // Аудит-0915 A2: Closed — то же («×»-путь).
         _hotkeysWindow = new UI.HotkeysWindow { Name = "HotkeysWindow" };
+        _hotkeysWindow.Closed += HandleModalResumeOnClose;
         _hudCanvas.AddChild(_hotkeysWindow);
 
         // 2026-09-04 S1: Журнал событий (J) — был рекламирован в легенде HUD
         // и F1-справке, но не существовал («мёртвая проводка» клавиши journal).
+        // Аудит-0915 A2: Closed — то же («×»-путь).
         _eventLogWindow = new UI.EventLogWindow { Name = "EventLogWindow" };
+        _eventLogWindow.Closed += HandleModalResumeOnClose;
         _hudCanvas.AddChild(_eventLogWindow);
 
         // 2026-09-04 S1: Журнал заданий (Q) — вторая «мёртвая проводка».
+        // Аудит-0915 A2: Closed — то же («×»-путь).
         _questWindow = new UI.QuestWindow { Name = "QuestWindow" };
+        _questWindow.Closed += HandleModalResumeOnClose;
         _hudCanvas.AddChild(_questWindow);
 
         // C3 (2026-08-26): окно Культивации Ци (K) — 3 вкладки (Техники / Меридианы / Ядро)
@@ -1771,8 +1818,12 @@ public partial class GameWorldController : Node2D
         // Time speed control: PageUp = faster, PageDown = slower.
         // Debounce: max 1 change per real second (prevents rapid cycling).
         // Does NOT include Paused — pause is only via Esc.
+        // Аудит-0915 A5 (INP2-1): аварийный резюм PageUp/PageDown гейтимся
+        // модальными окнами — раньше они снимали паузу ПОД открытым окном,
+        // нарушая инвариант INP-1 «пауза ⇔ стек модальных ∨ Esc игрока»
+        // (движение оживает под планирующим окном).
         _speedChangeCooldown -= (float)GetPhysicsProcessDeltaTime();
-        if (_speedChangeCooldown <= 0)
+        if (_speedChangeCooldown <= 0 && !AnyModalWindowOpen())
         {
             if (PlayerInput.IsTimeSpeedUpPressed)
             {
@@ -2023,9 +2074,12 @@ public partial class GameWorldController : Node2D
     /// </summary>
     private void OnTradeOpened(in Core.Messaging.Contracts.TradeOpenedEvent e)
     {
-        // INP-1: окно могло уже пометить себя открытым (порядок подписок на
-        // TradeOpenedEvent не гарантирован) — исключаем его из проверки стека.
-        bool otherModalOpen = AnyModalWindowOpen() && _tradeWindow is not { IsOpen: true };
+        // INP-1 + аудит-0915 A3 (INP1-2): снапшот «мир был запаузен до окон»
+        // снимается только если ПОД лавкой нет других модальных окон.
+        // Аудит-0915 A3 (INP1-2): предикат — AnyModalWindowOpenExceptTrade()
+        // (см. комментарий там): прежнее выражение всегда вычислялось в
+        // false из-за порядка подписок — снапшот снимался всегда.
+        bool otherModalOpen = AnyModalWindowOpenExceptTrade();
         HandleModalPauseOnOpen(otherModalOpen);
         GD.Print($"[GameWorld] Trade opened: {e.NpcId} — ticks paused");
     }

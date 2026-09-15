@@ -159,7 +159,17 @@ public sealed class GameSession : IGameSession
             // registered saveable (порядок — контракт RestoreOrder в
             // SaveDataAggregator: мир → время → каталог → …). GameSession.Data
             // обновляется из ВОССТАНОВЛЕННОГО состояния ниже.
-            _save.Load(slot);
+            // Аудит-0915 A4 (SAV-P2-1): результат Load обязателен к проверке —
+            // false (файл отсутствует/битый JSON/упавший блок) раньше
+            // игнорировался: сессия строилась на СТЁРТЫХ (ResetWorld выше)
+            // и не восстановленных доменах, а первый автосейв затирал слот
+            // этим пустым состоянием. Теперь — честный отказ в меню.
+            if (!_save.Load(slot))
+            {
+                Console.WriteLine($"[GameSession] LoadGame FAILED — slot='{slot}' damaged or missing; returning to MainMenu");
+                SetState(SessionState.MainMenu);
+                return;
+            }
 
             // R17 (E-3): идентичность мира — из блока "world" (раньше
             // хардкод TestPolygon: сейв из large_world грузился на сетку

@@ -83,7 +83,7 @@
 │   │   ✓ NPCManager      → updateNPCs()                                  │   │
 │   │   ✓ CombatManager   → updateCombat()                                │   │
 │   │   ✓ UIManager       → updateTimeDisplay()                           │   │
-│   │   ✓ SaveManager     → autosaveCheck() (каждые 60 тиков)             │   │
+│   │   ✓ SaveManager     → autosaveCheck() (каждые 30 игровых мин)      │   │
 │   │   ✓ ActivityManager → autoSwitch() (по активности игрока)           │   │
 │   └─────────────────────────────────────────────────────────────────────┘   │
 │                                                                              │
@@ -290,9 +290,8 @@ TimeOfDay = night | dawn | morning | day | evening | dusk
 
 ### 9.3 Auto-save
 
-- **Автосохранение каждые 60 тиков** (= 60 игровых минут = 1 игровой час).
-- При normal (1 тик/сек): каждые 60 реальных секунд.
-- При fast (5 тик/сек): каждые 12 реальных секунд.
+- **Автосохранение каждые 30 игровых минут** (`SaveConfig.AutoSaveIntervalMinutes`, слот `autosave` — R17; до R17 — 60 тиков).
+- При normal (1 тик/сек): каждые ~30 реальных секунд.
 - Принудительное сохранение при паузе.
 - Критические события сохраняются немедленно.
 
@@ -306,7 +305,7 @@ TimeOfDay = night | dawn | morning | day | evening | dusk
 | NPC AI (Brain) | 100–500 ms | планирование |
 | Qi regen (batch) | каждые 10 тиков | производительность |
 | Buff/Modifier | каждый тик (с истечением) | время эффектов |
-| Auto-save | каждые 60 тиков | безопасность данных |
+| Auto-save | каждые 30 игровых мин (SaveConfig, R17) | безопасность данных |
 | Pathfinding | по запросу | дорого |
 
 Подробнее о стратегии производительности — в `01_architecture/PERFORMANCE_STRATEGY.md`.
@@ -341,7 +340,7 @@ TimeOfDay = night | dawn | morning | day | evening | dusk
 2. **4 скорости:** Pause (0), Normal (1 tps), Fast (5 tps), Quick (15 tps).
 3. **Движение = 1 тик / клетка.** Микро-шаг внутри клетки = 0.1 тика.
 4. **Timer service, не корутины движка.** Чистый логический сервис, вызываемый из основного цикла симуляции.
-5. **Batch-обработка:** Qi-regen каждые 10 тиков, auto-save каждые 60 тиков.
+5. **Batch-обработка:** Qi-regen каждые 10 тиков, auto-save каждые 30 игровых минут (SaveConfig, R17).
 6. **ActivityManager** автоматически подбирает скорость по активности, но не переопределяет ручной выбор.
 7. **Единый источник истины** — `TimeManager`. Все системы слушают его события.
 
@@ -355,4 +354,4 @@ TimeOfDay = night | dawn | morning | day | evening | dusk
 | `WORLD_SYSTEM.md` | Путешествия во времени |
 | `TRANSITION_SYSTEM.md` | Время путешествий между локациями |
 | `02_systems/QI_SYSTEM.md` | Регенерация Ци, batch обработка |
-| `05_data/SAVE_SYSTEM.md` | Автосохранение каждые 60 тиков |
+| `05_data/SAVE_SYSTEM.md` | Автосохранение: интервал/слоты/атомарность (R17 §6.1) |
