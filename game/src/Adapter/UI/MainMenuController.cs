@@ -46,14 +46,38 @@ public partial class MainMenuController : Control
         // Testability hook (same family as GODOT_MAP_SIZE / GODOT_GEN_DEBUG):
         // GODOT_NEWGAME=1 auto-starts a new game so headless runs exercise the
         // full scene-assembly pipeline (phases incl. NPC/animal spawn).
+        // L500 (2026-09-15): человек по «Новой игре» попадает в БОЛЬШОЙ мир
+        // (500×500, основной); headless-QA остаётся на test_polygon —
+        // 16 симов реестра завязаны на его детерминированный состав
+        // (12 NPC/3-5 зверей/раскладки позиций) и быструю сборку.
         if (System.Environment.GetEnvironmentVariable("GODOT_NEWGAME") == "1")
         {
-            GD.Print("[MainMenu] GODOT_NEWGAME=1 — auto-starting new game (50×50)");
-            CallDeferred(nameof(OnNewGame));
+            // L500 QA: GODOT_NEWGAME_WORLD переопределяет мир авто-старта
+            // (по умолчанию test_polygon — детерминизм 16 симов реестра;
+            // GODOT_NEWGAME_WORLD=large_world — GODOT_L500_DEBUG).
+            string world = System.Environment.GetEnvironmentVariable("GODOT_NEWGAME_WORLD");
+            if (string.IsNullOrEmpty(world)) world = "test_polygon";
+            GD.Print($"[MainMenu] GODOT_NEWGAME=1 — auto-starting QA world ({world})");
+            CallDeferred(nameof(OnNewGameInWorld), world);
             return;
         }
 
         GD.Print("[MainMenu] Ready");
+    }
+
+    /// <summary>L500 QA-путь: авто-старт в конкретный мир (env-driven).</summary>
+    private void OnNewGameInWorld(string worldId)
+    {
+        GD.Print($"[MainMenu] New Game (QA) selected — {worldId}");
+        try
+        {
+            Session?.NewGame(1, worldId);
+            GetTree().ChangeSceneToFile(GameWorldScenePath);
+        }
+        catch (System.Exception ex)
+        {
+            GD.PrintErr($"[MainMenu] NewGameInWorld({worldId}) failed: {ex}");
+        }
     }
 
     private void BuildUI()
@@ -126,14 +150,16 @@ public partial class MainMenuController : Control
         AddChild(buttonContainer);
 
         // ---- Buttons (with 4.7 hover-lift + press-shrink animations) ----
-        _newGameBtn = UIFactory.CreateButton("NewGame",   "◆ Новая игра (50×50)", 400, 50);
+        // L500 (2026-09-15): «Новая игра» = БОЛЬШОЙ мир 500×500 (основной,
+        // здесь тестируется боевка); тестовый полигон — отдельной кнопкой.
+        _newGameBtn = UIFactory.CreateButton("NewGame",   "◆ Новая игра (500×500)", 400, 50);
         _newGameBtn.Pressed += OnNewGame;
         UIFactory.AddHoverLift(_newGameBtn);
         UIFactory.AddPressShrink(_newGameBtn);
         buttonContainer.AddChild(_newGameBtn);
 
-        _largeWorldBtn = UIFactory.CreateButton("LargeWorld", "◈ Большой мир (500×500)", 400, 50);
-        _largeWorldBtn.Pressed += OnLargeWorld;
+        _largeWorldBtn = UIFactory.CreateButton("TestPolygon", "◇ Тестовый полигон (50×50)", 400, 50);
+        _largeWorldBtn.Pressed += OnTestPolygon;
         UIFactory.AddHoverLift(_largeWorldBtn);
         UIFactory.AddPressShrink(_largeWorldBtn);
         buttonContainer.AddChild(_largeWorldBtn);
@@ -180,10 +206,13 @@ public partial class MainMenuController : Control
 
     private void OnNewGame()
     {
-        GD.Print("[MainMenu] New Game selected — test_polygon (50×50)");
+        // L500: основной мир игрока — large_world (500×500, полный состав
+        // населения: GenerateStartup ×4 + звери 24 + 4 группы — «пояс жизни»
+        // у центра, чтобы тест боевки не превращался в марш по пустыне).
+        GD.Print("[MainMenu] New Game selected — large_world (500×500, primary)");
         try
         {
-            Session?.NewGame(1, "test_polygon");
+            Session?.NewGame(1, "large_world");
             GetTree().ChangeSceneToFile(GameWorldScenePath);
         }
         catch (System.Exception ex)
@@ -192,17 +221,17 @@ public partial class MainMenuController : Control
         }
     }
 
-    private void OnLargeWorld()
+    private void OnTestPolygon()
     {
-        GD.Print("[MainMenu] Large World selected — large_world (500×500)");
+        GD.Print("[MainMenu] Test Polygon selected — test_polygon (50×50)");
         try
         {
-            Session?.NewGame(1, "large_world");
+            Session?.NewGame(1, "test_polygon");
             GetTree().ChangeSceneToFile(GameWorldScenePath);
         }
         catch (System.Exception ex)
         {
-            GD.PrintErr($"[MainMenu] LargeWorld failed: {ex}");
+            GD.PrintErr($"[MainMenu] TestPolygon failed: {ex}");
         }
     }
 

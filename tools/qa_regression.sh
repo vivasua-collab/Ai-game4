@@ -22,6 +22,7 @@ ALL_SIMS=(
   "TRASHDROP:GODOT_TRASHDROP_DEBUG"
   "CONTEXT:GODOT_CONTEXT_DEBUG"
   "MODALQA:GODOT_MODALQA_DEBUG"
+  "L500:GODOT_L500_DEBUG"
   "WEAPONVIS:GODOT_WEAPONVIS_DEBUG"
   "REASSEMBLY:GODOT_REASSEMBLY_DEBUG"
   "CHARGE:GODOT_CHARGE_SIM"
@@ -69,6 +70,13 @@ for entry in "${SIMS[@]}"; do
   # логе; жёсткий потолок CEILING сек без вердикта. Вердикт ищем во всём
   # выводе (exit 137 от kill — норма, если вердикт уже напечатан).
   : > "$LOG"
+  # L500: сим большого мира требует выбора large_world в меню-харнессе
+  # (GODOT_NEWGAME_WORLD); остальные — дефолтный QA-мир test_polygon.
+  if [ "$name" = "L500" ]; then
+    export GODOT_NEWGAME_WORLD=large_world
+  else
+    unset GODOT_NEWGAME_WORLD
+  fi
   env GODOT_NEWGAME=1 "$var=1" "$GODOT" --headless --path . scenes/MainMenu.tscn > "$LOG" 2>&1 &
   PID=$!
   SIM_PID="$PID"

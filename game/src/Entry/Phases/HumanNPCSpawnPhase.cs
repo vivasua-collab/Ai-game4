@@ -46,6 +46,15 @@ public sealed class HumanNPCSpawnPhase : AbstractSceneAssemblyPhase
     private const int MaxSpawnAttempts = 200;
     private const int MinDistanceFromPlayer = 5;
 
+    // L500 (2026-09-15): кластерный спавн на больших картах — 60% NPC в
+    // «поясе жизни» у центра (игрок тестирует боевку, не марширует по
+    // пустыне 1×1 км), 40% — по всей карте (ощущение обитаемого мира).
+    // Малые карты (< LargeAreaThreshold): прежний равномерный спавн —
+    // rng-стрим ИДЕНТИЧЕН (QA-детерминизм).
+    private const int LargeAreaThreshold = 100_000;
+    private const int NearRingRadius = 60;
+    private const double NearRingFraction = 0.6;
+
     public override Task ExecuteAsync()
     {
         var locId = _session.Data?.WorldId ?? LocationCatalog.TestPolygon.Id;
@@ -57,12 +66,13 @@ public sealed class HumanNPCSpawnPhase : AbstractSceneAssemblyPhase
         var requests = _composition?.GenerateStartup(loc)
             ?? new System.Collections.Generic.List<SpawnRequest>();
 
+        bool clustered = loc.Width * loc.Height >= LargeAreaThreshold;
         var rng = new SeededRandom(loc.Seed + NpcSeedOffset);
         int spawned = 0;
 
         foreach (var request in requests)
         {
-            var pos = FindWalkablePosition(rng, loc.Width, loc.Height);
+            var pos = FindWalkablePosition(rng, loc.Width, loc.Height, clustered);
             if (pos is null)
             {
                 Console.WriteLine($"[HumanNPCSpawn] No walkable tile for {request.Role} — skipped");
@@ -99,13 +109,28 @@ public sealed class HumanNPCSpawnPhase : AbstractSceneAssemblyPhase
         _                  => null, // Enemy/Monster — только бой
     };
 
-    private Position2D? FindWalkablePosition(SeededRandom rng, int width, int height)
+    private Position2D? FindWalkablePosition(SeededRandom rng, int width, int height, bool clustered)
     {
         int cx = width / 2, cy = height / 2;
+        // L500: радиус «пояса жизни» — от центра, с запасом до края карты.
+        int nearRadius = Math.Min(NearRingRadius, Math.Min(width, height) / 2 - 2);
         for (int attempt = 0; attempt < MaxSpawnAttempts; attempt++)
         {
-            int x = rng.Next(1, width - 1);
-            int y = rng.Next(1, height - 1);
+            int x, y;
+            if (clustered && nearRadius > MinDistanceFromPlayer + 3
+                && rng.NextDouble() < NearRingFraction)
+            {
+                // Пояс жизни: квадрат ±nearRadius вокруг центра (кламп в границы).
+                x = Math.Clamp(cx + rng.Next(-nearRadius, nearRadius + 1), 1, width - 2);
+                y = Math.Clamp(cy + rng.Next(-nearRadius, nearRadius + 1), 1, height - 2);
+            }
+            else
+            {
+                // Равномерно по всей карте (прежнее поведение малых карт).
+                x = rng.Next(1, width - 1);
+                y = rng.Next(1, height - 1);
+            }
+
             if (!_tiles.IsWalkable(x, y)) continue;
 
             int dist = Math.Max(Math.Abs(x - cx), Math.Abs(y - cy));

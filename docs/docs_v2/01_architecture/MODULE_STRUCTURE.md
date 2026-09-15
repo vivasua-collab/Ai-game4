@@ -306,6 +306,15 @@ Spawner.ResetWorld + CorpseService.ResetWorld + NPCGroupService.ResetWorld
 мир — без сброса повторная сборка даёт double-spawn, трупы/группы прошлого
 мира остаются в новом. QA: GODOT_REASSEMBLY_DEBUG (NPC-домен-ассерты).
 
+**L500 (2026-09-15, «основной мир 500×500»):** состав населения масштабируется
+от площади локации (`GenerateStartup`: area ≥100k тайлов → scale до ×4, кап
+12×scale; малые карты — scale=1, rng-стрим идентичен до-L500 → QA-детерминизм
+сохранён). Кластеризация: 60% NPC/зверей/групп — «пояс жизни» у центра карты
+(±60/±80/±90 тайлов), 40% — равномерно. Звери: area/10000 (500×500 → 24).
+Группы на больших картах — 4 (волчья стая + патруль + караван + стадо).
+«Новая игра» меню = large_world; GODOT_NEWGAME (QA) = test_polygon,
+GODOT_NEWGAME_WORLD оверрайдит. QA: GODOT_L500_DEBUG.
+
 **Визуал (Adapter/Scene, R15):** NPCSpriteRenderer рисует overlay оружия
 в основной руке (hand-спрайты WeaponVisualCatalog: 7 классов × 5 тиров
 материала × редкость; кэш npcId→itemId, перескан 0.5с — NPC-экип не

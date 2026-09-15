@@ -516,6 +516,13 @@ public partial class GameWorldController : Node2D
             var modalSim = new ModalSimDebug { Name = "ModalSimDebug" };
             AddChild(modalSim);
         }
+        // L500 (2026-09-15): мир 500×500 — интеграция генераций NPC
+        // (GODOT_L500_DEBUG=1, в связке с GODOT_NEWGAME_WORLD=large_world).
+        if (System.Environment.GetEnvironmentVariable("GODOT_L500_DEBUG") == "1")
+        {
+            var l500Sim = new L500SimDebug { Name = "L500SimDebug" };
+            AddChild(l500Sim);
+        }
         // 2026-09-04 S2: headless-верификация виньетки опасности
         // (GODOT_LOWHP_DEBUG=1) — alpha/пульс оверлея при HP < 35%/15%.
         if (System.Environment.GetEnvironmentVariable("GODOT_LOWHP_DEBUG") == "1")

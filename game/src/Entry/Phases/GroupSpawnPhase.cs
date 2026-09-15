@@ -252,10 +252,25 @@ public sealed class GroupSpawnPhase : AbstractSceneAssemblyPhase
     private Position2D? FindGroupCenter(SeededRandom rng, int mapW, int mapH, int minSpacing)
     {
         int cx = mapW / 2, cy = mapH / 2;
+        // L500 (2026-09-15): на больших картах 60% групп — «пояс жизни» ±90
+        // тайлов от центра (караван/патруль встречаются, а не блуждают по
+        // пустыне 1×1 км), 40% — вся карта. Малые карты: прежний равномерный
+        // спавн — rng-стрим идентичен (QA-детерминизм).
+        int nearRadius = Math.Min(90, Math.Min(mapW, mapH) / 2 - 2);
+        bool clusterNearCentre = mapW * mapH >= 100_000 && nearRadius > MinDistanceFromPlayer + 5;
         for (int attempt = 0; attempt < MaxSpawnAttempts; attempt++)
         {
-            int x = rng.Next(1, mapW - 1);
-            int y = rng.Next(1, mapH - 1);
+            int x, y;
+            if (clusterNearCentre && rng.NextDouble() < 0.6)
+            {
+                x = Math.Clamp(cx + rng.Next(-nearRadius, nearRadius + 1), 1, mapW - 2);
+                y = Math.Clamp(cy + rng.Next(-nearRadius, nearRadius + 1), 1, mapH - 2);
+            }
+            else
+            {
+                x = rng.Next(1, mapW - 1);
+                y = rng.Next(1, mapH - 1);
+            }
             if (!_tiles.IsWalkable(x, y)) continue;
 
             int distToPlayer = Math.Max(Math.Abs(x - cx), Math.Abs(y - cy));

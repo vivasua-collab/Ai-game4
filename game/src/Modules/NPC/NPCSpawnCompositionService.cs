@@ -79,6 +79,16 @@ namespace CultivationGame.Modules.NPC
         /// <summary>Кап на общий размер композиции (защита малых карт).</summary>
         private const int MaxCompositionSize = 12;
 
+        // L500 (2026-09-15, запрос пользователя: «основной мир 500×500, в нём
+        // тестирую боевку»): бюджет населения от площади локации — большой
+        // мир не пустыня. Порог большой карты — 100k тайлов; масштаб — до ×4
+        // (500×500=250k → ×4 → ≤48 NPC + группы/звери отдельно, общий
+        // MaxActiveNPCs=100 не превышается). МАЛЫЕ КАРТЫ: scale=1 — rng-стрим
+        // и счётчики ИДЕНТИЧНЫ прежним (QA LOOT/REASSEMBLY детерминизм).
+        private const int LargeAreaThreshold = 100_000;
+        private const int ScaleAreaDivisor = 62_500;
+        private const int MaxScale = 4;
+
         // === Ивент-спаун (единственный внутрисессионный источник NPC) ===
         /// <summary>Минимальная дистанция ивент-спауна от игрока (тайлы, Чебышёв).</summary>
         private const int EventSpawnMinPlayerDistance = 12;
@@ -133,85 +143,96 @@ namespace CultivationGame.Modules.NPC
             int danger = Math.Max(0, location?.DangerLevel ?? 0);
             var requests = new List<SpawnRequest>();
 
+            // L500: масштаб населения от площади (деталь — см. константы выше).
+            int area = (location?.Width ?? 0) * (location?.Height ?? 0);
+            bool large = area >= LargeAreaThreshold;
+            int scale = large ? Math.Clamp(area / ScaleAreaDivisor, 2, MaxScale) : 1;
+            int cap = MaxCompositionSize * scale;
+
             bool peaceful = IsPeacefulLocation(location);
             bool wild = IsWildLocation(location);
 
             if (peaceful)
             {
                 // Мирное ядро: торговец всегда, старейшина при danger==0.
-                requests.Add(new SpawnRequest(NPCRole.Merchant, RollLevel(rng, 1, danger)));
+                // (торговец масштабируется: на большой карте — несколько).
+                for (int i = 0; i < scale; i++)
+                    requests.Add(new SpawnRequest(NPCRole.Merchant, RollLevel(rng, 1, danger)));
                 if (danger == 0)
                     requests.Add(new SpawnRequest(NPCRole.Elder, RollLevel(rng, 2, danger)));
 
                 int guards = 1 + (danger >= 2 ? 1 : 0) + rng.Next(0, 2);
-                for (int i = 0; i < guards; i++)
+                for (int i = 0; i < guards * scale; i++)
                     requests.Add(new SpawnRequest(NPCRole.Guard, RollLevel(rng, 2, danger)));
 
                 int passersby = 2 + rng.Next(0, 2 + danger / 2);
-                for (int i = 0; i < passersby; i++)
+                for (int i = 0; i < passersby * scale; i++)
                     requests.Add(new SpawnRequest(NPCRole.Passerby, RollLevel(rng, 0, danger)));
 
                 int cultivators = 1 + rng.Next(0, 2);
-                for (int i = 0; i < cultivators; i++)
+                for (int i = 0; i < cultivators * scale; i++)
                     requests.Add(new SpawnRequest(NPCRole.Cultivator, RollLevel(rng, 3, danger)));
 
                 // Даже на ферме шалят бандиты: минимум 1 при danger 0.
                 int enemies = Math.Max(1, danger + rng.Next(1, 3));
-                for (int i = 0; i < enemies; i++)
+                for (int i = 0; i < enemies * scale; i++)
                     requests.Add(new SpawnRequest(NPCRole.Enemy, RollLevel(rng, 1, danger)));
             }
             else if (wild)
             {
                 // Дикие земли: враги доминируют, мирные редки.
                 int enemies = 2 + danger + rng.Next(0, 3);
-                for (int i = 0; i < enemies; i++)
+                for (int i = 0; i < enemies * scale; i++)
                     requests.Add(new SpawnRequest(NPCRole.Enemy, RollLevel(rng, 1, danger)));
 
                 int monsters = 1 + danger / 2 + rng.Next(0, 2);
-                for (int i = 0; i < monsters; i++)
+                for (int i = 0; i < monsters * scale; i++)
                     requests.Add(new SpawnRequest(NPCRole.Monster, RollLevel(rng, 1, danger), "wolf"));
 
                 int cultivators = rng.Next(0, 2);
-                for (int i = 0; i < cultivators; i++)
+                for (int i = 0; i < cultivators * scale; i++)
                     requests.Add(new SpawnRequest(NPCRole.Cultivator, RollLevel(rng, 2, danger)));
 
                 int passersby = rng.Next(0, 2);
-                for (int i = 0; i < passersby; i++)
+                for (int i = 0; i < passersby * scale; i++)
                     requests.Add(new SpawnRequest(NPCRole.Passerby, RollLevel(rng, 0, danger)));
 
                 int guards = rng.Next(0, 2);
-                for (int i = 0; i < guards; i++)
+                for (int i = 0; i < guards * scale; i++)
                     requests.Add(new SpawnRequest(NPCRole.Guard, RollLevel(rng, 2, danger)));
 
-                if (rng.Next(0, 2) == 1)
+                int merchants = rng.Next(0, 2);
+                for (int i = 0; i < merchants * scale; i++)
                     requests.Add(new SpawnRequest(NPCRole.Merchant, RollLevel(rng, 1, danger)));
             }
             else
             {
                 // Смешанный состав (Region/Area/Building/Room/...).
                 int enemies = 1 + danger / 2 + rng.Next(0, 2);
-                for (int i = 0; i < enemies; i++)
+                for (int i = 0; i < enemies * scale; i++)
                     requests.Add(new SpawnRequest(NPCRole.Enemy, RollLevel(rng, 1, danger)));
 
                 int passersby = 1 + rng.Next(0, 3);
-                for (int i = 0; i < passersby; i++)
+                for (int i = 0; i < passersby * scale; i++)
                     requests.Add(new SpawnRequest(NPCRole.Passerby, RollLevel(rng, 0, danger)));
 
                 int cultivators = rng.Next(0, 2);
-                for (int i = 0; i < cultivators; i++)
+                for (int i = 0; i < cultivators * scale; i++)
                     requests.Add(new SpawnRequest(NPCRole.Cultivator, RollLevel(rng, 2, danger)));
 
-                if (rng.Next(0, 2) == 1)
+                int guards = rng.Next(0, 2);
+                for (int i = 0; i < guards * scale; i++)
                     requests.Add(new SpawnRequest(NPCRole.Guard, RollLevel(rng, 2, danger)));
 
-                if (rng.Next(0, 3) == 0)
+                int merchants = rng.Next(0, 3);
+                for (int i = 0; i < merchants * scale; i++)
                     requests.Add(new SpawnRequest(NPCRole.Merchant, RollLevel(rng, 1, danger)));
             }
 
             // Кап: лишние срезаются с КОНЦА (мирные роли идут раньше врагов —
             // при резе остаются мирные, враги уходят первыми: безопаснее).
-            if (requests.Count > MaxCompositionSize)
-                requests.RemoveRange(MaxCompositionSize, requests.Count - MaxCompositionSize);
+            if (requests.Count > cap)
+                requests.RemoveRange(cap, requests.Count - cap);
 
             _targetPopulation = requests.Count;
             return requests;

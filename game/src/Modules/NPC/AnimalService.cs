@@ -254,21 +254,41 @@ namespace CultivationGame.Modules.NPC
 
             var rng = new SeededRandom(seed + AnimalSeedOffset);
 
-            int targetCount = rng.Next(3, 6);  // 3-5 animals
+            // L500 (2026-09-15): звери масштабируются от площади на больших
+            // картах (500×500 → 24; волки для теста боевки гарантированно
+            // есть), малые карты — прежний 3-5 rng (QA-детерминизм: стрим
+            // и число вызовов идентичны до-L500).
+            bool large = width * height >= 100_000;
+            int targetCount = large
+                ? Math.Min(24, (width * height) / 10_000)
+                : rng.Next(3, 6);  // 3-5 animals
             string[] speciesPool = { "wolf", "deer", "rabbit" };
 
             int playerX = width / 2;
             int playerY = height / 2;
+            // L500: 60% зверей — «пояс жизни» ±80 тайлов от центра (игрок
+            // встречает волков, не ищет их по пустыне), 40% — вся карта.
+            int nearRadius = Math.Min(80, Math.Min(width, height) / 2 - 2);
+            bool clusterNearCentre = large && nearRadius > MinDistanceFromPlayer + 5;
 
             int spawned = 0;
             int attempts = 0;
-            while (spawned < targetCount && attempts < MaxSpawnAttempts)
+            while (spawned < targetCount && attempts < MaxSpawnAttempts * 4)
             {
                 attempts++;
 
                 // Random position within the map, leaving a 1-tile margin.
-                int x = rng.Next(1, width - 1);
-                int y = rng.Next(1, height - 1);
+                int x, y;
+                if (clusterNearCentre && rng.NextDouble() < 0.6)
+                {
+                    x = Math.Clamp(playerX + rng.Next(-nearRadius, nearRadius + 1), 1, width - 2);
+                    y = Math.Clamp(playerY + rng.Next(-nearRadius, nearRadius + 1), 1, height - 2);
+                }
+                else
+                {
+                    x = rng.Next(1, width - 1);
+                    y = rng.Next(1, height - 1);
+                }
 
                 if (!_tileService.IsWalkable(x, y))
                     continue;
