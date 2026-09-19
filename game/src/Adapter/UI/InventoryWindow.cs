@@ -41,8 +41,10 @@ public partial class InventoryWindow : Control
     [Inject] private IGroundItemService GroundItems { get; set; } = null!;
     [Inject] private IEquipmentService EquipmentService { get; set; } = null!;
     [Inject] private IPlayerService PlayerService { get; set; } = null!;
-    [Inject] private IQiService QiService { get; set; } = null!;
-    [Inject] private IBodyService BodyService { get; set; } = null!;
+    // R19 «Потребляемые ресурсы»: маршрутизация «Использовать» по типу
+    // (поглощение Ци/лечение/восстановление Ци + риск хаоса — в сервисе;
+    // IQiService/IBodyService окну больше не нужны напрямую).
+    [Inject] private IItemUseService ItemUseService { get; set; } = null!;
     [Inject] private CultivationGame.Core.Events.IPublisher<CultivationGame.Core.Messaging.Contracts.ToastShownEvent> ToastPub { get; set; } = null!;
 
     private bool _isVisible;
@@ -279,93 +281,59 @@ public partial class InventoryWindow : Control
     public CharacterDollPanel? GetDollPanel() => _dollPanel;
 
     /// <summary>
-    /// Этап 7 внедрения ЦИ: использовать камень Ци (RMB в инвентаре → Use).
-    /// v1 — мгновенное поглощение всего Ци камня:
-    ///   • +QiAmount к CurrentQi игрока (IQiService.AddQi).
-    ///   • chaotic: 10% шанс −10% MaxHP (опасность хаотичной Ци, §10.2).
-    ///   • камень расходуется (1 шт. снимается с инвентаря).
+    /// Этап 7 внедрения ЦИ → R19: делегат IItemUseService (единая
+    /// маршрутизация по типу предмета). Сохранён как публичный API для
+    /// QA/хоткеев (поведение и тосты — прежние: поглощение + риск хаоса).
+    /// Списывает камень из ПЕРВОЙ кучки этого itemId — исторический
+    /// контракт «RMB → Use» этапа 7 (слот-адресная семантика R10 внутри).
     /// </summary>
     public bool TryUseQiStone(string itemId)
     {
         if (string.IsNullOrEmpty(itemId)) return false;
         if (!ItemDatabase.TryGetItem(itemId, out var itemData)) return false;
-        if (itemData is not QiStoneData stone) return false;
+        if (itemData is not QiStoneData) return false;
 
-        int count = InventoryService.GetItemCount(itemId);
-        if (count <= 0)
+        Guid firstSlotId = Guid.Empty;
+        foreach (var s in InventoryService.GetAllSlots())
+        {
+            if (s.ItemId == itemId) { firstSlotId = s.SlotId; break; }
+        }
+        if (firstSlotId == Guid.Empty)
         {
             PublishToast("Нет камня для использования");
             return false;
         }
 
-        long before = QiService?.CurrentQi ?? 0;
-
-        // Снять 1 шт. с инвентаря.
-        if (!InventoryService.TryRemoveItem(itemId, 1))
-        {
-            PublishToast("Не удалось использовать камень");
-            return false;
-        }
-
-        // Поглотить Ци (мгновенно для v1).
-        QiService?.AddQi(stone.QiAmount);
-
-        long after = QiService?.CurrentQi ?? 0;
-        long gained = after - before;
-
-        // Хаотичная Ци: 10% шанс −10% MaxHP (риск по канону §10.2).
-        bool tookDamage = false;
-        if (stone.IsChaotic)
-        {
-            var rng = new System.Random((int)System.DateTime.UtcNow.Ticks);
-            double roll = rng.NextDouble();
-            if (roll < 0.10) // 10% риск
-            {
-                ApplyChaoticDamage();
-                tookDamage = true;
-            }
-        }
-
-        // Формирование отзыва.
-        string stoneName = stone.NameRu;
-        if (tookDamage)
-        {
-            PublishToast($"💥 {stoneName}: +{gained} Ци, но хаотичная Ци ранила вас! (−10% HP)");
-            GD.Print($"[Inventory] Used Qi stone {itemId}: +{gained} Qi, chaotic damage applied");
-        }
-        else if (stone.IsChaotic)
-        {
-            PublishToast($"⚡ {stoneName}: +{gained} Ци (хаос сдержан — повезло)");
-            GD.Print($"[Inventory] Used chaotic Qi stone {itemId}: +{gained} Qi, no damage");
-        }
-        else
-        {
-            PublishToast($"✦ {stoneName}: +{gained} Ци");
-            GD.Print($"[Inventory] Used Qi stone {itemId}: +{gained} Qi");
-        }
-
-        RefreshExternally();
-        return true;
+        bool ok = ItemUseService.TryUseFromInventory(firstSlotId, itemId);
+        if (ok) RefreshExternally();
+        return ok;
     }
 
     /// <summary>
-    /// Применить урон хаотичной Ци: −10% от максимального HP игрока.
-    /// HP = сумма MaxRedHP по частям тела (Q4). Урон наносится в торс
-    /// (витальная часть) — представляет нагрузку на культивационное ядро.
+    /// R19 «Потребляемые ресурсы»: использовать 1 шт. из КОНКРЕТНОЙ кучки
+    /// (ПКМ-кнопка «Использовать»). Маршрутизация по типу объекта —
+    /// IItemUseService (камни Ци → поглощение; heal → лечение самых
+    /// повреждённых частей; qi_restore → Ци; остальное — отказ).
+    /// Слот-адресность R10 P1-SlotId: при мутации кучки — отказ, инвентарь
+    /// не тронут. Обратная связь — тост от сервиса.
     /// </summary>
-    private void ApplyChaoticDamage()
+    public bool TryUseItem(Guid slotId, string itemId)
     {
-        if (BodyService == null) return;
-        int maxHp = 0;
-        var parts = BodyService.GetAllParts();
-        if (parts == null) return;
-        foreach (var p in parts) maxHp += p.MaxRedHP;
-        if (maxHp <= 0) return;
-
-        int damage = (int)System.Math.Max(1, maxHp * 0.10f);
-        BodyService.ApplyDamage(BodyPartType.Torso, damage);
-        GD.Print($"[Inventory] Chaotic Qi damage: -{damage} HP (10% of {maxHp})");
+        bool ok = ItemUseService.TryUseFromInventory(slotId, itemId);
+        if (ok)
+        {
+            RefreshExternally();
+            _dollPanel?.RefreshAll();
+        }
+        return ok;
     }
+
+    /// <summary>
+    /// R19: информация об использовании (для ПКМ-меню: показывать ли
+    /// кнопку «Использовать» и какой tooltip). Делегат IItemUseService.
+    /// </summary>
+    public CultivationGame.Core.Interfaces.ItemUseInfo GetUseInfo(ItemData item)
+        => ItemUseService.GetUseInfo(item);
 
     /// <summary>Опубликовать toast (показывается GameWorldController).</summary>
     private void PublishToast(string message)

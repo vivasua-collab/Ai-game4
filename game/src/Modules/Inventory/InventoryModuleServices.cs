@@ -35,6 +35,11 @@ public static class InventoryModuleServices
         // === Belt quick slots (2026-08-22: хотбар 3-9, гейт по поясу) ===
         builder.Register<BeltService>(Lifetime.Singleton);
 
+        // === R19 «Потребляемые ресурсы»: единая маршрутизация использования
+        // предметов по типу (камни Ци / heal / qi_restore) — потребляется
+        // ПКМ-контекстным меню инвентаря и BeltService. ===
+        builder.Register<IItemUseService, ItemUseService>(Lifetime.Singleton);
+
         // === Точка входа модуля ===
         builder.Register<InventoryModule>(Lifetime.Singleton);
 

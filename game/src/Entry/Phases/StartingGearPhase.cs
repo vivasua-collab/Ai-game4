@@ -93,21 +93,28 @@ public sealed class StartingGearPhase : AbstractSceneAssemblyPhase
         }
 
         // === 2. Канонические расходники (БД + игроку ×5) ===
-        var consumables = new (string id, string name, float weight, float volume, ItemRarity rarity, int maxStack, string effect, int value)[]
+        // R19 (2026-09-19) «Потребляемые ресурсы»: БАГ ДАННЫХ — тапл нес
+        // (effect, value), но в ItemData писалось ТОЛЬКО Value=value (стоимость!),
+        // а Effects НЕ заполнялись → у стартовых пилюль/ягод не было эффектов:
+        // ПКМ-«Использовать» не появлялся, пояс не лечил. Теперь: Effects
+        // заполняются из данных (кейс-нормализация — в IItemUseService),
+        // стоимость — отдельное поле туапла. Описания — живые (ПКМ-меню
+        // теперь читаемо и показывает их).
+        var consumables = new (string id, string name, string description, float weight, float volume, ItemRarity rarity, int maxStack, string effect, int effectValue, int cost)[]
         {
-            ("consumable_berry",  "Ягоды",               0.05f, 0.1f, ItemRarity.Common,   50, "heal",       5),
-            ("consumable_herb",   "Лекарственная трава", 0.03f, 0.1f, ItemRarity.Uncommon, 50, "material",   0),
-            ("con_pill_healing",  "Пилюля лечения",      0.05f, 0.1f, ItemRarity.Common,   20, "heal",      30),
-            ("con_pill_qi",       "Пилюля Ци",           0.05f, 0.1f, ItemRarity.Uncommon, 20, "qi_restore", 50),
+            ("consumable_berry",  "Ягоды",               "Съедобные лесные ягоды: немного восстанавливают силы.", 0.05f, 0.1f, ItemRarity.Common,   50, "heal",       5, 2),
+            ("consumable_herb",   "Лекарственная трава", "Целебная трава. Употребляется в алхимии, не сама по себе.", 0.03f, 0.1f, ItemRarity.Uncommon, 50, "material",   0, 3),
+            ("con_pill_healing",  "Пилюля лечения",      "Стандартная лечебная пилюля: закрывает раны по телу.", 0.05f, 0.1f, ItemRarity.Common,   20, "heal",      30, 8),
+            ("con_pill_qi",       "Пилюля Ци",           "Восстанавливает Ци практика. Стандарт для медитаций.", 0.05f, 0.1f, ItemRarity.Uncommon, 20, "qi_restore", 50, 12),
         };
-        foreach (var (id, name, weight, volume, rarity, maxStack, effect, value) in consumables)
+        foreach (var (id, name, description, weight, volume, rarity, maxStack, effect, effectValue, cost) in consumables)
         {
             var item = new ItemData
             {
                 ItemId = id,
                 NameRu = name,
                 NameEn = name,
-                Description = "Расходник",
+                Description = description,
                 Category = ItemCategory.Consumable,
                 ItemType = "Consumable",
                 Rarity = rarity,
@@ -115,8 +122,12 @@ public sealed class StartingGearPhase : AbstractSceneAssemblyPhase
                 MaxStack = maxStack,
                 Weight = weight,
                 Volume = volume,
-                Value = value,
+                Value = cost,
                 HasDurability = false,
+                Effects = new System.Collections.Generic.List<ItemEffect>
+                {
+                    new ItemEffect { EffectType = effect, Value = effectValue },
+                },
             };
             _itemDb.Register(item);
             registered++;

@@ -8,7 +8,23 @@
 //     в исходном стке, справа — сколько уйдёт в новую кучку).
 //   • «Выбросить стак» — выбрасывает ТОЛЬКО этот слот (кучку), а не все
 //     предметы типа (важно при множественных кучках одного ItemId).
-//   • Будущее (планы): алхимия — точные количества вещества из кучки.
+//
+// R19 (2026-09-19) «Потребляемые ресурсы» — два запроса пользователя:
+//   1. «Более выраженный фон подокна — не читается текст»:
+//      КОРНЕВОЙ БАГ: панель была `Panel` c CustomMinimumSize(400, 0) —
+//      БЕЗ якорей и БЕЗ контейнера: высота панели = 0 → StyleBox фон
+//      физически не рисовался (полоса 0 px), контент (VBox с FullRect-
+//      якорями) рендерился «ниже» панели прямо на тёмном бекдропе —
+//      текст «плавал» без подложки (скриншоты пользователя: фон #3c3120,
+//      текст #7f7f7f, контраст ~2.9:1). Фикс: PanelContainer —
+//      авторазмер по контенту + явный stylebox-override (прецедент всех
+//      окон проекта) + непрозрачный пергамент + затемнение бекдропа 0.45.
+//   2. Кнопка «Использовать» для ВСЕХ используемых типов (маршрутизация
+//      по типу объекта — IItemUseService): камни Ци → поглощение Ци,
+//      расходники heal/qi_restore → лечение/Ци. Материалы/свитки —
+//      кнопка не показывается. Раньше «Использовать» был только у камней Ци.
+//   + кейс-нормализация ключей эффектов в отображении (баг: генератор
+//      писал "Heal", меню показывало сырой ключ вместо «Лечение»).
 using Godot;
 using System;
 using System.Collections.Generic;
@@ -28,7 +44,7 @@ public partial class ItemContextMenu : Control
     private readonly InventorySlot _slot;
     private readonly ItemData _item;
 
-    private Panel _panel = null!;
+    private PanelContainer _panel = null!;
 
     // === QA-акцессоры (GODOT_CONTEXT_DEBUG, №26) ===
     public Button? UseButtonForQA { get; private set; }
@@ -37,6 +53,14 @@ public partial class ItemContextMenu : Control
     /// <summary>R10 P1-SlotId: стабильная идентичность кучки (действия меню).</summary>
     public Guid SlotIdForQA => _slot.SlotId;
     public int PropertyCountForQA { get; private set; }
+
+    // === R19 QA: читаемость подокна (регресс-гард «фон не рисовался») ===
+    /// <summary>Высота панели меню (px) — была 0 у Panel без контейнера.</summary>
+    public float MenuPanelHeightForQA => _panel?.Size.Y ?? 0f;
+    /// <summary>Альфа фона панели (1.0 = непрозрачный пергамент).</summary>
+    public float MenuPanelBgAlphaForQA { get; private set; }
+    /// <summary>Контраст (WCAG, отношение) фон↔текст описания (цель ≥ 4.5).</summary>
+    public float DescriptionContrastForQA { get; private set; }
 
     public ItemContextMenu(InventoryWindow parent, InventorySlot slot, ItemData item)
     {
@@ -52,11 +76,12 @@ public partial class ItemContextMenu : Control
         SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         MouseFilter = MouseFilterEnum.Stop;
 
-        // Затемнение — клик мимо панели закрывает меню.
+        // Затемнение — клик мимо панели закрывает меню. R19: 0.25 → 0.45:
+        // выраженное отделение светлой панели от инвентаря позади.
         var backdrop = new ColorRect
         {
             Name = "Backdrop",
-            Color = new Color(0f, 0f, 0f, 0.25f),
+            Color = new Color(0f, 0f, 0f, 0.45f),
         };
         backdrop.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         backdrop.MouseFilter = MouseFilterEnum.Stop;
@@ -66,20 +91,45 @@ public partial class ItemContextMenu : Control
         var rarityColor = CharacterDollPanel.GetRarityColor(_item.Rarity);
 
         // ── Панель с содержимым ──
-        _panel = new Panel
+        // R19-ФИКС: PanelContainer (авторазмер по контенту). Старая панель
+        // была Panel c CustomMinimumSize(400, 0): высота 0 → StyleBox-фон
+        // не рисовался вовсе, контент «плавал» на бекдропе (нечитаемо).
+        _panel = new PanelContainer
         {
             Name = "MenuPanel",
-            CustomMinimumSize = new Vector2(400, 0),
+            CustomMinimumSize = new Vector2(420, 0),
         };
         _panel.MouseFilter = MouseFilterEnum.Stop;
+        // R19: явный override (прецедент всех окон проекта) — непрозрачный
+        // пергамент + золотая рамка 3px (напр. как PanelStyle темы, но
+        // гарантированно прикреплён к узлу).
+        var panelStyle = new StyleBoxFlat
+        {
+            BgColor = ParchmentTheme.ParchmentBase,
+            BorderColor = ParchmentTheme.AccentGold,
+            BorderWidthBottom = 3,
+            BorderWidthTop = 3,
+            BorderWidthLeft = 3,
+            BorderWidthRight = 3,
+            CornerRadiusTopLeft = 6,
+            CornerRadiusTopRight = 6,
+            CornerRadiusBottomLeft = 6,
+            CornerRadiusBottomRight = 6,
+            ContentMarginLeft = 14,
+            ContentMarginRight = 14,
+            ContentMarginTop = 10,
+            ContentMarginBottom = 12,
+        };
+        _panel.AddThemeStyleboxOverride("panel", panelStyle);
         AddChild(_panel);
 
+        // QA-снимок стиля (до layout — значения константны).
+        MenuPanelBgAlphaForQA = panelStyle.BgColor.A;
+        DescriptionContrastForQA = WcagContrast(ParchmentTheme.ParchmentBase, ParchmentTheme.InkBlack);
+
+        // Контент — естественная вертикальная раскладка (без FullRect-якорей:
+        // панель сама растёт по высоте контента — в этом и был фикс).
         var vbox = new VBoxContainer();
-        vbox.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        vbox.OffsetLeft = 12;
-        vbox.OffsetRight = -12;
-        vbox.OffsetTop = 10;
-        vbox.OffsetBottom = -10;
         vbox.AddThemeConstantOverride("separation", 4);
         _panel.AddChild(vbox);
 
@@ -126,6 +176,7 @@ public partial class ItemContextMenu : Control
             var val = new Label
             {
                 Text = valueText,
+                CustomMinimumSize = new Vector2(236, 0),
                 SizeFlagsHorizontal = SizeFlags.ExpandFill,
                 AutowrapMode = TextServer.AutowrapMode.WordSmart,
             };
@@ -136,46 +187,55 @@ public partial class ItemContextMenu : Control
             vbox.AddChild(row);
         }
 
-        // Описание (если есть).
+        // Описание (если есть). R19: InkBlack 13px (было InkFaded 12 —
+        // нечитаемо), ширина ограничена для переноса длинных строк.
         if (!string.IsNullOrEmpty(_item.Description))
         {
             vbox.AddChild(new HSeparator());
             var desc = new Label
             {
                 Text = _item.Description,
-                AutowrapMode = TextServer.AutowrapMode.WordSmart,
+                CustomMinimumSize = new Vector2(392, 0),
                 SizeFlagsHorizontal = SizeFlags.ExpandFill,
+                AutowrapMode = TextServer.AutowrapMode.WordSmart,
             };
-            desc.AddThemeFontSizeOverride("font_size", 12);
-            desc.AddThemeColorOverride("font_color", ParchmentTheme.InkFaded);
+            desc.AddThemeFontSizeOverride("font_size", 13);
+            desc.AddThemeColorOverride("font_color", ParchmentTheme.InkBlack);
             vbox.AddChild(desc);
         }
 
-        // ── Кнопки действий ──
+        // ── Действия ──
         vbox.AddChild(new HSeparator());
+
+        // ⚡ Использовать — R19: для ВСЕХ используемых типов (маршрутизация
+        // IItemUseService по типу объекта: камни Ци → поглощение; heal →
+        // лечение; qi_restore → Ци). Первичное действие — отдельной строкой,
+        // во всю ширину. Неиспользуемые типы (материал/свитки) кнопки не получают.
+        var useInfo = _parent.GetUseInfo(_item);
+        if (useInfo.Usable)
+        {
+            var useBtn = new Button
+            {
+                Text = "⚡ Использовать",
+                TooltipText = useInfo.ActionLabel,
+                SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            };
+            useBtn.Pressed += () =>
+            {
+                _parent.CloseContextMenu();
+                _parent.TryUseItem(_slot.SlotId, _item.ItemId);
+            };
+            vbox.AddChild(useBtn);
+            UseButtonForQA = useBtn;
+        }
+
+        // Вторичные действия — одной строкой: разделить/выбросить.
         var buttons = new HBoxContainer
         {
             Alignment = BoxContainer.AlignmentMode.Center,
         };
         buttons.AddThemeConstantOverride("separation", 8);
         vbox.AddChild(buttons);
-
-        // ⚡ Использовать — только камни Ци (RMB-поведение этапа 7).
-        if (_item.Category == ItemCategory.QiStone)
-        {
-            var useBtn = new Button
-            {
-                Text = "⚡ Использовать",
-                TooltipText = "Поглотить Ци камня (1 шт.)",
-            };
-            useBtn.Pressed += () =>
-            {
-                _parent.CloseContextMenu();
-                _parent.TryUseQiStone(_item.ItemId);
-            };
-            buttons.AddChild(useBtn);
-            UseButtonForQA = useBtn;
-        }
 
         // ✂ Разделить стак — только для стакающихся ×2+.
         if (_item.Stackable && _slot.Count > 1)
@@ -230,6 +290,25 @@ public partial class ItemContextMenu : Control
         _panel.Position = new Vector2(x, y);
     }
 
+    /// <summary>
+    /// WCAG-контраст (отношение яркостей) между двумя цветами — QA-гард
+    /// читаемости текста подокна (R19: цель ≥ 4.5 для описания).
+    /// </summary>
+    private static float WcagContrast(Color bg, Color fg)
+    {
+        static double Lum(Color c)
+        {
+            double R = c.R <= 0.03928 ? c.R / 12.92 : System.Math.Pow((c.R + 0.055) / 1.055, 2.4);
+            double G = c.G <= 0.03928 ? c.G / 12.92 : System.Math.Pow((c.G + 0.055) / 1.055, 2.4);
+            double B = c.B <= 0.03928 ? c.B / 12.92 : System.Math.Pow((c.B + 0.055) / 1.055, 2.4);
+            return 0.2126 * R + 0.7152 * G + 0.0722 * B;
+        }
+        double l1 = Lum(bg);
+        double l2 = Lum(fg);
+        double ratio = (System.Math.Max(l1, l2) + 0.05) / (System.Math.Min(l1, l2) + 0.05);
+        return (float)ratio;
+    }
+
     private void OnBackdropInput(InputEvent @event)
     {
         if (@event is InputEventMouseButton mb && mb.Pressed)
@@ -270,12 +349,15 @@ public partial class ItemContextMenu : Control
                 break;
         }
 
-        // Эффекты расходников.
+        // Эффекты расходников. R19: кейс-нормализация ключа — генератор
+        // писал "Heal" (заглавная) и меню показывало сырой ключ вместо
+        // «Лечение» (скриншот пользователя: «Неал +15» = «Heal +15»).
         if (_item.Effects is { Count: > 0 })
         {
             foreach (var fx in _item.Effects)
             {
-                string fxName = fx.EffectType switch
+                string key = fx.EffectType?.Trim().ToLowerInvariant() ?? string.Empty;
+                string fxName = key switch
                 {
                     "heal" => "Лечение",
                     "qi_restore" => "Восстановление Ци",

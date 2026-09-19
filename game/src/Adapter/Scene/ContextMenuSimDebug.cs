@@ -14,9 +14,19 @@
 //   7. Корзина выбрасывает ТОЛЬКО перетащенную кучку (drag-data несёт
 //      slot_index), остальные кучки того же предмета остаются.
 //   8. Esc-приоритет: CloseTopmostPopup закрывает верхний попап, не окно.
+// R19 (2026-09-19) «Потребляемые ресурсы» — новые шаги:
+//   12. Пилюля лечения: ПКМ → «Использовать», урон → использование →
+//       счётчик −1, HP восстановлен (маршрутизация heal через IItemUseService).
+//   13. Сгенерированное лекарство с EffectType="Heal" (ЗАГЛАВНАЯ — баг
+//       пользователя: не лечил/показывал сырой ключ): кнопка есть,
+//       кейс-нормализация работает, HP восстанавливается.
+//   14. Материал (ItemCategory.Material): кнопки «Использовать» НЕТ.
+//   15. Читаемость подокна: панель имеет высоту (регресс: фон не
+//       рисовался при высоте 0), фон непрозрачен, контраст ≥ 4.5:1.
 // Запуск: GODOT_NEWGAME=1 GODOT_CONTEXT_DEBUG=1 godot --headless --path . scenes/MainMenu.tscn
 using Godot;
 using System;
+using System.Collections.Generic;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.Interfaces;
@@ -30,9 +40,13 @@ public partial class ContextMenuSimDebug : Node
     [Inject] private IInventoryService? _inventory;
     [Inject] private IItemDatabaseService? _itemDb;
     [Inject] private IGroundItemService? _groundItems;
+    [Inject] private IBodyService? _body;      // R19: лечение/урон в тесте
+    [Inject] private IQiService? _qi;          // R19: поглощение Ци камня
 
     private const string StoneId = "material_stone";
     private const string QiDustId = "qistone_dust_calm";
+    private const string HealPillId = "con_pill_healing";
+    private const string HealCapitalTestId = "con_test_heal_capital"; // R19: репродукция бага "Heal"
 
     public override void _Ready()
     {
@@ -101,18 +115,47 @@ public partial class ContextMenuSimDebug : Node
         GD.Print($"[ContextSim] 1. ПКМ открывает свойства: меню={menuOpened}, строк характеристик={menu?.PropertyCountForQA ?? 0} (≥3), кнопка «Разделить»={hasSplit}, кнопка «Выбросить»={hasDrop}");
         pass &= menuOpened && hasProps && hasSplit && hasDrop;
 
-        // === 2. Камень Ци: кнопка «Использовать» в меню ============
+        // === 2. Камень Ци: кнопка «Использовать» + РЕАЛЬНОЕ поглощение ===
+        // R19: расширен — кнопка теперь приходит из маршрутизации
+        // IItemUseService; проверяем и энд-ту-энд поглощение через неё
+        // (миграция TryUseQiStone → ItemUseService.TryUseFromInventory).
         int qiSlot = FindSlotIndex(_inventory, QiDustId);
         bool qiUseButton = false;
+        bool qiAbsorbed = false;
         if (qiSlot >= 0)
         {
+            int qiCountBefore = _inventory.GetItemCount(QiDustId);
+            // Сливаем половину Ци: стартовый буфер 1000/1000 полон — AddQi
+            // капится по MaxQi, поглощение пыли (+1024) дало бы +0 (так было
+            // и в старом TryUseQiStone: тост «+0 Ци»). Дрейн открывает окно.
+            _qi?.TryConsumeQi(System.Math.Min(_qi.CurrentQi, _qi.MaxQi / 2));
+            long qiBefore = _qi?.CurrentQi ?? 0;
+
             win.CloseContextMenu();
             win.OpenContextMenu(qiSlot);
-            qiUseButton = win.ContextMenuForQA?.UseButtonForQA != null;
+            var qiMenu = win.ContextMenuForQA;
+            qiUseButton = qiMenu?.UseButtonForQA != null;
+            if (qiMenu?.UseButtonForQA != null)
+            {
+                // Нажатие как у игрока: хендлер закрывает меню и вызывает
+                // TryUseItem(slotId, itemId) → сервис → Qi +1024, счётчик −1.
+                // (≥1024: мир живёт — фоновая регенерация Ци может добавить
+                // чуть больше за время ожидания; расход Ци у стоячего игрока нет.)
+                qiMenu.UseButtonForQA.EmitSignal(BaseButton.SignalName.Pressed);
+                await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+                long qiAfter = _qi?.CurrentQi ?? 0;
+                long maxQi = _qi?.MaxQi ?? 0;
+                int qiCountAfter = _inventory.GetItemCount(QiDustId);
+                // ≥ дрейна: пыль +1024 но капится по MaxQi; мир живёт —
+                // фоновая регенерация может добавить ещё; главное — буфер
+                // заполнился и счётчик уменьшился ровно на 1.
+                qiAbsorbed = qiAfter > qiBefore && qiAfter <= maxQi && qiCountAfter == qiCountBefore - 1;
+                GD.Print($"[ContextSim] 2b. поглощение через кнопку: Ци {qiBefore}→{qiAfter} (макс {maxQi}), счётчик {qiCountBefore}→{qiCountAfter}");
+            }
             win.CloseContextMenu();
         }
-        GD.Print($"[ContextSim] 2. камень Ци «Использовать» в меню: {qiUseButton} (ожидаем True — поведение этапа 7 сохранено)");
-        pass &= qiUseButton;
+        GD.Print($"[ContextSim] 2. камень Ци «Использовать» в меню: {qiUseButton} (ожидаем True), поглощение сквозь кнопку: {qiAbsorbed}");
+        pass &= qiUseButton && qiAbsorbed;
 
         // === 3. Диалог разделения: слайдер и числа ==================
         // R10 P1-SlotId: открытие по стабильному идентичности кучки.
@@ -416,22 +459,190 @@ public partial class ContextMenuSimDebug : Node
             pass &= splitTargetOk;
         }
 
+        // === 12. R19: пилюля лечения — «Использовать» из ПКМ-меню =====
+        // Сценарий пользователя: «Я поднял лекарство, у меня нет пояса,
+        // должна быть возможность потребить его по правой кнопке».
+        // Уронить торс → ПКМ → кнопка → счётчик −1, HP восстановлен.
+        {
+            int healSlot = FindSlotIndex(_inventory, HealPillId);
+            bool healOk = false;
+            if (healSlot >= 0 && _body != null && _itemDb!.TryGetItem(HealPillId, out _))
+            {
+                int pillCountBefore = _inventory.GetItemCount(HealPillId);
+                int redFull = TotalRedHp();
+                _body.ApplyDamage(BodyPartType.Torso, 15);
+                int redDamaged = TotalRedHp();
+
+                win.CloseContextMenu();
+                win.OpenContextMenu(healSlot);
+                var healMenu = win.ContextMenuForQA;
+                bool healButton = healMenu?.UseButtonForQA != null;
+                if (healMenu?.UseButtonForQA != null)
+                {
+                    healMenu.UseButtonForQA.EmitSignal(BaseButton.SignalName.Pressed);
+                    await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+                }
+                else
+                {
+                    win.CloseContextMenu();
+                }
+
+                int redHealed = TotalRedHp();
+                int pillCountAfter = _inventory.GetItemCount(HealPillId);
+                // Урон проходит через броню торса (стартовая броня L1) —
+                // абсолютные числа не детерминированы; тело живёт —
+                // регенерация тикает. Инварианты: урон применился (HP упал),
+                // heal применился (HP вырос), счётчик −1 ровно.
+                healOk = healButton
+                    && redDamaged < redFull
+                    && redHealed > redDamaged
+                    && pillCountAfter == pillCountBefore - 1;
+                GD.Print($"[ContextSim] 12. пилюля из ПКМ-меню: кнопка={healButton}, HP {redFull}→(урон)→{redDamaged}→(heal 30)→{redHealed}, счётчик {pillCountBefore}→{pillCountAfter}");
+            }
+            else
+            {
+                GD.Print("[ContextSim] 12. FAIL — пилюля лечения/тело не найдены");
+            }
+            pass &= healOk;
+        }
+
+        // === 13. R19: сгенерированное лекарство "Heal" (ЗАГЛАВНАЯ) =====
+        // Баг-репродукция пользователя: генератор пишет EffectType="Heal",
+        // старые потребители switch-ят по "heal" → лекарство НЕ ЛЕЧИЛО
+        // (даже через пояс), а меню показывало сырой ключ «Heal +15».
+        // Кейс-нормализация в IItemUseService должна это починить.
+        {
+            var capitalPill = new ItemData
+            {
+                ItemId = HealCapitalTestId,
+                NameRu = "Тестовое лекарство (Heal)",
+                NameEn = "Test Medicine (Heal)",
+                Description = "Репродукция бага: EffectType с заглавной буквы",
+                Category = ItemCategory.Consumable,
+                ItemType = "Consumable",
+                Rarity = ItemRarity.Common,
+                Stackable = true,
+                MaxStack = 10,
+                Weight = 0.1f,
+                Volume = 0.1f,
+                Value = 4,
+                HasDurability = false,
+                Effects = new List<ItemEffect> { new ItemEffect { EffectType = "Heal", Value = 25 } },
+            };
+            _itemDb!.Register(capitalPill);
+            _inventory!.TryAddItem(capitalPill, 2);
+            win.RefreshExternally();
+            await ToSignal(GetTree().CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
+
+            int capSlot = FindSlotIndex(_inventory, HealCapitalTestId);
+            bool capitalOk = false;
+            if (capSlot >= 0 && _body != null)
+            {
+                int capCountBefore = _inventory.GetItemCount(HealCapitalTestId);
+                int redFull2 = TotalRedHp();
+                _body.ApplyDamage(BodyPartType.Torso, 10);
+                int redDamaged2 = TotalRedHp();
+
+                win.CloseContextMenu();
+                win.OpenContextMenu(capSlot);
+                var capMenu = win.ContextMenuForQA;
+                bool capButton = capMenu?.UseButtonForQA != null;
+                if (capMenu?.UseButtonForQA != null)
+                {
+                    capMenu.UseButtonForQA.EmitSignal(BaseButton.SignalName.Pressed);
+                    await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+                }
+                else
+                {
+                    win.CloseContextMenu();
+                }
+
+                int redHealed2 = TotalRedHp();
+                int capCountAfter = _inventory.GetItemCount(HealCapitalTestId);
+                // Инварианты (броня/регенерация — относительные): урон
+                // применился, heal 25 применился, счётчик −1.
+                capitalOk = capButton
+                    && redDamaged2 < redFull2
+                    && redHealed2 > redDamaged2
+                    && capCountAfter == capCountBefore - 1;
+                GD.Print($"[ContextSim] 13. лекарство \"Heal\" (заглавная): кнопка={capButton} (кейс нормализован), HP {redFull2}→(урон)→{redDamaged2}→(heal 25)→{redHealed2}, счётчик {capCountBefore}→{capCountAfter}");
+            }
+            else
+            {
+                GD.Print("[ContextSim] 13. FAIL — тестовое лекарство не добавлено");
+            }
+            pass &= capitalOk;
+        }
+
+        // === 14. R19: материал — кнопки «Использовать» НЕТ ============
+        // Маршрутизация: Material → не употребляется (крафт/алхимия).
+        {
+            int matSlot = FindSlotIndex(_inventory, StoneId);
+            bool matNoButton = false;
+            if (matSlot >= 0)
+            {
+                win.CloseContextMenu();
+                win.OpenContextMenu(matSlot);
+                matNoButton = win.ContextMenuForQA?.UseButtonForQA == null;
+                win.CloseContextMenu();
+            }
+            GD.Print($"[ContextSim] 14. материал «Использовать» скрыт: {matNoButton} (ожидаем True — тип не используется напрямую)");
+            pass &= matNoButton;
+        }
+
+        // === 15. R19: читаемость подокна ==============================
+        // Регресс-гард бага «фон не рисовался»: панель была Panel с
+        // CustomMinimumSize(400, 0) без контейнера — высота 0, StyleBox
+        // не рисовался, текст плавал на тёмном бекдропе (контраст ~2.9:1).
+        // Теперь: PanelContainer → реальная высота, фон непрозрачен,
+        // контраст WCAG ≥ 4.5:1.
+        {
+            int rbSlot = FindSlotIndex(_inventory, HealPillId);
+            bool readabilityOk = false;
+            if (rbSlot >= 0)
+            {
+                win.CloseContextMenu();
+                win.OpenContextMenu(rbSlot);
+                var rbMenu = win.ContextMenuForQA;
+                if (rbMenu != null)
+                {
+                    await ToSignal(GetTree().CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
+                    float panelH = rbMenu.MenuPanelHeightForQA;
+                    float bgAlpha = rbMenu.MenuPanelBgAlphaForQA;
+                    float contrast = rbMenu.DescriptionContrastForQA;
+                    readabilityOk = panelH > 100f && bgAlpha >= 0.95f && contrast >= 4.5f;
+                    GD.Print($"[ContextSim] 15. читаемость: высота панели={panelH:F0}px (>100), альфа фона={bgAlpha:F2} (≥0.95), контраст текст/фон={contrast:F1}:1 (≥4.5)");
+                }
+                win.CloseContextMenu();
+            }
+            else
+            {
+                GD.Print("[ContextSim] 15. FAIL — пилюля для проверки читаемости не найдена");
+            }
+            pass &= readabilityOk;
+        }
+
         // === HOLD для VLM-скриншота (GODOT_CONTEXT_HOLD=1) ==========
         if (System.Environment.GetEnvironmentVariable("GODOT_CONTEXT_HOLD") == "1")
         {
             // Открыть контекстное меню свойства камня (скриншот №1),
             // затем диалог разделения (скриншот №2, если задан _SPLIT).
+            // GODOT_CONTEXT_MENU_ITEM (R19): какой предмет показывать в
+            // меню скриншота — по itemId (default: камень). Пример:
+            // con_pill_healing — снимок с кнопкой «Использовать».
             // NOTE: переменные _MENU/_SPLIT читает сам сим — GameBoot-автоматика
             // GODOT_SCREENSHOT здесь НЕ используется (она завершает процесс).
             string? shot = System.Environment.GetEnvironmentVariable("GODOT_SCREENSHOT_MENU");
             string? shotSplit = System.Environment.GetEnvironmentVariable("GODOT_SCREENSHOT_SPLIT");
+            string? shotItemId = System.Environment.GetEnvironmentVariable("GODOT_CONTEXT_MENU_ITEM");
+            string shotTarget = string.IsNullOrEmpty(shotItemId) ? StoneId : shotItemId!;
             if (!string.IsNullOrEmpty(shot))
             {
-                win.OpenContextMenu(FindSlotIndex(_inventory, StoneId));
+                win.OpenContextMenu(FindSlotIndex(_inventory, shotTarget));
                 await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
                 var img = GetViewport().GetTexture().GetImage();
                 img.SavePng(shot);
-                GD.Print($"[ContextSim] screenshot: {shot}");
+                GD.Print($"[ContextSim] screenshot: {shot} (item {shotTarget})");
             }
             if (!string.IsNullOrEmpty(shotSplit))
             {
@@ -462,6 +673,16 @@ public partial class ContextMenuSimDebug : Node
             if (slots[i].ItemId == itemId)
                 return i;
         return -1;
+    }
+
+    /// <summary>Суммарный «красный» HP игрока по всем частям (R19: heal-тесты).</summary>
+    private int TotalRedHp()
+    {
+        int total = 0;
+        var parts = _body?.GetAllParts();
+        if (parts == null) return 0;
+        foreach (var p in parts) total += p.CurrentRedHP;
+        return total;
     }
 
     private static GameWorldController? FindWorld(Node node)

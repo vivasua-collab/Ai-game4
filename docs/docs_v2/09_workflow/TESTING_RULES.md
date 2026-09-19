@@ -41,7 +41,7 @@
 | `GODOT_RESPAWN_DEBUG=1` | RespawnSimDebug | Ревью-этап-6: respawn ресурсов (истощение→7 дней→восстановление тайла), честный TryTravel, TimeChangedEvent.Delta == DeltaTime |
 | `GODOT_QUEST_DEBUG=1` | QuestSimDebug | Ревью-этап-7: полный цикл квестов — accept (через реальный диалог старейшины) → событие → complete → reward; гейт RequiredCultivationLevel |
 | `GODOT_TRASHDROP_DEBUG=1` | TrashDropSimDebug | Баг-репорт 09-08: инвентарный drag&drop в корзину — материалы draggable (раньше пустой Variant), корзина выбрасывает весь стек, кукла отклоняет не-экипировку, чужой source отвергается |
-| `GODOT_CONTEXT_DEBUG=1` | ContextMenuSimDebug | Запрос 09-09: ПКМ-контекстное меню — окно свойств, «Разделить стак…» (слайдер −/+ с двумя числами), множественные кучки одного ItemId, слот-адресный выброс кучки в корзину, Esc-приоритет попапов (8/8); ревью-R10 SlotId: stale drop при мутации в полёте, stale split → отказ, split при дрейфе индексов (11/11). Сим сам завершает процесс (GetTree().Quit) — без HOLD |
+| `GODOT_CONTEXT_DEBUG=1` | ContextMenuSimDebug | Запрос 09-09: ПКМ-контекстное меню — окно свойств, «Разделить стак…» (слайдер −/+ с двумя числами), множественные кучки одного ItemId, слот-адресный выброс кучки в корзину, Esc-приоритет попапов (8/8); ревью-R10 SlotId: stale drop при мутации в полёте, stale split → отказ, split при дрейфе индексов (11/11); R19 (2026-09-19) «Потребляемые ресурсы» +4 шага: поглощение камня Ци сквозь кнопку (дрейн Ци — буфер полон), пилюля лечения из ПКМ-меню (урон→heal→счётчик −1), лекарство "Heal" с ЗАГЛАВНОЙ (репродукция бага кейса — нормализация), материал без кнопки «Использовать», читаемость подокна (высота панели >100/альфа ≥0.95/контраст ≥4.5) (15/15). Сим сам завершает процесс (GetTree().Quit) — без HOLD |
 | `GODOT_MODALQA_DEBUG=1` | ModalSimDebug | Аудит-0915 A8 (P2-3): модальные окна — инвариант «пауза ⇔ стек окон ∨ Esc»: «×»/bg-click всех 6 окон (B/C/Q/J/F1/T) доходит до резюма тиков (Input.ActionPress эмуляция клавиш headless), идемпотентность двойного резюма (GWC-ветка + Closed), стек инвентарь+лавка не вешает паузу (A3) |
 | `GODOT_NEWGAME_WORLD=<id>` | MainMenuController | L500: мир авто-старта GODOT_NEWGAME (по умолчанию test_polygon — детерминизм 16 симов; large_world — для L500-сима) |
 | `GODOT_L500_DEBUG=1` | L500SimDebug | L500 (2026-09-15): мир 500×500 основной — сетка 500×500, генерации интегрированы (NPC ≥30 заспавнено / звери ≥15 / группы ≥4), пояс жизни (≥40% NPC в радиусе 100 от центра; эмерджентная смертность диких земель — живые ≥15 отдельно), MaxActiveNPCs ≤ 100. Запуск в связке: GODOT_NEWGAME_WORLD=large_world (раннер ставит сам) |
@@ -55,6 +55,7 @@
 | `GODOT_SCREENSHOT_DELAY=<сек>` | GameBoot | Задержка кадра для скриншота |
 | `GODOT_CONTEXT_HOLD=1` | ContextMenuSimDebug | Держать ПКМ-меню (скриншоты) — без HOLD сим сам завершает процесс |
 | `GODOT_SCREENSHOT_MENU=<путь>` | ContextMenuSimDebug | Скриншот окна ПКМ-свойств |
+| `GODOT_CONTEXT_MENU_ITEM=<itemId>` | ContextMenuSimDebug | R19: предмет для скриншота ПКМ-меню (default material_stone; напр. con_pill_healing — снимок с кнопкой «Использовать») |
 | `GODOT_SCREENSHOT_SPLIT=<путь>` | ContextMenuSimDebug | Скриншот слайдера разделения стака |
 
 ### 0.2. Прогон регрессии — `tools/qa_regression.sh` (2026-09-15)
