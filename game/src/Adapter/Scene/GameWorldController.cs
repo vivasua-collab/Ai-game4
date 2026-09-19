@@ -1621,6 +1621,22 @@ public partial class GameWorldController : Node2D
         }
 #endif
 
+        // 2026-09-19 R18-1: F7 — тумблер индикации врагов (HP-бары над
+        // врагами + цифры урона над ними). Настройка игрока (не DEBUG):
+        // работает всегда (как cheat_menu), мгновенно персистится
+        // (user://settings.json). Подготовка высокой сложности — там
+        // индикация противника выключена по дизайну.
+        if (PlayerInput.IsEnemyVitalsTogglePressed)
+        {
+            GameSettings.EnsureLoaded();
+            bool newValue = !GameSettings.ShowEnemyVitals;
+            GameSettings.SetShowEnemyVitals(newValue);
+            ShowToast(newValue
+                ? "👁 Индикация врагов: ВКЛ (HP-бары и урон)"
+                : "🚫 Индикация врагов: ВЫКЛ (как на высокой сложности)");
+            GD.Print($"[GameWorld] ShowEnemyVitals = {newValue} (F7, saved to user://settings.json)");
+        }
+
         // 2026-08-28: F1 — окно-справка горячих клавиш (с паузой — чтение).
         // R13-audit (P2-2): гвард модальности обыска (см. комментарий у T).
         if (PlayerInput.IsHelpHotkeysPressed && _hotkeysWindow != null && Time != null

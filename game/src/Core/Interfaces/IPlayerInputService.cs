@@ -123,6 +123,13 @@ namespace CultivationGame.Core.Interfaces
         /// </summary>
         bool IsHelpHotkeysPressed { get; }
 
+        /// <summary>
+        /// 2026-09-19 R18-1: F7 — тумблер индикации врагов (HP-бары + цифры
+        /// урона над врагами) нажат (sticky, one-shot). Работает даже поверх
+        /// UI — это глобальная настройка (GameSettings.ShowEnemyVitals).
+        /// </summary>
+        bool IsEnemyVitalsTogglePressed { get; }
+
         /// <summary>Текущий кадр ввода (raw). Ai-game3 compatibility — для Adapter'ов.</summary>
         InputFrameData CurrentFrame { get; }
 

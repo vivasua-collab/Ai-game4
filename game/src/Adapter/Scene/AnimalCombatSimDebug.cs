@@ -26,6 +26,7 @@ using CultivationGame.Core.Events;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Core.Messaging.Contracts;
 using CultivationGame.Adapter.Di;
+using CultivationGame.Adapter.Persistence;
 using CultivationGame.Modules.NPC;
 
 namespace CultivationGame.Adapter.Scene;
@@ -47,6 +48,11 @@ public partial class AnimalCombatSimDebug : Node2D
     [Inject] private Modules.Player.PlayerCombatAdapter? _combatAdapter;
     // Конкретный AnimalService — QA-API (IsHostile, GetAllAnimals, SpawnAnimal).
     [Inject] private Modules.NPC.AnimalService? _animalService;
+    // R18-1 QA (шаг 8): HP-бары — NPC-предикат + ID всех NPC.
+    [Inject] private INPCService? _npcService;
+    // R18-1 QA (шаг 8): синтетический DamageAppliedEvent для проверки гейта
+    // цифр урона (без хрупкой зависимости от хода-гейта CombatService).
+    [Inject] private IPublisher<DamageAppliedEvent>? _damageEventPub;
     // Проверка завершения боя при de-aggro (AbandonCombat через disengage).
     [Inject] private CultivationGame.Modules.Combat.CombatService? _combatServiceImpl;
 
@@ -117,7 +123,7 @@ public partial class AnimalCombatSimDebug : Node2D
 
         if (_attackIntentPub == null || _playerService == null || _bodyProvider == null
             || _corpseService == null || _combatAdapter == null || _animalService == null
-            || _combatServiceImpl == null)
+            || _combatServiceImpl == null || _damageEventPub == null || _npcService == null)
         {
             GD.Print("[AnimalQA] FAIL — DI not wired");
             PrintVerdict(false);
@@ -286,10 +292,130 @@ public partial class AnimalCombatSimDebug : Node2D
                  $"→ {(rabbitPeaceful ? "OK" : "FAIL")}");
         allOk &= rabbitPeaceful;
 
+        // === 8. R18-1: HP-БАРЫ ВРАГОВ + ГЛОБАЛЬНЫЙ ТУМБЛЕР ================
+        // Требование пользователя: «полоска жизни над врагами, глобально
+        // отключаемая — на высокой сложности никакой индикации урона и жизни
+        // противников». Проверяем: (а) повреждённый кролик (прямая мутация
+        // non-vital части — паттерн шага 4, без хрупкой атаки через ход-гейт)
+        // → предикат бара true; (б) лёгкое повреждение non-vital части NPC →
+        // NPC-предикат true; (в) тумблер OFF → оба предиката false + цифры
+        // урона над не-игроком подавляются (синтетическое событие с фейковой
+        // целью — гейт DamageNumberRenderer); (г) тумблер ON восстановлен +
+        // откат всех повреждений (чистое глобальное состояние).
+        var animalRenderer = FindNode<AnimalSpriteRenderer>(GetTree().Root);
+        var dmgRenderer = FindNode<DamageNumberRenderer>(GetTree().Root);
+        var npcRendererForBars = FindNode<NPCSpriteRenderer>(GetTree().Root);
+        if (animalRenderer == null || dmgRenderer == null || npcRendererForBars == null)
+        {
+            GD.Print("[AnimalQA] 8-HP-бары: FAIL — рендереры не найдены " +
+                     $"(animal={animalRenderer != null}, dmg={dmgRenderer != null}, npc={npcRendererForBars != null})");
+            allOk = false;
+        }
+        else
+        {
+            GameSettings.EnsureLoaded();
+            GameSettings.SetShowEnemyVitals(true);
+
+            // 8а: ДЕТЕРМИНИРОВАННЫЙ кролик — живой (доспавн при необходимости) +
+            // прямая мутация non-vital части (без событий — паттерн шага 4).
+            // Атака через CombatService НЕ годится: ход-гейт (чужой бой,
+            // не-свой-ход) — флаки, атака-в-attack-speed-миграции перепишется.
+            if (rabbit == null || !rabbit.IsAlive)
+            {
+                var pp = _playerService.Position;
+                rabbit = _animalService.SpawnAnimal("rabbit", new Position2D(pp.X + 2, pp.Y + 2));
+            }
+            BodyPart? rabbitPart = null;
+            int rabbitPartHpBackup = -1;
+            foreach (var p in _bodyProvider.GetBodyParts(rabbit.EntityId))
+            {
+                if (p.Type != BodyPartType.Head && p.Type != BodyPartType.Heart
+                    && p.CurrentRedHP > 6)
+                {
+                    rabbitPart = p;
+                    rabbitPartHpBackup = p.CurrentRedHP;
+                    p.SetHP(p.CurrentRedHP - 5, p.CurrentBlackHP);
+                    break;
+                }
+            }
+            bool rabbitBarOn = rabbitPart != null
+                && animalRenderer.WouldDrawAnimalHealthBar(rabbit.EntityId);
+
+            // 8б-NPC: слегка повреждённый non-vital частью NPC → бар виден.
+            // Direct-мутация части (без событий — паттерн шага 4), откат в 8г.
+            string? damagedNpcId = null;
+            int npcPartHpBackup = -1;
+            BodyPart? damagedNpcPart = null;
+            if (_npcService != null)
+            {
+                foreach (var npcId in _npcService.GetAllNPCIds())
+                {
+                    if (!_npcService.IsAlive(npcId)) continue;
+                    foreach (var p in _bodyProvider.GetBodyParts(npcId))
+                    {
+                        // Non-vital: Head/Heart не трогаем (правило тел!).
+                        if (p.Type != BodyPartType.Head && p.Type != BodyPartType.Heart
+                            && p.CurrentRedHP > 1)
+                        {
+                            damagedNpcPart = p;
+                            npcPartHpBackup = p.CurrentRedHP;
+                            p.SetHP(p.CurrentRedHP - 1, p.CurrentBlackHP);
+                            damagedNpcId = npcId;
+                            break;
+                        }
+                    }
+                    if (damagedNpcId != null) break;
+                }
+            }
+            bool npcBarOn = damagedNpcId != null
+                && npcRendererForBars.WouldDrawNpcHealthBar(damagedNpcId);
+
+            // 8в: тумблер OFF — предикаты false + СИНТЕТИЧЕСКОЕ событие урона
+            // (фейковая цель — ни один сервис её не резолвит, только гейт
+            // DamageNumberRenderer честно срабатывает: цель ≠ игрок → подавить).
+            GameSettings.SetShowEnemyVitals(false);
+            bool rabbitBarOff = !animalRenderer.WouldDrawAnimalHealthBar(rabbit.EntityId);
+            bool npcBarOff = damagedNpcId == null
+                || !npcRendererForBars.WouldDrawNpcHealthBar(damagedNpcId);
+
+            int suppressedBefore = dmgRenderer.EnemyTextSuppressedCount;
+            _damageEventPub!.Publish(new DamageAppliedEvent(
+                PlayerBodyId, "qa_vitals_gate_probe", 1, DamageType.Physical,
+                BodyPartType.Torso, CombatAttackResult.Hit));
+            bool suppressed = dmgRenderer.EnemyTextSuppressedCount > suppressedBefore;
+
+            // 8г: восстановление (глобальное состояние!) + откат повреждений.
+            GameSettings.SetShowEnemyVitals(true);
+            bool rabbitBarRestored = animalRenderer.WouldDrawAnimalHealthBar(rabbit.EntityId);
+            if (rabbitPart != null && rabbitPartHpBackup > 0)
+                rabbitPart.SetHP(rabbitPartHpBackup, rabbitPart.CurrentBlackHP);
+            if (damagedNpcPart != null && npcPartHpBackup > 0)
+                damagedNpcPart.SetHP(npcPartHpBackup, damagedNpcPart.CurrentBlackHP);
+
+            bool barsOk = rabbitBarOn && npcBarOn && rabbitBarOff && npcBarOff
+                          && suppressed && rabbitBarRestored;
+            GD.Print($"[AnimalQA] 8-HP-бары: кролик-ON={rabbitBarOn}, npc-ON={npcBarOn} " +
+                     $"(id={damagedNpcId ?? "—"}), кролик-OFF={rabbitBarOff}, npc-OFF={npcBarOff}, " +
+                     $"урон-подавлен={suppressed} (+{dmgRenderer.EnemyTextSuppressedCount - suppressedBefore}), " +
+                     $"восстановлено={rabbitBarRestored} → {(barsOk ? "OK" : "FAIL")}");
+            allOk &= barsOk;
+        }
+
         PrintVerdict(allOk);
     }
 
+    private static T? FindNode<T>(Node node) where T : Node
+    {
+        if (node is T typed) return typed;
+        foreach (var child in node.GetChildren())
+        {
+            var found = FindNode<T>(child);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
     private static void PrintVerdict(bool pass) => GD.Print(pass
-        ? "[AnimalQA] VERDICT: PASS — таргетинг/урон/месть/смерть→труп/killfeed-имя/de-aggro/мирный вид: бой с животными зарегистрирован полностью"
+        ? "[AnimalQA] VERDICT: PASS — таргетинг/урон/месть/смерть→труп/killfeed-имя/de-aggro/мирный вид/HP-бары+тумблер: бой с животными зарегистрирован полностью"
         : "[AnimalQA] VERDICT: FAIL — см. шаги выше (какой контур не прошёл)");
 }

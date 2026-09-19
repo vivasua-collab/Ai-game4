@@ -4,12 +4,17 @@
 // for each animal on the world map. Re-queries AnimalService every frame
 // so wandering animals are drawn at their current tile position.
 // Источник: checkpoints/08_22_body_impl_plan.md Phase C
+// Редактировано: 2026-09-19 R18-1 — HP-бар над животным (как у NPC с
+// 2026-08-25 Phase 7): если повреждён ИЛИ hostile (месть), под глобальным
+// тумблером GameSettings.ShowEnemyVitals (высокая сложность — без
+// индикации противника; HP зверей — IBodyDataProvider per-entity).
 using Godot;
 using System.Collections.Generic;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Adapter.Di;
+using CultivationGame.Adapter.Persistence;
 using CultivationGame.Modules.NPC;
 
 namespace CultivationGame.Adapter.Scene;
@@ -27,6 +32,9 @@ namespace CultivationGame.Adapter.Scene;
 public partial class AnimalSpriteRenderer : Node2D
 {
     [Inject] private AnimalService? _animalService = null!;
+    // R18-1: HP зверей — тот же per-entity провайдер, что у NPC (Quadruped
+    // тела регистрирует AnimalService в IBodyDataProvider).
+    [Inject] private IBodyDataProvider? _bodyProvider;
 
     // Cache species → colour to avoid switch per frame.
     private static readonly Dictionary<string, Color> SpeciesColours = new()
@@ -45,6 +53,8 @@ public partial class AnimalSpriteRenderer : Node2D
 
     public override void _Ready()
     {
+        // R18-1: глобальный тумблер индикации врагов (persists в user://).
+        GameSettings.EnsureLoaded();
         var container = Scene.GameBoot.Container;
         if (container != null)
         {
@@ -93,7 +103,68 @@ public partial class AnimalSpriteRenderer : Node2D
             float spriteSize = tex.GetWidth();
             var pos = new Vector2(cx - spriteSize / 2f, cy - spriteSize / 2f);
             DrawTexture(tex, pos);
+
+            // R18-1: HP-бар над зверем — повреждён ИЛИ hostile (месть),
+            // под глобальным тумблером ShowEnemyVitals. Паттерн NPC-бара
+            // (Phase 7): 48×5, зелёный/жёлтый/красный по ratio.
+            if (GameSettings.ShowEnemyVitals && _bodyProvider != null)
+            {
+                int hp = _bodyProvider.GetCurrentHealth(animal.EntityId);
+                int maxHp = _bodyProvider.GetMaxHealth(animal.EntityId);
+                bool hostile = _animalService.IsHostile(animal.EntityId);
+                if (maxHp > 0 && (hp < maxHp || hostile))
+                {
+                    float barTop = cy - spriteSize / 2f - 8f;
+                    DrawAnimalHealthBar(cx, barTop, hp, maxHp);
+                }
+            }
         }
+    }
+
+    /// <summary>
+    /// R18-1: HP-бар над животным — тот же стиль, что у NPC (Phase 7):
+    /// тёмная подложка + заливка по ratio + тонкая рамка. 48×5 px.
+    /// </summary>
+    private void DrawAnimalHealthBar(float cx, float top, int hp, int maxHp)
+    {
+        const float barWidth = 48f;
+        const float barHeight = 5f;
+        float ratio = maxHp > 0 ? (float)hp / maxHp : 0f;
+
+        // Подложка.
+        DrawRect(new Rect2(cx - barWidth / 2f, top, barWidth, barHeight),
+            new Color(0.05f, 0.04f, 0.02f, 0.8f));
+
+        // Заливка.
+        var fillColour = ratio > 0.5f
+            ? new Color(0.30f, 0.75f, 0.30f)
+            : ratio > 0.25f
+                ? new Color(0.85f, 0.75f, 0.25f)
+                : new Color(0.85f, 0.25f, 0.20f);
+        float fillWidth = barWidth * ratio;
+        if (fillWidth > 0.5f)
+            DrawRect(new Rect2(cx - barWidth / 2f, top, fillWidth, barHeight), fillColour);
+
+        // Тонкая рамка.
+        DrawRect(new Rect2(cx - barWidth / 2f, top, barWidth, barHeight),
+            new Color(0f, 0f, 0f, 0.5f), false, 1f);
+    }
+
+    /// <summary>
+    /// R18-1 QA (headless — БЕЗ отрисовки): будет ли нарисован HP-бар для
+    /// животного в текущем состоянии (тумблер + damaged-OR-hostile).
+    /// Верифицируется в ANIMALQA (шаг 8).
+    /// </summary>
+    public bool WouldDrawAnimalHealthBar(string animalEntityId)
+    {
+        if (_animalService == null || _bodyProvider == null) return false;
+        var animal = _animalService.TryGetAnimal(animalEntityId);
+        if (animal == null || !animal.Value.IsAlive) return false;
+        int maxHp = _bodyProvider.GetMaxHealth(animalEntityId);
+        if (maxHp <= 0) return false;
+        return GameSettings.ShowEnemyVitals
+            && (_bodyProvider.GetCurrentHealth(animalEntityId) < maxHp
+                || _animalService.IsHostile(animalEntityId));
     }
 
     private static float GetRadiusForSize(SizeClass size)

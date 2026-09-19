@@ -114,6 +114,11 @@ public static class InputMapInitializer
         // 2026-08-28: переехало с F1 на F2 — F1 теперь занят окном-справкой.
         AddKeyAction("cheat_menu", Key.F2);
 
+        // 2026-09-19 R18-1: F7 — тумблер индикации врагов (HP-бары + цифры
+        // урона над врагами; подготовка высокой сложности). F5/F9 заняты
+        // сейвами, F3/F4/F6/F8 свободны — выбран F7 (конвенция «toggle HUD»).
+        AddKeyAction("toggle_enemy_vitals", Key.F7);
+
         // Time speed control: Page Up = faster, Page Down = slower
         AddPhysicalKeyAction("time_speed_up", Key.Pageup);
         AddPhysicalKeyAction("time_speed_down", Key.Pagedown);

@@ -355,6 +355,30 @@ public partial class MainMenuController : Control
         hint.AddThemeColorOverride("font_color", new Color(0.65f, 0.58f, 0.45f));
         box.AddChild(hint);
 
+        // ── Индикация врагов (R18-1, 2026-09-19) ──
+        var vitalsCheck = new CheckButton
+        {
+            Name = "EnemyVitalsCheck",
+            Text = "  Индикация врагов: HP-бары и урон (F7)",
+            ButtonPressed = GameSettings.ShowEnemyVitals,
+            ToggleMode = true,
+        };
+        vitalsCheck.Toggled += on =>
+        {
+            GameSettings.SetShowEnemyVitals(on);
+            GD.Print($"[MainMenu] ShowEnemyVitals = {on} (saved to user://settings.json)");
+        };
+        box.AddChild(vitalsCheck);
+
+        var vitalsHint = new Label
+        {
+            Text = "(на высокой сложности индикация\nпротивника будет отключена по дизайну)",
+            HorizontalAlignment = HorizontalAlignment.Center,
+        };
+        vitalsHint.AddThemeFontSizeOverride("font_size", 11);
+        vitalsHint.AddThemeColorOverride("font_color", new Color(0.65f, 0.58f, 0.45f));
+        box.AddChild(vitalsHint);
+
         var closeBtn = UIFactory.CreateButton("SettingsClose", "Закрыть", 160, 36);
         closeBtn.Pressed += () =>
         {

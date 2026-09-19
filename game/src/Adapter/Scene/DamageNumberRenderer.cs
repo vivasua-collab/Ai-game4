@@ -13,6 +13,7 @@ using CultivationGame.Core.Data;
 using CultivationGame.Core.Events;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Adapter.Di;
+using CultivationGame.Adapter.Persistence;
 
 namespace CultivationGame.Adapter.Scene;
 
@@ -31,6 +32,10 @@ public partial class DamageNumberRenderer : Node2D
     [Inject] private IAnimalService? _animalService;
 
     private System.IDisposable? _damageToken;
+
+    // R18-1 (2026-09-19): счётчик подавленных текстов над врагами — для QA
+    // (ANIMALQA шаг 8: тумблер ShowEnemyVitals=false гейтит enemy-тексты).
+    public int EnemyTextSuppressedCount { get; private set; }
 
     /// <summary>Одно всплывающее число (пул, без аллокаций на событие).</summary>
     private struct FloatText
@@ -56,6 +61,8 @@ public partial class DamageNumberRenderer : Node2D
 
     public override void _Ready()
     {
+        // R18-1: глобальный тумблер индикации врагов (persists в user://).
+        GameSettings.EnsureLoaded();
         var container = Scene.GameBoot.Container;
         if (container != null)
             ContainerAdapter.InjectProperties(this, container);
@@ -112,6 +119,16 @@ public partial class DamageNumberRenderer : Node2D
     private void OnDamageApplied(in Core.Messaging.Contracts.DamageAppliedEvent e)
     {
         if (_active.Count >= MaxConcurrent) return; // анти-спам
+
+        // R18-1: индикация врага гейтится глобальным тумблером (высокая
+        // сложность: «никакой индикации урона и жизни противников»).
+        // Цифры/слова над игроком (урон ПО игроку) остаются — это обратная
+        // связь о состоянии самого игрока, не разведка врага.
+        if (!IsPlayer(e.TargetId) && !GameSettings.ShowEnemyVitals)
+        {
+            EnemyTextSuppressedCount++;
+            return;
+        }
 
         Vector2? worldPos = ResolveTargetPixelPos(e.TargetId);
         if (worldPos == null) return;

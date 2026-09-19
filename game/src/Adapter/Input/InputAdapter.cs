@@ -124,6 +124,10 @@ public partial class InputAdapter : Node
         // 2026-08-28: переехало с F1 на F2 (F1 — окно-справка).
         if (GodotInput.IsActionJustPressed("cheat_menu"))      _stickyKeys.Add("cheat_menu");
 
+        // 2026-09-19 R18-1: F7 — тумблер индикации врагов (работает поверх UI,
+        // как cheat_menu — настройка доступна в любом состоянии).
+        if (GodotInput.IsActionJustPressed("toggle_enemy_vitals")) _stickyKeys.Add("toggle_enemy_vitals");
+
         // 2026-08-28: F1 — окно-справка горячих клавиш (работает даже поверх UI,
         // как cheat_menu — справка нужна и при открытом инвентаре).
         if (GodotInput.IsActionJustPressed("help_hotkeys"))    _stickyKeys.Add("help_hotkeys");

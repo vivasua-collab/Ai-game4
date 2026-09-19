@@ -41,6 +41,8 @@ public sealed class PlayerInputService : IPlayerInputService
     private bool _timeSpeedDown;
     private bool _cheatMenu;
     private bool _helpHotkeys;
+    // 2026-09-19 R18-1: F7 — тумблер индикации врагов (настройка — работает всегда).
+    private bool _enemyVitalsToggle;
     private int _selectedSlot;
     // D (2026-08-26): cultivation window + weapon/technique slot hotkeys
     private bool _cultivationWindow;
@@ -101,6 +103,10 @@ public sealed class PlayerInputService : IPlayerInputService
     public bool IsCheatMenuPressed => _cheatMenu;
     public bool IsHelpHotkeysPressed => _helpHotkeys;
 
+    // 2026-09-19 R18-1: F7 — тумблер индикации врагов (sticky, one-shot).
+    /// <inheritdoc />
+    public bool IsEnemyVitalsTogglePressed => _enemyVitalsToggle;
+
     public int SelectedTechniqueSlot => _selectedSlot;
 
     // Mouse state
@@ -158,6 +164,8 @@ public sealed class PlayerInputService : IPlayerInputService
         if (data.IsSticky("cheat_menu")) _cheatMenu = true;
         // 2026-08-28: F1 — окно-справка тоже доступно всегда (поверх UI).
         if (data.IsSticky("help_hotkeys")) _helpHotkeys = true;
+        // 2026-09-19 R18-1: F7 — тумблер индикации врагов (настройка).
+        if (data.IsSticky("toggle_enemy_vitals")) _enemyVitalsToggle = true;
         if (data.HotbarSlot is int slot && slot > 0) _selectedSlot = slot;
     }
 
@@ -171,6 +179,7 @@ public sealed class PlayerInputService : IPlayerInputService
         _timeSpeedUp = _timeSpeedDown = false;
         _cheatMenu = false;
         _helpHotkeys = false;
+        _enemyVitalsToggle = false;
         _inventoryRaw = false;
         _selectedSlot = 0;
         // D: сброс cultivation window + weapon/technique slot flags

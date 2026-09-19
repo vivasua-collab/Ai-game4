@@ -10,6 +10,9 @@
 // из WeaponVisualCatalog; кэш npcId→itemId, перескан 0.5с — NPC не
 // публикует EquipmentChangedEvent; flip по направлению движения с
 // гистерезисом, DrawSetTransform-зеркалирование §16).
+// Редактировано: 2026-09-19 R18-1 — HP-бар/нейм-плейт: показ и при полном HP
+// если NPC в бою (IsInCombat), глобальный тумблер GameSettings.ShowEnemyVitals
+// (высокая сложность — без индикации противника).
 using Godot;
 using System.Collections.Generic;
 using CultivationGame.Core.Data;
@@ -18,6 +21,7 @@ using CultivationGame.Core.Events;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Core.Messaging.Contracts;
 using CultivationGame.Adapter.Di;
+using CultivationGame.Adapter.Persistence;
 
 namespace CultivationGame.Adapter.Scene;
 
@@ -80,6 +84,8 @@ public partial class NPCSpriteRenderer : Node2D
 
     public override void _Ready()
     {
+        // R18-1: глобальный тумблер индикации врагов (persists в user://).
+        GameSettings.EnsureLoaded();
         var container = Scene.GameBoot.Container;
         if (container != null)
         {
@@ -221,20 +227,23 @@ public partial class NPCSpriteRenderer : Node2D
             // R15: overlay оружия в руке — hand-спрайт поверх тела.
             DrawNpcWeapon(id, cx, cy, spriteSize);
 
-            // Phase 7: HP-бар над NPC — только если повреждён (полный HP не рисуем,
-            // чтобы не засорять HUD в мирное время). Высота полосы — над спрайтом.
+            // Phase 7: HP-бар над NPC — если повреждён ИЛИ в бою с игроком
+            // (R18-1: полный HP + бой = «враг» — бар виден с начала стычки;
+            // мирный неповреждённый NPC — чистый экран).
             // 2026-09-04 S1 (VLM-аудит): + имя и уровень NPC над баром —
             // информативность боя (видно КТО ранен и его силу).
-            if (_bodyProvider != null)
+            // R18-1: глобальный тумблер — GameSettings.ShowEnemyVitals.
+            var st = _npcService.GetNPCState(id);
+            bool inCombat = st?.IsInCombat ?? false;
+            if (GameSettings.ShowEnemyVitals && _bodyProvider != null)
             {
                 int hp = _bodyProvider.GetCurrentHealth(id);
                 int maxHp = _bodyProvider.GetMaxHealth(id);
-                if (maxHp > 0 && hp < maxHp)
+                if (maxHp > 0 && (hp < maxHp || inCombat))
                 {
                     float barTop = cy - spriteSize / 2f - 8f;
                     DrawNpcHealthBar(cx, barTop, hp, maxHp);
 
-                    var st = _npcService.GetNPCState(id);
                     if (st != null)
                     {
                         int lvl = (int)st.CultivationLevel;
@@ -338,6 +347,22 @@ public partial class NPCSpriteRenderer : Node2D
     }
 
     // === R15: QA-доступ (GODOT_WEAPONVIS_DEBUG) ===
+
+    /// <summary>
+    /// R18-1 QA (headless — БЕЗ отрисовки): будет ли нарисован HP-бар для
+    /// NPC в текущем состоянии. Предикат той же логики, что в _Draw
+    /// (тумблер + damaged-OR-inCombat) — верифицируется в ANIMALQA.
+    /// </summary>
+    public bool WouldDrawNpcHealthBar(string npcId)
+    {
+        if (_npcService == null || _bodyProvider == null) return false;
+        var st = _npcService.GetNPCState(npcId);
+        if (st == null) return false;
+        int maxHp = _bodyProvider.GetMaxHealth(npcId);
+        if (maxHp <= 0) return false;
+        return GameSettings.ShowEnemyVitals
+            && (_bodyProvider.GetCurrentHealth(npcId) < maxHp || st.IsInCombat);
+    }
 
     /// <summary>QA: ключ hand-текстуры оружия NPC (null — нет оружия/не рисуется).</summary>
     public string? NPCWeaponTextureIdOf(string npcId)
