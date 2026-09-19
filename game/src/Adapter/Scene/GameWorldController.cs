@@ -255,6 +255,8 @@ public partial class GameWorldController : Node2D
     // Esc»: «×»-закрытие (мимо GWC-веток) обязано доходить до единой
     // точки резюма тиков. ===
     public UI.CharacterSheetWindow? CharacterSheetWindowForQA => _characterSheetWindow;
+    // R20 (баг №6): K-окно — Esc-закрытие (не-паузящее окно).
+    public UI.CultivationWindow? CultivationWindowForQA => _cultivationWindow;
     public UI.QuestWindow? QuestWindowForQA => _questWindow;
     public UI.EventLogWindow? EventLogWindowForQA => _eventLogWindow;
     public UI.HotkeysWindow? HotkeysWindowForQA => _hotkeysWindow;
@@ -1729,6 +1731,14 @@ public partial class GameWorldController : Node2D
         {
             _characterSheetWindow.Toggle();
             HandleModalResumeOnClose();
+        }
+        // R20 (баг №6, запрос 09_09_22_40): Esc закрывает окно Культивации (K).
+        // Репорт: «не закрывается по ESC, требует повторного нажатия K».
+        // Правило пользователя: два типа закрытия — повторная клавиша вызова
+        // И классический Esc. K-окно не паузит игру (справочное) — резюм не нужен.
+        else if (PlayerInput.IsPausePressed && _cultivationWindow is { Visible: true })
+        {
+            _cultivationWindow.Toggle();
         }
         // Esc (sticky "escape") → toggle pause. INP-1: только когда НЕ открыто
         // ни одного модального окна (раньше гард проверял только инвентарь —

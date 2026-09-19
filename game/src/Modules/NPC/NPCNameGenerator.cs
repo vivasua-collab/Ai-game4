@@ -2,7 +2,19 @@
 // Создано: 2026-05-20 18:18 UTC
 // Фаза 2.4: Генератор имён NPC на основе Legacy NamingDatabase + NameBuilder
 // Источник: docs/NPC.md §Имена, Legacy NamingDatabase, NameBuilder
+//
+// R20 (баг №1, запрос 09_09_22_40 «у всех гуманоидов имя Наталья»):
+// аудит показал — генератор работает и применялся (QA large_world: 12
+// различных имён), но пул был мал (8+8) при ~25+ гуманоидах на локацию →
+// имена ПОВТОРЯЛИСЬ (а на устаревшей локальной сборке пользователя —
+// совпадали полностью). Улучшение R20:
+//   • пул расширен (24 мужских + 24 женских + 20 фамилий);
+//   • дедупликация в рамках сессии: повторы получают фамилию
+//     («Мария» → «Мария Ветрова»); ResetSession() при пересборке мира;
+//   • пол по-прежнему 50/50 (запрос: «имя генерировалось в зависимости
+//     от пола» — уже было, сохранено).
 using System;
+using System.Collections.Generic;
 using CultivationGame.Core;
 using CultivationGame.Core.Data;
 
@@ -16,16 +28,33 @@ namespace CultivationGame.Modules.NPC
     public sealed class NPCNameGenerator
     {
         // === Таблицы имён: Люди (мужские/женские отдельно для 50/50) ===
+        // R20: пул расширен 8+8 → 24+24 (однаковых «Наталья» на локации
+        // больше не будет даже без дедупа).
         private static readonly string[] HumanMaleNames =
         {
             "Иван", "Пётр", "Дмитрий", "Алексей", "Сергей",
-            "Михаил", "Андрей", "Николай"
+            "Михаил", "Андрей", "Николай", "Борис", "Виктор",
+            "Григорий", "Данила", "Ерофей", "Захар", "Илья",
+            "Клим", "Лукьян", "Матвей", "Назар", "Остап",
+            "Родион", "Савелий", "Тихон", "Фёдор"
         };
 
         private static readonly string[] HumanFemaleNames =
         {
             "Мария", "Анна", "Елена", "Ольга", "Наталья",
-            "Татьяна", "Светлана", "Екатерина"
+            "Татьяна", "Светлана", "Екатерина", "Аглая", "Варвара",
+            "Глафира", "Дарья", "Ефросинья", "Зинаида", "Инна",
+            "Ксения", "Лада", "Марфа", "Нина", "Оксана",
+            "Полина", "Раиса", "Устинья", "Харитина"
+        };
+
+        // === Фамилии (дедуп-фолбэк R20: «Мария» → «Мария Ветрова») ===
+        private static readonly string[] HumanSurnames =
+        {
+            "Ветров", "Каменев", "Лебедев", "Морозов", "Снегирёв",
+            "Тёмный", "Уваров", "Хмурый", "Черныш", "Яровой",
+            "Волков", "Воронов", "Соколов", "Орлов", "Медведев",
+            "Крылов", "Зорин", "Лунев", "Селянинов", "Травников"
         };
 
         // === Таблицы имён: Эльфы ===
@@ -85,6 +114,15 @@ namespace CultivationGame.Modules.NPC
         private static readonly string MaterialL4_5 = "меди";
         private static readonly string MaterialL6_Plus = "кристалла";
 
+        // === R20: дедупликация имён гуманоидов в рамках сессии ==========
+        // Один генератор = синглтон: все спавны (стартовый состав, ивенты)
+        // видят общий пул занятых имён. Существа (волки и пр.) НЕ
+        // дедуплицируются — «Серый Волк» ×10 норма для стаи.
+        private readonly HashSet<string> _sessionUsedHumanNames = new();
+
+        /// <summary>Сброс дедупликации (пересборка мира — новое население).</summary>
+        public void ResetSession() => _sessionUsedHumanNames.Clear();
+
         /// <summary>
         /// Сгенерировать имя NPC на основе вида, роли, уровня культивации и RNG.
         /// </summary>
@@ -111,7 +149,7 @@ namespace CultivationGame.Modules.NPC
 
         private string GenerateCharacterName(string speciesId, NPCRole role, int lvl, SeededRandom rng)
         {
-            // Выбор пола (50/50) → таблица имён
+            // R20: базовое имя + дедуп — повторы получают фамилию.
             string firstName = speciesId switch
             {
                 "human"  => PickHumanName(rng),
@@ -120,16 +158,30 @@ namespace CultivationGame.Modules.NPC
                 _        => rng.NextElement(HumanMaleNames) // Фоллбэк
             };
 
-            // Старейшина: "{Title} {FirstName}"
+            // Дедупликация: fullName для роли (титулы включаются в уникальность).
+            string fullName = BuildRoleName(firstName, role, lvl, rng);
+            if (_sessionUsedHumanNames.Add(fullName))
+                return fullName;
+
+            // Коллизия → имя + фамилия (до 8 попыток, дальше честный дубль).
+            for (int i = 0; i < 8; i++)
+            {
+                string withSurname = BuildRoleName(
+                    $"{firstName} {rng.NextElement(HumanSurnames)}", role, lvl, rng);
+                if (_sessionUsedHumanNames.Add(withSurname))
+                    return withSurname;
+            }
+            return fullName;
+        }
+
+        /// <summary>Собрать имя с титулом роли (Старейшина/Практик...).</summary>
+        private static string BuildRoleName(string name, NPCRole role, int lvl, SeededRandom rng)
+        {
             if (role == NPCRole.Elder)
-                return $"{rng.NextElement(ElderTitles)} {firstName}";
-
-            // Культиватор: "{CultivatorTitle} {FirstName}"
+                return $"{rng.NextElement(ElderTitles)} {name}";
             if (role == NPCRole.Cultivator)
-                return $"{GetCultivatorTitle(lvl)} {firstName}";
-
-            // Остальные роли: просто "{FirstName}"
-            return firstName;
+                return $"{GetCultivatorTitle(lvl)} {name}";
+            return name;
         }
 
         /// <summary>

@@ -40,6 +40,8 @@ public sealed class HumanNPCSpawnPhase : AbstractSceneAssemblyPhase
     [Inject] private readonly CultivationGame.Modules.Interaction.DialogueService _dialogues = null!;
     // R13: генератор состава населения («NPC спаун через генерацию»).
     [Inject] private readonly NPCSpawnCompositionService _composition = null!;
+    // R20 (баг №1): сброс дедупликации имён при пересборке мира.
+    [Inject] private readonly NPCNameGenerator _nameGenerator = null!;
 
     // Prime offset — independent RNG stream from animals (7919) and terrain.
     private const int NpcSeedOffset = 104729;
@@ -63,6 +65,7 @@ public sealed class HumanNPCSpawnPhase : AbstractSceneAssemblyPhase
         // R13: Reset (re-assembly safety) + генерация состава населения.
         // ДЕТЕРМИНИЗМ: один сид локации → один состав (QA-воспроизводимость).
         _composition?.Reset();
+        _nameGenerator?.ResetSession(); // R20: пересборка мира = новое население → имена свободны
         var requests = _composition?.GenerateStartup(loc)
             ?? new System.Collections.Generic.List<SpawnRequest>();
 

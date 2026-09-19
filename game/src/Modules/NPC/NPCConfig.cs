@@ -44,8 +44,17 @@ namespace CultivationGame.Modules.NPC
         /// <summary>Максимальное количество активных NPC</summary>
         public int MaxActiveNPCs = 100;
 
-        /// <summary>Скорость движения NPC по умолчанию (ед/сек)</summary>
-        public float DefaultMoveSpeed = 2f;
+        /// <summary>Скорость движения NPC по умолчанию (тайлов/тик).
+        /// R20 (баг №2): 2 → 3 — блуждание/патруль живее (игрок 180px/с ÷ 64px = 2.8 тайла/с — NPC были медленнее игрока вдвое при блуждании).</summary>
+        public float DefaultMoveSpeed = 3f;
+
+        /// <summary>
+        /// R20 (баг №2): множитель скорости ПОГОНИ за целью (Attacking).
+        /// 1.2 → 1.6: погоня 4.8 тайла/с > игрока (2.8) — «медленно убежать»
+        /// больше не работает (репорт: «я снова успеваю медленно убежать»);
+        // спастись можно только оторвавшись за leash (aggro-drop).
+        /// </summary>
+        public float ChaseSpeedMultiplier = 1.6f;
 
         /// <summary>Скорость бегства (множитель к DefaultMoveSpeed)</summary>
         public float FleeSpeedMultiplier = 1.5f;

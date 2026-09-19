@@ -67,6 +67,17 @@ public sealed class WorldModule : IModule
         _timeService.Speed = _config.DefaultSpeed;
         var t = (_timeService is TimeService ts2) ? ts2.CurrentTime.ToString() : "?";
         Console.WriteLine($"[WorldModule] Started — time {t}, speed {_timeService.Speed}");
+
+        // R20 (баг №3): инициализация календарных маркеров ТЕКУЩИМ временем.
+        // Раньше _lastDay/Month/Year = -1 → на ПЕРВОМ тике фантомно срабатывали
+        // Day+Month+Year-события (год «менялся» в момент старта): NPC старели
+        // мгновенно. LoadGame с другим временем — легитимный переход календаря
+        // (одиночные события), старт новой игры — тишина.
+        if (_timeService is TimeService tsCal)
+        {
+            var t0 = tsCal.CurrentTime;
+            _lastDay = t0.Day; _lastMonth = t0.Month; _lastYear = t0.Year;
+        }
     }
 
     public void Tick(int tickCount)

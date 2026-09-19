@@ -18,6 +18,7 @@
 //      (счётчики инкрементятся в обработчиках событий — headless-совместимо).
 //
 // Паттерн: CombatSimDebug (async-сценарий, VERDICT в конце).
+using System;
 using Godot;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Data;
@@ -194,6 +195,40 @@ public partial class CombatAISimDebug : Node2D
                  $"урон по NPC={_damageToNpc}, combatStarted={_combatStartedCount} → " +
                  $"{(retaliationOk ? "OK" : "FAIL")}");
 
+        // === 1b. R20 (баг №2): ПОГОНЯ — NPC сближается с игроком ===
+        // Репорт: «после нанесения ему урона вступает в бой, при этом он не
+        // перемещается, меня не преследует». Сценарий: NPC в 6 тайлах,
+        // игрок бьёт → NPC обязан СБЛИЖАТЬСЯ (скорость погони > игрока).
+        bool chaseOk = false;
+        {
+            // Уводим NPC на 6 тайлов от игрока (walkable-строка — прямая
+            // дистанция по X, препятствия игнорируем телепортом в ряд Y).
+            var playerNow = _playerService != null
+                ? new Position2D((int)_playerService.Position.X, (int)_playerService.Position.Y)
+                : new Position2D(25, 25);
+            int chaseDist = 6;
+            var chaseStart = new Position2D(playerNow.X + chaseDist, playerNow.Y);
+            npcState.Position = chaseStart;
+            npcState.TargetId = PlayerCombatId;
+            if (npcState.AIState != NPCAIState.Attacking)
+                npcState.AIState = NPCAIState.Attacking;
+
+            // Игрок СТОИТ (не убегает): за 4 секунды NPC (4.8 тайла/с) обязан
+            // покрыть 6 тайлов → дистанция ≤ AttackRadius (1.5).
+            int distBefore = Math.Max(
+                Math.Abs(npcState.Position.X - playerNow.X),
+                Math.Abs(npcState.Position.Y - playerNow.Y));
+            await ToSignal(GetTree().CreateTimer(4.0), SceneTreeTimer.SignalName.Timeout);
+            int distAfter = Math.Max(
+                Math.Abs(npcState.Position.X - playerNow.X),
+                Math.Abs(npcState.Position.Y - playerNow.Y));
+            bool chaseResult = distAfter < distBefore - 3; // явно приблизился
+            chaseOk = chaseResult;
+            GD.Print($"[CombatAI] 1b-погоня: дистанция {distBefore} → {distAfter} за 4с " +
+                     $"({(chaseResult ? "NPC сближается — OK" : "НЕ двигается к цели — FAIL")}), " +
+                     $"скорость погони = {3f * 1.6f:F1} тайла/с (ChaseSpeedMultiplier)");
+        }
+
         // === 2. ДВУСТОРОННИЙ БОЙ: NPC атакует игрока сам ===
         // (месть уже в Attacking — ждём атак ИИ; ходовая модель отдаст ход NPC
         // после резолва атаки игрока, кулдаун 1.6с + каст ~0.5с.)
@@ -291,7 +326,7 @@ public partial class CombatAISimDebug : Node2D
                  $"strikes={StrikeFxRenderer.TotalStrikes} → {(fxOk ? "OK" : "FAIL")}");
 
         // === ИТОГ ===
-        bool pass = retaliationOk && twoWayOk && selectorOk && fleeOk && leashOk && stanceOk && fxOk;
+        bool pass = retaliationOk && twoWayOk && selectorOk && fleeOk && leashOk && stanceOk && fxOk && chaseOk;
         GD.Print($"[CombatAI] SUMMARY: месть={retaliationOk} двусторонний={twoWayOk} " +
                  $"селектор={selectorOk} бегство={fleeOk} leash={leashOk} " +
                  $"стойка={stanceOk} анимация={fxOk}");

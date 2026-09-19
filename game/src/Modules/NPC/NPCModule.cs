@@ -48,7 +48,7 @@ public class NPCModule : IModule, IWorldResettable
     [Inject] private readonly ITimeService _timeService = null!;
     private IDisposable? _yearChangedSubscription;
 
-    [Inject] private readonly IPublisher<NPCDeathEvent> _npcDeathPub = null!;
+    [Inject] private readonly IPublisher<NPCDeathEvent> _npcDeathPub = null!; // R20: old_age-ветка удалена; publisher оставлен для будущих осознанных смертей (болезни/проклятия)
 
     // R13 FULL-LOOT (2026-09-10): трупы-контейнеры лута. CorpseService
     // подписан на NPCDeathEvent сам (Initialize ниже) — снапшот экипировки/
@@ -258,21 +258,19 @@ public class NPCModule : IModule, IWorldResettable
 
     /// <summary>
     /// Задача 2.6: Обработчик смены года — NPC стареют.
+    /// R20 (баг №3, запрос 09_09_22_40): смерть от старости УДАЛЕНА —
+    /// правило пользователя: «NPC на карте не должны умирать самостоятельно,
+    /// только при смерти в бою или от проклятий и ядов». Возраст продолжает
+    /// расти (будущие системы — ветвость/болезни — должны быть ОСОЗНАННЫМИ
+    /// событиями с репортом, не тихой смертью на тике календаря).
+    /// Потребители «✝ ушёл из мира (старость)» (KillFeed/EventLog) сохранены.
     /// </summary>
     private void OnYearChanged(in YearChangedEvent e)
     {
         foreach (var state in _npcServiceImpl.GetAllStates())
         {
             if (!state.IsAlive) continue;
-
             state.Age++;
-
-            if (state.MaxLifespan > 0 && state.Age >= state.MaxLifespan)
-            {
-                state.IsAlive = false;
-                state.CurrentHealth = 0;
-                _npcDeathPub.Publish(new NPCDeathEvent(state.NpcId, "old_age"));
-            }
         }
     }
 }

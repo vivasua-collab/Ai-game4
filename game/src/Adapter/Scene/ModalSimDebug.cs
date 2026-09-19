@@ -132,6 +132,32 @@ public partial class ModalSimDebug : Node
         pass &= invOpen && tradeOpenOverInv && tradeClosedInvAlive && stackResolved;
         if (_time.IsPaused) _time.Resume();
 
+        // === 9. R20 (баг №6): K — открытие без паузы + Esc ЗАКРЫВАЕТ ======
+        // Репорт: «окно культивации, которое вызывается по K, не закрывается
+        // по ESC, требует повторного нажатия K». Правило пользователя: оба
+        // типа закрытия. K-окно справочное — НЕ паузит (открытие/закрытие
+        // без изменения паузы; Esc закрывает окно, не ставит паузу).
+        {
+            var cult = world.CultivationWindowForQA;
+            if (cult != null)
+            {
+                await PressAndRelease("cultivation_window");
+                await WaitFramesAsync();
+                bool openedNoPause = cult.Visible && !_time.IsPaused;
+                await PressAndRelease("pause"); // Esc
+                await WaitFramesAsync();
+                bool closedByEsc = !cult.Visible && !_time.IsPaused;
+                GD.Print($"[ModalSim] 9. K-окно: открыто-без-паузы={openedNoPause}, Esc-закрыло={closedByEsc} (ожидаем True/True)");
+                pass &= openedNoPause && closedByEsc;
+                if (cult.Visible) cult.Toggle(); // самовосстановление
+            }
+            else
+            {
+                GD.Print("[ModalSim] 9. K-окно: НЕ найдено — FAIL (CultivationWindowForQA)");
+                pass = false;
+            }
+        }
+
         GD.Print($"[ModalSim] VERDICT: {(pass
             ? "PASS — «×»/bg-click всех 6 окон доходит до резюма; двойной резюм идемпотентен; стек инвентарь+лавка не вешает паузу"
             : "FAIL")}");

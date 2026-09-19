@@ -164,15 +164,33 @@ namespace CultivationGame.Modules.NPC
         /// Смертные (L0): age = random(16, 80), awakeningAge = 0
         /// Практики (L1+): awakeningAge + cultivationYears
         /// Фаза 3, задача 3.4: возвращает кортеж (age, awakeningAge)
+        ///
+        /// R20 (баг №3, 2026-09-19): КЛАМП ≥16 был ЧЕЛОВЕЧЕСКИМ минимумом,
+        /// но применялся ко ВСЕМ видам: волк (BaseAgeRange 1-3, lifespan
+        /// 10-15) получал age=16 → «старше собственной жизни» → умирал от
+        /// старости на первом тике. Теперь: 16-кламп — только для людей
+        /// («human»); существа — возраст из диапазона ВИДА без клампа.
         /// </summary>
         private (int age, int awakeningAge) DetermineAge(CultivationLevel level, SpeciesData species, SeededRandom rng)
         {
             if (level == CultivationLevel.None)
             {
-                // Смертный: возраст в диапазоне BaseAgeRange или 16-80
-                int minAge = Math.Max(16, (int)species.BaseAgeRange.Min);
-                int maxAge = Math.Max(minAge + 1, (int)species.BaseAgeRange.Max);
-                return (rng.Next(minAge, maxAge), 0);
+                // Люди-смертные: возраст из BaseAgeRange, но не моложе 16
+                // (взрослый член населения) и диапазон 16-80 по умолчанию.
+                if (species.SpeciesId == "human")
+                {
+                    int minAge = Math.Max(16, (int)species.BaseAgeRange.Min);
+                    int maxAge = Math.Max(minAge + 1, (int)species.BaseAgeRange.Max);
+                    return (rng.Next(minAge, maxAge), 0);
+                }
+
+                // Прочие виды-смертные (волк/олень/паук...): честный диапазон
+                // ВИДА — без человеческого клампа (иначе «волк 16 лет»
+                // при lifespan 10-15 = мгновенная старость).
+                int spMin = (int)species.BaseAgeRange.Min;
+                int spMax = (int)species.BaseAgeRange.Max;
+                if (spMax <= spMin) spMax = spMin + 1;
+                return (rng.Next(spMin, spMax), 0);
             }
 
             // Практик: awakeningAge + cultivationYears

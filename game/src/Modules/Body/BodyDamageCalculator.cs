@@ -79,11 +79,24 @@ namespace CultivationGame.Modules.Body
         {
             foreach (var part in parts)
             {
-                if (part.IsVital && part.CurrentRedHP <= 0)
+                if (IsFatalPart(part) && part.CurrentRedHP <= 0)
                     return false;
             }
             return true;
         }
+
+        /// <summary>
+        /// R20 (баг №4, запрос 09_09_22_40): часть, уничтожение которой =
+        /// СМЕРТЬ — ТОЛЬКО Head | Heart (канон: единое правило тел,
+        /// аудит-0911 BOD-2; PlayerService.Die-путь считает так же).
+        /// ВАЖНО: IsVital-флаг ≠ смертность: торс — жизненно важный ОРГАН
+        /// (IsVital=true в шаблоне — не ампутируется), но его разрушение =
+        /// критическая инвалидность, НЕ смерть. Раньше IsAlive проверял
+        /// IsVital → торс 0/100 при живых голове/сердце давал «Мёртв»
+        /// (статус листа персонажа при живом игроке) И отключал регенерацию.
+        /// </summary>
+        public static bool IsFatalPart(BodyPart part)
+            => part.Type == BodyPartType.Head || part.Type == BodyPartType.Heart;
 
         /// <summary>
         /// Общий процент здоровья организма (по красной HP).

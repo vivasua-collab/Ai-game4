@@ -200,6 +200,9 @@ public partial class ChargeSimDebug : Node
                 GD.Print($"[ChargeSim] NPC {npcId} teleported to ({playerPos.X + 1}, {playerPos.Y})");
             }
         }
+        // R20 (баг №8): HP тела ДО каста — проверка фактического применения урона.
+        int bodyHpBefore = _bodyProvider?.GetCurrentHealth(npcId) ?? 0;
+        GD.Print($"[ChargeSim] NPC {npcId} body HP before cast: {bodyHpBefore}");
 
         // 4. Первое нажатие Z — запуск зарядки.
         int mouseX = (playerPos.X + 2) * GameConstants.TILE_PIXELS * 1000;
@@ -275,9 +278,18 @@ public partial class ChargeSimDebug : Node
         bool npcDamaged = _damageByTarget.TryGetValue(npcId, out int dmg) && dmg > 0;
         GD.Print($"[ChargeSim] npc {npcId} damage total: {dmg}");
 
+        // 11b. R20 (баг №8): ФАКТИЧЕСКОЕ HP тела NPC падает. Репорт
+        // пользователя: «цифры урона появляются, но хотбар жизни NPC не
+        // меняется». Прежний тест видел только DamageAppliedEvent (событие),
+        // НЕ проверяя тело: пайплайн мог «отрисовать цифры» без применения.
+        int bodyHpAfter = _bodyProvider?.GetCurrentHealth(npcId) ?? 0;
+        bool bodyHpDropped = bodyHpBefore > 0 && bodyHpAfter < bodyHpBefore;
+        GD.Print($"[ChargeSim] 11b. HP тела NPC: {bodyHpBefore} → {bodyHpAfter} " +
+                 $"({(bodyHpDropped ? "урон ПРИМЕНЁН к телу — OK" : "HP НЕ изменился при события урона — FAIL (баг №8)")})");
+
         // 12. Итог.
         bool pass = _startedReceived && _completedReceived && _heldReceived
-                    && _releaseIntentReceived && npcDamaged;
+                    && _releaseIntentReceived && npcDamaged && bodyHpDropped;
         if (!_releaseIntentReceived)
             GD.Print("[ChargeSim] FAIL — release AttackIntent not published (potency > 1000 expected)");
         if (!npcDamaged)

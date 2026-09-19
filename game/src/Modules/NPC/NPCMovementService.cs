@@ -302,15 +302,17 @@ namespace CultivationGame.Modules.NPC
                 }
                 if (distance <= weapon.AttackRange) return; // в зоне обстрела — стоим
                 // Дальше дальности оружия — сближаемся (в зону обстрела).
-                MoveToward(state, targetPos, _config.DefaultMoveSpeed * 1.2f, deltaTime);
+                // R20 (баг №2): ChaseSpeedMultiplier (1.6) вместо хардкода 1.2 —
+                // погоня 4.8 тайла/с обгоняет игрока (2.8): «медленно убежать» не выйдет.
+                MoveToward(state, targetPos, _config.DefaultMoveSpeed * _config.ChaseSpeedMultiplier, deltaTime);
                 return;
             }
 
             // Ближний бой: уже в радиусе атаки — не двигаемся
             if (distance <= _config.AttackRadius) return;
 
-            // Движение к цели
-            MoveToward(state, targetPos, _config.DefaultMoveSpeed * 1.2f, deltaTime);
+            // Движение к цели (R20: ChaseSpeedMultiplier — см. выше).
+            MoveToward(state, targetPos, _config.DefaultMoveSpeed * _config.ChaseSpeedMultiplier, deltaTime);
         }
 
         /// <summary>

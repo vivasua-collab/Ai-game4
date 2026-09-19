@@ -69,10 +69,16 @@ namespace CultivationGame.Modules.NPC
 
         /// <summary>
         /// R16: радиус привязи (leash) — дистанция до цели-игрока, после которой
-        /// NPC выходит из боя (aggro-drop). AggroRadius × 3 = 15 тайлов по умолчанию
-        /// (5 агро + запас на преследование; убежать от NPC — реальная стратегия).
+        /// NPC выходит из боя (aggro-drop). R20: ×6 = 30 тайлов (см. ниже).
         /// </summary>
-        private float LeashRadius => _config.AggroRadius * 3f;
+        /// <summary>
+        /// R16: leash (aggro-drop) — цель-игрок слишком далеко.
+        /// R20 (баг №2): ×3 → ×6 (15 → 30 тайлов) — репорт: «преследует,
+        /// но только на небольшом радиусе действия, я снова успеваю
+        /// медленно убежать». Погоня теперь и быстрее (ChaseSpeedMultiplier),
+        /// и дольше (30 тайлов привязи).
+        /// </summary>
+        private float LeashRadius => _config.AggroRadius * 6f;
 
         // === Конструктор (VContainer) ===
         public NPCAIService(
@@ -555,6 +561,27 @@ namespace CultivationGame.Modules.NPC
         /// </summary>
         private void RetaliateOrFlee(NPCState state, string sourceId)
         {
+            // R20 (баг №2): NPC уже в Attacking/Fleeing, но бьёт НОВЫЙ атакующий
+            // (типичная сцена репорта: NPC в эмерджентной стычке с волком →
+            // игрок бьёт его → «вступает в бой, но не перемещается, меня не
+            // преследует» — NPC продолжал гонять волка). Ретаргет: если
+            // угроза нового атакующего (уже добавлена OnDamageApplied до
+            // этого вызова) больше текущей цели — переключаемся на него.
+            if (state.AIState == NPCAIState.Attacking
+                && !string.IsNullOrEmpty(state.TargetId)
+                && state.TargetId != sourceId
+                && !Core.Helpers.PlayerIdResolver.IsPlayer(state.TargetId))
+            {
+                state.Threats.TryGetValue(sourceId, out float newThreat);
+                state.Threats.TryGetValue(state.TargetId, out float curThreat);
+                if (newThreat > curThreat)
+                {
+                    state.TargetId = sourceId;
+                    Console.WriteLine($"[NPCAI] Retarget {state.NpcId}: {state.DisplayName} переключается на нового атакующего ({sourceId}, угроза {newThreat:F0} > {curThreat:F0})");
+                    return; // состояние уже Attacking — цель сменена
+                }
+            }
+
             if (state.AIState is NPCAIState.Attacking or NPCAIState.Fleeing) return;
 
             float healthRatio = state.MaxHealth > 0

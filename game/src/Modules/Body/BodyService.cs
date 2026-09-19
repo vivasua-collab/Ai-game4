@@ -902,8 +902,11 @@ namespace CultivationGame.Modules.Body
 
         /// <summary>
         /// Проверить, жива ли сущность (Спринт 1 A2).
-        /// Возвращает false, если любая жизненно важная часть (Head, Heart)
-        /// имеет CurrentRedHP <= 0.
+        /// R20 (баг №4): смерть = ТОЛЬКО Head|Heart RedHP ≤ 0 (единое правило
+        /// тел, как PlayerService.Die-путь). Раньше проверялся IsVital-флаг —
+        /// он у ТОРСА тоже true (жизненно важный орган, не ампутируется):
+        /// торс 0/100 при целых голове/сердце давал «Мёртв» (статус листа
+        /// персонажа при живом игроке) и отключал регенерацию.
         /// Для игрока проверяет _parts, для NPC — _entityBodyParts.
         /// </summary>
         public bool IsEntityAlive(string entityId)
@@ -915,7 +918,7 @@ namespace CultivationGame.Modules.Body
             {
                 foreach (var kvp in _parts)
                 {
-                    if (kvp.Value.IsVital && kvp.Value.CurrentRedHP <= 0)
+                    if (BodyDamageCalculator.IsFatalPart(kvp.Value) && kvp.Value.CurrentRedHP <= 0)
                         return false;
                 }
                 return true;
@@ -927,7 +930,7 @@ namespace CultivationGame.Modules.Body
 
             foreach (var part in parts)
             {
-                if (part.IsVital && part.CurrentRedHP <= 0)
+                if (BodyDamageCalculator.IsFatalPart(part) && part.CurrentRedHP <= 0)
                     return false;
             }
             return true;

@@ -36,6 +36,8 @@ public class QiModule : IModule, IWorldResettable, IDisposable
 
     // === Медитация (этап 1 внедрения ЦИ) ===
     [Inject] private readonly IPublisher<MeditationStateChangedEvent> _meditationStatePub = null!;
+    // R20 (баг №7): тост «ядро полно» при активации медитации полным ядром.
+    [Inject] private readonly IPublisher<CultivationGame.Core.Messaging.Contracts.ToastShownEvent> _toastPub = null!;
     [Inject] private readonly ISubscriber<MeditationToggleRequestedEvent> _meditationToggleSub = null!;
     [Inject] private readonly ISubscriber<CombatStartedEvent> _combatStartedSub = null!;
     // Этап 5: формации Gathering удваивают поглощение Ци в зоне действия.
@@ -91,11 +93,15 @@ public class QiModule : IModule, IWorldResettable, IDisposable
                 _qiService.AddQi(absorbed);
             }
 
-            // Ядро заполнено — медитация бессмысленна, авто-завершение.
-            if (_qiService.IsFull)
-            {
-                SetMeditation(false);
-            }
+            // R20 (баг №7, запрос 09_09_22_40): АВТО-ЗАВЕРШЕНИЕ при полном
+            // ядре УДАЛЕНО. Репорт: «медитация на V заканчивается за 1 тик,
+            // подозреваю связано с полным заполнением ядра 1000/1000. При
+            // потере Ци подтверждено — идёт до восполнения». Спека QI_SYSTEM
+            // §5.2 авто-завершения не описывает; игрок сам завершает V или
+            // бой (CombatStartedEvent). Полное ядро = поглощение капится в
+            // AddQi (0 эффекта), состояние медитации сохраняется (визуал
+            // кольца, погружение). Прерывания: V-повтор, бой, пересборка
+            // мира (ResetWorld). Тост «ядро полно» — при АКТИВАЦИИ полным.
         }
     }
 
@@ -122,6 +128,14 @@ public class QiModule : IModule, IWorldResettable, IDisposable
         _meditationRate = active
             ? _qiService.Conductivity * GameConstants.ENVIRONMENT_MULT_NORMAL * _gatheringEnvironmentMult
             : 0f;
+
+        // R20 (баг №7): при активации с полным ядром — тост-объяснение
+        // (медитация идёт, но поглощения нет — AddQi капится по MaxQi).
+        if (active && _qiService.IsFull)
+        {
+            _toastPub?.Publish(new CultivationGame.Core.Messaging.Contracts.ToastShownEvent(
+                "Ядро Ци полно — медитация идёт без поглощения (прорыв — в окне Культивации, K)", 3.0f));
+        }
 
         _meditationStatePub.Publish(new MeditationStateChangedEvent(_meditationActive, _meditationRate));
     }
