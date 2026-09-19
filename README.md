@@ -59,7 +59,7 @@ Ai-game4/
 ## Быстрый старт
 
 ### Требования
-- **Godot 4.3+** (рекомендуется 4.7.1 stable .NET build) — https://godotengine.org/download
+- **Godot 4.3+** (рекомендуется 4.7.2 stable .NET build) — https://godotengine.org/download
 - **.NET SDK 8.0+** — https://dotnet.microsoft.com/download
 - Git
 

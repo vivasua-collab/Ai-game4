@@ -3,7 +3,7 @@
 Обновлено: 2026-09-11 11:30 UTC (облачный агент Z.ai Code)
 
 ## Проект
-Cultivation World Simulator (Ai-game4), Godot 4.7.1 .NET, C#
+Cultivation World Simulator (Ai-game4), Godot 4.7.2 .NET, C#
 Репозиторий: https://github.com/vivasua-collab/Ai-game4 (публичный)
 HEAD: см. `git ls-remote origin main` (полный аудит + P1-фиксы запушены)
 
@@ -226,7 +226,7 @@ HEAD: см. `git ls-remote origin main` (полный аудит + P1-фиксы
 
 ## Замороженные решения (НЕ нарушать)
 
-- Godot 4.7.1 .NET; Qi = long; Permil integer math
+- Godot 4.7.2 .NET (обновлено 4.7.1→4.7.2 2026-09-19, maintenance-прыжок); Qi = long; Permil integer math
 - Документация первична: docs_v2 ≠ код = баг → синхронизировать
   с обоснованием (прецедент: R13 sync 2026-09-10)
 - НЕ запускать Next.js DEV сервер (остановлен по запросу 09-10)

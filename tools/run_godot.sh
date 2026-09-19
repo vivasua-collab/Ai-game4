@@ -24,8 +24,8 @@ set -u
 export DOTNET_ROOT="${DOTNET_ROOT:-/home/z/.dotnet}"
 export PATH="$DOTNET_ROOT:$PATH"
 
-GODOT_BIN="/home/z/my-project/godot/Godot_v4.7.1-stable_mono_linux.x86_64/Godot_v4.7.1-stable_mono_linux.x86_64"
-GODOT_DIR="/home/z/my-project/godot/Godot_v4.7.1-stable_mono_linux.x86_64"
+GODOT_BIN="/home/z/my-project/godot/Godot_v4.7.2-stable_mono_linux.x86_64/Godot_v4.7.2-stable_mono_linux.x86_64"
+GODOT_DIR="/home/z/my-project/godot/Godot_v4.7.2-stable_mono_linux.x86_64"
 GAME_DIR="/home/z/my-project/aigame4/game"
 TIMEOUT_SECS="${GODOT_TIMEOUT:-40}"
 

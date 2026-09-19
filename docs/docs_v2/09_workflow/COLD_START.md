@@ -57,7 +57,7 @@ commits: bbde5dc "2dca0a15-5aba-..." (UUID сессий Z.ai Code)
 | START_PROMPT | `aigame4/START_PROMPT.md` |
 | worklog | `aigame4/worklog.md` |
 | cold_start.sh | `aigame4/cold_start.sh` |
-| Godot binary | `godot/Godot_v4.7.1-.../Godot_..._mono_linux.x86_64` |
+| Godot binary | `godot/Godot_v4.7.2-.../Godot_..._mono_linux.x86_64` |
 
 **Убранные симлинки** (были в Variant D, избыточны):
 - ~~`game` → `Ai-game4/game`~~ → использовать `aigame4/game/`
@@ -81,7 +81,7 @@ bash /home/z/my-project/aigame4/cold_start.sh
 
 ### Что делает (idempotent — безопасно запускать многократно)
 1. **.NET SDK** — установить в `/home/z/.dotnet/` если отсутствует
-2. **Godot 4.7.1** — скачать в `/home/z/godot/` если отсутствует
+2. **Godot 4.7.2** — скачать в `/home/z/godot/` если отсутствует
 3. **Ai-game4** — `git clone` если отсутствует, `git pull` если есть
 4. **Симлинки** — создать `aigame4` и `godot` (удалить старые если есть)
 5. **NuGet.config** — создать локальный (gitignored)

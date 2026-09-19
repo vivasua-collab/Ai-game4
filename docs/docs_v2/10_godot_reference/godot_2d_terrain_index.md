@@ -393,7 +393,7 @@ initial_value = param_value + param_value * randomness
 - **Ambient fog / mist over terrain** — `GPUParticles2D` with `Local Coords = false`, large `Visibility Rect`, low `Explosiveness`, high `Randomness`, `Preprocess > 0` so the fog is already present when the player enters.
 - **Dust / leaves drifting across terrain tiles** — `GPUParticles2D` as a **scene tile** (see page #3) placed inside the TileSet, so each "ambience tile" emits localised particles.
 - **Water splashes, lava bubbles, fire embers** on animated terrain tiles — flipbook textures via `CanvasItemMaterial`.
-- **Performance note (4.3 caveat):** Godot 4.3 does not support physics interpolation for 2D particles; workaround = set `Node > Physics Interpolation > Mode = Off` on the particle node. (Verify current status for 4.7.1.)
+- **Performance note (4.3 caveat):** Godot 4.3 does not support physics interpolation for 2D particles; workaround = set `Node > Physics Interpolation > Mode = Off` on the particle node. (Verify current status for 4.7.2.)
 
 ### Code patterns
 

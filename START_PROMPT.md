@@ -29,7 +29,7 @@
 |----------|----------|
 | **Название** | Cultivation World Simulator (Ai-game4) |
 | **Жанр** | Xianxia cultivation life-sim (Kenshi + RimWorld + cultivation) |
-| **Движок** | Godot 4.7.1 .NET (C#, .NET 8) |
+| **Движок** | Godot 4.7.2 .NET (C#, .NET 8) |
 | **Рендер** | Чистый 2D top-down orthographic (gl_compatibility) |
 | **Сетевой режим** | Полностью однопользовательская, все данные локально |
 | **Репозиторий** | https://github.com/vivasua-collab/Ai-game4 |
@@ -74,7 +74,7 @@
 | Симлинк | Цель | Назначение |
 |---------|------|------------|
 | `aigame4` | `Ai-game4/` | **Единая точка входа** — весь репозиторий (структура 1-в-1 как GitHub) |
-| `godot` | `/home/z/godot` | Godot 4.7.1 binary (toolchain) |
+| `godot` | `/home/z/godot` | Godot 4.7.2 binary (toolchain) |
 
 **Доступ ко всему через `aigame4/`:**
 - `aigame4/START_PROMPT.md` — этот файл (правила работы)
@@ -117,7 +117,7 @@
 | Компонент | Путь | Версия |
 |-----------|------|--------|
 | .NET SDK | `/home/z/.dotnet/` | 8.0.424 + 9.0.317 |
-| Godot | `/home/z/godot/Godot_v4.7.1-stable_mono_linux_x86_64/` | 4.7.1 stable mono |
+| Godot | `/home/z/godot/Godot_v4.7.2-stable_mono_linux_x86_64/` | 4.7.2 stable mono |
 | Проект | `/home/z/my-project/Ai-game4/` | git main branch |
 | Reference (Ai-game3) | `/home/z/my-project/Ai-game3-ref/` | Unity итерация (только чтение) |
 
@@ -129,7 +129,7 @@ export DOTNET_ROOT=/home/z/.dotnet && export PATH=$DOTNET_ROOT:$PATH
 dotnet build
 
 # Headless проверка
-export GODOT=/home/z/godot/Godot_v4.7.1-stable_mono_linux_x86_64/Godot_v4.7.1-stable_mono_linux.x86_64
+export GODOT=/home/z/godot/Godot_v4.7.2-stable_mono_linux_x86_64/Godot_v4.7.2-stable_mono_linux.x86_64
 "$GODOT" --headless --path . --quit
 
 # Скриншот (визуальная верификация)
@@ -149,7 +149,7 @@ bash /home/z/my-project/Ai-game4/recover_sandbox.sh
 
 Скрипт `recover_sandbox.sh` выполняет:
 1. Устанавливает .NET SDK 8.0 + 9.0 (если нет)
-2. Скачивает Godot 4.7.1 .NET (если нет)
+2. Скачивает Godot 4.7.2 .NET (если нет)
 3. Клонирует/обновляет Ai-game4 с GitHub
 4. Чинит симлинки (game, game-docs, godot)
 5. Создаёт NuGet.config (локальный, не в git)
@@ -253,7 +253,7 @@ checkpoints/ММ_ДД_краткое_описание.md
 Обновлено: YYYY-MM-DD HH:MM UTC
 
 ## Проект
-Cultivation World Simulator, Godot 4.7.1 .NET, C#
+Cultivation World Simulator, Godot 4.7.2 .NET, C#
 
 ## Последние сессии (5 дней)
 
@@ -295,9 +295,9 @@ Cultivation World Simulator, Godot 4.7.1 .NET, C#
 
 | # | Запрет | Причина |
 |---|--------|---------|
-| 1 | **НЕ использовать Unity.** | Проект на Godot 4.7.1. |
+| 1 | **НЕ использовать Unity.** | Проект на Godot 4.7.2. |
 | 2 | **НЕ использовать `float` для Qi-значений.** Только `long`. | L9 ~524M effectiveQi, точность. |
-| 3 | **НЕ возвращаться к MonoGame/Phaser.** | Решение принято: Godot 4.7.1 primary. |
+| 3 | **НЕ возвращаться к MonoGame/Phaser.** | Решение принято: Godot 4.7.2 primary. |
 | 4 | **НЕ запускать Next.js DEV сервер.** | Песочница не используется для игры. |
 | 5 | **НЕ коммитить `.godot/`, `*.uid`, `*.import`, `bin/`, `obj/`.** | Локальный cache. |
 | 6 | **НЕ коммитить токены/ключи в git.** | Безопасность. Токен хранить в `/home/z/my-project/.auth/github.token` (персистентно, вне git; зеркало `/home/sync/.auth/`). Контекст чата сбрасывается между сообщениями — «память сессии» токен НЕ сохраняет. Если файла нет — запросить у пользователя ОДИН раз, сохранить и больше не спрашивать. |

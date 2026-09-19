@@ -154,7 +154,7 @@ ln -sf /home/z/godot              /home/z/my-project/godot
 ├── checkpoints/          ← чекпоинты напрямую
 ├── game/                 ← код игры (backward compat)
 ├── game-docs/            ← документация (backward compat)
-├── godot/                ← Godot 4.7.1 binary
+├── godot/                ← Godot 4.7.2 binary
 ├── Ai-game4/             ← реальная папка (источник истины)
 ├── Ai-game3-ref/         ← reference clone (Unity, только для чтения)
 └── ... (Next.js sandbox файлы)

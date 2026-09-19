@@ -1,7 +1,7 @@
 # Godot Procedural Geometry & Noise Generation Index
 
 > **Task ID:** IDX-2 | **Agent:** index-procedural-docs
-> **Engine target:** Godot 4.7.1 (stable) | **Project context:** 2D top-down game
+> **Engine target:** Godot 4.7.2 (stable) | **Project context:** 2D top-down game
 > **Source pages:** official Godot docs (procedural_geometry/index, arraymesh, surfacetool,
 > immediatemesh), FastNoiseLite & Noise class references, plus community tutorials
 > (ziva.sh, abitawake.com, gameidea.org).

@@ -39,7 +39,7 @@ set -e
 TOKEN="${GITHUB_TOKEN:-}"   # приоритет: env → my-project/.auth → /home/sync/.auth (резолв в шаге 3)
 REPO_URL_PUBLIC="https://github.com/vivasua-collab/Ai-game4.git"
 REPO_URL_AUTH="https://x-access-token:${TOKEN}@github.com/vivasua-collab/Ai-game4.git"
-GODOT_URL="https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_mono_linux_x86_64.zip"
+GODOT_URL="https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_mono_linux_x86_64.zip"
 DOTNET_INSTALL="/tmp/dotnet-install.sh"
 
 SANDBOX="/home/z/my-project"
@@ -69,15 +69,18 @@ export PATH="$DOTNET_ROOT:$PATH"
 echo "  SDK: $(dotnet --list-sdks | tr '\n' ' ')"
 echo ""
 
-# ─── Шаг 2: Godot 4.7.1 .NET (python-извлечение!) ────────────────
-echo "── Шаг 2/6: Godot 4.7.1 ──"
-GODOT_BIN="$GODOT_DIR/Godot_v4.7.1-stable_mono_linux.x86_64/Godot_v4.7.1-stable_mono_linux.x86_64"
-if python3 -c "import os,sys; sys.exit(0 if os.path.exists('$GODOT_BIN') and os.path.getsize('$GODOT_BIN')==145073296 else 1)" 2>/dev/null; then
+# ─── Шаг 2: Godot 4.7.2 .NET (python-извлечение!) ────────────────
+# 2026-09-19: 4.7.1 → 4.7.2 (maintenance, официально совместим;
+# оценка — checkpoints/09_19_godot_472_upgrade_eval.md). Бинарник
+# 146900080 байт (zip-архив 107698034 — не путать с size-check!).
+echo "── Шаг 2/6: Godot 4.7.2 ──"
+GODOT_BIN="$GODOT_DIR/Godot_v4.7.2-stable_mono_linux.x86_64/Godot_v4.7.2-stable_mono_linux.x86_64"
+if python3 -c "import os,sys; sys.exit(0 if os.path.exists('$GODOT_BIN') and os.path.getsize('$GODOT_BIN')==146900080 else 1)" 2>/dev/null; then
     echo "  ✅ Уже установлен: $GODOT_DIR"
 else
-    ZIP=/tmp/godot471.zip
+    ZIP=/tmp/godot472.zip
     if ! python3 -c "import zipfile; zipfile.ZipFile('$ZIP')" 2>/dev/null; then
-        echo "  Скачиваю Godot 4.7.1 .NET..."
+        echo "  Скачиваю Godot 4.7.2 .NET..."
         curl -sSL "$GODOT_URL" -o "$ZIP"
     fi
     echo "  Извлекаю python-zipfile (dot-нормализация имён)..."
@@ -85,9 +88,9 @@ else
 import os, sys, zipfile, shutil
 zp = sys.argv[1]
 base = '/home/z/my-project/godot'
-bin_size = 145073296
-dotdir = os.path.join(base, 'Godot_v4.7.1-stable_mono_linux.x86_64')
-binpath = os.path.join(dotdir, 'Godot_v4.7.1-stable_mono_linux.x86_64')
+bin_size = 146900080
+dotdir = os.path.join(base, 'Godot_v4.7.2-stable_mono_linux.x86_64')
+binpath = os.path.join(dotdir, 'Godot_v4.7.2-stable_mono_linux.x86_64')
 if os.path.exists(binpath) and os.path.getsize(binpath) == bin_size:
     raise SystemExit(0)
 # base может быть БИТЫМ симлинком (легаси godot -> /home/z/godot после

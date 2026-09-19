@@ -4,7 +4,7 @@
 set -u
 export PATH="/home/z/.dotnet:$PATH"
 export DOTNET_ROOT="/home/z/.dotnet"
-GODOT="/home/z/my-project/godot/Godot_v4.7.1-stable_mono_linux.x86_64/Godot_v4.7.1-stable_mono_linux.x86_64"
+GODOT="/home/z/my-project/godot/Godot_v4.7.2-stable_mono_linux.x86_64/Godot_v4.7.2-stable_mono_linux.x86_64"
 cd /home/z/my-project/Ai-game4/game || exit 1
 
 # Порядок = исторический реестр TESTING_RULES §0.1 (R17: SAVELOAD+REASSEMBLY расширены)
