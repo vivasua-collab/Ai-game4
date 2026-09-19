@@ -157,6 +157,9 @@ public partial class GameWorldController : Node2D
     // Label, новое сообщение затирало предыдущее). Повторы агрегируются ×N,
     // строки затухают fade-out'ом, стек максимум MaxToastLines строк.
     private VBoxContainer _toastStack    = null!;
+    // 2026-09-19: индикатор паузы (INP-1 диагностика видимости) — см. UpdatePauseIndicator.
+    private Label? _pauseIndicator;
+    private string? _lastPauseText;
     private sealed class ToastLine
     {
         public Label Label = null!;
@@ -382,6 +385,48 @@ public partial class GameWorldController : Node2D
             Time.Resume();
     }
 
+    /// <summary>
+    /// 2026-09-19 (повторный репорт INP-1): HUD-индикатор паузы с ПРИЧИНОЙ.
+    /// Пауза была невидима — «зависло» неотличимо от «пауза», из-за чего
+    /// два баг-репорта о «сломанном движении» не могли быть диагностированы
+    /// игроком. Теперь: «⏸ ПАУЗА — B·инвентарь + Q·квесты» (стек окон) или
+    /// «⏸ ПАУЗА (Esc)» (пауза игрока). Обновление — только при изменении
+    /// текста (zero-GC в steady-state); переход в лог (GD.Print).
+    /// </summary>
+    private void UpdatePauseIndicator()
+    {
+        if (Time == null || _pauseIndicator == null) return;
+        string? text = null;
+        if (Time.IsPaused)
+        {
+            var open = OpenModalWindowNames();
+            text = open.Count > 0
+                ? "⏸ ПАУЗА — " + string.Join(" + ", open)
+                : "⏸ ПАУЗА (Esc)";
+        }
+        if (text == _lastPauseText) return; // steady-state: дёшево
+        _lastPauseText = text;
+        _pauseIndicator.Text = text ?? "";
+        _pauseIndicator.Visible = text != null;
+        if (text != null) GD.Print($"[GameWorld] {text}"); // диагностика причины в лог
+    }
+
+    /// <summary>Открытые модальные окна — короткие подписи для индикатора.</summary>
+    private List<string> OpenModalWindowNames()
+    {
+        var names = new List<string>(4);
+        if (_inventoryWindow is { Visible: true }) names.Add("B·инвентарь");
+        if (_characterSheetWindow is { Visible: true }) names.Add("C·лист");
+        if (_questWindow is { Visible: true }) names.Add("Q·квесты");
+        if (_eventLogWindow is { Visible: true }) names.Add("J·журнал");
+        if (_hotkeysWindow is { Visible: true }) names.Add("F1·справка");
+        if (_techniqueBook is { Visible: true }) names.Add("T·книга");
+        if (_lootWindow is { IsOpen: true }) names.Add("обыск");
+        if (_tradeWindow is { IsOpen: true }) names.Add("лавка");
+        if (_dialogueWindow is { IsOpen: true }) names.Add("диалог");
+        return names;
+    }
+
     // NOTE: Movement is handled by PlayerModule.Tick() — tied to the tick system,
     // NOT to _PhysicsProcess. This ensures movement scales with TimeSpeed
     // (Normal=1 tile/sec, Fast=5 tiles/sec, Quick=15 tiles/sec).
@@ -515,6 +560,13 @@ public partial class GameWorldController : Node2D
         {
             var modalSim = new ModalSimDebug { Name = "ModalSimDebug" };
             AddChild(modalSim);
+        }
+        // 2026-09-19 (повторный репорт INP-1): MODAL2 — исчерпывающий перебор
+        // 30×2 пар стеков + Esc-инвариант + тройной стек (GODOT_MODAL2_DEBUG=1).
+        if (System.Environment.GetEnvironmentVariable("GODOT_MODAL2_DEBUG") == "1")
+        {
+            var modalStackSim = new ModalStackSimDebug { Name = "ModalStackSimDebug" };
+            AddChild(modalStackSim);
         }
         // L500 (2026-09-15): мир 500×500 — интеграция генераций NPC
         // (GODOT_L500_DEBUG=1, в связке с GODOT_NEWGAME_WORLD=large_world).
@@ -967,6 +1019,22 @@ public partial class GameWorldController : Node2D
         _toastStack.OffsetRight = 260;
         _hudCanvas.AddChild(_toastStack);
 
+        // 2026-09-19 (повторный репорт INP-1): индикатор паузы — игрок
+        // ВИДИТ, почему мир стоит: «⏸ ПАУЗА — B·инвентарь» / «⏸ ПАУЗА (Esc)».
+        // До этого пауза не отображалась никак — фриз от паузы были
+        // неотличимы, что и породило два «ложных» баг-репорта о движении.
+        _pauseIndicator = new Label
+        {
+            Name = "PauseIndicator",
+            Visible = false,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
+        _pauseIndicator.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.CenterTop);
+        _pauseIndicator.OffsetTop = 24;
+        _pauseIndicator.AddThemeFontSizeOverride("font_size", 18);
+        _pauseIndicator.AddThemeColorOverride("font_color", new Color(0.95f, 0.82f, 0.45f));
+        _hudCanvas.AddChild(_pauseIndicator);
+
         // 2026-09-04 S5: стрелки направления атакующих вне экрана — игрок
         // видит, ОТКУДА прилетает урон, даже когда источник за кадром.
         _dmgDirIndicator = new UI.DamageDirectionIndicator { Name = "DamageDirIndicator" };
@@ -1247,6 +1315,8 @@ public partial class GameWorldController : Node2D
 
         HandleStickyInput();
 
+        // 2026-09-19: видимость паузы + причина (только при изменении — дёшево).
+        UpdatePauseIndicator();
         // Этап 1 внедрения ЦИ: V — переключить медитацию (поглощение Ци из среды).
         if (PlayerInput is { IsMeditatePressed: true })
         {
