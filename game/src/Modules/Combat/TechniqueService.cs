@@ -542,6 +542,21 @@ namespace CultivationGame.Modules.Combat
         }
 
         /// <summary>
+        /// R23-1 (аудит CMB-1): откат CompleteUse — кулдаун снят, мастерство
+        /// возвращено. Вызывается PlayerTechniqueCaster при отклонении
+        /// выпуска техники гейтами CombatService (AttackRejectedEvent):
+        /// игрок НЕ должен терять кулдаун+мастерство без эффекта. Ци НЕ
+        /// возвращается — энергия рассеялась (списана тиками зарядки).
+        /// </summary>
+        public void RefundUse(string techniqueId)
+        {
+            if (!_learnedTechniques.TryGetValue(techniqueId, out var tech)) return;
+
+            _cooldowns.Remove(techniqueId);
+            tech.Mastery = MathF.Max(0f, tech.Mastery - 0.01f);
+        }
+
+        /// <summary>
         /// Обновить кулдауны (вызывается из CombatModule.Tick).
         /// </summary>
         public void UpdateCooldowns(float deltaTime)

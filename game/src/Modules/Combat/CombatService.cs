@@ -559,12 +559,23 @@ namespace CultivationGame.Modules.Combat
             // «перезарядилось» (readiness ≥ порога). Прошлая схема строго
             // чередовала удары 1:1 — «ход противника» блокировал игрока даже
             // с готовым мечом. Расход готовности — здесь (замах свершен).
-            int attackerReadiness = GetReadinessPermil(attackerId);
-            if (attackerReadiness < AttackThreshold)
+            //
+            // R23-1 (аудит CMB-1): ЗАРЯЖЕННАЯ атака (isCharged ∨ potency > базы)
+            // гейт готовности ПРОПУСКАЕТ и readiness НЕ расходует —
+            // COMBAT_SYSTEM §8.2: «заряженные техники готовность не
+            // расходывают дополнительно: их темп = зарядка + Ци». Зарядка
+            // TechniqueChargeService уже была замахом; гейт оружия поверх
+            // неё терял игроку Ци+кулдаун+мастерство без эффекта.
+            bool isChargedAttack = isCharged || potencyPermil > GameConstants.POTENCY_BASE_PERMIL;
+            if (!isChargedAttack)
             {
-                PublishRejection(attackerId, techniqueId,
-                    $"удар не готов ({attackerReadiness}‰ < {AttackThreshold}‰)");
-                return AttackAcceptance.Rejected;
+                int attackerReadiness = GetReadinessPermil(attackerId);
+                if (attackerReadiness < AttackThreshold)
+                {
+                    PublishRejection(attackerId, techniqueId,
+                        $"удар не готов ({attackerReadiness}‰ < {AttackThreshold}‰)");
+                    return AttackAcceptance.Rejected;
+                }
             }
 
             // A3-3 FIX + Review этап 3 (P1-4): переключение цели — только
@@ -606,11 +617,12 @@ namespace CultivationGame.Modules.Combat
 
             // Stage 0: если атака уже заряжена (isCharged или potency > 1000) —
             // пропустить pending-таймер (зарядка TechniqueChargeService была временем каста).
-            if (isCharged || potencyPermil > GameConstants.POTENCY_BASE_PERMIL)
+            if (isChargedAttack)
             {
                 _lastAttackPotencyPermil = potencyPermil;
                 _lastAttackIsRanged = isRanged;
-                ConsumeReadiness(attackerId); // R21-2: замах свершен (расход при приёме)
+                // R23-1 (CMB-1): ConsumeReadiness УДАЛЁН — зарядка была замахом
+                // (§8.2: «заряженные не расходывают готовность дополнительно»).
                 ApplyTechniqueImmediately(attackerId, techniqueId);
                 return AttackAcceptance.Accepted;
             }

@@ -423,10 +423,14 @@ public partial class CombatSimDebug : Node
         }
 
         // 3e. R21-2 (attack-speed): ПРОВЕРКА READINESS-ГЕЙТА — авторитетность
-        // модели готовности (замена turn-gate: ходы удалены). 1) удар при
-        // НЕГОТОВНОСТИ (сразу после предыдущего удара) = Rejected
-        // («удар не готов» + AttackRejectedEvent); 2) после начисления
-        // готовности тиками = Accepted.
+        // модели готовности (замена turn-gate: ходы удалены). R23-1 (аудит
+        // CMB-1) — новый контракт §8.2: (a) обычный удар при готовности =
+        // Accepted + списание; (b) незаряженный удар при неготовности =
+        // Rejected; (c) ЗАРЯЖЕННЫЙ удар при НЕготовности = Accepted (гейт
+        // пропускается — зарядка была замахом); (d) сразу после charged
+        // обычный удар = всё ещё Rejected (charged готовность НЕ расходует —
+        // регресс-гард); (e) после начисления тиками = Accepted.
+        // Детерминизм: (b)/(c)/(d) выполняются в ОДНОМ кадре (без await).
         bool turnGateOk = true;
         if (_combatServiceImpl != null && _playerService != null)
         {
@@ -435,22 +439,53 @@ public partial class CombatSimDebug : Node
             if (tgTarget != null)
             {
                 await WaitForCastClearAsync(2.0f);
-                // (1) Готов → ЗАРЯЖЕННЫЙ удар (potency > 1000 → мгновенный путь,
-                // расход готовности). Детерминизм: заряженная атака БЕЗ каста —
-                // следующая атака попадёт в гейт готовности, а не каста.
-                await WaitForReadinessAsync(PlayerCombatId, 4.0f);
-                var readyHit = _combatServiceImpl.ExecuteAttack(PlayerCombatId, "basic_attack", tgTarget, false, potencyPermil: 1500);
-                GD.Print($"[CombatSim] readiness-gate: player ready (charged) → {readyHit} (ожидаем Accepted)");
-                turnGateOk &= readyHit == AttackAcceptance.Accepted;
+                // (a) Готов → ОБЫЧНЫЙ удар (списание готовности; pending-каст).
+                // Если во время ожидания каста готовность успела дозарядиться
+                // до капа (чужой NPC-каст удлинил ожидание) — повторяем слив.
+                for (int drain = 0; drain < 3; drain++)
+                {
+                    await WaitForReadinessAsync(PlayerCombatId, 4.0f);
+                    if (!_combatServiceImpl.IsAttackReady(PlayerCombatId)) break;
+                    var drainHit = _combatServiceImpl.ExecuteAttack(PlayerCombatId, "basic_attack", tgTarget, false);
+                    turnGateOk &= drainHit == AttackAcceptance.Accepted;
+                    await WaitForCastClearAsync(1.5f);
+                    if (!_combatServiceImpl.IsInCombat) break; // NPC умер от удара
+                }
 
-                // (2) НЕМЕДЛЕННО вторая атака: готовность списана (0‰) →
-                // Rejected «удар не готов» (детерминированно — каста нет).
-                _rejectedCount = 0; _lastRejection = "";
-                var notReady = _combatServiceImpl.ExecuteAttack(PlayerCombatId, "basic_attack", tgTarget, false);
-                GD.Print($"[CombatSim] readiness-gate: player NOT ready → {notReady} ('{_lastRejection}')");
-                turnGateOk &= notReady == AttackAcceptance.Rejected && _rejectedCount > 0;
+                if (_combatServiceImpl.IsInCombat
+                    && !_combatServiceImpl.IsAttackReady(PlayerCombatId))
+                {
+                    // (b) Готовность списана → обычный удар = Rejected «не готов».
+                    _rejectedCount = 0; _lastRejection = "";
+                    var notReady = _combatServiceImpl.ExecuteAttack(PlayerCombatId, "basic_attack", tgTarget, false);
+                    GD.Print($"[CombatSim] readiness-gate: player NOT ready → {notReady} ('{_lastRejection}')");
+                    turnGateOk &= notReady == AttackAcceptance.Rejected && _rejectedCount > 0;
 
-                // (3) Готовность восстанавливается тиками (кулаки ~0.9с /
+                    // (c) R23-1 (CMB-1): ЗАРЯЖЕННЫЙ удар (potency 1500) при
+                    // неготовности = Accepted — гейт готовности пропускается
+                    // (§8.2 «заряженные готовность не расходуют дополнительно»),
+                    // путь мгновенный (без pending-каста).
+                    var chargedNotReady = _combatServiceImpl.ExecuteAttack(
+                        PlayerCombatId, "basic_attack", tgTarget, false, potencyPermil: 1500);
+                    GD.Print($"[CombatSim] readiness-gate: CHARGED at NOT-ready → {chargedNotReady} (ожидаем Accepted, CMB-1)");
+                    turnGateOk &= chargedNotReady == AttackAcceptance.Accepted;
+
+                    // (d) Тот же кадр: обычный удар = Rejected — charged НЕ
+                    // расходовал готовность (регресс-гард CMB-1).
+                    if (_combatServiceImpl.IsInCombat)
+                    {
+                        _rejectedCount = 0; _lastRejection = "";
+                        var afterCharged = _combatServiceImpl.ExecuteAttack(PlayerCombatId, "basic_attack", tgTarget, false);
+                        GD.Print($"[CombatSim] readiness-gate: NOT-charged after charged → {afterCharged} ('{_lastRejection}') (ожидаем Rejected)");
+                        turnGateOk &= afterCharged == AttackAcceptance.Rejected && _rejectedCount > 0;
+                    }
+                }
+                else if (_combatServiceImpl.IsInCombat)
+                {
+                    GD.Print("[CombatSim] WARN — player still ready after drain loop; gate phase (b)-(d) skipped");
+                }
+
+                // (e) Готовность восстанавливается тиками (кулаки ~0.9с /
                 // оружие класс-зависимо): ждём и бьём — Accepted (pending-каст).
                 if (_combatServiceImpl.IsInCombat)
                 {

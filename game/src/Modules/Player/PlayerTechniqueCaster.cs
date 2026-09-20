@@ -51,6 +51,9 @@ public sealed class PlayerTechniqueCaster : IDisposable
     [Inject] private readonly ISubscriber<TechniqueCastRequestedEvent> _castRequestSub = null!;
     [Inject] private readonly ISubscriber<TechniqueChargeCompletedEvent> _chargeCompletedSub = null!;
     [Inject] private readonly ISubscriber<FormationActivatedEvent> _formationActivatedSub = null!;
+    // R23-1 (аудит CMB-1): рефанд кулдауна/мастерства при отклонении выпуска
+    // гейтами CombatService (PublishRejection → только для игрока).
+    [Inject] private readonly ISubscriber<AttackRejectedEvent> _attackRejectedSub = null!;
 
     private const int DashDistanceTiles = 3;
     private const float MinAttackRangeTiles = 2f;
@@ -64,6 +67,10 @@ public sealed class PlayerTechniqueCaster : IDisposable
     private IDisposable? _castRequestToken;
     private IDisposable? _chargeCompletedToken;
     private IDisposable? _formationActivatedToken;
+    // R23-1 (CMB-1): окно рефанда — техника, выпущенная последней (2с окно;
+    // защищает от отката чужого/старого списания).
+    private string? _lastFiredTechniqueId;
+    private long _lastFiredAtMs;
     private readonly Random _formationRng = new();
 
     public void Start()
@@ -71,7 +78,10 @@ public sealed class PlayerTechniqueCaster : IDisposable
         _castRequestToken = _castRequestSub.Subscribe(OnCastRequested);
         _chargeCompletedToken = _chargeCompletedSub.Subscribe(OnChargeCompleted);
         _formationActivatedToken = _formationActivatedSub.Subscribe(OnFormationActivated);
+        _attackRejectedToken = _attackRejectedSub.Subscribe(OnAttackRejected);
     }
+
+    private IDisposable? _attackRejectedToken;
 
     public void Tick(float deltaTime) { /* нет кадровых задач в самом кастере */ }
 
@@ -193,6 +203,11 @@ public sealed class PlayerTechniqueCaster : IDisposable
                 ? "Перезарядка" : "Применение невозможно");
             return;
         }
+
+        // R23-1 (CMB-1): запоминаем выпуск — если CombatService отклонит
+        // (гейты участника/каста), OnAttackRejected вернёт кулдаун+мастерство.
+        _lastFiredTechniqueId = tech.TechniqueId;
+        _lastFiredAtMs = Environment.TickCount64;
 
         // Этап 5: бонус урона от активной формации Amplification (пермил, ЗАПРЕТ 3.9)
         _techniques.ExternalDamageBonusPermil = GetAmplificationBonusPermil();
@@ -403,5 +418,27 @@ public sealed class PlayerTechniqueCaster : IDisposable
         _chargeCompletedToken = null;
         _formationActivatedToken?.Dispose();
         _formationActivatedToken = null;
+        _attackRejectedToken?.Dispose();
+        _attackRejectedToken = null;
+    }
+
+    /// <summary>
+    /// R23-1 (аудит CMB-1): выпуск техники отклонён гейтами CombatService
+    /// («не участник»/«каст уже идёт»; readiness-гейт charged больше не
+    /// отклоняет) → рефанд кулдауна+мастерства (RefundUse). Ци НЕ
+    /// возвращается — энергия рассеялась (лор: зарядка дренировала Ци
+    /// тиками). Окно 2с и совпадение techniqueId — защита от отката
+    /// чужого/старого списания (Space-атака ≠ техника).
+    /// </summary>
+    private void OnAttackRejected(in AttackRejectedEvent e)
+    {
+        if (_lastFiredTechniqueId == null || _lastFiredTechniqueId != e.TechniqueId) return;
+        if (Environment.TickCount64 - _lastFiredAtMs > 2000) return;
+
+        _techniques.RefundUse(e.TechniqueId);
+        _lastFiredTechniqueId = null; // один рефанд на выпуск
+        Console.WriteLine(
+            $"[PlayerTechniqueCaster] Выпуск '{e.TechniqueId}' отклонён ({e.Reason}) — " +
+            "кулдаун и мастерство возвращены; Ци рассеялась");
     }
 }
