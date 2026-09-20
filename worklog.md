@@ -2534,3 +2534,96 @@ Work Log:
 Stage Summary:
 - «Ход противника» больше не существует: удары независимы, темп задаёт оружие (волк 1 укус — игрок-меч ~2.2 удара). Парирование при одновременной атаке работает (клинки скрестились). Баланс-наблюдение: NPC-урон по игроку вырос (темп) — тюнинг отдельно.
 - №5 (экономика золото/камни 1:10) — единственный незакрытый пункт репорта 20.09, план в аудите R21-C.
+
+---
+Task ID: R22-EP2-A
+Agent: haiku (combat audit)
+Task: read-only аудит боевой системы и pipeline (физический + Ци), регрессии R21
+
+Work Log:
+- Протокол: worklog-хвост (R20-R22) + START_PROMPT §9/§14 прочитаны (06:28 UTC).
+  Read-only: код не правился, build не запускался.
+- CombatService.cs (1266 стр) целиком: readiness-модель, per-attacker касты,
+  CLASH, ExecuteAttack-гейты, UpdateTimer-партия кастов, смерть/EndCombat.
+- Проводка ударов: CombatModule (AttackIntent-мост, LOS/стрелы),
+  DamageService (11 слоёв, Ци-буфер inline), DamageCalculator/
+  WeaponDamageCalculator/DefenseProcessor/LevelSuppression/
+  NPCDefenseSelector/CombatRng/CombatConfig/CombatLos/CombatRangeGateService/
+  StatProviderAdapter/TechniqueCapacity/CombatConsequencesService/
+  ElementalEffectService.
+- Ци-проводка: QiService, QiBufferService, QiDataProvider (авто-RawQi),
+  QiRegenCalculator, QiModule; техники: TechniqueService (CompleteUse/
+  кулдауны), TechniqueChargeService (fill-модель), PlayerTechniqueCaster
+  (зарядка→аура→выпуск), TechniqueSlotService.
+- Тела: BodyService/BodyDamageCalculator/BodyModule (DoT→DamageApplied
+  Torso), смерть Head|Heart; Buff-тики (BuffTickProcessor→BuffTickedEvent).
+- NPC-сторона: NPCModule.ProcessNpcAttacks, NPCCombatAdapter (смерть→
+  NPCDeathEvent), NPCAIService (RetaliateOrFlee/threats), AnimalService
+  (укус-интенты, смерть, de-aggro).
+- Доки: COMBAT_SYSTEM (§1.4/§2/§7/§8.2), QI_SYSTEM (§6/§8), TECHNIQUE_SYSTEM
+  (§5.3), ALGORITHMS §5.2, TECHNIQUE_EFFECTS точечно; PlayerIdResolver,
+  контракты Combat/Qi, Constants.
+- Отчёт записан: checkpoints/09_20_r22_combat_audit.md (21 дефект, формат
+  CMB-N, регрессионные риски R21 по чеклисту A1-A5, код↔доки, порядок фиксов).
+
+Stage Summary:
+- 21 дефект: 3 P1 / 6 P2 / 12 P3. Главные P1: (1) глобальный 1v1-лок боя —
+  эмерджентная стычка NPC-NPC/волк-NPC где угодно на карте блокирует атаки
+  игрока (MaxCombatDuration=0) — корень R20-#8 жив; (2) заряженные техники
+  Ци гейтятся на readiness оружия и теряют Ци+кулдаун+мастерство при
+  отклонении (против COMBAT §8.2:404); (3) партия завершённых кастов в
+  UpdateTimer резолвится ПОСЛЕ EndCombat — урон вне боя/по мёртвому,
+  смерть игрока после конца боя без CombatEndedEvent.
+- P2-топ: CLASH асимметричен при одновременном замахе (insertion order
+  решает, кто парирован); 0.5с «замах» у всех базовых ударов → частые
+  гарантированные парирования, звери парируют без оружия (§7.2);
+  Defense-техника платит Ци дважды (зарядка + инвестиция); фантомные
+  цели "dot:{buffId}" в RetaliateOrFlee → NPC гоняет игрока без агро и без
+  leash; DoT всегда в Torso → отравить насмерть невозможно; DoT-тик
+  прерывает каст игрока без возврата readiness.
+- Гигиена в порядке: урон int/long+промилле (NaN/overflow/деление-на-0
+  закрыты), броня §5.2 честная (percent→flat×0.5→min1, overkill нет),
+  пассивный RawQi игрок/NPC соответствует QI §6; события: DamageApplied 1×,
+  смерть→труп→EnemyKilled порядок корректный.
+- Отчёт: checkpoints/09_20_r22_combat_audit.md
+
+---
+Task ID: R22-MAIN-0920
+Agent: main (Z.ai Code)
+Task: дата/время + START_PROMPT; заготовки экономики (1 камень = 100
+золота, стабы + доки); детальный аудит боевой системы (физический + Ци)
+пока пользователь тестирует. Субагенты — flash (haiku), последовательно.
+
+Work Log:
+- 06:15 UTC старт. START_PROMPT/§9/§14 прочитаны; git чист = origin (518e32a).
+- Р22-1 ЭКОНОМИКА (стабы): EconomyConstants (GoldPerSpiritStone=100 —
+  канон пользователя 2026-09-20, обновляет R21-C «1:10»; StoneBuy 1200‰/
+  StoneSell 500‰; CanHoldSpiritStones — «неча смертным владеть камнями»),
+  ICurrencyExchangeService + ExchangeQuote, CurrencyExchangeService
+  (котировки Permil, без кошелька — сейвы не тронуты), DI в
+  TradeModuleServices. Build 0 err.
+- Докуметация: ECONOMY_SYSTEM.md (06_player, новый: курс/правила владения/
+  лор/статус стабов/план внедрения), TRADE_SYSTEM §8.1 закрыт + ссылка,
+  README docs_v2 реестр. Чекпоинт 09_20_r22_economy_stubs.md.
+- Коммит+пуш 4726d59.
+- R22-EP2-A АУДИТ БОЯ: ОДИН субагент (haiku, read-only, последовательно —
+  §14.2). Отчёт checkpoints/09_20_r22_combat_audit.md: 21 дефект (3 P1 /
+  6 P2 / 12 P3) + регрессионные риски R21 + 7 расхождений код↔доки.
+  Main-верификация P1 по коду: CMB-2 (StartCombat if(_isInCombat) return —
+  глобальный 1v1-лок = корень гипотезы R20-№8), CMB-1 (readiness-гейт
+  :562 до charged-ветки), CMB-3 (batch-резолв кастов без _isInCombat) —
+  подтверждены.
+- SESSION_SUMMARY.md переписан (был 09-11): сессии R17-R22, очередь
+  фиксов аудита, заморозка курса 1:100.
+
+Stage Summary:
+- Экономика: канон 1:100 + правило смертных зафиксированы кодом и доками;
+  реализация обмена — будущие эпизоды (план ECONOMY_SYSTEM §7).
+- Аудит боя готов к работе: порядок фиксов CMB-2 → CMB-1 → CMB-3 →
+  CMB-4/5 (clash) → CMB-7/8 (dot:/яд) → P3-пакет + синк доков.
+- Гигиена боя подтверждена аудитом: int/промилле, броня §5.2, RawQi,
+  порядок событий, нет утечек pending.
+
+NEXT: фиксы аудита R22 по порядку отчёта (первый эпизод: CMB-2 дизайн
+мульти-боя/приоритета игрока — согласовать с пользователем подход);
+R20-№5 книга техник; локальный плейтест пользователя.
