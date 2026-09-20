@@ -3,7 +3,7 @@
 > **Раздел:** 06_player
 > **Статус:** Реализована (2026-08-25, NPC_COMBAT_PREP Phase 4-5; UX-итерация S6 2026-09-06).
 > Документ создан 2026-09-06 (аудит) — до этого модуль Trade не был документирован в docs_v2.
-> **Связанные документы:** [DIALOGUE_SYSTEM.md](DIALOGUE_SYSTEM.md), [NPC.md](../04_entities/NPC.md), [INVENTORY_SYSTEM.md](INVENTORY_SYSTEM.md), [LORE_SYSTEM.md](../08_content/LORE_SYSTEM.md) §9.2, [MODULE_STRUCTURE.md](../01_architecture/MODULE_STRUCTURE.md) §2.17.
+> **Связанные документы:** [DIALOGUE_SYSTEM.md](DIALOGUE_SYSTEM.md), [ECONOMY_SYSTEM.md](ECONOMY_SYSTEM.md) (R22-1: курс 1 камень = 100 золота), [NPC.md](../04_entities/NPC.md), [INVENTORY_SYSTEM.md](INVENTORY_SYSTEM.md), [LORE_SYSTEM.md](../08_content/LORE_SYSTEM.md) §9.2, [MODULE_STRUCTURE.md](../01_architecture/MODULE_STRUCTURE.md) §2.17.
 
 ---
 
@@ -89,7 +89,7 @@
 
 ## 8. Открытые вопросы
 
-1. **Экономика камней Ци:** духовные камни одновременно валюта и расходник Ци — курс/конвертация не специфицированы.
+1. ~~**Экономика камней Ци:** курс/конвертация не специфицированы.~~ → **специфицировано R22-1 (2026-09-20):** курс 1 камень = 100 золота, смертные не владеют камнями, стабы `EconomyConstants` + `ICurrencyExchangeService`. См. [ECONOMY_SYSTEM.md](ECONOMY_SYSTEM.md).
 2. **Ресток:** условия обновления ассортимента (сезон? событие? поставки?).
 3. **Динамика цен:** отношение NPC (attitude) пока не влияет на MarkupPermil — потенциальная связка с NPCRelationshipService.
 4. **Ограничение веса/объёма покупки** — не реализовано.

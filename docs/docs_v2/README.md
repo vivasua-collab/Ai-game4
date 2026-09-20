@@ -68,6 +68,7 @@ docs_v2/
 │   ├── DIALOGUE_SYSTEM.md             — (синхронизировано с кодом 2026-09-06)
 │   ├── GROUND_ITEM_SYSTEM.md
 │   ├── TRADE_SYSTEM.md                — (добавлен 2026-09-06, аудит: модуль Trade был не документирован)
+│   ├── ECONOMY_SYSTEM.md              — (R22-1 2026-09-20: СТАБ двухвалютной экономики — курс 1 камень = 100 золота, «смертным не владеть камнями»)
 │   ├── SMOOTH_MOVEMENT_PLAN.md
 │   └── MORTAL_DEVELOPMENT.md
 ├── 07_ui/                             ← UI концепции (engine-agnostic)

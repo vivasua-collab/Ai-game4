@@ -18,6 +18,9 @@ namespace CultivationGame.Modules.Trade
             // регистрирует оба ключа одной Registration).
             builder.Register<ICurrencyService, CurrencyService>(Lifetime.Singleton);
             builder.Register<ITradeService, TradeService>(Lifetime.Singleton);
+            // R22-1 (2026-09-20): СТАБ обмена валют (золото ⇄ камни, курс 1:100).
+            // Котировки доступны; проводка в торговлю — будущий эпизод.
+            builder.Register<ICurrencyExchangeService, CurrencyExchangeService>(Lifetime.Singleton);
 
             // === Конфигурация по умолчанию ===
             var defaultConfig = new TradeConfig();
