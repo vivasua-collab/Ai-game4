@@ -439,50 +439,57 @@ public partial class CombatSimDebug : Node
             if (tgTarget != null)
             {
                 await WaitForCastClearAsync(2.0f);
-                // (a) Готов → ОБЫЧНЫЙ удар (списание готовности; pending-каст).
-                // Если во время ожидания каста готовность успела дозарядиться
-                // до капа (чужой NPC-каст удлинил ожидание) — повторяем слив.
-                for (int drain = 0; drain < 3; drain++)
+                await WaitForReadinessAsync(PlayerCombatId, 4.0f);
+
+                // (a) Готов → ОБЫЧНЫЙ удар = Accepted (реальное списание
+                // готовности; pending-каст ~0.5с — резолвим ниже).
+                if (_combatServiceImpl.IsInCombat && _combatServiceImpl.IsAttackReady(PlayerCombatId))
                 {
-                    await WaitForReadinessAsync(PlayerCombatId, 4.0f);
-                    if (!_combatServiceImpl.IsAttackReady(PlayerCombatId)) break;
-                    var drainHit = _combatServiceImpl.ExecuteAttack(PlayerCombatId, "basic_attack", tgTarget, false);
-                    turnGateOk &= drainHit == AttackAcceptance.Accepted;
-                    await WaitForCastClearAsync(1.5f);
-                    if (!_combatServiceImpl.IsInCombat) break; // NPC умер от удара
+                    var readyHit = _combatServiceImpl.ExecuteAttack(PlayerCombatId, "basic_attack", tgTarget, false);
+                    GD.Print($"[CombatSim] readiness-gate: player ready, basic hit → {readyHit} (ожидаем Accepted)");
+                    turnGateOk &= readyHit == AttackAcceptance.Accepted;
+                    // Каст (a) должен резолвиться до (c): charged-атака
+                    // упирается в каст-гейт (per-attacker), если свой каст
+                    // ещё идёт. Чужие NPC-касты не мешают (IsEntityCasting).
+                    await WaitForOwnCastClearAsync(PlayerCombatId, 2.0f);
                 }
 
-                if (_combatServiceImpl.IsInCombat
-                    && !_combatServiceImpl.IsAttackReady(PlayerCombatId))
+                // R23-1 (CMB-1): детерминизм через DebugSetReadinessPermil
+                // (QA-паттерн R16 LastNpcDefenseSelected): игровой тик
+                // начисляет ЦЕЛУЮ секунду готовности (кап за 1 тик) — окно
+                // «не готов» между тиками не поймать поллами.
+                if (_combatServiceImpl.IsInCombat)
                 {
-                    // (b) Готовность списана → обычный удар = Rejected «не готов».
+                    // (b) принудительно 0‰ → обычный удар = Rejected «не готов».
+                    _combatServiceImpl.DebugSetReadinessPermil(PlayerCombatId, 0);
                     _rejectedCount = 0; _lastRejection = "";
                     var notReady = _combatServiceImpl.ExecuteAttack(PlayerCombatId, "basic_attack", tgTarget, false);
                     GD.Print($"[CombatSim] readiness-gate: player NOT ready → {notReady} ('{_lastRejection}')");
                     turnGateOk &= notReady == AttackAcceptance.Rejected && _rejectedCount > 0;
 
                     // (c) R23-1 (CMB-1): ЗАРЯЖЕННЫЙ удар (potency 1500) при
-                    // неготовности = Accepted — гейт готовности пропускается
-                    // (§8.2 «заряженные готовность не расходуют дополнительно»),
-                    // путь мгновенный (без pending-каста).
+                    // 600‰ (ниже порога) = Accepted — гейт готовности
+                    // ПРОПУЩЕН (§8.2 «заряженные готовность не расходывают
+                    // дополнительно»), путь мгновенный, свой каст чист.
+                    _combatServiceImpl.DebugSetReadinessPermil(PlayerCombatId, 600);
                     var chargedNotReady = _combatServiceImpl.ExecuteAttack(
                         PlayerCombatId, "basic_attack", tgTarget, false, potencyPermil: 1500);
-                    GD.Print($"[CombatSim] readiness-gate: CHARGED at NOT-ready → {chargedNotReady} (ожидаем Accepted, CMB-1)");
+                    GD.Print($"[CombatSim] readiness-gate: CHARGED at 600‰ → {chargedNotReady} (ожидаем Accepted, CMB-1)");
                     turnGateOk &= chargedNotReady == AttackAcceptance.Accepted;
 
-                    // (d) Тот же кадр: обычный удар = Rejected — charged НЕ
-                    // расходовал готовность (регресс-гард CMB-1).
                     if (_combatServiceImpl.IsInCombat)
                     {
+                        // (d) Регресс-гард «charged НЕ расходует»: readiness
+                        // после charged-выпуска ВСЁ ЕЩЁ 600‰ (тот же кадр,
+                        // тика не было). Плюс поведенческий тест: обычный
+                        // удар при 600‰ = Rejected «не готов».
+                        int afterCharged = _combatServiceImpl.GetReadinessPermil(PlayerCombatId);
                         _rejectedCount = 0; _lastRejection = "";
-                        var afterCharged = _combatServiceImpl.ExecuteAttack(PlayerCombatId, "basic_attack", tgTarget, false);
-                        GD.Print($"[CombatSim] readiness-gate: NOT-charged after charged → {afterCharged} ('{_lastRejection}') (ожидаем Rejected)");
-                        turnGateOk &= afterCharged == AttackAcceptance.Rejected && _rejectedCount > 0;
+                        var afterChargedHit = _combatServiceImpl.ExecuteAttack(PlayerCombatId, "basic_attack", tgTarget, false);
+                        GD.Print($"[CombatSim] readiness-gate: after charged readiness={afterCharged}‰ (ожидаем 600) hit → {afterChargedHit} ('{_lastRejection}')");
+                        turnGateOk &= afterCharged == 600
+                            && afterChargedHit == AttackAcceptance.Rejected && _rejectedCount > 0;
                     }
-                }
-                else if (_combatServiceImpl.IsInCombat)
-                {
-                    GD.Print("[CombatSim] WARN — player still ready after drain loop; gate phase (b)-(d) skipped");
                 }
 
                 // (e) Готовность восстанавливается тиками (кулаки ~0.9с /
@@ -666,6 +673,24 @@ public partial class CombatSimDebug : Node
             waited += 0.1f;
         }
         GD.Print($"[CombatSim] WARN — cast still pending after {timeoutSec}s (gate phase may be C-5-rejected)");
+    }
+
+    /// <summary>
+    /// R23-1 (CMB-1): ждём ТОЛЬКО собственный каст сущности (IsEntityCasting).
+    /// Чужой застрявший NPC-каст не блокирует проверку готовности атакующего
+    /// (IsCasting=любой каст — ожидание по нему дозаряжает readiness до капа).
+    /// </summary>
+    private async System.Threading.Tasks.Task WaitForOwnCastClearAsync(string entityId, float timeoutSec)
+    {
+        if (_combatServiceImpl == null) return;
+        float waited = 0f;
+        while (waited < timeoutSec)
+        {
+            if (!_combatServiceImpl.IsEntityCasting(entityId)) return;
+            await ToSignal(GetTree().CreateTimer(0.1), SceneTreeTimer.SignalName.Timeout);
+            waited += 0.1f;
+        }
+        GD.Print($"[CombatSim] WARN — own cast {entityId} still pending after {timeoutSec}s");
     }
 
     /// <summary>

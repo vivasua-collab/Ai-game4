@@ -4,7 +4,17 @@
 set -u
 export PATH="/home/z/.dotnet:$PATH"
 export DOTNET_ROOT="/home/z/.dotnet"
-GODOT="/home/z/my-project/godot/Godot_v4.7.2-stable_mono_linux.x86_64/Godot_v4.7.2-stable_mono_linux.x86_64"
+GODOT="${GODOT_BIN:-/home/z/my-project/godot/Godot_v4.7.2-stable_mono_linux.x86_64/Godot_v4.7.2-stable_mono_linux.x86_64}"
+# R23-1: my-project/godot периодически «гасится» платформой (dentry-ghost:
+# записи недоступны, exec ENOENT при живом ls). Fallback — стабильная копия
+# в /home/z/godot_bin (вне зоны снапшота). Ручной оверрайд: GODOT_BIN=... .
+if [ ! -x "$GODOT" ]; then
+  ALT="/home/z/godot_bin/Godot_v4.7.2-stable_mono_linux.x86_64/Godot_v4.7.2-stable_mono_linux.x86_64"
+  if [ -x "$ALT" ]; then
+    GODOT="$ALT"
+    echo "[qa_regression] WARN — canonical godot недоступен (dentry-ghost), использую $ALT"
+  fi
+fi
 cd /home/z/my-project/Ai-game4/game || exit 1
 
 # Порядок = исторический реестр TESTING_RULES §0.1 (R17: SAVELOAD+REASSEMBLY расширены)

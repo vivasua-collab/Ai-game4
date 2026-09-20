@@ -429,6 +429,19 @@ namespace CultivationGame.Modules.Combat
             return GetReadinessPermil(entityId) >= AttackThreshold;
         }
 
+        /// <summary>
+        /// R23-1 (CMB-1 QA): тест-сеттер готовности (COMBAT_SIM 3e —
+        /// детерминированная проверка пропуска readiness-гейта charged-атакой:
+        /// игровой тик начисляет целую секунду готовности, окно «не готов»
+        /// между тиками поллами не поймать). Паттерн = R16 QA-геттер
+        /// LastNpcDefenseSelected. Боевого применения НЕ имеет.
+        /// </summary>
+        public void DebugSetReadinessPermil(string entityId, int permil)
+        {
+            if (string.IsNullOrEmpty(entityId)) return;
+            _readinessPermil[entityId] = Math.Clamp(permil, 0, AttackThreshold);
+        }
+
         /// <summary>R21-2: кастит ли КОНКРЕТНАЯ сущность (per-attacker).</summary>
         public bool IsEntityCasting(string entityId)
         {
