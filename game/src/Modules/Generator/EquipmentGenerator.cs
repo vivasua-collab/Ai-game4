@@ -138,6 +138,11 @@ public sealed class EquipmentGenerator : IEquipmentGenerator
                 * eff * (1f + material.DamageBonus / 100f)),
             Penetration = @class.Penetration + (material.Tier - 1),
             AttackRange = @class.AttackRangeTiles,
+            // R21-2: скорость атаки на предмете (было: только урон-компенсация
+            // SpeedDamageScale; фактор не попадал в предмет). Readiness-модель
+            // CombatService читает через IEquipmentDataProvider.GetAttackSpeedPermil.
+            AttackSpeedPermil = Math.Clamp(
+                (int)MathF.Round(@class.AttackSpeedFactor * 1000f), 250, 2000),
 
             Grade = grade,
             ItemLevel = level,

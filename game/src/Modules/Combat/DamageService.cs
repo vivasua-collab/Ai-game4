@@ -214,6 +214,12 @@ namespace CultivationGame.Modules.Combat
 
             // Парирование — снижение урона на 50%
             // P1-4.1 FIX: integer math — defense multiplier в промилле (ЗАПРЕТ 3.9)
+            // R21-2: CLASH — одновременная атака (оба готовы, CombatService):
+            // удар парируется ГАРАНТИРОВАННО (скрещенные клинки), если не
+            // уклонился и не кританул (эти исходы сильнее). Расход
+            // готовности защитника — в CombatService.
+            if (request.ForceClashParry && attackResult == CombatAttackResult.Hit)
+                attackResult = CombatAttackResult.Parry;
             int defensePermil = attackResult switch
             {
                 CombatAttackResult.Parry => 500,      // 50% урона

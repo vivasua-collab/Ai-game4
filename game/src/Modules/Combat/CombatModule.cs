@@ -183,9 +183,12 @@ public class CombatModule : IModule
 
         // Phase 8 ч.3: гейт дальнего боя. Каст в процессе → пропускаем
         // гейт (стрелу НЕ тратим), ExecuteAttack сам отклонит по C-5.
+        // R21-2: проверяем каст ИМЕННО АТАКУЮЩЕГО (per-attacker; общий
+        // IsCasting при параллельных атаках почти всегда true — чужой
+        // каст не должен отключать LOS/стрелы).
         // Пустой TargetId (легаси авто-выбор) — гейт не нужен: цель
         // резолвится внутри ExecuteAttack, расход не списываем.
-        if (e.IsRanged && !string.IsNullOrEmpty(e.TargetId) && !_combatServiceImpl.IsCasting)
+        if (e.IsRanged && !string.IsNullOrEmpty(e.TargetId) && !_combatServiceImpl.IsEntityCasting(e.AttackerId))
         {
             if (!_rangeGate.HasLineOfSight(e.AttackerId, e.TargetId))
             {

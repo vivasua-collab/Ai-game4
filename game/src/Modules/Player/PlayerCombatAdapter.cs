@@ -231,9 +231,11 @@ public sealed class PlayerCombatAdapter : IDisposable
         _attackIntentPub.Publish(new AttackIntentEvent(
             _player.PlayerId, target, "basic_attack", isRanged));
 
-        // Кулдаун ставится только на УСПЕШНЫЙ интент (цель найдена) —
-        // атака «вхолостую» не блокирует следующий замах.
-        _attackCooldownSec = AttackCooldownSeconds();
+        // R21-2 (attack-speed): кулдаун адаптера — ОЦЕНКА каденции для
+        // HUD/анти-спама (истина — readiness-гейт в CombatService: удар
+        // отклоняется «не готов» и бэкофф догонит). Скорость — из оружия
+        // (AttackSpeedPermil × AGI §8.2); кулаками — 1000‰.
+        _attackCooldownSec = EstimatedAttackCooldownSec();
     }
 
     // === R16: стойка защиты (клавиша G) ===
@@ -280,15 +282,19 @@ public sealed class PlayerCombatAdapter : IDisposable
     }
 
     /// <summary>
-    /// COMBAT_SYSTEM.md §8.2 (только для базовых атак):
-    /// actualDuration = baseDuration / (1 + agility × 0.01).
-    /// AGI игрока — через IStatProvider (StatProviderAdapter).
-    /// Дефолт AGI=10 → 1/(1.1) ≈ 0.91 сек.
+    /// R21-2: ОЦЕНКА времени до следующего удара (анти-спам + HUD).
+    /// Авторитет — readiness-гейт CombatService (WeaponMain.AttackSpeedPermil
+    /// × AGI-фактор §8.2 — инверсия прежней формулы длительности
+    /// BaseAttackCooldownSec/(1+AGI×0.01), кулдаун 1с удалён).
     /// </summary>
-    private float AttackCooldownSeconds()
+    private float EstimatedAttackCooldownSec()
     {
+        var weapon = _equipment?.GetEquipped(_player.PlayerId, EquipmentSlot.WeaponMain);
+        int speedPermil = weapon != null && weapon.AttackSpeedPermil > 0
+            ? weapon.AttackSpeedPermil : 1000; // кулаки
         int agi = _stats?.GetStat(_player.PlayerId, StatType.Agility) ?? 10;
-        return BaseAttackCooldownSec / (1f + agi * 0.01f);
+        int effPermil = Math.Clamp((int)((long)speedPermil * (1000 + agi * 10) / 1000), 100, 3000);
+        return 1000f / effPermil;
     }
 
     /// <summary>

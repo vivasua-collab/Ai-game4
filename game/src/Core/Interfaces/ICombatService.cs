@@ -61,6 +61,28 @@ namespace CultivationGame.Core.Interfaces
         /// Молчит для не-участников и вне боя.
         /// </summary>
         void AbandonCombat(string entityId);
+
+        // === R21-2 (2026-09-20): readiness-модель (attack-speed) ===
+
+        /// <summary>
+        /// R21-2: готовность удара участника в промилле (0 = только что бил;
+        /// ≥ порога = готов ударить). Ходы удалены — темп задаёт оружие
+        /// (WeaponMain.AttackSpeedPermil × AGI §8.2); звери — видовая 500‰.
+        /// HUD/адаптеры/NPC-АИ поллят перед публикацией интента (анти-спам).
+        /// </summary>
+        int GetReadinessPermil(string entityId);
+
+        /// <summary>R21-2: готов ли участник ударить (readiness ≥ порога).</summary>
+        bool IsAttackReady(string entityId);
+
+        /// <summary>
+        /// R21-2: кастит ли КОНКРЕТНАЯ сущность свой удар (per-attacker
+        /// pending-каст). Потребители гейтов (LOS/стрелы в CombatModule)
+        /// раньше проверяли общий IsCasting — при параллельных атаках
+        /// чужой каст НЕ должен отключать гейт (стрела не тратится только
+        /// если КАСТИТ сам атакующий — его интент всё равно отклонится C-5).
+        /// </summary>
+        bool IsEntityCasting(string entityId);
     }
 
     /// <summary>
@@ -141,6 +163,11 @@ namespace CultivationGame.Core.Interfaces
         // P2-7.3 FIX: Подтип атаки для различения slashing/piercing от blunt (для кровотечения)
         public readonly CombatSubtype AttackSubtype;       // Подтип боевой техники (MeleeStrike, MeleeWeapon, и т.д.)
 
+        // R21-2: CLASH — одновременная атака (оба готовы): удар парируется
+        // системой парирования (COMBAT §7.2; уклонение сильнее — урон 0;
+        // крит пробивает скрещенные клинки).
+        public readonly bool ForceClashParry;
+
         /// <summary>
         /// Обратная совместимость — старый конструктор.
         /// Новые поля получают значения по умолчанию.
@@ -176,7 +203,8 @@ namespace CultivationGame.Core.Interfaces
             Morphology targetMorphology = Morphology.Humanoid,
             int defenderSTR = 10, // P2-5.2: DefenderSTR для блока
             bool isPlayerTarget = false, // P2-4.1: флаг «цель — игрок»
-            CombatSubtype attackSubtype = CombatSubtype.None) // P2-7.3: подтип атаки
+            CombatSubtype attackSubtype = CombatSubtype.None, // P2-7.3: подтип атаки
+            bool forceClashParry = false) // R21-2: одновременная атака → парирование
         {
             AttackerId = attackerId;
             TargetId = targetId;
@@ -205,6 +233,7 @@ namespace CultivationGame.Core.Interfaces
             TargetMorphology = targetMorphology; // C10: морфология цели
             IsPlayerTarget = isPlayerTarget; // P2-4.1: флаг «цель — игрок»
             AttackSubtype = attackSubtype; // P2-7.3: подтип атаки (для кровотечения)
+            ForceClashParry = forceClashParry; // R21-2: clash-парирование
         }
     }
 

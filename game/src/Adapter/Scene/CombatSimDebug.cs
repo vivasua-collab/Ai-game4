@@ -172,22 +172,35 @@ public partial class CombatSimDebug : Node
         }
 
         // 3. Серия ударов в обе стороны (как это делает NPCModule/PlayerCombatAdapter).
-        // Review этап 3 (P0-1): атаки ход-зависимы — ждём нужного владельца хода
-        // перед каждым интентом (гейт CombatService отклонит «не в свой ход»;
-        // это уже не баг, а контракт — QA обязан его соблюдать).
+        // R21-2 (attack-speed): удары НЕЗАВИСИМЫ от ходов (ходы удалены) —
+        // ждём ГОТОВНОСТЬ каждого участника перед интентом (readiness-гейт
+        // CombatService отклонит «удар не готов»; это контракт — QA обязан
+        // его соблюдать). Инициатива: инициатор начинает с полной готовностью.
         for (int round = 1; round <= 3; round++)
         {
             // NPC → игрок (P0-проверка: урон должен примениться к телу игрока).
             // Раунд 1: боя нет → интент сам стартует бой (инициатор NPC —
-            // честная инициатива: первый ход у инициатора).
-            await WaitForStageAsync(CombatStage.EnemyTurn, 4.0f);
+            // честная инициатива: первый удар сразу).
+            // Раунды 2+: NPCModule атакует сам при своей готовности —
+            // ожидание готовности NPC ГОНКА с его автоатаками (куладаун
+            // списывается NPCModule): фиксированная пауза вместо ожидания.
+            if (_combatServiceImpl != null && _combatServiceImpl.IsInCombat)
+            {
+                await ToSignal(GetTree().CreateTimer(0.8), SceneTreeTimer.SignalName.Timeout);
+            }
+            else
+            {
+                await WaitForReadinessAsync(npcId, 4.0f);
+            }
             await WaitForCastClearAsync(1.0f);
             _attackIntentPub.Publish(new Core.Messaging.Contracts.AttackIntentEvent(
                 npcId, PlayerCombatId, "npc_strike", false));
+            // Каст NPC 0.5с — даём догореть (урон в игрока).
+            await ToSignal(GetTree().CreateTimer(0.7), SceneTreeTimer.SignalName.Timeout);
 
-            // Игрок → NPC (Phase 8: weapon damage wiring): ждём свой ход —
-            // после резолва атаки NPC владелец переходит игроку.
-            await WaitForStageAsync(CombatStage.PlayerTurn, 4.0f);
+            // Игрок → NPC (Phase 8: weapon damage wiring): ждём готовность
+            // оружия игрока (кулаки 1000‰ × AGI; после удара — ~0.9с).
+            await WaitForReadinessAsync(PlayerCombatId, 4.0f);
             await WaitForCastClearAsync(1.0f);
             _attackIntentPub.Publish(new Core.Messaging.Contracts.AttackIntentEvent(
                 PlayerCombatId, npcId, "basic_attack", false));
@@ -217,8 +230,8 @@ public partial class CombatSimDebug : Node
                 GD.Print($"[CombatSim] player equipped '{weapon.NameRu}' (dmg={weapon.Damage}, pen={weapon.Penetration}) — " +
                          $"provider: dmg={_equipmentProvider.GetTotalDamage(PlayerCombatId)}, " +
                          $"pen={_equipmentProvider.GetWeaponPenetration(PlayerCombatId)}");
-                // Review этап 3: ждём ход игрока (после чужого хода/тайм-аута).
-                await WaitForStageAsync(CombatStage.PlayerTurn, 4.0f);
+                // R21-2: ждём готовность оружия игрока (кулаки → ~0.9с).
+                await WaitForReadinessAsync(PlayerCombatId, 4.0f);
                 await WaitForCastClearAsync(1.0f);
                 int npcHpBeforeWeapon = _bodyProvider.GetCurrentHealth(npcId);
                 _attackIntentPub.Publish(new Core.Messaging.Contracts.AttackIntentEvent(
@@ -289,9 +302,9 @@ public partial class CombatSimDebug : Node
 
                 // Phase 8 ч.3: детерминизм — выстрел должен пройти гейт
                 // (LOS+стрелы), а не упереться в догорающий каст (C-5).
-                // Review этап 3: + ждём ход игрока (выстрел в EnemyTurn отклонён).
+                // R21-2: + ждём ГОТОВНОСТЬ оружия игрока (readiness-гейт).
                 await WaitForCastClearAsync(2.0f);
-                await WaitForStageAsync(CombatStage.PlayerTurn, 4.0f);
+                await WaitForReadinessAsync(PlayerCombatId, 4.0f);
 
                 _attackIntentPub.Publish(new Core.Messaging.Contracts.AttackIntentEvent(
                     PlayerCombatId, npcId, "basic_attack", isRanged: true));
@@ -409,9 +422,11 @@ public partial class CombatSimDebug : Node
                 GD.Print($"[CombatSim] LOS tiles restored: {clearedLosTiles.Count}");
         }
 
-        // 3e. Review этап 3 (P0-1): ПРОВЕРКА TURN-GATE — авторитетность
-        // ходовой модели. 1) атака игрока в свой ход = Accepted;
-        // 2) атака игрока в чужой ход = Rejected + AttackRejectedEvent.
+        // 3e. R21-2 (attack-speed): ПРОВЕРКА READINESS-ГЕЙТА — авторитетность
+        // модели готовности (замена turn-gate: ходы удалены). 1) удар при
+        // НЕГОТОВНОСТИ (сразу после предыдущего удара) = Rejected
+        // («удар не готов» + AttackRejectedEvent); 2) после начисления
+        // готовности тиками = Accepted.
         bool turnGateOk = true;
         if (_combatServiceImpl != null && _playerService != null)
         {
@@ -420,36 +435,40 @@ public partial class CombatSimDebug : Node
             if (tgTarget != null)
             {
                 await WaitForCastClearAsync(2.0f);
-                // Ждём ход игрока (тайм-аут EnemyTurn вернёт ход при пассивном NPC).
-                await WaitForStageAsync(CombatStage.PlayerTurn, 4.0f);
-                var inTurn = _combatServiceImpl.ExecuteAttack(PlayerCombatId, "basic_attack", tgTarget, false);
-                GD.Print($"[CombatSim] turn-gate: player in PlayerTurn → {inTurn} (ожидаем Accepted)");
-                turnGateOk &= inTurn == AttackAcceptance.Accepted;
+                // (1) Готов → ЗАРЯЖЕННЫЙ удар (potency > 1000 → мгновенный путь,
+                // расход готовности). Детерминизм: заряженная атака БЕЗ каста —
+                // следующая атака попадёт в гейт готовности, а не каста.
+                await WaitForReadinessAsync(PlayerCombatId, 4.0f);
+                var readyHit = _combatServiceImpl.ExecuteAttack(PlayerCombatId, "basic_attack", tgTarget, false, potencyPermil: 1500);
+                GD.Print($"[CombatSim] readiness-gate: player ready (charged) → {readyHit} (ожидаем Accepted)");
+                turnGateOk &= readyHit == AttackAcceptance.Accepted;
 
-                // Ждём передачи хода NPC (после резолва атаки игрока).
-                await WaitForCastClearAsync(1.5f);
-                await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+                // (2) НЕМЕДЛЕННО вторая атака: готовность списана (0‰) →
+                // Rejected «удар не готов» (детерминированно — каста нет).
+                _rejectedCount = 0; _lastRejection = "";
+                var notReady = _combatServiceImpl.ExecuteAttack(PlayerCombatId, "basic_attack", tgTarget, false);
+                GD.Print($"[CombatSim] readiness-gate: player NOT ready → {notReady} ('{_lastRejection}')");
+                turnGateOk &= notReady == AttackAcceptance.Rejected && _rejectedCount > 0;
+
+                // (3) Готовность восстанавливается тиками (кулаки ~0.9с /
+                // оружие класс-зависимо): ждём и бьём — Accepted (pending-каст).
                 if (_combatServiceImpl.IsInCombat)
                 {
-                    await WaitForStageAsync(CombatStage.EnemyTurn, 3.0f);
-                }
-                if (_combatServiceImpl.IsInCombat && _combatServiceImpl.CurrentStage == CombatStage.EnemyTurn)
-                {
-                    _rejectedCount = 0; _lastRejection = "";
-                    var offTurn = _combatServiceImpl.ExecuteAttack(PlayerCombatId, "basic_attack", tgTarget, false);
-                    GD.Print($"[CombatSim] turn-gate: player in EnemyTurn → {offTurn} ('{_lastRejection}')");
-                    turnGateOk &= offTurn == AttackAcceptance.Rejected && _rejectedCount > 0;
+                    await WaitForReadinessAsync(PlayerCombatId, 6.0f);
+                    var reReady = _combatServiceImpl.ExecuteAttack(PlayerCombatId, "basic_attack", tgTarget, false);
+                    GD.Print($"[CombatSim] readiness-gate: player re-ready → {reReady} (ожидаем Accepted)");
+                    turnGateOk &= reReady == AttackAcceptance.Accepted;
                 }
                 else
                 {
-                    // Бой завершился (NPC умер от атаки 3e-1) — off-turn проверку
-                    // пропускаем честно (WARN), ин-turn проверка выше уже валидна.
-                    GD.Print("[CombatSim] WARN — combat ended before off-turn check (NPC died?); skipped");
+                    // Бой завершился (NPC умер) — re-ready проверку пропускаем
+                    // честно (WARN): обе проверки выше уже валидны.
+                    GD.Print("[CombatSim] WARN — combat ended before re-ready check (NPC died?); skipped");
                 }
             }
             else
             {
-                GD.Print("[CombatSim] skip turn-gate phase — no alive NPC");
+                GD.Print("[CombatSim] skip readiness-gate phase — no alive NPC");
             }
         }
 
@@ -587,7 +606,7 @@ public partial class CombatSimDebug : Node
         if (!gatesOk)
             GD.Print("[CombatSim] FAIL — LOS/ammo gates broken (Phase 8 ч.3?)");
         if (!turnGateOk)
-            GD.Print("[CombatSim] FAIL — turn-gate broken (review-3 P0-1: ходы не авторитетны?)");
+            GD.Print("[CombatSim] FAIL — readiness-gate broken (R21-2: готовность не авторитетна?)");
         if (!r21ArmorOk)
             GD.Print("[CombatSim] FAIL — r21-armor: плоское вычитание/DR-агрегат сломаны (репорт 20.09 №3?)");
         if (!r21QiOk)
@@ -615,10 +634,24 @@ public partial class CombatSimDebug : Node
     }
 
     /// <summary>
-    /// Review этап 3 (P0-1): ждать нужного владельца хода (CombatStage).
-    /// Возврат: стадия достигнута ИЛИ боя нет (интент сам стартует бой с
-    /// нужным инициатором). Тайм-аут — идти дальше (вердикт ниже заметит).
+    /// R21-2: ждём ГОТОВНОСТЬ удара участника (readiness-модель; замена
+    /// ожиданиям хода). Вне боя — сразу выходим (бой завершён).
     /// </summary>
+    private async System.Threading.Tasks.Task WaitForReadinessAsync(string entityId, float timeoutSec)
+    {
+        if (_combatServiceImpl == null) return;
+        float waited = 0f;
+        while (waited < timeoutSec)
+        {
+            if (!_combatServiceImpl.IsInCombat) return;
+            if (_combatServiceImpl.IsAttackReady(entityId)) return;
+            await ToSignal(GetTree().CreateTimer(0.1), SceneTreeTimer.SignalName.Timeout);
+            waited += 0.1f;
+        }
+        GD.Print($"[CombatSim] WARN — readiness {entityId} not ready after {timeoutSec}s " +
+                 $"({_combatServiceImpl.GetReadinessPermil(entityId)}‰)");
+    }
+
     private async System.Threading.Tasks.Task WaitForStageAsync(CombatStage stage, float timeoutSec)
     {
         if (_combatServiceImpl == null) return;
@@ -652,6 +685,6 @@ public partial class CombatSimDebug : Node
 
     private static void PrintVerdict(bool pass)
     {
-        GD.Print($"[CombatSim] VERDICT: {(pass ? "PASS — обе стороны боя получают урон (melee + ranged + LOS/ammo gates + turn-gate)" : "FAIL")}");
+        GD.Print($"[CombatSim] VERDICT: {(pass ? "PASS — обе стороны боя получают урон (melee + ranged + LOS/ammo gates + readiness-gate)" : "FAIL")}");
     }
 }

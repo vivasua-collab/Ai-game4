@@ -67,6 +67,12 @@ namespace CultivationGame.Modules.NPC
         private readonly IPublisher<NPCDeathEvent> _npcDeathPub;
         private readonly IPublisher<CombatDisengageEvent> _combatDisengagePub;
         private readonly IPlayerService _playerService;
+        // R21-2: ICombatService НЕ инъектируется в конструктор — цикл DI
+        // (CombatService → StatProviderAdapter → IAnimalService → сюда →
+        // ICombatService). Видовой темп зверей рулит readiness-гейт
+        // CombatService (500‰/тик — не в провайдере экипировки); здесь —
+        // прежний тиковый троттлинг интентов (анти-спам), идеально
+        // совпадающий с готовностью: кулдаун 2 тика = readiness 2 тика.
 
         // === State ===
         private readonly List<AnimalEntity> _animals = new();
@@ -461,11 +467,15 @@ namespace CultivationGame.Modules.NPC
                         continue;
                     }
 
+                    // R21-2 (attack-speed): видовой темп укуса рулит
+                    // readiness-гейт CombatService (звери не в провайдере
+                    // экипировки → 500‰/тик = 1 укус / 2 тика — прежний темп
+                    // волка). Тиковый кулдаун здесь = троттлинг интентов
+                    // (анти-спам), синхронный с готовностью; во время
+                    // ожидания — ЧЕЙС (догоняет, не стоит).
                     if (a.CombatCooldownTicks > 0)
                     {
                         a.CombatCooldownTicks--;
-                        // Кулдаун укуса ≠ кулдаун бега: во время ожидания
-                        // продолжаем ЧЕЙЗ (шаг к игроку), не стоим.
                         a.Target = new Position2D(playerPos.X, playerPos.Y);
                         StepTowardsTarget(a);
                         continue;
@@ -478,11 +488,9 @@ namespace CultivationGame.Modules.NPC
                         // должен быть честным).
                         _attackIntentPub.Publish(new AttackIntentEvent(
                             a.EntityId, _playerService.PlayerId, string.Empty, false));
-                        // Аудит: 2 тика (НЕ 3 как в ANIMALS §5.3): окно чужого хода
-                        // CombatService — 2.5с (EnemyTurnTimeout), 3-й тик ВСЕГДА
-                        // опаздывает в чужой ход → укус отклонялся бы вечно.
-                        // 2 тика ≈ 2с < 2.5с — месть работает; темп медленнее
-                        // NPC-людей (1.6с) — дух спеки сохранён.
+                        // R21-2: тиковый троттлинг интентов (гейт готовности в
+                        // CombatService авторитетен; CombatCooldownTicks —
+                        // только анти-спам здесь, 2 тика ≈ 500‰/тик).
                         a.CombatCooldownTicks = 2;
                     }
                     else

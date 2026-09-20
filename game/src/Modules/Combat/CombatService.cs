@@ -27,6 +27,7 @@
 // выдаёт CorpseService (труп-контейнер, DEATH_AND_LOOT §2), случайный дроп
 // поверх трупа был двойным лутом.
 using System;
+using System.Collections.Generic;
 using CultivationGame.Core;
 using CultivationGame.Core.Helpers;
 using CultivationGame.Core.Messaging.Contracts;
@@ -97,15 +98,22 @@ namespace CultivationGame.Modules.Combat
         private CombatConfig _config;
         private DefenseSubtype _lastPlayerDefense = DefenseSubtype.None; // Последняя защита игрока
 
-        // Review этап 3 (P0-1): ВЛАДЕЛЕЦ ХОДА — единственный авторитетный гейт.
-        // Атаковать может ТОЛЬКО владелец хода (+ проверка участника боя P1-4).
-        // CurrentStage — производное: игрок-владелец → PlayerTurn, иначе EnemyTurn.
-        private string _currentTurnOwnerId;
-        private float _turnOwnerSetTime;
+        // R21-2 (attack-speed модель, репорт 20.09 №2): ГОТОВНОСТЬ удара
+        // вместо ВЛАДЕНИЯ ХОДОМ. Каждый тик каждому участнику начисляется
+        // скорость атаки (оружие × AGI §8.2; звери — видовая); удар принимается
+        // при readiness ≥ AttackThresholdPermil и вычитает порог (остаток
+        // сохраняется — плавные каденции). Ходы/чередование/EnemyTurnTimeout
+        // удалены; «пока волк укусит раз, игрок с мечом стукнет ~2.2 раза».
+        private readonly Dictionary<string, int> _readinessPermil = new();
 
-        // Спринт 8 C11: время каста техник
-        private PendingTechnique _pendingTechnique;
-        private bool _isCasting;
+        // Спринт 8 C11: время каста техник.
+        // R21-2 (attack-speed): КАСТЫ PER-ATTACKER (Dictionary). Раньше —
+        // один combat-wide pending: пока кастовал NPC, атака игрока
+        // отвергалась «Каст уже идёт» — несовместимо с параллельными
+        // ударами (ходы удалены). Теперь каждый участник кастует СВОЙ
+        // удар; чужой каст не блокирует (COMBAT_SYSTEM §4: каст = подготовка
+        // ТВОЕЙ атаки).
+        private readonly Dictionary<string, PendingTechnique> _pendingCasts = new();
 
         // Stage 0 (2026-08-25, GLM-5.3): potency последней атаки (от зарядки игрока).
         // 1000 = базовая (NPC/без зарядки); >1000 = заряженная игроком (множитель урона).
@@ -135,7 +143,7 @@ namespace CultivationGame.Modules.Combat
         /// стрелы (иначе игрок терял бы расходник на каждую отклонённую
         /// попытку — гейт ампы вызывается только для «реального» выстрела).
         /// </summary>
-        public bool IsCasting => _isCasting;
+        public bool IsCasting => _pendingCasts.Count > 0;
 
         /// <summary>
         /// R16-аудит (P2-1): последняя стойка, ВЫБРАННАЯ NPCDefenseSelector для
@@ -240,13 +248,27 @@ namespace CultivationGame.Modules.Combat
         /// </summary>
         private void OnDamageAppliedForCastInterrupt(in DamageAppliedEvent e)
         {
-            if (!_isCasting) return;
-            // Если атакующий получает урон во время каста — прервать
-            if (e.TargetId == _pendingTechnique.AttackerId)
+            // R21-2: прерываем КАСТ КОНКРЕТНОГО получателя урона (per-attacker).
+            if (_pendingCasts.TryGetValue(e.TargetId, out var own)
+                || TryGetCastByAlias(e.TargetId, out own))
             {
-                _isCasting = false;
-                _pendingTechnique = default;
+                _pendingCasts.Remove(own.AttackerId);
             }
+        }
+
+        /// <summary>R21-2: каст по алиасу игрока (ключ — канонический ID).</summary>
+        private bool TryGetCastByAlias(string entityId, out PendingTechnique cast)
+        {
+            foreach (var kvp in _pendingCasts)
+            {
+                if (PlayerIdResolver.AreSameEntity(entityId, kvp.Key))
+                {
+                    cast = kvp.Value;
+                    return true;
+                }
+            }
+            cast = default;
+            return false;
         }
 
         /// <summary>
@@ -274,10 +296,16 @@ namespace CultivationGame.Modules.Combat
             // Подписка на QiDepletedEvent — для прерывания техник
             _qiDepletedSubscription = _qiDepletedSub.Subscribe(OnQiDepleted);
 
-            // Review этап 3 (P0-1): честная инициатива — первый ход у ИНИЦИАТОРА боя
-            // (раньше «игрок всегда первый»: NPC-инициированный бой открывался
-            // ходом игрока, что ломало порядок и QA-сценарии NPC-атаки).
-            SetTurnOwner(instigatorId);
+            // R21-2: ИНИЦИАТИВА без ходов — инициатор начинает с полной
+            // готовностью (первый удар сразу), защитник с нулевой.
+            // Stage — фиксированный на весь бой (игрок участвует →
+            // PlayerTurn; QA/CHARGE-геттер семантики «бой идёт»).
+            _readinessPermil.Clear();
+            _readinessPermil[instigatorId] = AttackThreshold;
+            _readinessPermil[targetId] = 0;
+            _currentStage = PlayerIdResolver.IsPlayer(instigatorId) || PlayerIdResolver.IsPlayer(targetId)
+                ? CombatStage.PlayerTurn
+                : CombatStage.EnemyTurn;
 
             _combatStartedPub.Publish(new CombatStartedEvent(instigatorId, targetId));
         }
@@ -352,23 +380,22 @@ namespace CultivationGame.Modules.Combat
             _currentStage = CombatStage.None;
             _currentTargetId = null;
             _instigatorId = null;
-            _currentTurnOwnerId = null;
+            _readinessPermil.Clear();
             _combatTimer = 0f;
             _lastPlayerDefense = DefenseSubtype.None;
 
-            // R16-аудит (P1-1): гасим незавершённый каст. До R16 EndCombat
+            // R16-аудит (P1-1): гасим незавершённые касты. До R16 EndCombat
             // вне резолва атаки был недостижим (MaxCombatDuration=0); R16
             // добавил AbandonCombat (бегство/leash по инициативе NPC из
             // NPCModule.Tick) — бой может завершиться ПОСЕРЕДИ чужого каста.
-            // UpdateTimer гейтится !_isInCombat → каст никогда не резолвится
-            // и не чистится: гейт _isCasting (строка выше) отклоняет ВСЕ новые
-            // атаки, анти-лок EnemyTurnTimeout отключён условием !_isCasting →
-            // перманентный лок боевой подсистемы до пересборки локации.
-            if (_isCasting)
+            // R21-2: гасим ВСЕ пер-атакующие касты (словарь).
+            if (_pendingCasts.Count > 0)
             {
-                Console.WriteLine($"[Combat] EndCombat: прерываем незавершённый каст '{_pendingTechnique.TechniqueId}' ({_pendingTechnique.AttackerId}) — бой завершён");
-                _isCasting = false;
-                _pendingTechnique = default;
+                foreach (var pt in _pendingCasts.Values)
+                {
+                    Console.WriteLine($"[Combat] EndCombat: прерываем незавершённый каст '{pt.TechniqueId}' ({pt.AttackerId}) — бой завершён");
+                }
+                _pendingCasts.Clear();
             }
 
             // Освобождаем подписку
@@ -376,21 +403,92 @@ namespace CultivationGame.Modules.Combat
             _qiDepletedSubscription = null;
         }
 
-        // === Review этап 3 (P0-1): хелперы ходовой модели ===
+        // === R21-2: хелперы readiness-модели (замена ходовых) ===
+
+        /// <summary>Порог готовности удара (CombatConfig.AttackThresholdPermil).</summary>
+        private int AttackThreshold => _config?.AttackThresholdPermil ?? 1000;
 
         /// <summary>
-        /// Установить владельца хода (производный CurrentStage).
-        /// Единственная точка изменения владельца — кроме честной передачи
-        /// после действия (SetTurnOwner(OtherSideOf(...))) и тайм-аута
-        /// чужого хода в UpdateTimer.
+        /// R21-2: готовность удара участника (промилле). 0 = только что
+        /// бил; ≥ порога = готов ударить. Вне боя/не участник → 0.
         /// </summary>
-        private void SetTurnOwner(string ownerId)
+        public int GetReadinessPermil(string entityId)
         {
-            _currentTurnOwnerId = ownerId;
-            _currentStage = PlayerIdResolver.IsPlayer(ownerId)
-                ? CombatStage.PlayerTurn
-                : CombatStage.EnemyTurn;
-            _turnOwnerSetTime = _combatTimer;
+            if (string.IsNullOrEmpty(entityId) || !_isInCombat) return 0;
+            // Алиасы игрока: ключ словаря — канонический участник.
+            foreach (var kvp in _readinessPermil)
+            {
+                if (PlayerIdResolver.AreSameEntity(entityId, kvp.Key)) return kvp.Value;
+            }
+            return 0;
+        }
+
+        /// <summary>R21-2: готов ли участник ударить (readiness ≥ порога).</summary>
+        public bool IsAttackReady(string entityId)
+        {
+            return GetReadinessPermil(entityId) >= AttackThreshold;
+        }
+
+        /// <summary>R21-2: кастит ли КОНКРЕТНАЯ сущность (per-attacker).</summary>
+        public bool IsEntityCasting(string entityId)
+        {
+            return _pendingCasts.TryGetValue(entityId, out _)
+                || TryGetCastByAlias(entityId, out _);
+        }
+
+        /// <summary>
+        /// R21-2: начислить готовность за тик (вызывается из UpdateTimer).
+        /// Скорость: участник с оружием → WeaponMain.AttackSpeedPermil ×
+        /// AGI-фактор §8.2 (1000 + AGI×10, инверсия формулы длительности);
+        /// зверь (не в провайдере экипировки) → видовая 500‰ (волк/тигр,
+        /// 1 атака / 2 тика); безоружный прочий → кулаки 1000‰.
+        /// Кламп 3000‰ (анти-рога разрыв).
+        /// </summary>
+        private void AccrueReadiness(float deltaTime)
+        {
+            if (deltaTime <= 0f) return;
+            var keys = new List<string>(_readinessPermil.Keys);
+            foreach (var id in keys)
+            {
+                int speed = GetAttackSpeedPermilFor(id);
+                // deltaTime = 1 игровой тик (WorldService.DeltaTime=1f):
+                // accrual пропорционален тику.
+                // R21-2: кап = ПОРОГУ (не «банковать» замахи: накопил 3 удара
+                // залпом — нефизично; «остаток» каденции возникает естественно
+                // от дискретных тиков: 1100‰/тик → удар → 100‰ остаток).
+                _readinessPermil[id] = Math.Min(
+                    _readinessPermil[id] + (int)(speed * deltaTime),
+                    AttackThreshold);
+            }
+        }
+
+        /// <summary>Скорость атаки участника в промилле/тик (см. AccrueReadiness).</summary>
+        private int GetAttackSpeedPermilFor(string entityId)
+        {
+            if (_equipmentDataProvider.HasEntity(entityId))
+            {
+                int weapon = _equipmentDataProvider.GetAttackSpeedPermil(entityId);
+                if (weapon <= 0) weapon = 1000; // безоружный (кулаки)
+                int agi = _statProvider.GetStat(entityId, StatType.Agility);
+                int agiFactor = 1000 + agi * 10; // §8.2: 1 + AGI×0.01
+                return Math.Clamp((int)((long)weapon * agiFactor / 1000), 100, 3000);
+            }
+            // Звери (животные не регистрируются в провайдере экипировки):
+            // видовой темп 500‰ — ровно прежний каденс волка (1 укус / 2 тика).
+            return 500;
+        }
+
+        /// <summary>Списать готовность за удар (остаток сохраняется).</summary>
+        private void ConsumeReadiness(string entityId)
+        {
+            foreach (var kvp in _readinessPermil)
+            {
+                if (PlayerIdResolver.AreSameEntity(entityId, kvp.Key))
+                {
+                    _readinessPermil[kvp.Key] = Math.Max(0, kvp.Value - AttackThreshold);
+                    return;
+                }
+            }
         }
 
         /// <summary>Участник текущего боя (инстагатор или цель; алиасы игрока учитываются).</summary>
@@ -398,14 +496,6 @@ namespace CultivationGame.Modules.Combat
         {
             return PlayerIdResolver.AreSameEntity(entityId, _instigatorId)
                 || PlayerIdResolver.AreSameEntity(entityId, _currentTargetId);
-        }
-
-        /// <summary>Противоположная сторона боя относительно сущности.</summary>
-        private string OtherSideOf(string entityId)
-        {
-            return PlayerIdResolver.AreSameEntity(entityId, _instigatorId)
-                ? _currentTargetId
-                : _instigatorId;
         }
 
         /// <summary>
@@ -464,14 +554,16 @@ namespace CultivationGame.Modules.Combat
                 return AttackAcceptance.Rejected;
             }
 
-            // === Review этап 3 (P0-1): гейт ВЛАДЕНИЯ ХОДОМ ===
-            // Атаковать может только владелец текущего хода. Раньше стадия
-            // менялась как побочный эффект каждого удара — интенты «не в свой
-            // ход» проходили и флипали стадию туда-сюда.
-            if (!PlayerIdResolver.AreSameEntity(attackerId, _currentTurnOwnerId))
+            // === R21-2 (репорт 20.09 №2): гейт ГОТОВНОСТИ вместо владения ходом ===
+            // Удары независимы от ходов: любой участник бьёт, когда его оружие
+            // «перезарядилось» (readiness ≥ порога). Прошлая схема строго
+            // чередовала удары 1:1 — «ход противника» блокировал игрока даже
+            // с готовым мечом. Расход готовности — здесь (замах свершен).
+            int attackerReadiness = GetReadinessPermil(attackerId);
+            if (attackerReadiness < AttackThreshold)
             {
                 PublishRejection(attackerId, techniqueId,
-                    "ход противника — подождите свой ход");
+                    $"удар не готов ({attackerReadiness}‰ < {AttackThreshold}‰)");
                 return AttackAcceptance.Rejected;
             }
 
@@ -502,10 +594,13 @@ namespace CultivationGame.Modules.Combat
             // C-5 FIX (аудит-3): раньше тихий return — игрок не понимал, почему
             // атака не прошла. Публикуем событие отклонения (для UI-тоста,
             // паттерн EquipmentBlockedEvent).
-            if (_isCasting)
+            // R21-2: пер-атакующий (КАСТ ТОЛЬКО ЭТОГО атакующего блокирует его
+            // новую атаку; параллельные удары других участников идут).
+            if (_pendingCasts.TryGetValue(attackerId, out var ownCast)
+                || TryGetCastByAlias(attackerId, out ownCast))
             {
                 PublishRejection(attackerId, techniqueId,
-                    $"Каст уже идёт: {_pendingTechnique.TechniqueId}");
+                    $"Каст уже идёт: {ownCast.TechniqueId}");
                 return AttackAcceptance.Rejected;
             }
 
@@ -515,6 +610,7 @@ namespace CultivationGame.Modules.Combat
             {
                 _lastAttackPotencyPermil = potencyPermil;
                 _lastAttackIsRanged = isRanged;
+                ConsumeReadiness(attackerId); // R21-2: замах свершен (расход при приёме)
                 ApplyTechniqueImmediately(attackerId, techniqueId);
                 return AttackAcceptance.Accepted;
             }
@@ -551,7 +647,9 @@ namespace CultivationGame.Modules.Combat
                 // не перенаправляет выстрел (npc не бьёт сам себя).
                 string castTargetId = attackerId == _instigatorId ? _currentTargetId : _instigatorId;
                 // Отложенное применение — установить PendingTechnique
-                _pendingTechnique = new PendingTechnique
+                // (R21-2: per-attacker dictionary).
+                ConsumeReadiness(attackerId); // R21-2: замах свершен (расход при приёме)
+                _pendingCasts[attackerId] = new PendingTechnique
                 {
                     AttackerId = attackerId,
                     TechniqueId = techniqueId,
@@ -561,7 +659,6 @@ namespace CultivationGame.Modules.Combat
                     RemainingCastTime = effectiveCastTime,
                     TotalCastTime = effectiveCastTime
                 };
-                _isCasting = true;
 
                 // Публикация события начала каста (для UI анимации)
                 // _castStartedPub.Publish(new TechniqueCastStartedEvent(...));
@@ -577,6 +674,7 @@ namespace CultivationGame.Modules.Combat
 
             // Мгновенное применение (effectiveCastTime <= 0.15с)
             // Редактировано: 2026-05-22 13:50:00 UTC — Этап 3.1: рефакторинг дублирования P1-8.1
+            ConsumeReadiness(attackerId); // R21-2: замах свершен (расход при приёме)
             BuildAndExecuteDamageRequest(attackerId, techniqueId);
             return AttackAcceptance.Accepted;
         }
@@ -797,6 +895,21 @@ namespace CultivationGame.Modules.Combat
                 LastNpcDefenseSelected = defenderDefense;
             }
 
+            // R21-2 (репорт 20.09 №2): CLASH — ОДНОВРЕМЕННАЯ АТАКА. Если
+            // защитник в момент удара тоже готов (readiness ≥ порога —
+            // «оба замахнулись»), срабатывает система парирования
+            // (COMBAT §7.2): удар парируется (урон ×0.5), готовность
+            // защитника расходуется на парирование. Обычные удары НЕ
+            // блокируются стойкой выбора (решение пользователя) — только
+            // одновременность скрещивает клинки. Уклонение/крит сильнее
+            // (обрабатываются в DamageService до форса).
+            // Защитник «в замахе» = его СОБСТВЕННАЯ атака в полёте (per-attacker
+            // pending-каст): скрещенные клинки НЕ отменяют замах защитника
+            // (парирование — реакция в движении; готовность уже потрачена
+            // на замах при приёме его атаки — двойного расхода нет).
+            bool clashParry = _pendingCasts.TryGetValue(defenderId, out _)
+                || TryGetCastByAlias(defenderId, out _);
+
             // P2-7.3 FIX: передаём подтип атаки для различения slashing/piercing от blunt
             // M2 (2026-09-03): basic_attack с оружием в главной руке теперь MeleeWeapon
             // (раньше всегда MeleeStrike — вооружённый удар шёл как «безоружный»:
@@ -826,7 +939,8 @@ namespace CultivationGame.Modules.Combat
                 targetMorphology,                                    // C10: морфология для таблицы попадания
                 defenderSTR,                                         // P2-5.2: STR защищающегося для блока
                 isPlayerTarget,                                      // P2-4.1: флаг «цель — игрок»
-                attackSubtype                                        // P2-7.3: подтип атаки (для кровотечения)
+                attackSubtype,                                       // P2-7.3: подтип атаки (для кровотечения)
+                clashParry                                           // R21-2: одновременная атака → парирование
             );
 
             // Единый пайплайн урона
@@ -878,11 +992,8 @@ namespace CultivationGame.Modules.Combat
                 return;
             }
 
-            // Review этап 3 (P0-1): переход хода — ЧЕСТНАЯ ПЕРЕДАЧА после
-            // завершённого действия: владелец = противоположная сторона
-            // АТАКУЮЩЕГО (не «флип текущей стадии»). Работает для игрока,
-            // NPC и NPC-vs-NPC (другая сторона = другой участник).
-            SetTurnOwner(OtherSideOf(attackerId));
+            // R21-2: передача хода удалена — удары независимы (readiness-модель:
+            // следующий удар того же участника — когда его оружие снова готово).
         }
 
         public void ExecuteDefense(string defenderId, DefenseSubtype defenseType)
@@ -915,13 +1026,9 @@ namespace CultivationGame.Modules.Combat
                 }
             }
 
-            // Переход хода после защиты — только если защита была действием
-            // ХОДА защитника (Review этап 3: обобщено с PlayerTurn-флипа на
-            // владение ходом; реакционная защита в чужой ход ход не заканчивает).
-            if (PlayerIdResolver.AreSameEntity(defenderId, _currentTurnOwnerId))
-            {
-                SetTurnOwner(OtherSideOf(defenderId));
-            }
+            // R21-2: «защита = действие хода» удалена — ходов больше нет;
+            // стойка (R16) остаётся реакцией на СЛЕДУЮЩУЮ входящую атаку
+            // независимо от темпа обоих участников.
         }
 
         // === Обработчики событий ===
@@ -963,33 +1070,39 @@ namespace CultivationGame.Modules.Combat
                 return;
             }
 
-            // Review этап 3 (P0-1): тайм-аут ЧУЖОГО хода (анти-лок).
-            // Пассивный не-игрок (не атакует: без оружия/далеко/стан) не
-            // блокирует бой навсегда — после EnemyTurnTimeoutSec ход
-            // возвращается другой стороне. Ход игрока тайм-аута не имеет
-            // (классический turn-based: противник ждёт игрока).
-            if (!_isCasting
-                && !PlayerIdResolver.IsPlayer(_currentTurnOwnerId)
-                && _config != null && _config.EnemyTurnTimeoutSec > 0f
-                && _combatTimer - _turnOwnerSetTime > _config.EnemyTurnTimeoutSec)
-            {
-                SetTurnOwner(OtherSideOf(_currentTurnOwnerId));
-            }
+            // R21-2 (attack-speed): НАЧИСЛЕНИЕ ГОТОВНОСТИ вместо тайм-аута
+            // чужого хода (анти-лок не нужен — никто никого не блокирует:
+            // удар доступен при readiness ≥ порога; бой завершается
+            // смертью/disengage/MaxCombatDuration). Кулдауны адаптеров
+            // (игрок/NPC/звери) удалены — единый источник темпа здесь.
+            AccrueReadiness(deltaTime);
 
             // Спринт 8 C11: Обновление таймера каста
-            if (_isCasting)
+            // R21-2: per-attacker — тикаем ВСЕ касты, резолв завершённых
+            // (снимок завершённых — резолв вне итерации: ApplyTechniqueImmediately
+            // может завершить бой и очистить словарь).
+            if (_pendingCasts.Count > 0)
             {
-                _pendingTechnique.RemainingCastTime -= deltaTime;
-                if (_pendingTechnique.RemainingCastTime <= 0f)
+                List<PendingTechnique> completed = null;
+                List<string> castKeys = new List<string>(_pendingCasts.Keys);
+                foreach (var key in castKeys)
                 {
-                    string attackerId = _pendingTechnique.AttackerId;
-                    string techniqueId = _pendingTechnique.TechniqueId;
-                    string pendingTargetId = _pendingTechnique.TargetId;   // M1: цель на момент старта каста
-                    int pendingPotencyPermil = _pendingTechnique.PotencyPermil; // M1: potency кастера
-                    bool pendingIsRanged = _pendingTechnique.IsRanged;     // Phase 8 ч.2: ranged-флаг каста
-                    _isCasting = false;
-                    _pendingTechnique = default;
-                    ApplyTechniqueImmediately(attackerId, techniqueId, pendingTargetId, pendingPotencyPermil, pendingIsRanged);
+                    var pt = _pendingCasts[key];
+                    pt.RemainingCastTime -= deltaTime;
+                    _pendingCasts[key] = pt; // struct — пишем обратно
+                    if (pt.RemainingCastTime <= 0f)
+                        (completed ??= new List<PendingTechnique>()).Add(pt);
+                }
+                if (completed != null)
+                {
+                    foreach (var pt in completed)
+                    {
+                        _pendingCasts.Remove(pt.AttackerId);
+                        // M1: цель на момент старта каста; potency кастера;
+                        // Phase 8 ч.2: ranged-флаг.
+                        ApplyTechniqueImmediately(pt.AttackerId, pt.TechniqueId,
+                            pt.TargetId, pt.PotencyPermil, pt.IsRanged);
+                    }
                 }
             }
         }
@@ -997,7 +1110,6 @@ namespace CultivationGame.Modules.Combat
         // === Вспомогательные методы для получения данных техники ===
 
         /// <summary>
-        /// Получить базовый урон техники.
         /// CMB-A10: если техника изучена — берём из данных, иначе — базовый урон оружия/кулака.
         /// Спринт 1 A3 FIX: используем TechniqueData.BaseDamage вместо TechniqueCapacity.CalculateCost().
         /// CalculateCost возвращает стоимость ёмкости (50-200), а не урон.

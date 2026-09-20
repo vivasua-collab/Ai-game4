@@ -76,11 +76,11 @@ public class NPCModule : IModule, IWorldResettable
     // Phase 8 ч.2 (2026-09-03): дальнобойные NPC (лук/арбалет) бьют
     // с дистанции оружия вместо melee-гейта dist>2.
     [Inject] private readonly IEquipmentDataProvider _equipmentDataProvider = null!;
+    // R21-2 (attack-speed): готовность удара NPC — из CombatService
+    // (куладаун 1.6с удалён: темп задаёт оружие NPC × AGI).
+    [Inject] private readonly ICombatService? _combatServiceForReadiness = null;
 
     public string ModuleName => "NPC";
-
-    /// NPC attack cooldown (seconds of game time).
-    private const float NpcAttackCooldownSec = 1.6f;
 
     public void Start()
     {
@@ -109,7 +109,7 @@ public class NPCModule : IModule, IWorldResettable
     /// Attacking с целью в радиусе атаки публикует AttackIntentEvent с
     /// кулдауном. CombatModule выполняет полный damage pipeline.
     /// </summary>
-    private readonly Dictionary<string, float> _npcAttackTimers = new();
+    private readonly Dictionary<string, float> _npcAttackTimers = new(); // R21-2: не используется (readiness) — оставлен для сейв-стабильности поля
 
     /// <summary>
     /// R13-аудит (P2-4) + R14-аудит (P2-1): сброс NPC-домена при пересборке
@@ -191,10 +191,14 @@ public class NPCModule : IModule, IWorldResettable
             int maxAttackRange = npcIsRanged ? npcWeapon!.AttackRange : 2;
             if (dist > maxAttackRange) continue; /// вне досягаемости оружия
 
-            if (!_npcAttackTimers.TryGetValue(state.NpcId, out var last)) last = -999f;
-            if (now - last < NpcAttackCooldownSec) continue;
+            // R21-2 (attack-speed): NPC шлёт интент при ГОТОВНОСТИ удара
+            // (CombatService.IsAttackReady — оружие NPC задаёт темп:
+            // кинжал 1430‰/тик, меч 1100, двуруч ~825 × AGI). Куладаун 1.6с
+            // и жёсткое чередование ходов удалены — удары независимы.
+            if (_combatServiceForReadiness != null
+                && !_combatServiceForReadiness.IsAttackReady(state.NpcId)) continue;
 
-            _npcAttackTimers[state.NpcId] = now;
+            _npcAttackTimers[state.NpcId] = now; // R21-2: только для диагностики
             // Phase 8 ч.2: isRanged → CombatService резолвит RangedProjectile + §4.2
             _attackIntentPub.Publish(new AttackIntentEvent(
                 state.NpcId, state.TargetId, "npc_strike", npcIsRanged));

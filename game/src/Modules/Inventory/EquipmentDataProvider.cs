@@ -282,6 +282,19 @@ namespace CultivationGame.Modules.Inventory
         }
 
         /// <summary>
+        /// R21-2: скорость атаки WeaponMain в промилле/тик (готовность-модель
+        /// CombatService). Нет оружия/сущности → 0 (дефолт решает вызывающий:
+        /// кулаки, звери). Старые предметы (поле не сериализовано) → 1000.
+        /// </summary>
+        public int GetAttackSpeedPermil(string entityId)
+        {
+            if (entityId == null) return 0;
+            var weapon = GetEquipped(entityId, EquipmentSlot.WeaponMain);
+            if (weapon == null) return 0;
+            return weapon.AttackSpeedPermil > 0 ? weapon.AttackSpeedPermil : 1000;
+        }
+
+        /// <summary>
         /// Установить покрытие брони для сущности.
         /// Вызывается из NPCAssemblyService после расчёта параметров NPC.
         /// </summary>

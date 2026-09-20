@@ -42,6 +42,14 @@ public class EquipmentData : ItemData
     /// <summary>Урон (для оружия)</summary>
     public int Damage = 0;
 
+    /// <summary>
+    /// R21-2 (attack-speed модель, COMBAT §8): базовая скорость оружия в
+    /// ПРОМИЛЛЕ готовности за тик (= AttackSpeedFactor × 1000 из
+    /// EquipmentGenerationTables; кинжал 1300, меч 1000, двуруч 750).
+    /// Готовность ≥ 1000‰ = удар. Старые предметы-сейвы → 1000 (кулаки).
+    /// </summary>
+    public int AttackSpeedPermil = 1000;
+
     /// <summary>Пробитие брони оружия. C6: Уменьшает эффективную броню цели.</summary>
     public int Penetration = 0;
 

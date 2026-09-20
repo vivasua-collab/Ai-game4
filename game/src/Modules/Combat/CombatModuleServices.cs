@@ -64,7 +64,9 @@ public static class CombatModuleServices
             // C-6 (аудит-3): PlayerEntityId удалён (мёртвое поле — PlayerIdResolver)
             // Review этап 3 (P0-2): EnableAI/AITurnDelay удалены (мёртвый конфиг фантомного AI)
             MaxCombatDuration = 0f,
-            EnemyTurnTimeoutSec = 2.5f,
+            // R21-2: EnemyTurnTimeoutSec удалён (ходов больше нет —
+            // readiness-модель); порог готовности удара — 1000‰.
+            AttackThresholdPermil = 1000,
             // R13-audit (P1-3): AutoLootOnVictory удалён вместе с CombatLootService.
             PlayerDamageMultiplier = 1.0f,
             EnemyDamageMultiplier = 1.0f,

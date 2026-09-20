@@ -69,6 +69,15 @@ namespace CultivationGame.Core.Interfaces
         int GetDamageReductionPermil(string entityId);
 
         /// <summary>
+        /// R21-2: базовая скорость атаки сущности в промилле/тик — из
+        /// WeaponMain.AttackSpeedPermil (генератор: класс оружия × 1000;
+        /// кинжал 1300, меч 1000, двуруч 750). Нет оружия/сущности → 0
+        /// (вызывающий решает дефолт: кулаки ~ 1000, звери — видовая).
+        /// Потребитель — CombatService (readiness-модель, COMBAT §8).
+        /// </summary>
+        int GetAttackSpeedPermil(string entityId);
+
+        /// <summary>
         /// Установить покрытие брони для сущности (0-100%).
         /// Вызывается из NPCAssemblyService после расчёта параметров NPC.
         /// Спринт 6 C5: для coverage roll в DamageService.

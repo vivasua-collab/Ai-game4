@@ -19,7 +19,7 @@
 | Хук | Сцена/файл | Что проверяет |
 |---|---|---|
 | `GODOT_NEWGAME=1` | MainMenuController | Полный флоу: меню → New Game → сборка сцены |
-| `GODOT_COMBAT_SIM=1` | CombatSimDebug | Бой в обе стороны + weapon end-to-end + r21-гарды: броня (плоское вычитание + DR-агрегат) и пассивный щит Ци (VERDICT) |
+| `GODOT_COMBAT_SIM=1` | CombatSimDebug | Бой в обе стороны + weapon end-to-end + readiness-gate (R21-2: Accepted/Rejected «не готов»/re-ready) + r21-гарды: броня (плоское вычитание + DR-агрегат) и пассивный щит Ци (VERDICT) |
 | `GODOT_CHARGE_SIM=1` | ChargeSimDebug | Заряд техник (кулдауны/ёмкость) |
 | `GODOT_TRADE_DEBUG=1` | TradeModule | Smoke покупки/продажи |
 | `GODOT_TRADE_HOLD=1` | TradeModule | Не закрывать лавку (скриншоты) |
