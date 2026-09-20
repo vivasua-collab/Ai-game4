@@ -169,7 +169,8 @@ namespace CultivationGame.Modules.Inventory
                  _entityEquipmentData.ContainsKey(entityId) ||
                  _cachedTotalArmor.ContainsKey(entityId) ||
                  _cachedTotalDamage.ContainsKey(entityId) ||
-                 _cachedArmorCoverage.ContainsKey(entityId));
+                 _cachedArmorCoverage.ContainsKey(entityId) ||
+                 _cachedDamageReduction.ContainsKey(entityId));
         }
 
         /// <summary>
@@ -185,6 +186,7 @@ namespace CultivationGame.Modules.Inventory
             _cachedTotalArmor.Remove(entityId);
             _cachedTotalDamage.Remove(entityId);
             _cachedArmorCoverage.Remove(entityId);
+            _cachedDamageReduction.Remove(entityId);
         }
 
         /// <summary>
@@ -197,6 +199,7 @@ namespace CultivationGame.Modules.Inventory
             _cachedTotalArmor.Remove(entityId);
             _cachedTotalDamage.Remove(entityId);
             _cachedArmorCoverage.Remove(entityId);
+            _cachedDamageReduction.Remove(entityId);
         }
 
         // === Дополнительные методы для NPCAssemblyService ===
@@ -242,6 +245,13 @@ namespace CultivationGame.Modules.Inventory
         private readonly Dictionary<string, int> _cachedArmorCoverage = new();
 
         /// <summary>
+        /// R21-3: кэш среднего предметного снижения урона (DamageReduction,
+        /// ПРОЦЕНТЫ 0-80): entityId → ср. % по броневым предметам.
+        /// Пишется в RecomputeAggregatesFromData (вместе с coverage).
+        /// </summary>
+        private readonly Dictionary<string, int> _cachedDamageReduction = new();
+
+        /// <summary>
         /// Получить средний процент покрытия брони для сущности.
         /// Спринт 6 C5: Возвращает 0-100 (процент покрытия).
         /// 0 = нет покрытия (броня никогда не покрывает), 100 = полное покрытие.
@@ -253,6 +263,22 @@ namespace CultivationGame.Modules.Inventory
             return _cachedArmorCoverage.TryGetValue(entityId, out int coverage) ? coverage : 0;
             // P2-6.2 FIX: default = 0 (нет покрытия), было 100 (полное покрытие)
             // Сущности без явного coverage НЕ получают бесплатную броню
+        }
+
+        /// <summary>
+        /// R21-3: среднее предметное «Снижение урона» в ПРОМИЛЛЕ (0-800).
+        /// Источник — EquipmentData.DamageReduction (проценты, генератор:
+        /// min(80, 3+level×1.5)). Потребитель — DamageService слой 6-7
+        /// (DefenseContext.DamageReductionPermil, ALGORITHMS §5.2).
+        /// Сущность без брони → 0 (естественная броня SetTotalArmor вклада
+        /// не даёт — только предметы).
+        /// </summary>
+        public int GetDamageReductionPermil(string entityId)
+        {
+            if (entityId == null) return 0;
+            return _cachedDamageReduction.TryGetValue(entityId, out int drPercent)
+                ? System.Math.Min(drPercent * 10, GameConstants.MAX_DAMAGE_REDUCTION_PERMIL)
+                : 0;
         }
 
         /// <summary>
@@ -362,7 +388,7 @@ namespace CultivationGame.Modules.Inventory
             if (entityId == null || equipment == null) return;
 
             float totalArmor = 0f, totalDamage = 0f;
-            float coverageSum = 0f;
+            float coverageSum = 0f, drSum = 0f;
             int armorPieces = 0;
 
             foreach (var kvp in equipment)
@@ -379,6 +405,11 @@ namespace CultivationGame.Modules.Inventory
                 {
                     totalArmor += item.Defense * gradeMult;
                     coverageSum += item.Coverage;
+                    // R21-3: предметное «Снижение урона» (%). БЕЗ грейд-
+                    // множителя — грейд добавляет отдельно через bonus в
+                    // формулу доков (ALGORITHMS §5.2); здесь — честное
+                    // среднее по броневым предметам (как coverage).
+                    drSum += System.Math.Min(item.DamageReduction, 80f);
                     armorPieces++;
                 }
             }
@@ -387,6 +418,9 @@ namespace CultivationGame.Modules.Inventory
             _cachedTotalArmor[entityId] = totalArmor;
             _cachedArmorCoverage[entityId] = armorPieces > 0
                 ? (int)System.Math.Round(coverageSum / armorPieces)
+                : 0;
+            _cachedDamageReduction[entityId] = armorPieces > 0
+                ? (int)System.Math.Round(drSum / armorPieces)
                 : 0;
         }
 

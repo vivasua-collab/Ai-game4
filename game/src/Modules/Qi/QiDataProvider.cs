@@ -6,6 +6,7 @@
 // Регистрируется в DI как Singleton: IQiDataProvider → QiDataProvider.
 // Migrated from Ai-game3 (Unity) to Ai-game4 (Godot) 2026-08-15.
 using System.Collections.Generic;
+using CultivationGame.Core;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.Interfaces;
 
@@ -85,6 +86,20 @@ public class QiDataProvider : IQiDataProvider
             existingBufferActive = existing.IsQiBufferActive;
             existingBufferMode = existing.QiBufferMode;
             existingBufferInvested = existing.QiBufferInvested;
+        }
+
+        // R21-4 (COMBAT_SYSTEM §5 / QI_SYSTEM §6: «Ци защищает практика от
+        // ЛЮБОГО урона — даже во сне»): пассивная «сырая Ци» для NPC.
+        // SetQiBufferState до R21 не имела НИ ОДНОГО вызывателя → NPC-щит
+        // был всегда выключен. Активируем RawQi автоматически при Ци ≥
+        // минимума (idемпотентно; формулы в DamageService гейтят по
+        // currentQi — при падении Ци ниже минимума поглощения нет).
+        // Вызывается при спауне (NPCSpawnerService), загрузке сейва
+        // (NPCService) и реген-тиках (NPCQiRegenService).
+        if (!existingBufferActive && currentQi >= GameConstants.MIN_QI_FOR_BUFFER)
+        {
+            existingBufferActive = true;
+            existingBufferMode = QiBufferMode.RawQi;
         }
 
         _entityData[entityId] = new QiEntityData

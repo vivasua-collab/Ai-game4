@@ -168,6 +168,12 @@ Shield (WeaponOff) → None` (`PlayerCombatAdapter.TickDefenseStance`,
 │  │   effectiveArmor = max(0, armor.armor - penetration)                       │
 │  │   damage = max(1, damage - effectiveArmor × 0.5)                           │
 │  └── Износ брони: armor.durability.current -= damage × 0.1 / hardness        │
+│      (R21, 2026-09-20: СЛОИ 6-7 реализованы полностью: предметный            │
+│       DamageReduction агрегируется в EquipmentDataProvider                    │
+│       (GetDamageReductionPermil, ср. по броневым предметам) и ПОДКЛЮЧЕН     │
+│       в DefenseContext.DamageReductionPermil поверх баффов/формаций;         │
+│       плоское вычитание — в DefenseProcessor.ApplyDefense ПОСЛЕ процентного. │
+│       Формула кривой брони — armor/(armor+100) в промилле.)                  │
 │                                                                               │
 │       ↓                                                                       │
 │  СЛОЙ 8 — МАТЕРИАЛ ТЕЛА ЦЕЛИ                                                  │
@@ -260,6 +266,18 @@ rawDamage += bonusDamage
 ## 5. Буфер Ци как защита
 
 Ци защищает практика от ЛЮБОГО урона — даже во сне и даже если практик не использует активную защиту.
+
+> **R21 (2026-09-20) — реализация пассивного режима.** Критерий «практика» в
+> коде: текущее Ци ≥ 10 (MIN_QI_FOR_BUFFER). Уровень в доках не задан:
+> практик = пробуждённое ядро (L1+) → Ци > 0; смертный L0 (Ци = 0) и
+> опустошённый практик поглощения НЕ получают. Реализовано как дефолт:
+> буфер игрока не активирован и Ци ≥ 10 → DamageService автоматически
+> применяет режим **RawQi** (COMBAT_SYSTEM §5.1, физика 80%/5:1/20%);
+> NPC — авто-активация RawQi в QiDataProvider.SetQiState (спаун/загрузка/
+> реген). Активная Defense-техника (Z) / Barrier-формация по-прежнему
+> переключает режим в **Shield** (100%/2:1/0%); G-стойка Shield доступна
+> без физического предмета в WeaponOff (Qi-щит ≠ физический щит; до R21
+> стойка была мёртвой — генератор не создаёт WeaponOff-предметов).
 
 ### 5.1. Таблицы поглощения
 

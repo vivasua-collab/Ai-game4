@@ -58,6 +58,17 @@ namespace CultivationGame.Core.Interfaces
         int GetArmorCoverage(string entityId);
 
         /// <summary>
+        /// R21-3: среднее предметное «Снижение урона %» (EquipmentData.
+        /// DamageReduction, генератор: min(80, 3+level×1.5)) в промилле —
+        /// вклад в DefenseContext.DamageReductionPermil (ALGORITHMS §5.2:
+        /// damageReduction = min(0.8, armor.damageReduction + materialBonus
+        /// + gradeBonus)). До R21 поле писалось генератором и показывалось
+        /// в тултипе, но бой его не читал — «мёртвый» показатель.
+        /// Возвращает 0-800 (промилле).
+        /// </summary>
+        int GetDamageReductionPermil(string entityId);
+
+        /// <summary>
         /// Установить покрытие брони для сущности (0-100%).
         /// Вызывается из NPCAssemblyService после расчёта параметров NPC.
         /// Спринт 6 C5: для coverage roll в DamageService.

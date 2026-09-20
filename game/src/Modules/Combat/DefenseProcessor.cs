@@ -62,7 +62,17 @@ namespace CultivationGame.Modules.Combat
                 totalReductionPermil = 0;
 
             // CRIT-1: integer math — finalDamage = baseDamage * (1000 - reductionPermil) / 1000
-            int finalDamage = (int)((long)baseDamage * (1000 - totalReductionPermil) / 1000);
+            int reducedDamage = (int)((long)baseDamage * (1000 - totalReductionPermil) / 1000);
+
+            // R21-3 (ALGORITHMS §5.2, COMBAT_SYSTEM слой 6-7): плоское
+            // вычитание ПОСЛЕ процентного — damage = max(1, damage −
+            // effectiveArmor × 0.5). Вместе с предметным DamageReduction
+            // (R21-3 в DamageService) броня L1-сета теперь даёт заметную
+            // разницу (против ~5% до фикса — репорт 20.09: «урон визуально
+            // не зависит, надета броня или нет»).
+            // integer ×0.5 → /2 (округление вниз).
+            int flatReduction = effectiveArmor / 2;
+            int finalDamage = reducedDamage - flatReduction;
             return finalDamage >= 1 ? finalDamage : 1; // Минимум 1 урон
         }
 

@@ -160,6 +160,14 @@ Point-фильтрация даёт чёткие пиксельные грани
 | Disciple | npc_disciple_male | npc_disciple_female | Процедурный гуманоид |
 | Passerby | npc_passerby | npc_villager_male/female | Процедурный гуманоид |
 
+> **R21 (2026-09-20): морфология важнее роли.** NPC с морфологией Quadruped
+> (напр., Monster-волк из диких локаций, species "wolf") рендерится
+> **звериным** процедурным рецептом (CreateAnimalSprite по SpeciesId —
+> тело-эллипс/уши/хвост §3.3 PROCEDURAL_SPRITES), а не «процедурным
+> гуманоидом». До R21 NPCSpriteRenderer выбирал рецепт ТОЛЬКО по роли —
+> волк рисовался «человеком в робе» (репорт 20.09). Прочие морфологии
+> (Bird/Serpentine/…) — прежний гуманоидный fallback по роли.
+
 ---
 
 ## 7. Категория 5: Equipment (20)

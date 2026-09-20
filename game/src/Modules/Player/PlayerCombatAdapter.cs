@@ -33,6 +33,9 @@ public sealed class PlayerCombatAdapter : IDisposable
 {
     [Inject] private readonly IPlayerService _player = null!;
     [Inject] private readonly IPlayerInputService _input = null!;
+    // R21-4: Ци игрока (IQiService — сервис игрока) для доступности стойки
+    // Shield (Qi-щит) без физического предмета в WeaponOff.
+    [Inject] private readonly IQiService? _qi = null;
     [Inject] private readonly INPCService _npcs = null!;
     // 2026-09-11 (аудит боя с животными D1): животные — легитимные цели Space
     // (волк/олень/кролик НЕ регистрируются в NPCService — живут в AnimalService).
@@ -255,9 +258,13 @@ public sealed class PlayerCombatAdapter : IDisposable
         _defenseSwitchCooldownSec = DefenseSwitchCooldownSec;
 
         // Доступные стойки: Dodge — всегда; Parry — с оружием;
-        // Shield — со щитом (WeaponOff). None — начало цикла.
+        // Shield — со щитом (WeaponOff) ИЛИ с Ци (R21-4: генератор не
+        // создаёт WeaponOff-щитов — стойка была мёртвой; Qi-щит — не
+        // физический предмет, CombatService гейтит активацию по Ци ≥ 25%
+        // ≥ MIN_QI_FOR_BUFFER; COMBAT_SYSTEM §1.4.2/§5).
         bool hasWeapon = _equipment?.GetEquipped(_player.PlayerId, EquipmentSlot.WeaponMain) != null;
-        bool hasShield = _equipment?.GetEquipped(_player.PlayerId, EquipmentSlot.WeaponOff) != null;
+        bool hasShield = _equipment?.GetEquipped(_player.PlayerId, EquipmentSlot.WeaponOff) != null
+            || (_qi?.CurrentQi ?? 0) >= GameConstants.MIN_QI_FOR_BUFFER;
 
         DefenseSubtype next = CurrentDefenseStance switch
         {

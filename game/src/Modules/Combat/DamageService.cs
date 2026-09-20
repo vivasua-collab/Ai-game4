@@ -240,8 +240,17 @@ namespace CultivationGame.Modules.Combat
             if (request.IsPlayerTarget)
             {
                 // Игрок — из кэша событий (быстрый путь)
-                bufferActive = _cachedBufferIsActive;
-                bufferMode = _cachedBufferMode;
+                // R21-4 (COMBAT_SYSTEM §5, QI_SYSTEM §6): пассивная «сырая Ци» —
+                // Ци защищает практика от ЛЮБОГО урона «даже во сне», БЕЗ
+                // активации буфера. Буфер не активирован и Ци ≥ минимума →
+                // работает режим RawQi (физика 80% / 5:1 / 20% пробитие).
+                // Уровень в доках не задан — критерий практики: пробуждённое
+                // ядро L1+ и Ци ≥ MIN_QI_FOR_BUFFER=10; смертный L0 (Ци=0)
+                // и опустошённый практик защиты НЕ получают (гейт Ци внутри
+                // CalculateBufferAbsorption — currentQi < MIN → нет поглощения).
+                bufferActive = _cachedBufferIsActive
+                    || _cachedCurrentQi >= GameConstants.MIN_QI_FOR_BUFFER;
+                bufferMode = _cachedBufferIsActive ? _cachedBufferMode : QiBufferMode.RawQi;
                 bufferQiInvested = _cachedBufferQiInvested;
                 targetCurrentQi = _cachedCurrentQi;
             }
@@ -323,9 +332,13 @@ namespace CultivationGame.Modules.Combat
             if (armorCoversHit)
             {
                 // Броня покрывает — применить DefenseProcessor с пробитием (Спринт 6 C6)
+                // R21-3: + предметное «Снижение урона» (ALGORITHMS §5.2:
+                // damageReduction = armor.damageReduction + бонусы) в
+                // DefenseContext.DamageReductionPermil (поверх бафф/формаций).
+                int equipDrPermil = _equipmentDataProvider.GetDamageReductionPermil(request.TargetId);
                 var defenseContext = new DefenseContext(
                     request.TargetId, armorValue, request.DefenderMaterial,
-                    buffReductionPermil, request.Penetration); // C6: penetration
+                    buffReductionPermil + equipDrPermil, request.Penetration); // C6: penetration
                 postArmorDamage = DefenseProcessor.ApplyDefense(piercingDamage, defenseContext);
                 absorbedByArmor = piercingDamage - postArmorDamage;
             }

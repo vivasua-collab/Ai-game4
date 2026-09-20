@@ -194,6 +194,12 @@ public partial class NPCSpriteRenderer : Node2D
     // Cached sprites per role.
     private readonly Dictionary<NPCRole, Texture2D> _spriteCache = new();
 
+    // R21-1: кэш звериных спрайтов по виду (speciesId). Волк-Монстр из диких
+    // локаций (NPCSpawnCompositionService: SpawnRequest(Monster, ..., "wolf"))
+    // рендерился «человеком в робе» — рецепт тела выбирался ТОЛЬКО по роли
+    // без учёта морфологии (репорт 20.09: «молодой волк с телом человека»).
+    private readonly Dictionary<string, Texture2D> _beastSpriteCache = new();
+
     public override void _Draw()
     {
         if (_npcService == null) return;
@@ -212,9 +218,30 @@ public partial class NPCSpriteRenderer : Node2D
             float cx = npc.Position.X * _tilePixels + halfTile;
             float cy = npc.Position.Y * _tilePixels + halfTile;
 
-            // Get or create sprite for this role.
-            if (!_spriteCache.TryGetValue(npc.Role, out var tex))
+            // R21-1: звериный NPC (Quadruped) → звериный спрайт по виду
+            // (CreateAnimalSprite: тело-эллипс/уши/хвост), НЕ гуманоидный
+            // рецепт по роли. Вид — из NPCState.SpeciesId (NPCData его не
+            // несёт). Прочие морфологии — прежний гуманоидный fallback
+            // (SPRITE_CATALOG §19: процедурный гуманоид с кодировкой роли).
+            var st = _npcService.GetNPCState(id);
+            bool isQuadruped = npc.Morphology == Morphology.Quadruped;
+            string? beastSpecies = isQuadruped ? st?.SpeciesId : null;
+
+            Texture2D tex;
+            if (!string.IsNullOrEmpty(beastSpecies)
+                && _beastSpriteCache.TryGetValue(beastSpecies!, out var beastTex))
             {
+                tex = beastTex;
+            }
+            else if (!string.IsNullOrEmpty(beastSpecies))
+            {
+                tex = ProceduralSpriteGenerator.CreateAnimalSprite(
+                    beastSpecies!, BeastSizeClass(beastSpecies!));
+                _beastSpriteCache[beastSpecies!] = tex;
+            }
+            else if (!_spriteCache.TryGetValue(npc.Role, out tex))
+            {
+                // Get or create sprite for this role.
                 tex = ProceduralSpriteGenerator.CreateNPCSprite(npc.Role);
                 _spriteCache[npc.Role] = tex;
             }
@@ -233,7 +260,6 @@ public partial class NPCSpriteRenderer : Node2D
             // 2026-09-04 S1 (VLM-аудит): + имя и уровень NPC над баром —
             // информативность боя (видно КТО ранен и его силу).
             // R18-1: глобальный тумблер — GameSettings.ShowEnemyVitals.
-            var st = _npcService.GetNPCState(id);
             bool inCombat = st?.IsInCombat ?? false;
             if (GameSettings.ShowEnemyVitals && _bodyProvider != null)
             {
@@ -256,6 +282,18 @@ public partial class NPCSpriteRenderer : Node2D
             }
         }
     }
+
+    /// <summary>
+    /// R21-1: размер звериного спрайта по виду (срез SpeciesRegistry:
+    /// rabbit=Small, tiger/dragon=Large/Large(Huge-катания нет), прочие=Medium).
+    /// </summary>
+    private static SizeClass BeastSizeClass(string speciesId) => speciesId switch
+    {
+        "rabbit" => SizeClass.Small,
+        "tiger" => SizeClass.Large,
+        "dragon" => SizeClass.Large,
+        _ => SizeClass.Medium,
+    };
 
     /// <summary>
     /// R15: overlay оружия NPC. Топ-левел hand-текстуры = топ-левел тела +

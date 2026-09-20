@@ -43,6 +43,10 @@ public partial class CombatSimDebug : Node
     [Inject] private IItemDatabaseService? _itemDb;
     [Inject] private ISubscriber<Core.Messaging.Contracts.AttackRejectedEvent>? _rejectedSub;
     [Inject] private Modules.Combat.CombatService? _combatServiceImpl;
+    // R21 (20.09): регресс-гарды пайплайна защиты — броня и пассивный щит Ци.
+    [Inject] private IDamageService? _damageService;
+    [Inject] private IQiService? _qiService;
+    [Inject] private IQiDataProvider? _qiDataProvider;
 
     private System.IDisposable? _damageToken;
     private System.IDisposable? _intentEchoToken;
@@ -449,6 +453,116 @@ public partial class CombatSimDebug : Node
             }
         }
 
+        // 3f. R21 (репорт 20.09, №3/№4): регресс-гарды пайплайна защиты.
+        // (a) DefenseProcessor — плоское вычитание eff.брони×0.5 ПОСЛЕ
+        //     процентного + предметное «Снижение урона» (ALGORITHMS §5.2);
+        // (b) EquipmentDataProvider — агрегат DamageReduction в промилле;
+        // (c) QiDataProvider — авто-активация пассивного RawQi (COMBAT §5
+        //     «даже во сне»);
+        // (d) DamageService — end-to-end: поглощение 80% физики сырой Ци,
+        //     траты Ци, 20% гарантированное пробитие (npc + player пути).
+        bool r21ArmorOk = true, r21QiOk = true;
+        {
+            int raw = 100;
+            int noArmor = DefenseProcessor.ApplyDefense(raw,
+                new DefenseContext("qa_r21", 0, BodyMaterial.Organic, 0, 0));
+            int withArmor = DefenseProcessor.ApplyDefense(raw,
+                new DefenseContext("qa_r21", 50, BodyMaterial.Organic, 200, 10));
+            // eff=50-10=40 → 285‰ (armor) + 200‰ (DR) = 485‰ → 51; flat −20 → 31.
+            r21ArmorOk &= noArmor == raw && withArmor > 0 && withArmor < raw - 30;
+            GD.Print($"[CombatSim] r21-armor(a): noArmor={noArmor} withArmor={withArmor} " +
+                     $"(плоское+DR: {(raw - withArmor)} из {raw})");
+
+            if (_equipmentProvider != null)
+            {
+                var piece = new EquipmentData
+                {
+                    Slot = EquipmentSlot.Torso,
+                    Defense = 30,
+                    Coverage = 100f,
+                    DamageReduction = 20f,
+                };
+                var slots = new Dictionary<EquipmentSlot, EquipmentData> { [EquipmentSlot.Torso] = piece };
+                _equipmentProvider.SetEquipmentData("qa_r21_entity", slots);
+                int drPermil = _equipmentProvider.GetDamageReductionPermil("qa_r21_entity");
+                r21ArmorOk &= drPermil == 200; // 20% × 10
+                _equipmentProvider.RemoveEntity("qa_r21_entity");
+                GD.Print($"[CombatSim] r21-armor(b): DR-агрегат = {drPermil}‰ (ожид 200)");
+            }
+            else
+            {
+                GD.Print("[CombatSim] WARN — r21-armor(b) skipped (no equipment provider)");
+            }
+
+            if (_qiDataProvider != null && _damageService != null)
+            {
+                // (c) авто-активация RawQi для NPC с Ци ≥ минимума.
+                _qiDataProvider.SetQiState("qa_r21_npc", 500, 1000, 1f);
+                bool npcBufActive = _qiDataProvider.IsQiBufferActive("qa_r21_npc");
+                var npcBufMode = _qiDataProvider.GetQiBufferMode("qa_r21_npc");
+                r21QiOk &= npcBufActive && npcBufMode == QiBufferMode.RawQi;
+                // Контроль: смертный (Ци < минимума) — без буфера.
+                _qiDataProvider.SetQiState("qa_r21_mortal", 5, 10, 1f);
+                bool mortalBuf = _qiDataProvider.IsQiBufferActive("qa_r21_mortal");
+                r21QiOk &= !mortalBuf;
+                GD.Print($"[CombatSim] r21-qi(c): npc buf={npcBufActive}/{npcBufMode}, " +
+                         $"mortal(Ци=5) buf={mortalBuf} (ожид false)");
+
+                // (d) end-to-end через DamageService: физика 100 → сырая Ци
+                // поглощает 80, 20 пробивает, Ци тратится (5:1).
+                // DefenderAGI=0/STR=10/стойка None → dodge/parry/block НЕ роллятся
+                // (ветки в DetermineAttackResult гейтятся стойкой); крит —
+                // базовый 5% (детерминированный RNG) → ожидание учитывает
+                // обе ветки (×1.5) и частичное поглощение при нехватке Ци.
+                var reqNpc = new DamageRequest("qa_r21_att", "qa_r21_npc", 100,
+                    DamageType.Physical, Element.Neutral, Element.Neutral,
+                    AttackType.Normal, TechniqueGrade.Common, 1000, 1, 1,
+                    DefenseSubtype.None, BodyMaterial.Organic,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    Morphology.Humanoid, 10, false, CombatSubtype.None);
+                var resNpc = _damageService.CalculateDamage(reqNpc);
+                int dmgN = resNpc.Result == CombatAttackResult.CriticalHit ? 150 : 100;
+                int absN = resNpc.AbsorbedByQi;
+                long npcQiAfter = _qiDataProvider.GetCurrentQi("qa_r21_npc");
+                // Инварианты: поглощено + пробито = весь урон; физика 800‰;
+                // Ци 5:1 (при нехватке — частичное поглощение, Ци в 0).
+                r21QiOk &= absN > 0 && resNpc.FinalDamage > 0 && absN + resNpc.FinalDamage == dmgN;
+                r21QiOk &= npcQiAfter == (500 - (long)absN * 5 < 0 ? 0 : 500 - (long)absN * 5);
+                GD.Print($"[CombatSim] r21-qi(d-npc): dmg={dmgN} absorbed={absN}, " +
+                         $"final={resNpc.FinalDamage}, Ци 500→{npcQiAfter} (5:1, {resNpc.Result})");
+
+                // (d-player) пассивная сырая Ци игрока без активации буфера.
+                if (_qiService != null)
+                {
+                    // Игрок в этой сборке — практик L1 (QiConfig default),
+                    // Ци уже полное; AddQi только при нехватке.
+                    long qiBefore = _qiService.CurrentQi;
+                    if (qiBefore < 500) _qiService.AddQi(500 - qiBefore);
+                    qiBefore = _qiService.CurrentQi;
+                    var reqPl = new DamageRequest("qa_r21_att", "player", 100,
+                        DamageType.Physical, Element.Neutral, Element.Neutral,
+                        AttackType.Normal, TechniqueGrade.Common, 1000, 1, 1,
+                        DefenseSubtype.None, BodyMaterial.Organic,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        Morphology.Humanoid, 10, true, CombatSubtype.None);
+                    var resPl = _damageService.CalculateDamage(reqPl);
+                    long qiAfter = _qiService.CurrentQi;
+                    int dmgP = resPl.Result == CombatAttackResult.CriticalHit ? 150 : 100;
+                    int absP = resPl.AbsorbedByQi;
+                    // Пассивный RawQi работает БЕЗ активации буфера (гейт
+                    // R21-4: Ци ≥ MIN → режим RawQi даже если буфер не активен).
+                    r21QiOk &= absP > 0 && resPl.FinalDamage > 0 && absP + resPl.FinalDamage == dmgP;
+                    r21QiOk &= qiAfter < qiBefore; // Ци потрачено (QiConsume через событие)
+                    GD.Print($"[CombatSim] r21-qi(d-player): dmg={dmgP} absorbed={absP}, " +
+                             $"final={resPl.FinalDamage}, Ци {qiBefore}→{qiAfter} (пассивная, буфер не активен)");
+                }
+            }
+            else
+            {
+                GD.Print("[CombatSim] WARN — r21-qi skipped (no qi/damage services)");
+            }
+        }
+
         // 4. Итоги.
         int playerHpAfter = _bodyProvider.GetCurrentHealth("player");
         int npcHpAfter = _bodyProvider.GetCurrentHealth(npcId);
@@ -460,7 +574,8 @@ public partial class CombatSimDebug : Node
                  $"player {playerHpBefore}→{playerHpAfter} ({(playerHpBefore - playerHpAfter)} dmg), " +
                  $"npc {npcHpBefore}→{npcHpAfter}, arrows now={_inventory?.GetItemCount(CombatRangeGateService.ArrowItemId) ?? -1}");
 
-        bool pass = playerTookDamage && npcTookDamage && weaponWiringOk && rangedWiringOk && gatesOk && turnGateOk;
+        bool pass = playerTookDamage && npcTookDamage && weaponWiringOk && rangedWiringOk && gatesOk && turnGateOk
+                    && r21ArmorOk && r21QiOk;
         if (!playerTookDamage)
             GD.Print("[CombatSim] FAIL — NPC→player damage did NOT apply (BodyService player-id mismatch?)");
         if (!npcTookDamage)
@@ -473,6 +588,10 @@ public partial class CombatSimDebug : Node
             GD.Print("[CombatSim] FAIL — LOS/ammo gates broken (Phase 8 ч.3?)");
         if (!turnGateOk)
             GD.Print("[CombatSim] FAIL — turn-gate broken (review-3 P0-1: ходы не авторитетны?)");
+        if (!r21ArmorOk)
+            GD.Print("[CombatSim] FAIL — r21-armor: плоское вычитание/DR-агрегат сломаны (репорт 20.09 №3?)");
+        if (!r21QiOk)
+            GD.Print("[CombatSim] FAIL — r21-qi: пассивная сырая Ци не работает (репорт 20.09 №4?)");
 
         PrintVerdict(pass);
     }

@@ -2498,3 +2498,21 @@ Stage Summary:
 NEXT: эпизод 2 R20 — (1) книга техник UI (№5); (2) статичные Wandering-NPC
 (инструментирование ProcessWandering); (3) проверка 1v1-лока CombatService
 (№8-гипотеза); (4) локальный тест пользователя новой сборкой.
+
+---
+Task ID: R21-EP1-0920
+Agent: main (Z.ai Code)
+Task: Репорт 20.09 (5 пунктов): эпизод 1 — волк с телом человека (№1), пайплайн брони (№3), пассивный щит Ци (№4); аудиты всех 5 пунктов.
+
+Work Log:
+- VLM-разбор скриншота: «волк» = NPC «Молодой Волк · L1» рендерился человеком в робе (VLM-мисрид «Монгол Воин» — шрифт 10px). Меч за спиной — старая сборка (погашен 67c0101).
+- 3 параллельных аудита (R21-A/B/C, read-only, записи выше): спрайт-линковка; пайплайн урона/щит Ци; экономика+парирование. Корни найдены все.
+- Песочница сброшена: восстановлен .NET 8 SDK (/home/z/.dotnet, dotnet-install).
+- №1 ФИКС: NPCSpriteRenderer — ветка по морфологии: Quadruped + SpeciesId → CreateAnimalSprite (кэш по виду, BeastSizeClass), прочие — гуманоидный fallback.
+- №3 ФИКС: (а) DefenseProcessor — плоское вычитание effectiveArmor×0.5 ПОСЛЕ процентного (ALGORITHMS §5.2): 100→31 при броне 50/DR 20%/pen 10 (было ~5% на L1); (б) мёртвое поле EquipmentData.DamageReduction подключено: агрегат в EquipmentDataProvider (GetDamageReductionPermil, интерфейс) → DefenseContext поверх баффов; тултип теперь честный.
+- №4 ФИКС: (а) DamageService путь игрока: буфер не активен + Ци≥10 → авто-режим RawQi («даже во сне»; уровень в доках не задан — критерий Ци≥10 = практик L1+); (б) QiDataProvider.SetQiState: авто-активация RawQi NPC (SetQiBufferState имел 0 вызывателей); (в) G-стойка Shield без WeaponOff (мёртвый путь — генератор щиты не создаёт).
+- QA: COMBAT_SIM фаза 3f (r21): DefenseProcessor 100→31; DR-агрегат 200‰; NPC авто-RawQi (мортал Ци=5 → нет); end-to-end поглощение 80/пробитие 20/Ци 500→100 — NPC и игрок. Крит-устойчивые инварианты. QA 18/18 PASS; build 0 err.
+- Доки: COMBAT_SYSTEM (слой 7 + §5 R21-примечания), QI_SYSTEM §6, SPRITE_CATALOG §6, TESTING_RULES; чекпоинт checkpoints/09_20_r21_sprite_armor_qi.md.
+
+Stage Summary:
+- №1/№3/№4 закрыты, запушено. №2 (attack-speed миграция + clash-парирование) и №5 (две валюты, курс 1:10, обмен только у культиваторов-торговцев) — планы в аудитах R21-C/чекпоинте, ждут своих эпизодов.
