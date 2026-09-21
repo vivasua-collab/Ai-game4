@@ -135,21 +135,26 @@ public partial class ModalSimDebug : Node
         // === 9. R20 (баг №6): K — открытие без паузы + Esc ЗАКРЫВАЕТ ======
         // Репорт: «окно культивации, которое вызывается по K, не закрывается
         // по ESC, требует повторного нажатия K». Правило пользователя: оба
-        // типа закрытия. K-окно справочное — НЕ паузит (открытие/закрытие
-        // без изменения паузы; Esc закрывает окно, не ставит паузу).
+        // типа закрытия. R30-П4 (репорт 21.09): K-окно — модальное С ПАУЗОЙ
+        // (как инвентарь/книга; тумблер настроек «пауза при открытых окнах»).
         {
             var cult = world.CultivationWindowForQA;
             if (cult != null)
             {
+                // R30-П4 (репорт 21.09): K-окно теперь ПОЛНОЦЕННОЕ модальное —
+                // пауза при открытии (как инвентарь/книга), резюм при Esc.
+                // Прежний ассерт «открыто-без-паузы» проверял справочное
+                // окно — поведение изменено решением пользователя.
                 await PressAndRelease("cultivation_window");
                 await WaitFramesAsync();
-                bool openedNoPause = cult.Visible && !_time.IsPaused;
+                bool openedPaused = cult.Visible && _time.IsPaused;
                 await PressAndRelease("pause"); // Esc
                 await WaitFramesAsync();
                 bool closedByEsc = !cult.Visible && !_time.IsPaused;
-                GD.Print($"[ModalSim] 9. K-окно: открыто-без-паузы={openedNoPause}, Esc-закрыло={closedByEsc} (ожидаем True/True)");
-                pass &= openedNoPause && closedByEsc;
+                GD.Print($"[ModalSim] 9. K-окно (П4): открыто+пауза={openedPaused}, Esc-закрыло+резюм={closedByEsc} (ожидаем True/True)");
+                pass &= openedPaused && closedByEsc;
                 if (cult.Visible) cult.Toggle(); // самовосстановление
+                if (_time.IsPaused) _time.Resume();
             }
             else
             {

@@ -51,6 +51,8 @@ public partial class GameWorldController : Node2D
     [Inject] private Modules.Combat.TechniqueService TechniqueSvc { get; set; } = null!;
     // D (2026-08-26): слоты техник 3-9 (для каста по клавише N) + тосты.
     [Inject] private Modules.Player.TechniqueSlotService TechniqueSlots { get; set; } = null!;
+    // П3 (репорт 21.09): полное описание формации в тостах активации/наполнения
+    [Inject] private Modules.Formation.FormationService? FormationSvc { get; set; }
     [Inject] private IPublisher<Core.Messaging.Contracts.ToastShownEvent> ToastPub { get; set; } = null!;
     [Inject] private Modules.Player.PlayerTechniqueCaster TechniqueCaster { get; set; } = null!;
     [Inject] private IPublisher<Core.Messaging.Contracts.MeditationToggleRequestedEvent> MeditationTogglePub { get; set; } = null!;
@@ -160,6 +162,10 @@ public partial class GameWorldController : Node2D
     // 2026-09-19: индикатор паузы (INP-1 диагностика видимости) — см. UpdatePauseIndicator.
     private Label? _pauseIndicator;
     private string? _lastPauseText;
+    // П6 (репорт 21.09): FPS-счётчик (F3 — тумбл, персист).
+    private Label? _fpsLabel;
+    private float _fpsAccum;
+    private string? _lastFpsText;
     private sealed class ToastLine
     {
         public Label Label = null!;
@@ -338,7 +344,10 @@ public partial class GameWorldController : Node2D
         || (_techniqueBook is { Visible: true })
         || (_lootWindow is { IsOpen: true })
         || (_tradeWindow is { IsOpen: true })
-        || (_dialogueWindow is { IsOpen: true });
+        || (_dialogueWindow is { IsOpen: true })
+        // П4 (репорт 21.09): K-окно культивации — полноценное модальное
+        // (прежде было только в списке клик-блокировки, паузы не ставило).
+        || (_cultivationWindow is { Visible: true });
 
     /// <summary>
     /// Аудит-0915 A3 (INP1-2): предикат «модальное окно открыто КРОМЕ лавки».
@@ -370,6 +379,10 @@ public partial class GameWorldController : Node2D
     {
         if (!otherModalAlreadyOpen)
             _wasPausedBeforeInventory = Time is { IsPaused: true };
+        // П4 (репорт 21.09): тумблер «пауза при открытых окнах» (настройки,
+        // default ON). Снапшот делается всегда — резюм при закрытии честен;
+        // при OFF мир течёт, пока игрок изучает окна (промотка времени).
+        if (!Persistence.GameSettings.PauseOnModalWindows) return;
         if (Time is { IsPaused: false })
             Time.Pause();
     }
@@ -413,6 +426,26 @@ public partial class GameWorldController : Node2D
         if (text != null) GD.Print($"[GameWorld] {text}"); // диагностика причины в лог
     }
 
+    /// <summary>П6 (репорт 21.09): FPS-счётчик — троттл 0.25с, цвет по диапазону
+    /// (зелёный ≥55, янтарный 30-54, красный <30). Обновление текста только при
+    /// изменении (аллокации минимизированы).</summary>
+    private void UpdateFpsCounter(double delta)
+    {
+        if (_fpsLabel == null || !_fpsLabel.Visible) return;
+        _fpsAccum += (float)delta;
+        if (_fpsAccum < 0.25f) return;
+        _fpsAccum = 0f;
+        int fps = (int)Engine.GetFramesPerSecond();
+        string text = $"FPS {fps}";
+        if (text == _lastFpsText) return;
+        _lastFpsText = text;
+        _fpsLabel.Text = text;
+        _fpsLabel.AddThemeColorOverride("font_color",
+            fps >= 55 ? new Color(0.6f, 0.9f, 0.6f)
+            : fps >= 30 ? new Color(0.95f, 0.8f, 0.4f)
+            : new Color(0.95f, 0.45f, 0.4f));
+    }
+
     /// <summary>Открытые модальные окна — короткие подписи для индикатора.</summary>
     private List<string> OpenModalWindowNames()
     {
@@ -426,6 +459,7 @@ public partial class GameWorldController : Node2D
         if (_lootWindow is { IsOpen: true }) names.Add("обыск");
         if (_tradeWindow is { IsOpen: true }) names.Add("лавка");
         if (_dialogueWindow is { IsOpen: true }) names.Add("диалог");
+        if (_cultivationWindow is { Visible: true }) names.Add("K·культивация");
         return names;
     }
 
@@ -634,6 +668,14 @@ public partial class GameWorldController : Node2D
             var chargeSim = new ChargeSimDebug { Name = "ChargeSimDebug" };
             AddChild(chargeSim);
         }
+        // R30-эпизод 2 (репорт 21.09): формации П1/П2/П3/П7 — радиус зарядки
+        // (headless-вердикт GODOT_FORM_DEBUG=1) + скриншоты GODOT_FORM_SHOT.
+        if (System.Environment.GetEnvironmentVariable("GODOT_FORM_DEBUG") == "1"
+            || System.Environment.GetEnvironmentVariable("GODOT_FORM_SHOT") != null)
+        {
+            var formShot = new FormationShotSimDebug { Name = "FormationShotSimDebug" };
+            AddChild(formShot);
+        }
         // R13 FULL-LOOT (2026-09-10): headless-верификация спауна через
         // генерацию + трупов/обыска/full loot (GODOT_LOOT_DEBUG=1) —
         // состав населения из генератора, смерть → труп-контейнер,
@@ -710,30 +752,36 @@ public partial class GameWorldController : Node2D
     /// <summary>Этап 5: тосты стадий формации.</summary>
     private void OnFormationStageChanged(in Core.Messaging.Contracts.FormationStageChangedEvent e)
     {
+        // П3 (репорт 21.09): Filling-тост несёт радиус зарядки (П2) — игрок
+        // знает правило «отошёл дальше — автонаполнение встало».
         string msg = e.NewStage switch
         {
             Core.Data.FormationStage.Drawing => "◈ Контур формации рисуется…",
-            Core.Data.FormationStage.Filling => "◈ Формация наполняется Ци…",
+            Core.Data.FormationStage.Filling => $"◈ Формация наполняется Ци… (зарядка в радиусе {FormationSvc?.ChargingRadiusTiles ?? 8} тайлов от контура)",
             Core.Data.FormationStage.Depleted => "◈ Формация истощена",
             _ => null
         };
         if (msg != null) ShowToast(msg);
     }
 
-    /// <summary>Этап 5: тост активации формации.</summary>
+    /// <summary>Этап 5 + П3 (репорт 21.09): тост активации — ПОЛНОЕ описание
+    /// (тип действия + эффекты + радиус + правило зарядки), а не просто
+    /// «Формация активна: Усиление». Прежде игрок не понимал, что делает
+    /// формация («светлая формация создалась, но не понятно, что делает»).</summary>
     private void OnFormationActivated(in Core.Messaging.Contracts.FormationActivatedEvent e)
     {
-        string type = e.Type switch
+        string desc;
+        var f = FormationSvc?.CurrentFormation;
+        if (f != null && FormationSvc != null)
         {
-            Core.Data.FormationType.Barrier => "Барьер",
-            Core.Data.FormationType.Amplification => "Усиление",
-            Core.Data.FormationType.Suppression => "Подавление",
-            Core.Data.FormationType.Gathering => "Сбор Ци",
-            Core.Data.FormationType.Trap => "Ловушка",
-            Core.Data.FormationType.Detection => "Обнаружение",
-            _ => e.Type.ToString()
-        };
-        ShowToast($"✦ Формация активна: {type}");
+            desc = Modules.Formation.FormationDescriptions.FullDescription(f, FormationSvc.ChargingRadiusTiles);
+        }
+        else
+        {
+            desc = $"{Modules.Formation.FormationDescriptions.TypeLabel(e.Type)} — " +
+                   Modules.Formation.FormationDescriptions.TypeAction(e.Type);
+        }
+        ShowToast($"✦ Формация активна: {desc}", 4.5f);
     }
 
     // ---- World setup ----
@@ -1037,6 +1085,28 @@ public partial class GameWorldController : Node2D
         _pauseIndicator.AddThemeColorOverride("font_color", new Color(0.95f, 0.82f, 0.45f));
         _hudCanvas.AddChild(_pauseIndicator);
 
+        // П6 (репорт 21.09, «заметил подлагивания — нужен счётчик FPS»):
+        // FPS-счётчик в левом-верхнем углу. F3 — тумбл (персистится),
+        // обновление текста — троттл 0.25с (zero-GC в steady-state не выйдет,
+        // но минимизируем аллокации строк). Цвет честный: зелёный ≥55,
+        // янтарный 30-54, красный <30 — игрок сразу видит «подлагивания».
+        _fpsLabel = new Label
+        {
+            Name = "FpsCounter",
+            Visible = Persistence.GameSettings.ShowFpsCounter,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
+        _fpsLabel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.TopLeft);
+        _fpsLabel.OffsetLeft = 8;
+        _fpsLabel.OffsetTop = 6;
+        _fpsLabel.OffsetRight = 110;
+        _fpsLabel.OffsetBottom = 26;
+        _fpsLabel.AddThemeFontSizeOverride("font_size", 13);
+        _fpsLabel.AddThemeColorOverride("font_color", new Color(0.6f, 0.9f, 0.6f));
+        _fpsLabel.AddThemeColorOverride("font_outline_color", new Color(0f, 0f, 0f, 0.8f));
+        _fpsLabel.AddThemeConstantOverride("outline_size", 2);
+        _hudCanvas.AddChild(_fpsLabel);
+
         // 2026-09-04 S5: стрелки направления атакующих вне экрана — игрок
         // видит, ОТКУДА прилетает урон, даже когда источник за кадром.
         _dmgDirIndicator = new UI.DamageDirectionIndicator { Name = "DamageDirIndicator" };
@@ -1319,6 +1389,8 @@ public partial class GameWorldController : Node2D
 
         // 2026-09-19: видимость паузы + причина (только при изменении — дёшево).
         UpdatePauseIndicator();
+        // П6 (репорт 21.09): FPS-счётчик (троттл 0.25с, только при изменении текста).
+        UpdateFpsCounter(delta);
         // Этап 1 внедрения ЦИ: V — переключить медитацию (поглощение Ци из среды).
         if (PlayerInput is { IsMeditatePressed: true })
         {
@@ -1639,6 +1711,19 @@ public partial class GameWorldController : Node2D
             GD.Print($"[GameWorld] ShowEnemyVitals = {newValue} (F7, saved to user://settings.json)");
         }
 
+        // П6 (репорт 21.09): F3 — тумбл FPS-счётчика (диагностика подлагиваний).
+        if (PlayerInput.IsFpsCounterTogglePressed)
+        {
+            GameSettings.EnsureLoaded();
+            bool newValue = !GameSettings.ShowFpsCounter;
+            GameSettings.SetShowFpsCounter(newValue);
+            if (_fpsLabel != null) _fpsLabel.Visible = newValue;
+            ShowToast(newValue
+                ? "📊 FPS-счётчик: ВКЛ (левый-верхний угол)"
+                : "📊 FPS-счётчик: ВЫКЛ");
+            GD.Print($"[GameWorld] ShowFpsCounter = {newValue} (F3, saved to user://settings.json)");
+        }
+
         // 2026-08-28: F1 — окно-справка горячих клавиш (с паузой — чтение).
         // R13-audit (P2-2): гвард модальности обыска (см. комментарий у T).
         if (PlayerInput.IsHelpHotkeysPressed && _hotkeysWindow != null && Time != null
@@ -1735,10 +1820,12 @@ public partial class GameWorldController : Node2D
         // R20 (баг №6, запрос 09_09_22_40): Esc закрывает окно Культивации (K).
         // Репорт: «не закрывается по ESC, требует повторного нажатия K».
         // Правило пользователя: два типа закрытия — повторная клавиша вызова
-        // И классический Esc. K-окно не паузит игру (справочное) — резюм не нужен.
+        // И классический Esc. П4 (репорт 21.09): K теперь модальное с паузой —
+        // снятие паузы при Esc-закрытии (как у инвентаря).
         else if (PlayerInput.IsPausePressed && _cultivationWindow is { Visible: true })
         {
             _cultivationWindow.Toggle();
+            HandleModalResumeOnClose();
         }
         // Esc (sticky "escape") → toggle pause. INP-1: только когда НЕ открыто
         // ни одного модального окна (раньше гард проверял только инвентарь —
@@ -1804,10 +1891,17 @@ public partial class GameWorldController : Node2D
         }
 
         // D (2026-08-26): K — окно Культивации Ци (3 вкладки + слоты техник 3-9).
-        // Не паузит игру (окно справочное — можно смотреть в реальном времени).
+        // П4 (репорт 21.09): теперь — модальное с паузой (как инвентарь/книга);
+        // тумблер «пауза при открытых окнах» в настройках позволяет времени
+        // течь, пока игрок изучает техники (см. HandleModalPauseOnOpen).
         if (PlayerInput.IsCultivationWindowPressed)
         {
+            bool wasOpen = _cultivationWindow is { Visible: true };
+            if (!wasOpen)
+                HandleModalPauseOnOpen(AnyModalWindowOpen()); // K ещё не виден
             _cultivationWindow?.Toggle();
+            if (wasOpen)
+                HandleModalResumeOnClose();
         }
 
         // D: 1 — выбор ближнего оружия. Phase 8 ч.2 (2026-09-03): реальный

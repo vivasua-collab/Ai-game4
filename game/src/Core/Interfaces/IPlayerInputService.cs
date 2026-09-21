@@ -133,6 +133,12 @@ namespace CultivationGame.Core.Interfaces
         /// </summary>
         bool IsEnemyVitalsTogglePressed { get; }
 
+        /// <summary>
+        /// П6 (репорт 21.09): F3 — тумблер FPS-счётчика нажат (sticky, one-shot).
+        /// Работает даже поверх UI — глобальная настройка (GameSettings.ShowFpsCounter).
+        /// </summary>
+        bool IsFpsCounterTogglePressed { get; }
+
         /// <summary>Текущий кадр ввода (raw). Ai-game3 compatibility — для Adapter'ов.</summary>
         InputFrameData CurrentFrame { get; }
 

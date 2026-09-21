@@ -131,6 +131,9 @@ public partial class InputAdapter : Node
         // как cheat_menu — настройка доступна в любом состоянии).
         if (GodotInput.IsActionJustPressed("toggle_enemy_vitals")) _stickyKeys.Add("toggle_enemy_vitals");
 
+        // П6 (репорт 21.09): F3 — тумблер FPS-счётчика (работает поверх UI).
+        if (GodotInput.IsActionJustPressed("toggle_fps_counter")) _stickyKeys.Add("toggle_fps_counter");
+
         // 2026-08-28: F1 — окно-справка горячих клавиш (работает даже поверх UI,
         // как cheat_menu — справка нужна и при открытом инвентаре).
         if (GodotInput.IsActionJustPressed("help_hotkeys"))    _stickyKeys.Add("help_hotkeys");

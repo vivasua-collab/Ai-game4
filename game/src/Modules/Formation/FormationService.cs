@@ -104,6 +104,18 @@ namespace CultivationGame.Modules.Formation
         // Автонаполнение от создателя-одиночки (этап 5): double-аккумулятор.
         private double _autoFillAccumulator;
 
+        // П2 (репорт 21.09, плейтест): радиус зарядки. Кэш позиции игрока
+        // (PlayerPositionChangedEvent, тайлы) + гейт автонаполнения по
+        // дистанции до контура. Прежне формация «пила» Ци кастера с ЛЮБОЙ
+        // дистанции — отошёл на экран, а потребление не прекращалось.
+        private int _playerTileX = int.MinValue;
+        private int _playerTileY = int.MinValue;
+        private bool _playerPosKnown;
+        private bool _chargingInRange = true;
+        private readonly ISubscriber<PlayerPositionChangedEvent> _playerPositionSub;
+        private readonly IPublisher<ToastShownEvent> _toastPub;
+        private IDisposable? _playerPositionSubscription;
+
         // === Конструктор (VContainer) ===
 
         public FormationService(
@@ -115,6 +127,8 @@ namespace CultivationGame.Modules.Formation
             ISubscriber<QiChangedEvent> qiChangedSub,
             ISubscriber<CombatEndedEvent> combatEndedSub,
             ISubscriber<FormationContributeQiRequestEvent> contributeRequestSub,
+            ISubscriber<PlayerPositionChangedEvent> playerPositionSub,
+            IPublisher<ToastShownEvent> toastPub,
             IQiDataProvider qiDataProvider, // Задача 4.3: per-entity Qi-данные
             FormationRegistry? formationRegistry = null) // Этап 4: генерируемые формации
         {
@@ -127,6 +141,8 @@ namespace CultivationGame.Modules.Formation
             _qiChangedSub = qiChangedSub;
             _combatEndedSub = combatEndedSub;
             _contributeRequestSub = contributeRequestSub;
+            _playerPositionSub = playerPositionSub;
+            _toastPub = toastPub;
 
             _qiDataProvider = qiDataProvider; // Задача 4.3
             _registry = formationRegistry;    // Этап 4 (nullable: legacy-сборки без DI)
@@ -154,6 +170,9 @@ namespace CultivationGame.Modules.Formation
 
             // Подписка на FormationContributeQiRequestEvent — внесение Ци от внешних систем
             _contributeRequestSubscription = _contributeRequestSub.Subscribe(OnContributeQiRequest);
+
+            // П2 (репорт 21.09): позиция игрока — гейт радиуса зарядки
+            _playerPositionSubscription = _playerPositionSub?.Subscribe(OnPlayerPositionChanged);
         }
 
         // === IFormationService: Жизненный цикл ===
@@ -471,6 +490,27 @@ namespace CultivationGame.Modules.Formation
             if (_currentStage != FormationStage.Filling) return;
             if (_cachedConductivity <= 0f || deltaTime <= 0f) return;
 
+            // П2 (репорт 21.09): РАДИУС ЗАРЯДКИ — кастер-игрок обязан быть
+            // рядом с контуром (Чебышёв, тайлы). Прежне автонаполнение
+            // работало с любой дистанции: игрок отходил на экран, а Ци
+            // продолжало утекать. Позиция неизвестна до первого события —
+            // считаем «в зоне» (первый тик события приедет до тика модуля).
+            if (PlayerIdResolver.IsPlayer(_casterId))
+            {
+                bool inRange = !_playerPosKnown || IsPlayerWithinChargingRadius();
+                if (inRange != _chargingInRange)
+                {
+                    _chargingInRange = inRange;
+                    _toastPub?.Publish(new ToastShownEvent(inRange
+                        ? "◈ Кастер вернулся к контуру — зарядка формации возобновлена"
+                        : "◈ Кастер далеко от контура — зарядка формации приостановлена " +
+                          $"(нужен радиус {ChargingRadiusTiles} тайлов)", 2.5f));
+                    Console.WriteLine($"[FormationService] ChargingRadius gate: inRange={inRange}, " +
+                        $"player=({_playerTileX},{_playerTileY}), formation=({_positionX},{_positionY}), radius={ChargingRadiusTiles}т");
+                }
+                if (!inRange) return; // П2: пауза автонаполнения (Ци не тратится)
+            }
+
             _autoFillAccumulator += _cachedConductivity * deltaTime;
             if (_autoFillAccumulator >= 1.0)
             {
@@ -479,6 +519,47 @@ namespace CultivationGame.Modules.Formation
                 ContributeQi(_casterId, chunk);
             }
         }
+
+        // === П2 (репорт 21.09): радиус зарядки ===========================
+
+        /// <summary>Кэш позиции игрока из PlayerPositionChangedEvent (тайлы).</summary>
+        private void OnPlayerPositionChanged(in PlayerPositionChangedEvent e)
+        {
+            _playerTileX = (int)e.X;
+            _playerTileY = (int)e.Y;
+            _playerPosKnown = true;
+        }
+
+        private bool IsPlayerWithinChargingRadius()
+        {
+            int dx = Math.Abs(_playerTileX - _positionX);
+            int dy = Math.Abs(_playerTileY - _positionY);
+            return Math.Max(dx, dy) <= ChargingRadiusTiles;
+        }
+
+        /// <summary>Радиус зарядки в тайлах (Чебышёв): контур + 3 запаса,
+        /// минимум 8 (Small 8, Medium 8, Large 18, Great 53). Внутри —
+        /// автонаполнение качает Ци кастера; снаружи — пауза (П2).</summary>
+        public int ChargingRadiusTiles
+        {
+            get
+            {
+                var size = _currentFormation?.Size ?? FormationSize.Small;
+                return Math.Max(8, (int)(ContourRadiusTiles(size) + 3f));
+            }
+        }
+
+        /// <summary>Радиус контура по размеру (тайлы) — единый источник
+        /// для сервиса (радиус зарядки) и FormationVisualRenderer (контур).
+        /// FORMATION_SYSTEM §4: Small 1.5т, Medium 5т, Large 15т, Great 50т.</summary>
+        public static float ContourRadiusTiles(FormationSize size) => size switch
+        {
+            FormationSize.Small => 1.5f,
+            FormationSize.Medium => 5f,
+            FormationSize.Large => 15f,
+            FormationSize.Great => 50f,
+            _ => 60f
+        };
 
         /// <summary>
         /// Обработать утечку Ци в тиках.
@@ -763,6 +844,8 @@ namespace CultivationGame.Modules.Formation
             _combatEndedSubscription = null;
             _contributeRequestSubscription?.Dispose();
             _contributeRequestSubscription = null;
+            _playerPositionSubscription?.Dispose(); // П2: подписка позиции игрока
+            _playerPositionSubscription = null;
             _qiPool?.Dispose();
         }
     }

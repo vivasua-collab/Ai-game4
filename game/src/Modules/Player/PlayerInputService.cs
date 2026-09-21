@@ -43,6 +43,8 @@ public sealed class PlayerInputService : IPlayerInputService
     private bool _helpHotkeys;
     // 2026-09-19 R18-1: F7 — тумблер индикации врагов (настройка — работает всегда).
     private bool _enemyVitalsToggle;
+    // П6 (репорт 21.09): F3 — тумблер FPS-счётчика (настройка — работает всегда).
+    private bool _fpsToggle;
     private bool _cycleTarget; // R27: Tab-цикл цели
     private int _selectedSlot;
     // D (2026-08-26): cultivation window + weapon/technique slot hotkeys
@@ -108,6 +110,10 @@ public sealed class PlayerInputService : IPlayerInputService
     /// <inheritdoc />
     public bool IsEnemyVitalsTogglePressed => _enemyVitalsToggle;
 
+    /// <summary>П6 (репорт 21.09): F3 — FPS-счётчик нажат (sticky, one-shot).
+    /// Работает даже поверх UI — глобальная настройка (GameSettings.ShowFpsCounter).</summary>
+    public bool IsFpsCounterTogglePressed => _fpsToggle;
+
     // R27 (2026-09-21): Tab — цикл выбора цели (sticky, one-shot).
     /// <inheritdoc />
     public bool IsCycleTargetPressed => _cycleTarget;
@@ -172,6 +178,8 @@ public sealed class PlayerInputService : IPlayerInputService
         if (data.IsSticky("help_hotkeys")) _helpHotkeys = true;
         // 2026-09-19 R18-1: F7 — тумблер индикации врагов (настройка).
         if (data.IsSticky("toggle_enemy_vitals")) _enemyVitalsToggle = true;
+        // П6 (репорт 21.09): F3 — тумблер FPS-счётчика (настройка).
+        if (data.IsSticky("toggle_fps_counter")) _fpsToggle = true;
         if (data.HotbarSlot is int slot && slot > 0) _selectedSlot = slot;
     }
 
@@ -187,6 +195,7 @@ public sealed class PlayerInputService : IPlayerInputService
         _cheatMenu = false;
         _helpHotkeys = false;
         _enemyVitalsToggle = false;
+        _fpsToggle = false;
         _inventoryRaw = false;
         _selectedSlot = 0;
         // D: сброс cultivation window + weapon/technique slot flags

@@ -70,6 +70,10 @@ public partial class HotbarPanel : Panel
     [Inject] private ISubscriber<TechniqueChargeCompletedEvent> ChargeCompletedSub = null!;
     [Inject] private ISubscriber<TechniqueChargeCancelledEvent> ChargeCancelledSub = null!;
     [Inject] private ISubscriber<HeldTechniqueChangedEvent> HeldChangedSub = null!;
+    // П5 (репорт 21.09): спец-слот медитации — тумблер + состояние + изучение.
+    [Inject] private IPublisher<Core.Messaging.Contracts.MeditationToggleRequestedEvent> _meditationTogglePub = null!;
+    [Inject] private ISubscriber<Core.Messaging.Contracts.MeditationStateChangedEvent> _meditationStateSub = null!;
+    [Inject] private ISubscriber<TechniqueLearnedEvent> _learnedSub = null!;
 
     // === Layout constants ===
     private const float MainSlotSize = 52f;
@@ -120,6 +124,15 @@ public partial class HotbarPanel : Panel
     private System.IDisposable? _techClearedToken;
     private System.IDisposable? _slotsToken;
     private System.IDisposable? _equipToken;
+
+    // П5 (репорт 21.09): спец-слот медитации — поля.
+    private System.IDisposable? _meditationStateToken;
+    private System.IDisposable? _learnedToken;
+    private Panel? _meditationPanel;
+    private Label? _meditationGlyph;
+    private Label? _meditationNameLabel;
+    private bool _meditationActive;
+    private string? _meditationTechId;
     // R26: подписки зарядки/удержания.
     private System.IDisposable? _chargeStartedToken;
     private System.IDisposable? _chargeProgressToken;
@@ -151,8 +164,12 @@ public partial class HotbarPanel : Panel
         _chargeCancelledToken = ChargeCancelledSub?.Subscribe(OnChargeCancelled);
         _heldChangedToken = HeldChangedSub?.Subscribe(OnHeldChanged);
 
+        // П5 (репорт 21.09): спец-слот медитации — состояние + изучение техник.
+        _meditationStateToken = _meditationStateSub?.Subscribe(OnMeditationStateChanged);
+        _learnedToken = _learnedSub?.Subscribe(OnTechniqueLearned);
+
         RefreshAll();
-        GD.Print("[HotbarPanel] Ready (v2: techniques + cooldowns + belt row + charge/aura R26)");
+        GD.Print("[HotbarPanel] Ready (v2: techniques + cooldowns + belt row + charge/aura R26 + медитация-слот П5)");
     }
 
     public override void _ExitTree()
@@ -166,6 +183,8 @@ public partial class HotbarPanel : Panel
         _chargeCompletedToken?.Dispose();
         _chargeCancelledToken?.Dispose();
         _heldChangedToken?.Dispose();
+        _meditationStateToken?.Dispose();
+        _learnedToken?.Dispose();
     }
 
     private void BuildUI()
@@ -462,6 +481,71 @@ public partial class HotbarPanel : Panel
             hbox.AddChild(slotPanel);
         }
 
+        // === П5 (репорт 21.09): спец-слот МЕДИТАЦИИ (без номера) ===
+        // Медитация — базовое действие культиватора, не техника слота 3-9:
+        // пассивная техника Культивации показывается ЗДЕСЬ (☯ + V), не
+        // занимая номерной слот быстрого доступа. Клик = тумблер медитации
+        // (Publish MeditationToggleRequestedEvent — тот же путь, что V).
+        _meditationPanel = new Panel
+        {
+            CustomMinimumSize = new Vector2(MainSlotSize, MainSlotSize),
+            MouseFilter = MouseFilterEnum.Stop,
+        };
+        var medStyle = new StyleBoxFlat
+        {
+            BgColor = new Color(0.13f, 0.16f, 0.13f, 0.92f), // медитативный тёмно-зелёный
+        };
+        medStyle.SetBorderWidthAll(1);
+        medStyle.SetBorderColor(new Color(0.45f, 0.62f, 0.45f));
+        medStyle.SetCornerRadiusAll(4);
+        _meditationPanel.AddThemeStyleboxOverride("panel", medStyle);
+
+        _meditationGlyph = new Label
+        {
+            Text = "☯",
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            MouseFilter = MouseFilterEnum.Ignore,
+        };
+        _meditationGlyph.AddThemeFontSizeOverride("font_size", 22);
+        _meditationGlyph.AddThemeColorOverride("font_color", new Color(0.72f, 0.9f, 0.72f));
+        _meditationGlyph.SetAnchorsAndOffsetsPreset(LayoutPreset.Center);
+        _meditationGlyph.OffsetTop = -8; _meditationGlyph.OffsetBottom = 14;
+        _meditationPanel.AddChild(_meditationGlyph);
+
+        var medKeyLabel = new Label
+        {
+            Text = "V",
+            MouseFilter = MouseFilterEnum.Ignore,
+        };
+        medKeyLabel.AddThemeFontSizeOverride("font_size", 9);
+        medKeyLabel.AddThemeColorOverride("font_color", new Color(0.75f, 0.88f, 0.75f, 0.9f));
+        medKeyLabel.SetAnchorsAndOffsetsPreset(LayoutPreset.TopRight);
+        medKeyLabel.OffsetLeft = -14; medKeyLabel.OffsetRight = -2;
+        medKeyLabel.OffsetTop = 1; medKeyLabel.OffsetBottom = 12;
+        _meditationPanel.AddChild(medKeyLabel);
+
+        _meditationNameLabel = new Label
+        {
+            Text = "медитация",
+            HorizontalAlignment = HorizontalAlignment.Center,
+            MouseFilter = MouseFilterEnum.Ignore,
+        };
+        _meditationNameLabel.AddThemeFontSizeOverride("font_size", 8);
+        _meditationNameLabel.AddThemeColorOverride("font_color", new Color(0.82f, 0.88f, 0.8f));
+        _meditationNameLabel.SetAnchorsAndOffsetsPreset(LayoutPreset.BottomWide);
+        _meditationNameLabel.OffsetTop = -12; _meditationNameLabel.OffsetBottom = -1;
+        _meditationPanel.AddChild(_meditationNameLabel);
+
+        // Клик по спец-слоту = тумблер медитации (как V).
+        _meditationPanel.GuiInput += @event =>
+        {
+            if (@event is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == Godot.MouseButton.Left)
+                _meditationTogglePub?.Publish(
+                    new Core.Messaging.Contracts.MeditationToggleRequestedEvent(!_meditationActive));
+        };
+        hbox.AddChild(_meditationPanel);
+
         UpdatePanelSize(beltVisible: false);
     }
 
@@ -676,6 +760,71 @@ public partial class HotbarPanel : Panel
         }
     }
 
+    // === П5 (репорт 21.09): спец-слот медитации ======================
+
+    /// <summary>Медитация вкл/выкл — пульс глифа и подсветка рамки.</summary>
+    private void OnMeditationStateChanged(in Core.Messaging.Contracts.MeditationStateChangedEvent e)
+    {
+        _meditationActive = e.IsActive;
+        UpdateMeditationVisuals();
+    }
+
+    /// <summary>Изучена техника — если Культивация, обновить спец-слот.</summary>
+    private void OnTechniqueLearned(in TechniqueLearnedEvent e)
+    {
+        if (e.Type == Core.Data.TechniqueType.Cultivation)
+            RefreshMeditationSlot();
+    }
+
+    /// <summary>Найти изученную пассивную технику Культивации и показать
+    /// её в спец-слоте (медитация не занимает номерные слоты 3-9 — П5).</summary>
+    private void RefreshMeditationSlot()
+    {
+        if (_meditationPanel == null) return;
+        string? found = null;
+        string? name = null;
+        var all = Techniques?.GetAllTechniques();
+        if (all != null)
+        {
+            foreach (var kvp in all)
+            {
+                if (kvp.Value is { Type: Core.Data.TechniqueType.Cultivation })
+                {
+                    found = kvp.Key;
+                    name = kvp.Value.Name;
+                    break;
+                }
+            }
+        }
+        _meditationTechId = found;
+        if (_meditationNameLabel != null)
+            _meditationNameLabel.Text = found != null && !string.IsNullOrEmpty(name)
+                ? Truncate(name, 12)
+                : "медитация";
+        UpdateMeditationVisuals();
+    }
+
+    /// <summary>Активная медитация — золотая рамка + тёплый глиф.</summary>
+    private void UpdateMeditationVisuals()
+    {
+        if (_meditationPanel == null) return;
+        if (_meditationPanel.GetThemeStylebox("panel") is StyleBoxFlat sb)
+        {
+            sb.BorderColor = _meditationActive
+                ? new Color(0.95f, 0.85f, 0.45f)
+                : new Color(0.45f, 0.62f, 0.45f);
+            sb.BgColor = _meditationActive
+                ? new Color(0.16f, 0.2f, 0.15f, 0.95f)
+                : new Color(0.13f, 0.16f, 0.13f, 0.92f);
+        }
+        if (_meditationGlyph != null)
+            _meditationGlyph.AddThemeColorOverride("font_color",
+                _meditationActive ? new Color(0.98f, 0.92f, 0.55f) : new Color(0.72f, 0.9f, 0.72f));
+    }
+
+    private static string Truncate(string s, int max) =>
+        s.Length <= max ? s : s.Substring(0, max - 1) + "…";
+
     private static string FormatQi(long qi) =>
         qi >= 10_000 ? $"{qi / 1000}к" : qi.ToString();
 
@@ -712,7 +861,7 @@ public partial class HotbarPanel : Panel
         }
     }
 
-    // === Обновление ===
+    // === RefreshAll ===
 
     private void RefreshAll()
     {
@@ -723,6 +872,9 @@ public partial class HotbarPanel : Panel
         // Techniques (3-9).
         for (int slotIndex = 3; slotIndex <= 9; slotIndex++)
             RefreshTechSlot(slotIndex);
+
+        // П5: спец-слот медитации (пассивная техника Культивации).
+        RefreshMeditationSlot();
 
         // Belt row — visibility gate + содержимое.
         bool beltOn = Belt is { IsBeltEquipped: true };

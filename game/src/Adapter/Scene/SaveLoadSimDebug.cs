@@ -183,10 +183,15 @@ public partial class SaveLoadSimDebug : Node
         Require(formationId1.Length > 0, "формация",
             "ActiveFormationId пуст после StartDrawing — проверка была бы тривиальна", problems);
 
-        // 1d. Слот техник: РЕАЛЬНАЯ изученная техника (валидация IsLearned).
+        // 1d. Слот техник: РЕАЛЬНАЯ изученная АКТИВНАЯ техника (валидация IsLearned).
         //     v1-дефект: «qa_probe_technique» не существует → AssignSlot
         //     молча отказывал → слот5 оставался «''» → сравнение тривиально.
-        string techId = techniqueSvc?.GetAllTechniques().Keys.FirstOrDefault() ?? "";
+        //     R30-П5 (репорт 21.09): фильтр по Type != Cultivation — пассивные
+        //     техники (медитация) БОЛЬШЕ не назначаются в номерные слоты
+        //     (гейт TechniqueSlotService.AssignSlot); первая изученная часто
+        //     именно Культивация — берём первую АКТИВНУЮ.
+        string techId = techniqueSvc?.GetAllTechniques()
+            .FirstOrDefault(kvp => kvp.Value.Type != TechniqueType.Cultivation).Key ?? "";
         if (techId.Length == 0 && techniqueSvc != null)
         {
             // Fallback: изучить дешёвую боевую технику (Level = текущий →

@@ -46,6 +46,25 @@ namespace CultivationGame.Adapter.Persistence
         /// </summary>
         public static bool ShowEnemyVitals { get; private set; } = true;
 
+        /// <summary>
+        /// 2026-09-21 (R30-П4, репорт плейтеста): «Пауза при открытых окнах».
+        /// true (по умолчанию) — модальные окна (инвентарь/книга/культивация
+        /// и т.д.) ставят мир на паузу (Old School планирование).
+        /// false — время ТЕЧЁТ, пока игрок изучает техники/инвентарь
+        /// (можно промотать реген Ци/баффы, как просил игрок: «вдруг игрок
+        /// захочет промотать время, пока изучает»). Индикатор ⏸ честно
+        /// не зажигается — мир жив.
+        /// </summary>
+        public static bool PauseOnModalWindows { get; private set; } = true;
+
+        /// <summary>
+        /// П6 (репорт 21.09, «заметил подлагивания — нужен счётчик FPS»):
+        /// показывать FPS-счётчик (левый-верхний угол HUD, F3 — тумбл).
+        /// По умолчанию false (не мешает в обычной игре; включается для
+        /// диагностики лагов — игрок сам решает, когда смотреть).
+        /// </summary>
+        public static bool ShowFpsCounter { get; private set; } = false;
+
         /// <summary>Гарантировать загрузку (idempotent, безопасно звать часто).</summary>
         public static void EnsureLoaded()
         {
@@ -68,6 +87,20 @@ namespace CultivationGame.Adapter.Persistence
             Save();
         }
 
+        /// <summary>Установить и сохранить тумблер паузы окон (R30-П4).</summary>
+        public static void SetPauseOnModalWindows(bool pause)
+        {
+            PauseOnModalWindows = pause;
+            Save();
+        }
+
+        /// <summary>Установить и сохранить тумблер FPS-счётчика (R30-П6).</summary>
+        public static void SetShowFpsCounter(bool show)
+        {
+            ShowFpsCounter = show;
+            Save();
+        }
+
         private static void Load()
         {
             try
@@ -86,6 +119,14 @@ namespace CultivationGame.Adapter.Persistence
                     ShowEnemyVitals = false;
                 else if (json.Contains("\"showEnemyVitals\": true", StringComparison.OrdinalIgnoreCase))
                     ShowEnemyVitals = true;
+                if (json.Contains("\"pauseOnModalWindows\": false", StringComparison.OrdinalIgnoreCase))
+                    PauseOnModalWindows = false;
+                else if (json.Contains("\"pauseOnModalWindows\": true", StringComparison.OrdinalIgnoreCase))
+                    PauseOnModalWindows = true;
+                if (json.Contains("\"showFpsCounter\": false", StringComparison.OrdinalIgnoreCase))
+                    ShowFpsCounter = false;
+                else if (json.Contains("\"showFpsCounter\": true", StringComparison.OrdinalIgnoreCase))
+                    ShowFpsCounter = true;
             }
             catch (Exception e)
             {
@@ -103,7 +144,7 @@ namespace CultivationGame.Adapter.Persistence
                     GD.Print("[GameSettings] Save failed: cannot open user://settings.json");
                     return;
                 }
-                f.StoreString($"{{\n  \"cheatsEnabled\": {(CheatsEnabled ? "true" : "false")},\n  \"showEnemyVitals\": {(ShowEnemyVitals ? "true" : "false")}\n}}\n");
+                f.StoreString($"{{\n  \"cheatsEnabled\": {(CheatsEnabled ? "true" : "false")},\n  \"showEnemyVitals\": {(ShowEnemyVitals ? "true" : "false")},\n  \"pauseOnModalWindows\": {(PauseOnModalWindows ? "true" : "false")},\n  \"showFpsCounter\": {(ShowFpsCounter ? "true" : "false")}\n}}\n");
             }
             catch (Exception e)
             {

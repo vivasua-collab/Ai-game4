@@ -42,8 +42,12 @@ namespace CultivationGame.Adapter.UI;
 /// Окно Культивации Ци (C3-C7, 2026-08-26).
 /// Открывается клавишей K (CultivationWindowToggleRequestedEvent).
 /// 3 вкладки: Техники / Меридианы / Ядро + панель слотов техник (3-9).
+/// П4 (репорт 21.09): базовый класс Panel — прежде Control, и override
+/// «panel» НИЧЕГО не рисовал (только Panel/Window используют этот
+/// стильбокс): текст читался сквозь полупрозрачную пустоту. Теперь
+/// стильбокс реально рисует тёмный непрозрачный фон.
 /// </summary>
-public partial class CultivationWindow : Control
+public partial class CultivationWindow : Panel
 {
     // === DI ===
     [Inject] private TechniqueService Techniques = null!;
@@ -139,7 +143,8 @@ public partial class CultivationWindow : Control
 
         var style = new StyleBoxFlat
         {
-            BgColor = new Color(0.10f, 0.08f, 0.05f, 0.95f),
+            // П4: непрозрачный тёмный фон (прежде 0.95 на Control не рисовался вовсе)
+            BgColor = new Color(0.09f, 0.07f, 0.05f, 0.98f),
         };
         style.SetBorderWidthAll(2);
         style.SetBorderColor(new Color(0.55f, 0.42f, 0.20f, 0.9f));
@@ -422,6 +427,14 @@ public partial class CultivationWindow : Control
         if (string.IsNullOrEmpty(_selectedTechId))
         {
             ToastPub?.Publish(new ToastShownEvent("Сначала выберите технику", 1.5f));
+            return;
+        }
+        // П5 (репорт 21.09): пассивная техника медитации не занимает номерный
+        // слот — вежливый отказ ДО вызова сервиса (сервис тоже гейтит).
+        if (Techniques.GetTechnique(_selectedTechId) is { Type: Core.Data.TechniqueType.Cultivation })
+        {
+            ToastPub?.Publish(new ToastShownEvent(
+                "☯ Пассивная техника — номерный слот не нужен: медитация включается клавишей V (спец-слот в хотбаре)", 3.0f));
             return;
         }
         int slotIndex = TechniqueSlotService.MinSlot + _slotSelector.Selected;

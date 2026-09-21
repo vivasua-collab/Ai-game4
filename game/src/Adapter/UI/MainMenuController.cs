@@ -379,6 +379,30 @@ public partial class MainMenuController : Control
         vitalsHint.AddThemeColorOverride("font_color", new Color(0.65f, 0.58f, 0.45f));
         box.AddChild(vitalsHint);
 
+        // ── Пауза при открытых окнах (R30-П4, 2026-09-21) ──
+        var pauseCheck = new CheckButton
+        {
+            Name = "PauseOnWindowsCheck",
+            Text = "  Пауза при открытых окнах (инвентарь/K/T…)",
+            ButtonPressed = GameSettings.PauseOnModalWindows,
+            ToggleMode = true,
+        };
+        pauseCheck.Toggled += on =>
+        {
+            GameSettings.SetPauseOnModalWindows(on);
+            GD.Print($"[MainMenu] PauseOnModalWindows = {on} (saved to user://settings.json)");
+        };
+        box.AddChild(pauseCheck);
+
+        var pauseHint = new Label
+        {
+            Text = "(OFF — время течёт, пока вы изучаете\nокна: промотка регена Ци и баффов)",
+            HorizontalAlignment = HorizontalAlignment.Center,
+        };
+        pauseHint.AddThemeFontSizeOverride("font_size", 11);
+        pauseHint.AddThemeColorOverride("font_color", new Color(0.65f, 0.58f, 0.45f));
+        box.AddChild(pauseHint);
+
         var closeBtn = UIFactory.CreateButton("SettingsClose", "Закрыть", 160, 36);
         closeBtn.Pressed += () =>
         {

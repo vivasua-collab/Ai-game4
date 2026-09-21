@@ -83,6 +83,19 @@ namespace CultivationGame.Modules.Player
             // Валидация: техника должна быть изучена
             if (_techniques != null && !_techniques.IsLearned(techniqueId)) return false;
 
+            // П5 (репорт 21.09): пассивные техники (медитация/Cultivation) —
+            // БЕЗ номерного слота: они не выпускаются кнопкой (медитация —
+            // клавиша V + спец-слот хотбара). Прежже игрок мог назначить
+            // «Культивацию L1» в слот 3-9 — слот быстрого доступа тратился
+            // впустую (FireTechnique всё равно отказывает «пассивная»).
+            var tech = _techniques?.GetTechnique(techniqueId);
+            if (tech is { Type: TechniqueType.Cultivation })
+            {
+                Console.WriteLine($"[TechniqueSlots] AssignSlot refused: '{techniqueId}' — " +
+                    "пассивная (Cultivation): медитация без номерного слота (V / спец-слот хотбара, П5)");
+                return false;
+            }
+
             _slots[slotIndex] = techniqueId;
             _assignedPub.Publish(new TechniqueSlotAssignedEvent(slotIndex, techniqueId));
             return true;

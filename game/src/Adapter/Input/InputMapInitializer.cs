@@ -122,6 +122,10 @@ public static class InputMapInitializer
         // сейвами, F3/F4/F6/F8 свободны — выбран F7 (конвенция «toggle HUD»).
         AddKeyAction("toggle_enemy_vitals", Key.F7);
 
+        // П6 (репорт 21.09, «заметил подлагивания — нужен счётчик FPS»):
+        // F3 — тумблер FPS-счётчика (конвенция движков/IDE).
+        AddKeyAction("toggle_fps_counter", Key.F3);
+
         // Time speed control: Page Up = faster, Page Down = slower
         AddPhysicalKeyAction("time_speed_up", Key.Pageup);
         AddPhysicalKeyAction("time_speed_down", Key.Pagedown);

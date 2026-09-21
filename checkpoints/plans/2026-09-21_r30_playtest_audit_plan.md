@@ -58,4 +58,6 @@ R30+ (мультибой-B, войны фракций) — ОТЛОЖЕНЫ по
 Верификация эпизодов: build 0 err; COMBAT_SIM (headless) PASS; регрессия 18/18;
 формации — FORMQA-скриншот цикл (Xvfb+opengl3+VLM) для П1/П3/П4/П6.
 
-Состояние: [IN PROGRESS] эпизод 1
+Состояние: [DONE] эпизод 1 (коммит 98fdc28) + эпизод 2 (см. git log) — все П1-П7
+и A1-B6 закрыты; регрессия 18/18 PASS; формации — FormationShotSimDebug PASS
+(headless + opengl3 + VLM). Скриншоты: game/screenshots/r30_form_*.png.

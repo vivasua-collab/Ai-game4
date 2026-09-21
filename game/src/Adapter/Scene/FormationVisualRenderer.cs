@@ -56,15 +56,18 @@ public partial class FormationVisualRenderer : Node2D
     private FormationStage _lastStage;
 
     /// <summary>Визуальный радиус контура по размеру (тайлы → пиксели).
-    /// Small 3×3 м = 1.5 т = 96 px и т.д. (FORMATION_SYSTEM §4).</summary>
-    private static float ContourRadiusPixels(FormationSize size) => size switch
-    {
-        FormationSize.Small => 1.5f * GameConstants.TILE_PIXELS,
-        FormationSize.Medium => 5f * GameConstants.TILE_PIXELS,
-        FormationSize.Large => 15f * GameConstants.TILE_PIXELS,
-        FormationSize.Great => 50f * GameConstants.TILE_PIXELS,
-        _ => 60f * GameConstants.TILE_PIXELS
-    };
+    /// Small 3×3 м = 1.5 т = 96 px и т.д. (FORMATION_SYSTEM §4).
+    /// R30-П3: единый источник — FormationService.ContourRadiusTiles.</summary>
+    private static float ContourRadiusPixels(FormationSize size)
+        => Modules.Formation.FormationService.ContourRadiusTiles(size) * GameConstants.TILE_PIXELS;
+
+    // П1 (репорт 21.09): тёмная подложка-обводка под ВСЕ светлые элементы.
+    // Формации на ярких биомах (пустынный песок) были почти не видны:
+    // стихийные цвета (Light 1.0/0.9/0.45, Air 0.75/0.78/0.75, золотой)
+    // сливались с песком. Приём «outline»: под каждой линией/полигоном/текстом
+    // рисуется чуть более широкий тёмный слой — контраст появляется на любом
+    // фоне, на тёмных биомах читается как тень.
+    private static readonly Color ShadowColor = new(0.04f, 0.04f, 0.07f, 0.55f);
 
     public override void _Ready()
     {
@@ -188,11 +191,22 @@ public partial class FormationVisualRenderer : Node2D
         float effectRadius = Mathf.Min(f.EffectRadiusMeters / 2f, 30f) * GameConstants.TILE_PIXELS;
         DrawDashedCircle(_center, effectRadius, new Color(1f, 1f, 1f, 0.10f));
 
-        // Подпись формации над контуром.
+        // Подпись формации над контуром + П3-подзаголовок (что делает формация).
+        // П1: тёмная тень под текстом — читаемость на светлом песке.
         var font = ThemeDB.FallbackFont;
-        DrawString(font, _center + new Vector2(-_contourRadius, -_contourRadius - 26f),
-            _label, HorizontalAlignment.Center, _contourRadius * 2, 13,
+        var labelPos = _center + new Vector2(-_contourRadius, -_contourRadius - 26f);
+        DrawString(font, labelPos + new Vector2(1.5f, 1.5f), _label,
+            HorizontalAlignment.Center, _contourRadius * 2, 13, ShadowColor);
+        DrawString(font, labelPos, _label, HorizontalAlignment.Center, _contourRadius * 2, 13,
             WithAlpha(_elementColor, 0.95f));
+        // П3 (репорт 21.09): «светлая формация создалась, но не понятно, что
+        // делает» — под именем рисуем краткое действие (FormationDescriptions).
+        string summary = Modules.Formation.FormationDescriptions.ShortSummary(f);
+        var subPos = labelPos + new Vector2(0f, 16f);
+        DrawString(font, subPos + new Vector2(1f, 1f), summary,
+            HorizontalAlignment.Center, _contourRadius * 2, 11, ShadowColor);
+        DrawString(font, subPos, summary, HorizontalAlignment.Center, _contourRadius * 2, 11,
+            new Color(1f, 1f, 1f, 0.85f));
     }
 
     /// <summary>Вершины контура по форме.</summary>
@@ -243,8 +257,10 @@ public partial class FormationVisualRenderer : Node2D
 
     private void DrawContourSolid(Color color, float width = 3f)
     {
+        // П1: тёмная подложка-обводка — контур виден на ярком песке.
         if (_shape == FormationShape.Circle)
         {
+            DrawArc(_center, _contourRadius, 0, Mathf.Tau, 64, ShadowColor, width + 3f);
             DrawArc(_center, _contourRadius, 0, Mathf.Tau, 64, color, width);
         }
         else
@@ -256,11 +272,13 @@ public partial class FormationVisualRenderer : Node2D
                 for (int start = 0; start < 6; start += 2)
                 {
                     var tri = new Vector2[] { pts[start], pts[(start + 2) % 6], pts[(start + 4) % 6] };
+                    DrawPolyline(AddClosingPoint(tri), ShadowColor, width + 3f);
                     DrawPolyline(AddClosingPoint(tri), color, width);
                 }
             }
             else
             {
+                DrawPolyline(AddClosingPoint(pts), ShadowColor, width + 3f);
                 DrawPolyline(AddClosingPoint(pts), color, width);
             }
         }
@@ -270,6 +288,8 @@ public partial class FormationVisualRenderer : Node2D
     {
         if (_shape == FormationShape.Circle)
         {
+            // П1: тёмный дубль дуги — читаемость на светлом фоне.
+            DrawDashedCircle(_center, _contourRadius, ShadowColor);
             DrawDashedCircle(_center, _contourRadius, color);
         }
         else
@@ -280,6 +300,7 @@ public partial class FormationVisualRenderer : Node2D
             {
                 var a = pts[i];
                 var b = pts[(i + 1) % pts.Length];
+                DrawLine(a, (a + b) / 2f, ShadowColor, 4.5f); // П1: подложка
                 DrawLine(a, (a + b) / 2f, color, 2.5f);
             }
         }
@@ -287,23 +308,51 @@ public partial class FormationVisualRenderer : Node2D
 
     private void DrawContourRadius(float radius, Color color)
     {
+        DrawArc(_center, radius, 0, Mathf.Tau, 64, ShadowColor, 3.5f); // П1: подложка
         DrawArc(_center, radius, 0, Mathf.Tau, 64, color, 2f);
     }
 
-    /// <summary>Заливка контура по прогрессу наполнения (полигон/круг с alpha).</summary>
+    /// <summary>Заливка контура по прогрессу наполнения (полигон/круг с alpha).
+    /// П7 (репорт 21.09, ошибка движка): гейт вырожденных полигонов —
+    /// canvas_item_add_polygon ронял C++-ошибку «triangulation failed /
+    /// indices.is_empty()» на почти-нулевом fillRatio (точки совпадали).</summary>
     private void DrawFill(Color color)
     {
-        if (_fillRatio <= 0f) return;
+        if (_fillRatio <= 0.02f) return; // П7: вырожденный масштаб не рисуем
         var filled = WithAlpha(color, color.A * Mathf.Min(1f, _fillRatio));
         if (_shape == FormationShape.Circle)
         {
+            // П1: тёмная подложка-диск под светлою заливку.
+            DrawCircle(_center, _contourRadius * _fillRatio + 2f,
+                WithAlpha(ShadowColor, ShadowColor.A * 0.8f));
             DrawCircle(_center, _contourRadius * _fillRatio, filled);
         }
         else
         {
             var pts = ShapePoints(_center, _contourRadius * _fillRatio, _shape);
-            if (pts.Length > 2) DrawColoredPolygon(pts, filled);
+            if (pts.Length > 2 && IsNonDegeneratePolygon(pts)) // П7
+            {
+                // П1: тёмная подложка чуть крупнее под светлую заливку.
+                var shadowPts = ShapePoints(_center, _contourRadius * _fillRatio + 2f, _shape);
+                if (shadowPts.Length > 2 && IsNonDegeneratePolygon(shadowPts))
+                    DrawColoredPolygon(shadowPts, WithAlpha(ShadowColor, ShadowColor.A * 0.8f));
+                DrawColoredPolygon(pts, filled);
+            }
         }
+    }
+
+    /// <summary>П7: площадь (shoelace×2) > 1 px² — триангуляция не выродится.</summary>
+    private static bool IsNonDegeneratePolygon(Vector2[] pts)
+    {
+        if (pts.Length < 3) return false;
+        float area2 = 0f;
+        for (int i = 0; i < pts.Length; i++)
+        {
+            var a = pts[i];
+            var b = pts[(i + 1) % pts.Length];
+            area2 += a.X * b.Y - b.X * a.Y;
+        }
+        return Mathf.Abs(area2) > 1f;
     }
 
     /// <summary>Руны на вершинах контура (маленькие ромбы).</summary>
@@ -360,6 +409,18 @@ public partial class FormationVisualRenderer : Node2D
             pos + new Vector2(0, size),
             pos + new Vector2(-size, 0),
         };
+        if (size >= 4f)
+        {
+            // П1: тёмная подложка-ромб — руны/глифы видны на песке.
+            var shadow = new Vector2[]
+            {
+                pos + new Vector2(0, -(size + 2f)),
+                pos + new Vector2(size + 2f, 0),
+                pos + new Vector2(0, size + 2f),
+                pos + new Vector2(-(size + 2f), 0),
+            };
+            DrawColoredPolygon(shadow, ShadowColor);
+        }
         DrawColoredPolygon(pts, color);
     }
 
