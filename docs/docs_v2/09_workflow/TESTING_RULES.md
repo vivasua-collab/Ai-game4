@@ -19,7 +19,7 @@
 | Хук | Сцена/файл | Что проверяет |
 |---|---|---|
 | `GODOT_NEWGAME=1` | MainMenuController | Полный флоу: меню → New Game → сборка сцены |
-| `GODOT_COMBAT_SIM=1` | CombatSimDebug | Бой в обе стороны + weapon end-to-end + readiness-gate (R21-2: Accepted/Rejected «не готов»/re-ready; R23-1: 3e (a)-(e) через DebugSetReadinessPermil — charged при 600‰ = Accepted и НЕ расходует; R24-C: 3g multi — (a) тихий NPC-NPC без UI-сессии + месть Threats, (b) сессия пары с игроком, (b2) не-участник бьёт игрока в активном бое = CMB-2-регресс, retry-циклы против NPCModule-гонок) + r21-гарды: броня (плоское вычитание + DR-агрегат) и пассивный щит Ци (VERDICT) |
+| `GODOT_COMBAT_SIM=1` | CombatSimDebug | Бой в обе стороны + weapon end-to-end + readiness-gate (R21-2: Accepted/Rejected «не готов»/re-ready; R23-1: 3e (a)-(e) через DebugSetReadinessPermil — charged при 600‰ = Accepted и НЕ расходует; R24-C: 3g multi — (a) тихий NPC-NPC без UI-сессии + месть Threats, (b) сессия пары с игроком, (b2) не-участник бьёт игрока в активном бое = CMB-2-регресс, retry-циклы против NPCModule-гонок; R25: 3h AoE — (a) стенд геометрии форм (круг/конус/полукруг/линия, int-математика), (b) конус игрока в толпу 3 NPC (per-target полный пайплайн, AoeImpact ≥2 целей, месть «нейтралов» Threats), (c) AoE-залп NPC по игроку+соседу (месть соседа на NPC-кастера)) + r21-гарды: броня (плоское вычитание + DR-агрегат) и пассивный щит Ци (VERDICT) |
 | `GODOT_CHARGE_SIM=1` | ChargeSimDebug | Заряд техник (кулдауны/ёмкость) |
 | `GODOT_TRADE_DEBUG=1` | TradeModule | Smoke покупки/продажи |
 | `GODOT_TRADE_HOLD=1` | TradeModule | Не закрывать лавку (скриншоты) |

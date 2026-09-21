@@ -225,7 +225,8 @@ public class CombatModule : IModule
         }
 
         AttackAcceptance acceptance = _combatService.ExecuteAttack(
-            e.AttackerId, e.TechniqueId, e.TargetId, e.IsRanged, e.PotencyPermil, e.IsCharged);
+            e.AttackerId, e.TechniqueId, e.TargetId, e.IsRanged, e.PotencyPermil, e.IsCharged,
+            e.AimTileX, e.AimTileY); // R25: прицел AoE игрока (эпицентр/направление)
 
         // Review этап 3 (P1-3): списание стрелы — ТОЛЬКО после принятия атаки
         // (единая authoritative точка; NPC — безлимит как раньше; Ци-техники

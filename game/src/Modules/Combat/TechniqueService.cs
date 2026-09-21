@@ -292,7 +292,15 @@ namespace CultivationGame.Modules.Combat
                 ArmorPenetration = data.ArmorPenetration,
                 BaseDamage = data.BaseDamage,
                 IsUltimate = data.IsUltimate,
-                Mastery = data.Mastery
+                Mastery = data.Mastery,
+
+                // R25: AoE-геометрия (None для обычных техник — сейв совместим)
+                AoeShape = data.AoeShape,
+                AoeRadiusTiles = data.AoeRadiusTiles,
+                AoeHalfAngleDeg = data.AoeHalfAngleDeg,
+                AoeFalloffPermil = data.AoeFalloffPermil,
+                AoeMaxTargets = data.AoeMaxTargets,
+                SpareAlliesPermil = data.SpareAlliesPermil
             };
 
             // Эхо мастерства: «осмысление» профиля (тип+стихия) даёт новой
@@ -753,6 +761,15 @@ namespace CultivationGame.Modules.Combat
         public bool IsUltimate { get; set; }
         public float Mastery { get; set; }
 
+        // R25 (2026-09-21): площадная техника (int — сейв-совместимо,
+        // старые сейвы: 0/None/и т.д. по умолчанию)
+        public int AoeShape { get; set; }
+        public int AoeRadiusTiles { get; set; }
+        public int AoeHalfAngleDeg { get; set; }
+        public int AoeFalloffPermil { get; set; }
+        public int AoeMaxTargets { get; set; }
+        public int SpareAlliesPermil { get; set; }
+
         public static TechniqueSnapshotDto FromLearned(LearnedTechnique t) => new()
         {
             TechniqueId = t.TechniqueId,
@@ -771,6 +788,14 @@ namespace CultivationGame.Modules.Combat
             ArmorPenetration = t.ArmorPenetration,
             IsUltimate = t.IsUltimate,
             Mastery = t.Mastery,
+
+            // R25: AoE-геометрия
+            AoeShape = (int)t.AoeShape,
+            AoeRadiusTiles = t.AoeRadiusTiles,
+            AoeHalfAngleDeg = t.AoeHalfAngleDeg,
+            AoeFalloffPermil = t.AoeFalloffPermil,
+            AoeMaxTargets = t.AoeMaxTargets,
+            SpareAlliesPermil = t.SpareAlliesPermil,
         };
 
         public static TechniqueSnapshotDto FromData(string scrollId, TechniqueData d) => new()
@@ -793,6 +818,14 @@ namespace CultivationGame.Modules.Combat
             ArmorPenetration = d.ArmorPenetration,
             IsUltimate = d.IsUltimate,
             Mastery = d.Mastery,
+
+            // R25: AoE-геометрия
+            AoeShape = (int)d.AoeShape,
+            AoeRadiusTiles = d.AoeRadiusTiles,
+            AoeHalfAngleDeg = d.AoeHalfAngleDeg,
+            AoeFalloffPermil = d.AoeFalloffPermil,
+            AoeMaxTargets = d.AoeMaxTargets,
+            SpareAlliesPermil = d.SpareAlliesPermil,
         };
 
         public LearnedTechnique ToLearned() => new()
@@ -813,6 +846,14 @@ namespace CultivationGame.Modules.Combat
             ArmorPenetration = ArmorPenetration,
             IsUltimate = IsUltimate,
             Mastery = Mastery,
+
+            // R25: AoE-геометрия (int→enum при загрузке сейва)
+            AoeShape = (AoeShape)AoeShape,
+            AoeRadiusTiles = AoeRadiusTiles,
+            AoeHalfAngleDeg = AoeHalfAngleDeg,
+            AoeFalloffPermil = AoeFalloffPermil,
+            AoeMaxTargets = AoeMaxTargets,
+            SpareAlliesPermil = SpareAlliesPermil,
         };
 
         public TechniqueData ToData() => new()
@@ -835,6 +876,14 @@ namespace CultivationGame.Modules.Combat
             ArmorPenetration = ArmorPenetration,
             IsUltimate = IsUltimate,
             Mastery = Mastery,
+
+            // R25: AoE-геометрия (int→enum при восстановлении свитка)
+            AoeShape = (AoeShape)AoeShape,
+            AoeRadiusTiles = AoeRadiusTiles,
+            AoeHalfAngleDeg = AoeHalfAngleDeg,
+            AoeFalloffPermil = AoeFalloffPermil,
+            AoeMaxTargets = AoeMaxTargets,
+            SpareAlliesPermil = SpareAlliesPermil,
         };
     }
 
@@ -863,5 +912,14 @@ namespace CultivationGame.Modules.Combat
         public Element Element;           // FIX CS1061: стихия (из TechniqueData, B5)
         public bool IsUltimate;           // FIX CS1061: Ultimate-техника (из TechniqueData)
         public float Mastery;             // Этап 1: мастерство 0..100 (растёт при использовании)
+
+        // === R25 (2026-09-21): площадная техника (копии из TechniqueData —
+        // CombatService читает AoE-геометрию из изученной техники) ===
+        public AoeShape AoeShape = AoeShape.None;
+        public int AoeRadiusTiles;
+        public int AoeHalfAngleDeg;
+        public int AoeFalloffPermil;
+        public int AoeMaxTargets;
+        public int SpareAlliesPermil;     // §6.4 хук «бережной» версии (future)
     }
 }

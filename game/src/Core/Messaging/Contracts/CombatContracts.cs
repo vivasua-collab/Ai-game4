@@ -204,8 +204,20 @@ public readonly struct AttackIntentEvent
     /// </summary>
     public readonly bool IsCharged;
 
+    /// <summary>
+    /// R25 (план R23 §2.2 п.1): тайл прицеливания (эпицентр круга /
+    /// направление конуса/линии) — конверсия курсора мыши у игрока;
+    /// -1 = не указан (NPC/базовая атака — резолвер возьмёт позицию цели).
+    /// int-геометрия (ЗАПРЕТ 3.9).
+    /// </summary>
+    public readonly int AimTileX;
+
+    /// <summary>R25: Y-координата тайла прицеливания (-1 = не указан).</summary>
+    public readonly int AimTileY;
+
     public AttackIntentEvent(string attackerId, string targetId,
-        string techniqueId, bool isRanged, int potencyPermil = 1000, bool isCharged = false)
+        string techniqueId, bool isRanged, int potencyPermil = 1000, bool isCharged = false,
+        int aimTileX = -1, int aimTileY = -1)
     {
         AttackerId = attackerId;
         TargetId = targetId;
@@ -213,6 +225,8 @@ public readonly struct AttackIntentEvent
         IsRanged = isRanged;
         PotencyPermil = potencyPermil;
         IsCharged = isCharged;
+        AimTileX = aimTileX;
+        AimTileY = aimTileY;
     }
 }
 
@@ -279,4 +293,63 @@ public readonly struct CombatDisengageEvent
 
     public CombatDisengageEvent(string npcId, string reason)
         { NpcId = npcId; Reason = reason; }
+}
+
+// === R25 (2026-09-21): площадные техники (AoE-A «мгновенный залп») ===
+
+/// <summary>
+/// R25: залп площадной техники состоялся — данные для VFX-фазы (R29+:
+/// вспышка формы/полёты цифр урона; рендереру достаточно этих полей).
+/// Публикуется CombatService.ExecuteAoeVolley ДО per-target резолва
+/// (формы/цели уже известны, урон по конвейеру пойдёт следом —
+/// DamageAppliedEvent per-target уже существующий контракт).
+/// Лор: «Ци срывается волной» — мгновенный взрыв, залп атомарен.
+/// </summary>
+public readonly struct AoeImpactEvent
+{
+    /// <summary>Кастер залпа</summary>
+    public readonly string CasterId;
+
+    /// <summary>Площадная техника</summary>
+    public readonly string TechniqueId;
+
+    /// <summary>Форма области (Circle/Cone/Semicircle/Line)</summary>
+    public readonly AoeShape Shape;
+
+    /// <summary>Позиция кастера в тайлах (источник волны/вершина конуса)</summary>
+    public readonly int OriginX;
+    public readonly int OriginY;
+
+    /// <summary>Точка прицеливания в тайлах (эпицентр круга/направление)</summary>
+    public readonly int EpicenterX;
+    public readonly int EpicenterY;
+
+    /// <summary>Радиус/полудлина в тайлах</summary>
+    public readonly int RadiusTiles;
+
+    /// <summary>Полуугол конуса в градусах (0 — круг/линия)</summary>
+    public readonly int HalfAngleDeg;
+
+    /// <summary>Стихия залпа (цвет вспышки)</summary>
+    public readonly Element Element;
+
+    /// <summary>Цели залпа (длина = количество per-target резолвов)</summary>
+    public readonly string[] TargetIds;
+
+    public AoeImpactEvent(string casterId, string techniqueId, AoeShape shape,
+        int originX, int originY, int epicenterX, int epicenterY,
+        int radiusTiles, int halfAngleDeg, Element element, string[] targetIds)
+    {
+        CasterId = casterId;
+        TechniqueId = techniqueId;
+        Shape = shape;
+        OriginX = originX;
+        OriginY = originY;
+        EpicenterX = epicenterX;
+        EpicenterY = epicenterY;
+        RadiusTiles = radiusTiles;
+        HalfAngleDeg = halfAngleDeg;
+        Element = element;
+        TargetIds = targetIds;
+    }
 }

@@ -42,8 +42,11 @@ namespace CultivationGame.Core.Interfaces
         /// potencyPermil>1000 → то же (Stage 2 overcharge); умножитель урона.
         /// Review этап 3 (P0-1/P1-4): гейты участника и владения ходом — ВНУТРИ
         /// (authority в CombatService, не в адаптерах ввода).
+        ///
+        /// R25 (2026-09-21): + aimTileX/Y — тайл прицеливания AoE (эпицентр
+        /// круга/направление конуса; -1 = не указан → позиция цели).
         /// </summary>
-        AttackAcceptance ExecuteAttack(string attackerId, string techniqueId, string targetId = null, bool isRanged = false, int potencyPermil = 1000, bool isCharged = false);
+        AttackAcceptance ExecuteAttack(string attackerId, string techniqueId, string targetId = null, bool isRanged = false, int potencyPermil = 1000, bool isCharged = false, int aimTileX = -1, int aimTileY = -1);
         void ExecuteDefense(string defenderId, DefenseSubtype defenseType);
 
         // === R16 (2026-09-10): доработка боевой системы ===

@@ -92,8 +92,23 @@ public sealed class TechniqueGrantPhase : AbstractSceneAssemblyPhase
             TechniqueType.Formation, level, level, seed + 600);
         if (_techniques.LearnTechnique(formation)) granted++;
 
+        // 5. R25 (2026-09-21, план R23 §2.2/§4-эп.2): гарантированный тест-набор
+        // ПЛОЩАДНЫХ техник (конус/полукруг/круг) — площади видимы в игре сразу;
+        // свободной ёмкости нет → формы останутся редким дропом (10% Combat
+        // в DetermineSubtype). GenerateAoe — рецепт формы из генератора.
+        int grantedAoe = 0;
+        var aoeForms = new[] { AoeShape.Cone, AoeShape.Semicircle, AoeShape.Circle };
+        foreach (var form in aoeForms)
+        {
+            if (_techniques.LibraryFree <= 0) break;
+            var aoe = _techniqueGenerator.GenerateAoe(form, level, level, seed + 700 + grantedAoe);
+            if (_techniques.LearnTechnique(aoe)) { grantedAoe++; granted++; }
+        }
+        Console.WriteLine($"[TechniqueGrant] R25 AoE-набор: {grantedAoe}/3 форм " +
+                          "(конус/полукруг/круг — площадные техники)");
+
         Console.WriteLine($"[Phase {PhaseOrder}] {PhaseName} complete — granted {granted} techniques " +
-                          $"(cultivation 1, active {grantedActive}/{combatSlots}, curse, formation) at L{level}");
+                          $"(cultivation 1, active {grantedActive}/{combatSlots}, curse, formation, aoe {grantedAoe}) at L{level}");
 
         // Headless smoke-тест формаций (этап 5): GODOT_FORMATION_TEST=1 — создать
         // формацию напрямую (StartDrawing + мгновенное наполнение → Active).

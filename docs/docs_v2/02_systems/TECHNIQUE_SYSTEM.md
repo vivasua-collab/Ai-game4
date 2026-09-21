@@ -317,6 +317,32 @@ pending-таймером (castTime по умолчанию 0.5 с). **Осозн
 `GODOT_CHARGE_SIM=1` (headless): зарядка → hold → release → урон по NPC.
 Ожидаемый вывод: `[ChargeSim] VERDICT: PASS — fill model + aura hold + release all wired`.
 
+### 5.5. Площадные техники (R25, 2026-09-21)
+
+TechniqueData/LearnedTechnique + int-поля (ЗАПРЕТ 3.9; None/0 по умолчанию —
+сейв и все существующие техники не затронуты; копируются в
+TechniqueSnapshotDto при сохранении):
+
+| Поле | Тип | Смысл |
+|---|---|---|
+| `AoeShape` | enum | None / Circle / Cone / Semicircle / Line |
+| `AoeRadiusTiles` | int | радиус/полудлина в тайлах (растёт с уровнем) |
+| `AoeHalfAngleDeg` | int | полуугол конуса (30/45/60; Semicircle = 90) |
+| `AoeFalloffPermil` | int | спад урона на краю (500‰ = ×0.5; 0 = нет) |
+| `AoeMaxTargets` | int | кап целей залпа (0 = без лимита) |
+| `SpareAlliesPermil` | int | хук «бережной» версии (§6.4 плана; v1 выкл) |
+
+- Заполняет ТОЛЬКО генератор для Subtype=`RangedAoe` (10% Combat-техник;
+  `ApplyAoeParams` — рецепт формы): Circle «огненный шар» (r=2+L/3, спад
+  500‰, 5 целей), Cone «волна пламени» (r=4+L/2, 45°, 400‰, 4), Semicircle
+  «веер Ци» (r=3+L/3, 90°, 300‰, 6), Line «копьё Ци» (r=5+L, 500‰, 3).
+- `ITechniqueGeneratorService.GenerateAoe(shape, level, cultivationLevel,
+  seed)` — детерминированная генерация заданной формы (QA + тест-набор
+  игрока). TechniqueGrantPhase выдаёт до 3 форм при свободной ёмкости
+  библиотеки (конус/полукруг/круг).
+- Резолв залпа — COMBAT_SYSTEM §4.4 (AoEResolver, per-target полный
+  пайплайн, месть нейтралов, AoeImpactEvent для VFX).
+
 ---
 
 ## 6. Архитектура «Матрёшка» (генерация техник)

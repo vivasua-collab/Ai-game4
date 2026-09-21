@@ -301,9 +301,34 @@ namespace CultivationGame.Modules.Generator
                 Mastery = mastery
             };
 
+            // R25 (план R23 §2.1): площадная техника — геометрия по рецепту формы
+            if (subtype == CombatSubtype.RangedAoe)
+                ApplyAoeParams(technique, PickAoeShape(rng), level);
+
             // === Шаг 6.10: Регистрация в TechniqueRegistry ===
             _registry.Register(technique);
 
+            return technique;
+        }
+
+        /// <summary>
+        /// R25 (2026-09-21, план R23 §2.1/§4-эп.2): сгенерировать ПЛОЩАДНУЮ
+        /// технику заданной формы (Circle/Cone/Semicircle/Line) — тест-набор
+        /// игрока и QA. Тип Combat, подтип RangedAoe, грейд/стихия/мастерство —
+        /// детерминированный рандом по seed. ЗАРЕГИСТРИРОВАНА в реестре
+        /// (семантика Generate* — сразу доступна поиску по id).
+        /// </summary>
+        /// <param name="shape">Форма области (не None!)</param>
+        /// <param name="level">Уровень техники (1..9)</param>
+        /// <param name="cultivationLevel">Уровень культивации практика (1..10)</param>
+        /// <param name="seed">Seed для детерминированной генерации</param>
+        public TechniqueData GenerateAoe(AoeShape shape, int level, int cultivationLevel, long seed)
+        {
+            if (shape == AoeShape.None) shape = AoeShape.Circle; // защита от пустой формы
+            var technique = BuildCore(TechniqueType.Combat, TechniqueGrade.Common,
+                level, cultivationLevel, seed,
+                forcedSubtype: CombatSubtype.RangedAoe, forcedAoeShape: shape);
+            _registry.Register(technique);
             return technique;
         }
 
@@ -368,8 +393,11 @@ namespace CultivationGame.Modules.Generator
         /// <summary>
         /// 2026-09-08 (ревью-1 P1-1): общее ядро построения TechniqueData.
         /// НЕ регистрирует в реестре — только конструирует объект.
+        /// R25: + forcedSubtype/forcedAoeShape — явная форма для GenerateAoe
+        /// (QA/тест-набор игрока); по умолчанию — обычный выбор генератора.
         /// </summary>
-        private TechniqueData BuildCore(TechniqueType type, TechniqueGrade grade, int level, int cultivationLevel, long seed)
+        private TechniqueData BuildCore(TechniqueType type, TechniqueGrade grade, int level, int cultivationLevel, long seed,
+            CombatSubtype? forcedSubtype = null, AoeShape? forcedAoeShape = null)
         {
             if (cultivationLevel < 1) cultivationLevel = 1;
             if (cultivationLevel > GameConstants.MAX_CULTIVATION_LEVEL)
@@ -381,7 +409,7 @@ namespace CultivationGame.Modules.Generator
 
             var rng = new SeededRandom(seed);
 
-            CombatSubtype subtype = DetermineSubtype(type, rng);
+            CombatSubtype subtype = forcedSubtype ?? DetermineSubtype(type, rng);
             Element element = DetermineElement(type, rng);
             float mastery = rng.NextFloat() * 100f;
 
@@ -432,6 +460,11 @@ namespace CultivationGame.Modules.Generator
                 Mastery = mastery
             };
 
+            // R25: площадная техника — геометрия по рецепту (случайная форма,
+            // если не задана явно через forcedAoeShape)
+            if (subtype == CombatSubtype.RangedAoe)
+                ApplyAoeParams(technique, forcedAoeShape ?? PickAoeShape(rng), level);
+
             return technique;
         }
 
@@ -460,6 +493,7 @@ namespace CultivationGame.Modules.Generator
         /// <summary>
         /// Выбрать CombatSubtype на основе TechniqueType.
         /// Combat → MeleeStrike, MeleeWeapon, RangedProjectile, RangedBeam
+        ///          + R25: 10% шанс RangedAoe (площадная — редкая специализация)
         /// Defense → DefenseBlock, DefenseShield, DefenseDodge
         /// Support → Healing/Buff → CombatSubtype.None (метаданные в Type)
         /// Остальные → CombatSubtype.None
@@ -468,11 +502,83 @@ namespace CultivationGame.Modules.Generator
         {
             return type switch
             {
-                TechniqueType.Combat => rng.NextElement(CombatSubtypes),
+                // R25 (план R23 §2.1): площадные техники выпадают редко —
+                // форма/радиус/спад задаются генератором (ApplyAoeParams).
+                TechniqueType.Combat => rng.NextBool(0.10f)
+                    ? CombatSubtype.RangedAoe
+                    : rng.NextElement(CombatSubtypes),
                 TechniqueType.Defense => rng.NextElement(DefenseSubtypes),
                 // Support/Healing/Buff → None (подтип хранится в Type)
                 _ => CombatSubtype.None
             };
+        }
+
+        // ===================================================================
+        // R25 (2026-09-21): параметры площадной техники (план R23 §2.1)
+        // ===================================================================
+
+        /// <summary>Пул форм для случайных RangedAoe (Generate/BuildCore).</summary>
+        private static readonly AoeShape[] AoeShapePool =
+        {
+            AoeShape.Circle,
+            AoeShape.Cone,
+            AoeShape.Semicircle
+        };
+
+        /// <summary>Случайная форма AoE (для генератора без явного рецепта).</summary>
+        private AoeShape PickAoeShape(SeededRandom rng)
+            => rng.NextElement(AoeShapePool);
+
+        /// <summary>
+        /// R25: заполнить AoE-геометрию техники по рецепту формы.
+        /// Вызывается ТОЛЬКО для Subtype=RangedAoe (прочие — AoeShape.None,
+        /// сейв/существующие техники не затронуты). Радиусы растут с уровнем
+        /// техники; вся арифметика int (ЗАПРЕТ 3.9).
+        /// </summary>
+        private void ApplyAoeParams(TechniqueData tech, AoeShape shape, int level)
+        {
+            tech.AoeShape = shape;
+            switch (shape)
+            {
+                case AoeShape.Circle:
+                    // «Огненный шар»: взрыв в точке прицеливания, спад от эпицентра
+                    tech.AoeRadiusTiles = 2 + level / 3;   // L1=2 .. L9=5
+                    tech.AoeHalfAngleDeg = 0;
+                    tech.AoeFalloffPermil = 500;            // край ×0.5
+                    tech.AoeMaxTargets = 5;
+                    break;
+                case AoeShape.Cone:
+                    // «Волна пламени»: от кастера в сторону прицела
+                    tech.AoeRadiusTiles = 4 + level / 2;   // L1=4 .. L9=8
+                    tech.AoeHalfAngleDeg = 45;
+                    tech.AoeFalloffPermil = 400;            // край ×0.6
+                    tech.AoeMaxTargets = 4;
+                    break;
+                case AoeShape.Semicircle:
+                    // «Веер Ци»: широкий перед кастером
+                    tech.AoeRadiusTiles = 3 + level / 3;
+                    tech.AoeHalfAngleDeg = 90;
+                    tech.AoeFalloffPermil = 300;            // край ×0.7
+                    tech.AoeMaxTargets = 6;
+                    break;
+                case AoeShape.Line:
+                    // «Копьё Ци»: узкий луч вдоль прицела
+                    tech.AoeRadiusTiles = 5 + level;
+                    tech.AoeHalfAngleDeg = 0;
+                    tech.AoeFalloffPermil = 500;
+                    tech.AoeMaxTargets = 3;
+                    break;
+                default:
+                    // Неизвестная форма — деградация до маленького круга
+                    tech.AoeShape = AoeShape.Circle;
+                    tech.AoeRadiusTiles = 1;
+                    tech.AoeFalloffPermil = 0;
+                    tech.AoeMaxTargets = 1;
+                    break;
+            }
+            // R23-эп.3 §6.4: SpareAllies — хук выкл в v1 (сопартийцев нет);
+            // генератор высоких уровней включит вместе с party-системой.
+            tech.SpareAlliesPermil = 0;
         }
 
         // ===================================================================

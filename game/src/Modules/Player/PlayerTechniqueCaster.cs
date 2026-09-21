@@ -225,8 +225,14 @@ public sealed class PlayerTechniqueCaster : IDisposable
                 bool isRanged = tech.Subtype is CombatSubtype.RangedProjectile
                                              or CombatSubtype.RangedBeam
                                              or CombatSubtype.RangedAoe;
+                // R25 (план R23 §2.2 п.1): тайл прицеливания — эпицентр круга/
+                // направление конуса AoE (милли-пиксели курсора → тайлы,
+                // int-деление, ЗАПРЕТ 3.9). Не-AoE техники игнорируют aim.
+                int aimTileX = mouseX / (1000 * GameConstants.TILE_PIXELS);
+                int aimTileY = mouseY / (1000 * GameConstants.TILE_PIXELS);
                 _attackIntentPub.Publish(new AttackIntentEvent(
-                    _player.PlayerId, target, tech.TechniqueId, isRanged, potencyPermil, isCharged: true));
+                    _player.PlayerId, target, tech.TechniqueId, isRanged, potencyPermil, isCharged: true,
+                    aimTileX, aimTileY));
                 PublishSuccess(tech, playerX, playerY, target);
                 return;
             }

@@ -82,6 +82,10 @@ namespace CultivationGame.Modules.Combat
         // 2026-09-11 (аудит боя): смерть защитника-не-игрока по правилам тел
         // (vital-разрушение/полный дренаж — IsEntityAlive), а не только IsFatalHit.
         private readonly IBodyDataProvider? _bodyDataProvider;
+        // R25 (2026-09-21): резолвер целей площадного залпа + событие для VFX-фазы
+        // (паблишер nullable: без него событие просто не публикуется — headless-сборки)
+        private readonly AoEResolver _aoeResolver;
+        private readonly IPublisher<AoeImpactEvent>? _aoeImpactPub;
 
         // EVT-01: подписки на кросс-модульные события (вместо инъекции IQiService/IQiBufferService)
         private readonly ISubscriber<QiChangedEvent> _qiChangedSub;
@@ -210,7 +214,9 @@ namespace CultivationGame.Modules.Combat
             IPublisher<QiBufferActivateRequestEvent> qiBufferActivateReqPub,
             IPublisher<QiBufferDeactivateRequestEvent> qiBufferDeactivateReqPub,
             IQiDataProvider qiDataProvider, // Фаза 3 (3.I)
-            IBodyDataProvider? bodyDataProvider = null) // 2026-09-11 (аудит боя): смерть защитника по правилам тел
+            IBodyDataProvider? bodyDataProvider = null, // 2026-09-11 (аудит боя): смерть защитника по правилам тел
+            AoEResolver? aoeResolver = null, // R25: площадные техники
+            IPublisher<AoeImpactEvent>? aoeImpactPub = null) // R25: событие залпа для VFX
         {
             _damageService = damageService;
             _techniqueService = techniqueService;
@@ -229,6 +235,10 @@ namespace CultivationGame.Modules.Combat
             _qiBufferDeactivateReqPub = qiBufferDeactivateReqPub;
             _qiDataProvider = qiDataProvider; // Фаза 3 (3.I)
             _bodyDataProvider = bodyDataProvider; // 2026-09-11 (аудит боя)
+            // R25: AoE-резолвер опционален (headless-сборки без позиционных сервисов
+            // деградируют до одиночной цели — см. ExecuteAoeVolley)
+            _aoeResolver = aoeResolver ?? new AoEResolver();
+            _aoeImpactPub = aoeImpactPub;
 
             // EVT-01: подписка на кэш состояния Ци
             _qiChangedSubscription = _qiChangedSub.Subscribe((in QiChangedEvent e) => {
@@ -590,8 +600,10 @@ namespace CultivationGame.Modules.Combat
         /// Stage 0 (2026-08-25, GLM-5.3): + potencyPermil (по умолчанию 1000).
         /// Если potencyPermil > 1000 — атака игрока после зарядки, пропуск pending-таймера
         /// (зарядка УЖЕ была временем каста). BuildAndExecuteDamageRequest применяет potency.
+        /// R25: + aimTileX/Y — тайл прицеливания игрока (эпицентр круга/
+        /// направление конуса AoE; -1 = не указан — берётся позиция цели).
         /// </summary>
-        public AttackAcceptance ExecuteAttack(string attackerId, string techniqueId, string targetId, bool isRanged, int potencyPermil = 1000, bool isCharged = false)
+        public AttackAcceptance ExecuteAttack(string attackerId, string techniqueId, string targetId, bool isRanged, int potencyPermil = 1000, bool isCharged = false, int aimTileX = -1, int aimTileY = -1)
         {
             // R24-C (мультибой «реестр входов», план 2026-09-20_r23 §1-C):
             // «слот» боя остаётся ТОЛЬКО как UI-сессия игрока (HUD-пара,
@@ -691,8 +703,11 @@ namespace CultivationGame.Modules.Combat
                 // (§8.2: «заряженные не расходывают готовность дополнительно»).
                 // R24-C: цель резолвится по текущим правилам (участник UI-боя —
                 // пара; толпа — заявленная цель интента).
+                // R25: aim-тайл переживает выпуск (эпицентр AoE игрока).
                 ApplyTechniqueImmediately(attackerId, techniqueId,
-                    ResolveDefenderIdFor(attackerId, targetId));
+                    ResolveDefenderIdFor(attackerId, targetId),
+                    explicitPotencyPermil: potencyPermil, explicitIsRanged: isRanged,
+                    aimTileX: aimTileX, aimTileY: aimTileY);
                 return AttackAcceptance.Accepted;
             }
 
@@ -741,6 +756,9 @@ namespace CultivationGame.Modules.Combat
                     TargetId = castTargetId,
                     PotencyPermil = potencyPermil,
                     IsRanged = isRanged,
+                    // R25: точка прицеливания переживает каст (эпицентр AoE)
+                    AimTileX = aimTileX,
+                    AimTileY = aimTileY,
                     RemainingCastTime = effectiveCastTime,
                     TotalCastTime = effectiveCastTime
                 };
@@ -763,7 +781,9 @@ namespace CultivationGame.Modules.Combat
             // _instigatorId == null — прежний внутренний резолв дал бы null → NRE).
             ConsumeReadiness(attackerId); // R21-2: замах свершен (расход при приёме)
             BuildAndExecuteDamageRequest(attackerId, techniqueId,
-                ResolveDefenderIdFor(attackerId, targetId));
+                ResolveDefenderIdFor(attackerId, targetId),
+                explicitPotencyPermil: null, explicitIsRanged: null,
+                aimTileX: aimTileX, aimTileY: aimTileY);
             return AttackAcceptance.Accepted;
         }
 
@@ -775,14 +795,109 @@ namespace CultivationGame.Modules.Combat
         /// оставляет null → прежний резолв из текущего состояния боя.
         /// Phase 8 ч.2 (2026-09-03): + explicitIsRanged — pending-каст передаёт
         /// запомненный ranged-флаг каста.
+        /// R25: + aimTileX/Y — точка прицеливания AoE (эпицентр/направление).
         /// </summary>
         private void ApplyTechniqueImmediately(string attackerId, string techniqueId,
             string explicitDefenderId = null, int? explicitPotencyPermil = null,
-            bool? explicitIsRanged = null)
+            bool? explicitIsRanged = null, int aimTileX = -1, int aimTileY = -1)
         {
             // Делегируем общую логику в BuildAndExecuteDamageRequest
             // Редактировано: 2026-05-22 13:50:00 UTC — Этап 3.1: рефакторинг дублирования P1-8.1
-            BuildAndExecuteDamageRequest(attackerId, techniqueId, explicitDefenderId, explicitPotencyPermil, explicitIsRanged);
+            BuildAndExecuteDamageRequest(attackerId, techniqueId, explicitDefenderId, explicitPotencyPermil, explicitIsRanged, aimTileX, aimTileY);
+        }
+
+        /// <summary>
+        /// R25 (2026-09-21, план R23 §2.2-A — выбор пользователя): площадной
+        /// залп. НЕ одна цель: AoEResolver собирает ВСЕХ в форме (NPC ∪ звери ∪
+        /// игрок; нейтралы ЗАДЕВАЮТСЯ — «мир жесток», месть включается сама
+        /// через DamageAppliedEvent → RetaliateOrFlee), на каждую цель — ПОЛНЫЙ
+        /// 11-слойный пайплайн (броня/щит Ци/парирование per-target честны),
+        /// спад силы — множитель potency per-target (промилле, ЗАПРЕТ 3.9).
+        /// AoeImpactEvent (форма/эпицентр/цели) — для VFX-фазы R29+.
+        /// Деградация: кастер не резолвится позиционно → одиночный удар по
+        /// заявленной цели (гейт не блокирует).
+        /// </summary>
+        private void ExecuteAoeVolley(string attackerId, string techniqueId,
+            LearnedTechnique tech, string explicitDefenderId,
+            int? explicitPotencyPermil, bool? explicitIsRanged,
+            int aimTileX, int aimTileY)
+        {
+            // Эпицентр/направление: явный aim игрока → позиция заявленной цели
+            // (NPC-кастеры) → позиция кастера (последний фолбэк)
+            int aimX = aimTileX, aimY = aimTileY;
+            if (aimX < 0 || aimY < 0)
+            {
+                if (!string.IsNullOrEmpty(explicitDefenderId)
+                    && _aoeResolver.TryResolveTile(explicitDefenderId, out int tx, out int ty))
+                {
+                    aimX = tx;
+                    aimY = ty;
+                }
+            }
+
+            if (!_aoeResolver.TryResolveTile(attackerId, out int cx, out int cy))
+            {
+                // Кастер без позиции (headless/неизвестная сущность) — честная
+                // деградация: одиночный удар по заявленной цели (не блокируем).
+                BuildAndExecuteDamageRequest(attackerId, techniqueId,
+                    explicitDefenderId, explicitPotencyPermil, explicitIsRanged);
+                return;
+            }
+            if (aimX < 0 || aimY < 0) { aimX = cx; aimY = cy; }
+
+            int basePotency = explicitPotencyPermil ?? _lastAttackPotencyPermil;
+            bool isRanged = explicitIsRanged ?? _lastAttackIsRanged;
+
+            var query = new AoeQuery
+            {
+                CasterId = attackerId,
+                CasterPos = new Position2D(cx, cy),
+                AimPos = new Position2D(aimX, aimY),
+                Shape = tech.AoeShape,
+                RadiusTiles = tech.AoeRadiusTiles,
+                HalfAngleDeg = tech.AoeHalfAngleDeg,
+                FalloffPermil = tech.AoeFalloffPermil,
+                MaxTargets = tech.AoeMaxTargets,
+                SpareAlliesPermil = tech.SpareAlliesPermil
+            };
+            var targets = _aoeResolver.Resolve(in query);
+
+            // R25: событие залпа для VFX-фазы (R29+ вспышки/формы) — до
+            // per-target резолвов, с полным списком целей.
+            if (_aoeImpactPub != null)
+            {
+                var ids = new string[targets.Count];
+                for (int i = 0; i < targets.Count; i++) ids[i] = targets[i].EntityId;
+                _aoeImpactPub.Publish(new AoeImpactEvent(
+                    attackerId, techniqueId, tech.AoeShape,
+                    cx, cy, aimX, aimY,
+                    Math.Max(1, tech.AoeRadiusTiles), tech.AoeHalfAngleDeg,
+                    tech.Element, ids));
+            }
+
+            // Один TechniqueUsedEvent на ЗАЛП (не N per-target: кулдаун/
+            // мастерство уже начислены TechniqueService.CompleteUse ДО интента;
+            // Ци списана тиками зарядки — повторные события только шум).
+            _techniqueUsedPub.Publish(new TechniqueUsedEvent(
+                attackerId, techniqueId, GetTechniqueQiCost(techniqueId)));
+
+            if (targets.Count == 0)
+            {
+                // Пустой залп (форма без целей): расход Ци/кулдаун честно
+                // потрачены — «Ци срывается волной в пустоту».
+                return;
+            }
+
+            foreach (var t in targets)
+            {
+                // Спад — per-target множитель: 1000 у источника, к краю —
+                // (1000 - AoeFalloffPermil). Заряженная мощь масштабируется
+                // честно (1500‰ × 0.7 = 1050‰).
+                int perTargetPotency = Math.Max(0, basePotency * t.FalloffPermil / 1000);
+                BuildAndExecuteDamageRequest(attackerId, techniqueId,
+                    t.EntityId, perTargetPotency, isRanged,
+                    suppressTechUsed: true);
+            }
         }
 
         /// <summary>
@@ -794,8 +909,29 @@ namespace CultivationGame.Modules.Combat
         /// </summary>
         private void BuildAndExecuteDamageRequest(string attackerId, string techniqueId,
             string explicitDefenderId = null, int? explicitPotencyPermil = null,
-            bool? explicitIsRanged = null)
+            bool? explicitIsRanged = null, int aimTileX = -1, int aimTileY = -1,
+            bool suppressTechUsed = false)
         {
+            // R25 (план R23 §2.2-A): площадная техника — МГНОВЕННЫЙ ЗАЛП по всем
+            // целям в форме (AoEResolver; нейтралы ЗАДЕВАЮТСЯ — месть включается
+            // сама через DamageAppliedEvent → RetaliateOrFlee). Per-target —
+            // полный 11-слойный пайплайн: броня/щит Ци/парирование честны для
+            // КАЖДОЙ цели, спад силы — множитель potency per-target.
+            // suppressTechUsed — защита от рекурсии: per-target вызовы идут
+            // напрямую (цель зафиксирована), не через AoE-гейт.
+            if (!suppressTechUsed)
+            {
+                var aoeTech = _techniqueService.GetTechnique(techniqueId);
+                if (aoeTech != null
+                    && aoeTech.Subtype == CombatSubtype.RangedAoe
+                    && aoeTech.AoeShape != AoeShape.None)
+                {
+                    ExecuteAoeVolley(attackerId, techniqueId, aoeTech, explicitDefenderId,
+                        explicitPotencyPermil, explicitIsRanged, aimTileX, aimTileY);
+                    return;
+                }
+            }
+
             // CMB-A10: получаем урон из данных техники вместо хардкода
             int baseDamage = GetTechniqueDamage(techniqueId);
             DamageType damageType = GetTechniqueDamageType(techniqueId);
@@ -1037,8 +1173,12 @@ namespace CultivationGame.Modules.Combat
             // Публикуем событие использования техники
             // C7-E01 FIX: QiCost = стоимость Ци техники, а не baseDamage
             // Фаза 9D: QiCost float→int (ЗАПРЕТ 3.9)
+            // R25: per-target вызовы AoE-залпа публикуют ОДНО событие
+            // в ExecuteAoeVolley (кулдаун/мастерство/Ци уже списаны —
+            // повторные события только шум в killfeed/UI).
             int qiCost = GetTechniqueQiCost(techniqueId);
-            _techniqueUsedPub.Publish(new TechniqueUsedEvent(attackerId, techniqueId, qiCost));
+            if (!suppressTechUsed)
+                _techniqueUsedPub.Publish(new TechniqueUsedEvent(attackerId, techniqueId, qiCost));
 
             // Проверяем результат боя
             // 2026-09-11 (аудит боя, «сущности неубиваемы»): смерть
@@ -1211,8 +1351,10 @@ namespace CultivationGame.Modules.Combat
                         _pendingCasts.Remove(pt.AttackerId);
                         // M1: цель на момент старта каста; potency кастера;
                         // Phase 8 ч.2: ranged-флаг.
+                        // R25: aim-тайл — прицел AoE пережил каст.
                         ApplyTechniqueImmediately(pt.AttackerId, pt.TechniqueId,
-                            pt.TargetId, pt.PotencyPermil, pt.IsRanged);
+                            pt.TargetId, pt.PotencyPermil, pt.IsRanged,
+                            pt.AimTileX, pt.AimTileY);
                     }
                 }
             }
@@ -1370,6 +1512,8 @@ namespace CultivationGame.Modules.Combat
             public string TargetId;        // M1: defender на момент старта каста
             public int PotencyPermil;      // M1: potency кастера на момент старта
             public bool IsRanged;          // Phase 8 ч.2: ranged-флаг каста (лук)
+            public int AimTileX;           // R25: прицел AoE на момент старта (-1 = нет)
+            public int AimTileY;
             public float RemainingCastTime;
             public float TotalCastTime;
         }

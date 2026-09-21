@@ -47,10 +47,20 @@ public partial class CombatSimDebug : Node
     [Inject] private IDamageService? _damageService;
     [Inject] private IQiService? _qiService;
     [Inject] private IQiDataProvider? _qiDataProvider;
+    // R25 (2026-09-21): площадные техники — генератор/библиотека/событие залпа.
+    [Inject] private Modules.Combat.TechniqueService? _techniqueService;
+    [Inject] private ITechniqueGeneratorService? _techniqueGenerator;
+    [Inject] private ISubscriber<Core.Messaging.Contracts.AoeImpactEvent>? _aoeImpactSub;
+    // R25 QA: спавн толпы для конуса (спавн — отдельный сервис, не INPCService).
+    [Inject] private INPCSpawnerService? _npcSpawner;
 
     private System.IDisposable? _damageToken;
     private System.IDisposable? _intentEchoToken;
     private System.IDisposable? _rejectedToken;
+    private System.IDisposable? _aoeImpactToken;
+
+    // R25: количество целей последнего AoE-залпа (AoeImpactEvent.TargetIds).
+    private int _aoeImpactCount = -1;
 
     // Phase 8 ч.3: трекинг отклонений (причины — LOS/стрелы/каст).
     private int _rejectedCount;
@@ -104,6 +114,14 @@ public partial class CombatSimDebug : Node
             GD.Print($"[CombatSim] damage: {e.SourceId} → {e.TargetId}: {e.Damage} ({e.Result}, part={e.HitPart}, sub={e.AttackSubtype})");
         });
 
+        // R25: трекинг AoE-залпов (количество целей = per-target резолвы).
+        _aoeImpactToken = _aoeImpactSub?.Subscribe((in Core.Messaging.Contracts.AoeImpactEvent e) =>
+        {
+            _aoeImpactCount = e.TargetIds.Length;
+            GD.Print($"[CombatSim] aoe impact: {e.CasterId} '{e.TechniqueId}' {e.Shape} " +
+                     $"r={e.RadiusTiles} targets={_aoeImpactCount}");
+        });
+
         GD.Print("[CombatSim] Ready — scripted combat verification starts in 2s");
         _ = RunSequenceAsync();
     }
@@ -113,9 +131,11 @@ public partial class CombatSimDebug : Node
         _damageToken?.Dispose();
         _intentEchoToken?.Dispose();
         _rejectedToken?.Dispose();
+        _aoeImpactToken?.Dispose();
         _damageToken = null;
         _intentEchoToken = null;
         _rejectedToken = null;
+        _aoeImpactToken = null;
     }
 
     private async System.Threading.Tasks.Task RunSequenceAsync()
@@ -619,6 +639,174 @@ public partial class CombatSimDebug : Node
             GD.Print("[CombatSim] WARN — multi phase skipped (no combat/npc/body services)");
         }
 
+        // 3h. R25 (2026-09-21, план R23 §2.2-A «мгновенный залп» — выбор
+        // пользователя: нейтралы ЗАДЕВАЮТСЯ, месть включается):
+        // (a) юнит-стенд геометрии AoEResolver (круг/конус/полукруг/линия —
+        //     int-математика форм без сервисов, детерминизм);
+        // (b) КОНУС игрока в толпу: 3 NPC клином → заряженный залп → каждый
+        //     задет per-target ПОЛНЫМ пайплайном (DamageApplied игроку→каждому),
+        //     AoeImpactEvent с ≥2 целями, месть «нейтрала» (задетый мимо
+        //     заявленной цели Threats[player] — включается САМА);
+        // (c) AoE-залп NPC: не-игрок кастер площадью по игроку+соседу —
+        //     задетый сосед получает Threats[кастера] (месть на NPC).
+        bool aoeOk = true;
+        if (_combatServiceImpl != null && _techniqueService != null && _techniqueGenerator != null
+            && _npcService != null && _bodyProvider != null && _playerService != null
+            && _npcSpawner != null)
+        {
+            // === (a) стенд геометрии (без сервисов — чистые формы) ===
+            {
+                var q = new AoeQuery
+                {
+                    CasterId = "qa_caster", CasterPos = new Position2D(10, 10),
+                    AimPos = new Position2D(13, 10), Shape = AoeShape.Cone,
+                    RadiusTiles = 4, HalfAngleDeg = 45, FalloffPermil = 400,
+                    MaxTargets = 0, SpareAlliesPermil = 0
+                };
+                bool coneIn = AoEResolver.IsPointInside(in q, 4, new Position2D(12, 11));
+                bool coneOut = AoEResolver.IsPointInside(in q, 4, new Position2D(12, 13));
+                bool coneBehind = AoEResolver.IsPointInside(in q, 4, new Position2D(8, 10));
+                var qc = q; qc.Shape = AoeShape.Circle;
+                bool circleIn = AoEResolver.IsPointInside(in qc, 2, new Position2D(14, 11));
+                bool circleOut = AoEResolver.IsPointInside(in qc, 2, new Position2D(16, 11));
+                var qs = q; qs.Shape = AoeShape.Semicircle;
+                bool semiIn = AoEResolver.IsPointInside(in qs, 4, new Position2D(11, 13));
+                bool semiOut = AoEResolver.IsPointInside(in qs, 4, new Position2D(8, 11));
+                var ql = q; ql.Shape = AoeShape.Line;
+                bool lineIn = AoEResolver.IsPointInside(in ql, 4, new Position2D(12, 10));
+                bool lineOut = AoEResolver.IsPointInside(in ql, 4, new Position2D(12, 12));
+                bool lineFar = AoEResolver.IsPointInside(in ql, 4, new Position2D(16, 10));
+                aoeOk &= coneIn && !coneOut && !coneBehind
+                    && circleIn && !circleOut && semiIn && !semiOut
+                    && lineIn && !lineOut && !lineFar;
+                GD.Print($"[CombatSim] aoe(a) shapes: cone {coneIn}/{coneOut}/{coneBehind} " +
+                         $"(ожид 1/0/0), circle {circleIn}/{circleOut} (1/0), " +
+                         $"semi {semiIn}/{semiOut} (1/0), line {lineIn}/{lineOut}/{lineFar} (1/0/0)");
+            }
+
+            // === (b) конус игрока в толпу ===
+            // Гарантия изучения: расширенная библиотека (QA-мод, не влияет на
+            // игровые лимиты — ExtraLibraryCapacity только этой сессии).
+            _techniqueService.ExtraLibraryCapacity += 4;
+            int cultLevel = _qiService != null ? (int)_qiService.CultivationLevel : 1;
+            if (cultLevel < 1) cultLevel = 1;
+            var coneTech = _techniqueGenerator.GenerateAoe(AoeShape.Cone, cultLevel, cultLevel, 99010);
+            bool coneLearned = _techniqueService.LearnTechnique(coneTech);
+            if (coneLearned)
+            {
+                var p = _playerService.Position;
+                // Толпа клином в направлении +X от игрока (внутри конуса 45°):
+                // (ближняя цель), (дальнее крыло), (нижнее крыло).
+                string? crowd1 = _npcSpawner.SpawnNPC("human", NPCRole.Enemy, 1,
+                    new Position2D(p.X + 2, p.Y), 99001);
+                string? crowd2 = _npcSpawner.SpawnNPC("human", NPCRole.Enemy, 1,
+                    new Position2D(p.X + 4, p.Y + 1), 99002);
+                string? crowd3 = _npcSpawner.SpawnNPC("human", NPCRole.Enemy, 1,
+                    new Position2D(p.X + 3, p.Y - 2), 99003);
+                int crowdCount = (crowd1 != null ? 1 : 0) + (crowd2 != null ? 1 : 0) + (crowd3 != null ? 1 : 0);
+
+                if (crowdCount >= 2 && crowd1 != null)
+                {
+                    await WaitForOwnCastClearAsync(PlayerCombatId, 2.0f);
+                    _combatServiceImpl.DebugSetReadinessPermil(PlayerCombatId, 1000);
+                    _aoeImpactCount = -1; // маркер: событие ещё не приходило
+
+                    int hp1a = _bodyProvider.GetCurrentHealth(crowd1);
+                    int hp2a = crowd2 != null ? _bodyProvider.GetCurrentHealth(crowd2) : int.MaxValue;
+                    int hp3a = crowd3 != null ? _bodyProvider.GetCurrentHealth(crowd3) : int.MaxValue;
+
+                    // Заряженный выпуск (1500‰): aim = (p.X+4, p.Y) — конус +X.
+                    var aoeAcc = _combatServiceImpl.ExecuteAttack(
+                        PlayerCombatId, coneTech.TechniqueId, crowd1, true,
+                        potencyPermil: 1500, isCharged: true,
+                        aimTileX: p.X + 4, aimTileY: p.Y);
+
+                    int hp1b = _bodyProvider.GetCurrentHealth(crowd1);
+                    int hp2b = crowd2 != null ? _bodyProvider.GetCurrentHealth(crowd2) : int.MaxValue;
+                    int hp3b = crowd3 != null ? _bodyProvider.GetCurrentHealth(crowd3) : int.MaxValue;
+                    bool crowd1Hit = hp1b < hp1a;
+                    bool bystanderHit = (crowd2 != null && hp2b < hp2a) || (crowd3 != null && hp3b < hp3a);
+                    bool impactOk = _aoeImpactCount >= 2;
+                    GD.Print($"[CombatSim] aoe(b) volley: acc={aoeAcc} (ожид Accepted), " +
+                             $"crowd1 {hp1a}→{hp1b}, crowd2 {hp2a}→{hp2b}, crowd3 {hp3a}→{hp3b}, " +
+                             $"AoeImpact.targets={_aoeImpactCount} (ожид ≥2)");
+                    aoeOk &= aoeAcc == AttackAcceptance.Accepted && crowd1Hit && bystanderHit && impactOk;
+
+                    // Месть «нейтралов»: задетые площадью (не заявленная цель)
+                    // получают угрозу игрока — RetaliateOrFlee включается сама.
+                    await ToSignal(GetTree().CreateTimer(1.2), SceneTreeTimer.SignalName.Timeout);
+                    var st2 = crowd2 != null ? _npcService.GetNPCState(crowd2) : null;
+                    var st3 = crowd3 != null ? _npcService.GetNPCState(crowd3) : null;
+                    bool revengeBystander =
+                        (st2 != null && st2.Threats.ContainsKey(PlayerCombatId))
+                        || (st3 != null && st3.Threats.ContainsKey(PlayerCombatId));
+                    GD.Print($"[CombatSim] aoe(b) bystander revenge: crowd2={st2?.Threats.ContainsKey(PlayerCombatId)}, " +
+                             $"crowd3={st3?.Threats.ContainsKey(PlayerCombatId)} (ожид хотя бы один true — «мир жесток»)");
+                    aoeOk &= revengeBystander;
+
+                    // === (c) AoE-залп NPC: crowd2 площадью по игроку+crowd1 ===
+                    // Направление crowd2 → игрок накрывает и crowd1 (клин).
+                    if (crowd2 != null)
+                    {
+                        await WaitForOwnCastClearAsync(crowd2, 2.0f);
+                        _combatServiceImpl.DebugSetReadinessPermil(crowd2, 1000);
+                        if (_combatServiceImpl.IsInCombat)
+                            _combatServiceImpl.AbandonCombat(PlayerCombatId);
+                        _aoeImpactCount = -1;
+                        int hpPlA = _bodyProvider.GetCurrentHealth("player");
+                        int hp1c = _bodyProvider.GetCurrentHealth(crowd1);
+                        var npcAoeAcc = _combatServiceImpl.ExecuteAttack(
+                            crowd2, coneTech.TechniqueId, PlayerCombatId, true,
+                            potencyPermil: 1500, isCharged: true,
+                            aimTileX: p.X, aimTileY: p.Y);
+                        int hpPlB = _bodyProvider.GetCurrentHealth("player");
+                        int hp1d = _bodyProvider.GetCurrentHealth(crowd1);
+                        bool npcAoeHitPlayer = hpPlB < hpPlA;
+                        bool npcAoeHitNeighbor = hp1d < hp1c;
+                        GD.Print($"[CombatSim] aoe(c) NPC volley: {crowd2}→player acc={npcAoeAcc} " +
+                                 $"(ожид Accepted), player {hpPlA}→{hpPlB}, crowd1 {hp1c}→{hp1d}");
+                        aoeOk &= npcAoeAcc == AttackAcceptance.Accepted && npcAoeHitPlayer;
+
+                        // Месть соседа на NPC-кастера (задет площадью).
+                        await ToSignal(GetTree().CreateTimer(1.2), SceneTreeTimer.SignalName.Timeout);
+                        var st1 = _npcService.GetNPCState(crowd1);
+                        bool revengeOnNpcCaster = st1 != null && st1.Threats.ContainsKey(crowd2);
+                        GD.Print($"[CombatSim] aoe(c) neighbor revenge on NPC caster: {revengeOnNpcCaster} " +
+                                 $"(crowd1 Threats[{crowd2}]; допустимо false если crowd1 погиб до проверки)");
+                        // Мягкая проверка: если crowd1 жив после залпа — месть обязана быть.
+                        bool crowd1AliveAfter = _npcService.IsAlive(crowd1);
+                        aoeOk &= !crowd1AliveAfter || revengeOnNpcCaster;
+                    }
+                    else
+                    {
+                        GD.Print("[CombatSim] WARN — aoe(c) skipped (crowd2 not spawned)");
+                    }
+
+                    // Чистота: UI-бой закрыть, толпу убрать (тихие войны не шумят в итогах).
+                    if (_combatServiceImpl.IsInCombat)
+                        _combatServiceImpl.AbandonCombat(PlayerCombatId);
+                    if (crowd1 != null) _npcSpawner.DespawnNPC(crowd1);
+                    if (crowd2 != null) _npcSpawner.DespawnNPC(crowd2);
+                    if (crowd3 != null) _npcSpawner.DespawnNPC(crowd3);
+                }
+                else
+                {
+                    GD.Print($"[CombatSim] WARN — aoe(b) skipped (crowd spawned {crowdCount}/3, лимит NPC?)");
+                    aoeOk = false;
+                }
+            }
+            else
+            {
+                GD.Print("[CombatSim] WARN — aoe(b) skipped (AoE technique not learned — слоты?)");
+                aoeOk = false;
+            }
+        }
+        else
+        {
+            GD.Print("[CombatSim] WARN — aoe phase skipped (no combat/npc/generator/spawner services)");
+            aoeOk = false;
+        }
+
         // 3f. R21 (репорт 20.09, №3/№4): регресс-гарды пайплайна защиты.
         // (a) DefenseProcessor — плоское вычитание eff.брони×0.5 ПОСЛЕ
         //     процентного + предметное «Снижение урона» (ALGORITHMS §5.2);
@@ -741,7 +929,7 @@ public partial class CombatSimDebug : Node
                  $"npc {npcHpBefore}→{npcHpAfter}, arrows now={_inventory?.GetItemCount(CombatRangeGateService.ArrowItemId) ?? -1}");
 
         bool pass = playerTookDamage && npcTookDamage && weaponWiringOk && rangedWiringOk && gatesOk && turnGateOk
-                    && r21ArmorOk && r21QiOk && multiOk;
+                    && r21ArmorOk && r21QiOk && multiOk && aoeOk;
         if (!playerTookDamage)
             GD.Print("[CombatSim] FAIL — NPC→player damage did NOT apply (BodyService player-id mismatch?)");
         if (!npcTookDamage)
@@ -760,6 +948,8 @@ public partial class CombatSimDebug : Node
             GD.Print("[CombatSim] FAIL — r21-qi: пассивная сырая Ци не работает (репорт 20.09 №4?)");
         if (!multiOk)
             GD.Print("[CombatSim] FAIL — multi (R24-C): тихий NPC-NPC бой / толпа-на-игрока сломаны (CMB-2 вернулся?)");
+        if (!aoeOk)
+            GD.Print("[CombatSim] FAIL — aoe (R25): геометрия/залп/месть нейтралов/AoeImpact сломаны (план R23 §2.2-A?)");
 
         PrintVerdict(pass);
     }

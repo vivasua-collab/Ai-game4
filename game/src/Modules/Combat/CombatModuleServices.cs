@@ -55,6 +55,11 @@ public static class CombatModuleServices
         // CombatSimDebug (headless-верификация 3d), CheatPanel (статус колчана).
         builder.Register<CombatRangeGateService>(Lifetime.Singleton);
 
+        // R25 (2026-09-21): резолвер целей площадных техник (AoE-A залп,
+        // план R23 §2.2-A). Потребители: CombatService.ExecuteAoeVolley
+        // (per-target полный пайплайн), CombatSimDebug 3h (QA-геометрия).
+        builder.Register<AoEResolver>(Lifetime.Singleton);
+
         // === Точка входа модуля ===
         builder.Register<CombatModule>(Lifetime.Singleton);
 

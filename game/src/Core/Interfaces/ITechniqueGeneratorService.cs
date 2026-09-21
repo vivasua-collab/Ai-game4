@@ -72,5 +72,18 @@ namespace CultivationGame.Core.Interfaces
         /// <param name="cultivationLevel">Уровень культивации практика (1-10)</param>
         /// <param name="seed">Seed для детерминированной генерации</param>
         TechniqueData BuildSpecified(TechniqueType type, TechniqueGrade grade, int level, int cultivationLevel, long seed);
+
+        /// <summary>
+        /// R25 (2026-09-21, план R23 §2.1/§4-эп.2): сгенерировать ПЛОЩАДНУЮ
+        /// технику заданной формы (Circle/Cone/Semicircle/Line) — тест-набор
+        /// игрока (3 формы) и QA COMBAT_SIM. Тип Combat, подтип RangedAoe;
+        /// геометрия (радиус/полуугол/спад/макс.целей) — рецепт формы
+        /// (ApplyAoeParams). ЗАРЕГИСТРИРОВАНА в реестре (поиск по id).
+        /// </summary>
+        /// <param name="shape">Форма области (None → защита: Circle)</param>
+        /// <param name="level">Уровень техники (1..9)</param>
+        /// <param name="cultivationLevel">Уровень культивации практика (1-10)</param>
+        /// <param name="seed">Seed для детерминированной генерации</param>
+        TechniqueData GenerateAoe(AoeShape shape, int level, int cultivationLevel, long seed);
     }
 }

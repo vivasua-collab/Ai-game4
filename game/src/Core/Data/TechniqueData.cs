@@ -103,5 +103,33 @@ namespace CultivationGame.Core.Data
         /// penetration = weapon.penetration + attackerSTR × 0.5 + ArmorPenetration
         /// </summary>
         public int ArmorPenetration = 0;
+
+        // === R25 (2026-09-21): площадная техника (план R23 §2.1) ===
+        // Заполняется ТОЛЬКО генератором для Subtype=RangedAoe (существующие
+        // техники не меняются: AoeShape.None по умолчанию — сейв совместим).
+        // Все значения int (ЗАПРЕТ 3.9).
+
+        /// <summary>Форма области. None = техника не площадная.</summary>
+        public AoeShape AoeShape = AoeShape.None;
+
+        /// <summary>Радиус/полудлина области в тайлах (Circle/Semicircle/Line; 0 = 1)</summary>
+        public int AoeRadiusTiles = 0;
+
+        /// <summary>Полуугол конуса в градусах (Cone: 30/45/60; Semicircle = 90)</summary>
+        public int AoeHalfAngleDeg = 0;
+
+        /// <summary>Спад урона на краю области в промилле (500‰ = ×0.5; 0 = без спада)</summary>
+        public int AoeFalloffPermil = 0;
+
+        /// <summary>Максимум целей залпа (баланс толпы; 0 = без лимита)</summary>
+        public int AoeMaxTargets = 0;
+
+        /// <summary>
+        /// R23-эп.3 §6.4 ХУК «SpareAllies»: доля силы, которой мастер жертвует,
+        /// чтобы пощадить «своих» (D&D Careful Spell). &gt;0 + party-аура цели →
+        /// цель щадится. В v1 сопартийцев нет — резолвер ХУК проверяет, но
+        /// результат всегда «не союзник» (хук всегда false, поле для будущих аур).
+        /// </summary>
+        public int SpareAlliesPermil = 0;
     }
 }
