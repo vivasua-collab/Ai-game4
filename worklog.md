@@ -2866,3 +2866,88 @@ Stage Summary:
 NEXT: R30+ — мультибой B (сессии пар, надстройка при войнах фракций),
 живые зоны AoE-B, SpareAllies-ауры сопартийцев; QA-чеклист ручных
 проверок пользователю на конец дня (заряд/спуск/Tab/хоуминг/AoE VFX).
+
+---
+Task ID: R31-MAIN-0921
+Agent: main (Z.ai Code)
+Task: верификация 2 фаз внешнего аудита upload/audit_09_21_20_30.txt
+(Ф3 боевые стыки + Ф4 lifecycle) с фиксами подтверждённого; ответ на
+вопрос «модуль 17 — торговля»; план аудита документации (БЕЗ применения
+обновлений); обновление SESSION_SUMMARY.md.
+
+Work Log:
+- 18:33 UTC старт. Аудит-файл прочитан: Ф3 (5 тезисов) + Ф4 (11 тезисов,
+  писались по HEAD cb7b565 — ДО r30-1; Ф4 частично закрыта B1, всё
+  перепроверено по текущему HEAD 09289fa).
+- Ф3 верификация: 5/5 ПОДТВЕРЖДЕНЫ по коду (CombatRangeGateService
+  :50/:108 true-fallback для зверей; PlayerTechniqueCaster :142/:215/:258
+  три гейта цели; AoEResolver.TryResolveTile без IsAlive + CombatService
+  :910 targetAlive=позиционный резолв; TrySpawnHomingProjectile :863
+  cx*1000=угол тайла vs рендеры pos*tile+tile/2; ProjectileRenderer
+  :177 «животные — null»).
+- Ф4 верификация: 6 сервисов уже IWorldResettable (r30-1 B1, поля
+  сверены); CombatService-хвост (2 кэша); PerkService/NPCRelationship-
+  Service/TargetingService/PlayerCombatAdapter/DialogueService — НЕ
+  resettable (подтверждено); RestoreState→void (BodyService молча
+  return при несовпадении морфологии) — подтверждён как ограничение.
+- NPCRelationshipService — двойной дефект: отношения переживают NewGame +
+  после Load падают в Neutral (NPCSaveEntry.AttitudeScore — мёртвое
+  поле: пишется/восстанавливается в NPCService, но читает
+  _relationshipService). Путь ModifyAttitude: только NPCCombatAdapter
+  (победитель/проигравший, −10/−20) — читателей в тиках нет (round-trip
+  QA безопасен).
+- Фиксы (13 файлов, +485/−36): Ф3-1 CombatRangeGateService + IAnimalService;
+  Ф3-2 PlayerTechniqueCaster (IsAoeAimValid: границы ITileService + радиус
+  Чебышёв; 3 гейта) + CombatService.ExecuteAttack (пустоцельный AoE-залп
+  при aim≥0; не-AoE — Rejected как прежде; AttackIntentEvent target??""
+  — контракт «null = авто-выбор»); Ф3-3 AoEResolver.TryResolveAliveTile +
+  UpdateProjectiles; Ф3-4 TileCenterOffsetMilli=500 (спавн/LastTarget);
+  Ф3-5 ProjectileRenderer + звери; Ф4: PerkService/TargetingService/
+  PlayerCombatAdapter/DialogueService : IWorldResettable (DI-регистрации
+  НЕ тронуты — ResolveAll матчит по фактическому типу инстанса);
+  NPCRelationshipService : IWorldResettable + ISaveable (блок
+  npc_relationships: плоские DTO, IncludeFields; RestoreOrder после
+  npc); CombatService.ResetWorld + кэши; SaveDataAggregator порядок.
+- QA: COMBAT_SIM 3h(d) НОВЫЙ (пустоцельный AoE: Accepted+AoeImpact /
+  aim−1 Rejected / не-AoE Rejected — все три зелёные); SaveLoadSim
+  1m+маркер+мутация+7c: обида −15 → мутация +30 → Load → −15
+  (восстановлена=True), ResolveAll 21 различных, round-trip 21 блок OK;
+  build 0 err; ПОЛНАЯ РЕГРЕССИЯ 18/18 PASS.
+- Инцидент среды: dotnet/godot сброшены → cold_start.sh (ок, PATH
+  /home/z/.dotnet + godot в my-project/godot).
+- Коммит+пуш b5512bc (09289fa..b5512bc main).
+- МОДУЛЬ 17 (вопрос пользователя): Modules = ровно 17 папок (Trade
+  среди них); MODULE_STRUCTURE.md «17 модулей Hub-and-Spoke» + §2.17 +
+  TRADE_SYSTEM.md (аудит 09_06) —Trade документирован, номер присвоен
+  корректно, в другой модуль НЕ входит. Хвосты: README:25 «16 модулей»
+  устарело; §2.17 не знает про экономику R22-1 (CurrencyExchangeService/
+  EconomyConstants живут в Modules/Trade).
+- ПЛАН АУДИТА ДОКОВ: checkpoints/plans/2026-09-21_r31_doc_audit_plan.md
+  (НОВЫЙ; обновления docs_v2 НЕ применены — указание пользователя,
+  план для многократной обработки): дрейф-окна (r30-1 фиксил 10 пунктов
+  БЕЗ синка; R31 намеренно; r30-2 синкнул FORMATION/HOTKEYS частично);
+  5 проходов с чекбоксами: Pass 1 P0-«доки врут» (SAVE_SYSTEM 19→21
+  блоков + «трупы вне сейва»=ложь с r30-1 A5; README 16→17; §2.17+
+  экономика; TESTING_RULES 3h(d)/1m), Pass 2 бой R31, Pass 3 lifecycle,
+  Pass 4 r30-1-дрейф, Pass 5 архитектурные решения; grep-критерии
+  приёмки; 3 открытых вопроса (RestoreState-void bool-контракт vs
+  журнал; legacy AttitudeScore; экономика — под-домен Trade или 18-й
+  модуль).
+- SESSION_SUMMARY.md переписан (был R22): R31/R30/R23-R29 сессии,
+  21 блок сейва, очередь = обработка плана доков, предупреждения.
+
+Stage Summary:
+- Внешний аудит 20:30 исчерпан: Ф3 5/5 закрыты, Ф4 5+хвост закрыты,
+  6 были закрыты r30-1, 1 (RestoreState-void) отложен в план с
+  вариантами решения.
+- AoE теперь честен от игрока: залп в пустую область легален
+  (валидация прицела вместо требования цели), не-AoE без цели —
+  Rejected; хоуминг не бьёт трупы и рождается из центра тайла;
+  стрелы рисуют полёт по зверям.
+- Отношения NPC переживают Save→Load (новый блок npc_relationships)
+  и не переживают NewGame; 5 сервисов догнали контракт IWorldResettable.
+- Модуль 17 Trade: подтверждён корректным, хвосты устаревания — в план.
+- План аудита документации создан и НЕ применён (мораторий пользователя).
+
+NEXT: обработка плана аудита доков (Pass 1 → D1-эпизод, ~30-40 мин);
+ответы пользователя на 3 вопроса §6 плана; R30+ после снятия моратория.
