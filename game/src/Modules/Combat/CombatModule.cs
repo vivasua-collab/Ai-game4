@@ -208,9 +208,20 @@ public class CombatModule : IModule
             }
         }
 
+        // R24-C (мультибой «реестр входов»): UI-сессию боя открывает ТОЛЬКО
+        // пара с участием игрока (HUD/стадии/CombatStarted). NPC-vs-NPC
+        // интенты идут дальше в ExecuteAttack БЕЗ слота — дерутся «молча»
+        // (урон по пайплайну, месть per-target). Прежний безусловный
+        // StartCombat занимал слот чужой стычкой (корень CMB-2: эмерджентный
+        // NPC-бой где-то на карте блокировал атаки игрока «не участник»).
         if (!_combatService.IsInCombat && !string.IsNullOrEmpty(e.TargetId))
         {
-            _combatService.StartCombat(e.AttackerId, e.TargetId);
+            bool pairHasPlayer = Core.Helpers.PlayerIdResolver.IsPlayer(e.AttackerId)
+                || Core.Helpers.PlayerIdResolver.IsPlayer(e.TargetId);
+            if (pairHasPlayer)
+            {
+                _combatService.StartCombat(e.AttackerId, e.TargetId);
+            }
         }
 
         AttackAcceptance acceptance = _combatService.ExecuteAttack(

@@ -2737,3 +2737,57 @@ Stage Summary:
 
 NEXT: выбор пользователя по UI-индикации; старт R24 (мультибой C)
 после подтверждения; push при появлении токена.
+
+---
+Task ID: R24-MAIN-0921
+Agent: main (Z.ai Code)
+Task: токен+git-проверка (R23 уже был на GitHub); реализация мультибоя
+C (R24) + индикация заряда/ауры в хотбаре (R26, идея 1, спуск = та же
+клавиша); QA + доки + коммит.
+
+Work Log:
+- Git: токен сохранён (.auth + credential store). ПРОВЕРКА: «ahead 2»
+  прошлой сессии — артефакт устаревшего remote-tracking (fetch не
+  делался); 2a50578/db194cf/24df21a УЖЕ на GitHub (пользователь был
+  прав). Запушен только 7a3eeab (доки R23-эп3). main == origin/main.
+- R24-C CombatService: гейт участника ExecuteAttack УДАЛЁН (CMB-2);
+  автостарт StartCombat только pairHasPlayer (и в CombatModule
+  OnAttackIntent); UpdateTimer тикает ВСЕГДА (реестр дерущихся без
+  привязки к UI-бою; таймаут — только UI-сессия); GetReadinessPermil
+  без _isInCombat-гейта + незарегистрированный = инициатор (иначе
+  deadlock первого интента NPC-пары через NPCModule IsAttackReady);
+  ConsumeReadiness заводит запись; ResolveDefenderIdFor (участник —
+  пара, не-участник — заявленная цель; мгновенный/charged/pending);
+  EndCombat чистит ТОЛЬКО UI-пару (RemoveFighter); смерть
+  не-участника — тихая (туп/месть по событиям), RemoveFighter при
+  смерти.
+- R26 HotbarPanel: подписки на ChargeStarted/Progress/Completed/
+  Cancelled + HeldTechniqueChanged (player-фильтр); изумрудная полоса
+  заряда снизу + «%» + пульс рамки; overcharge — янтарная полоска
+  сверху + «×N.N»; удержание — рамка цвета стихии + «◉»; сброс к
+  дефолту; кэш-гварды. Спуск = повторное нажатие (механика без
+  изменений — выбор пользователя).
+- QA COMBAT_SIM 3g (новый): (a) тихий NPC-NPC: Accepted + урон +
+  UI-сессия НЕ открыта (immediate-замер — месть A переоткрывает в
+  паузах: это фича) + месть Threats; (b) retry-открытие сессии парой
+  с игроком; (b2) CMB-2-регресс — не-участник бьёт игрока в активном
+  бое: Accepted + урон. Два итерационных прогона: гонки с
+  NPCModule-автоатаками мстящих NPC (Reject «Каст уже идёт»,
+  переоткрытие сессии) → WaitForOwnCast + DebugSet + retry-циклы.
+- Прогоны: build 0 err; COMBAT_SIM PASS; ПОЛНАЯ РЕГРЕССИЯ 18/18 PASS.
+- Доки: COMBAT_SYSTEM §1.4.0 (мультибой C — вся модель), TECHNIQUE_
+  SYSTEM §5.4 (индикация R26), TESTING_RULES (3g). Чекпоинт
+  09_21_r24_multicombat_c_aura_ui.md.
+
+Stage Summary:
+- CMB-2 закрыт: толпа бьёт игрока, игрок бьёт толпу, NPC-NPC дерутся
+  «молча» (скрытая жизнь мира); UI-сессия боя — только пара с игроком.
+- Миграция C→B остаётся надстройкой (план §6.2): словарь пар поверх.
+- Хотбар теперь показывает заряд/overcharge/удержание (боль
+  «не понимаю, что заряжается» закрыта); спуск = Z/та же клавиша.
+- QA 18/18; регрессии прежних сцен не задеты (COMBATAI/ANIMALQA/
+  CHARGE/HOTBAR зелёные).
+
+NEXT: R25 AoE-A «мгновенный залп» (AoEResolver int-геометрия, 3
+тестовые техники конус/полукруг/круг, месть нейтралов — бесплатно,
+хук SpareAllies); R27 Targeting; R28 хоуминг A. Push работает.

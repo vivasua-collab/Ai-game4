@@ -23,6 +23,7 @@
 using Godot;
 using System.Collections.Generic;
 using CultivationGame.Core.DI;
+using CultivationGame.Core.Data;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Core.Events;
 using CultivationGame.Core.Messaging.Contracts;
@@ -38,6 +39,17 @@ namespace CultivationGame.Adapter.UI;
 /// slots 3-9 = techniques (cooldown overlay + Qi affordability + tooltip).
 /// Belt row above: compact consumable slots, visible only when a belt is
 /// equipped (click = use, same as Shift+3..9 keys).
+///
+/// R26 (2026-09-21, идея 1 «слот-центричная», выбор пользователя):
+/// индикация ЗАРЯДКИ и УДЕРЖАНИЯ техники в ауре — слот показывает:
+///   • заряд идёт: изумрудная полоса снизу-вверх + % по центру + пульс
+///     рамки; overcharge (ChargedQi > QiCost) — янтарная полоска сверху
+///     и подпись «×N.N» (potency);
+///   • удержание в ауре: рамка цвета стихии (HeldTechniqueChanged),
+///     метка «◉» в углу, тултип «повторный Z/клик = выпуск».
+/// Спуск = повторное нажатие той же клавиши (Z/3-9/клик слота — механика
+/// PlayerTechniqueCaster/AuraHoldService, без изменений).
+/// Источник: план R23 §6.5 (checkpoints/plans/2026-09-20_r23_...md).
 /// </summary>
 public partial class HotbarPanel : Panel
 {
@@ -52,6 +64,12 @@ public partial class HotbarPanel : Panel
     [Inject] private ISubscriber<TechniqueSlotClearedEvent> TechClearedSub = null!;
     [Inject] private ISubscriber<Core.Messaging.Contracts.BeltSlotsChangedEvent> SlotsSub = null!;
     [Inject] private ISubscriber<Core.Messaging.Contracts.EquipmentChangedEvent> EquipSub = null!;
+    // R26: события зарядки/удержания (раньше их слушал только QA-дебаггер).
+    [Inject] private ISubscriber<TechniqueChargeStartedEvent> ChargeStartedSub = null!;
+    [Inject] private ISubscriber<TechniqueChargeProgressEvent> ChargeProgressSub = null!;
+    [Inject] private ISubscriber<TechniqueChargeCompletedEvent> ChargeCompletedSub = null!;
+    [Inject] private ISubscriber<TechniqueChargeCancelledEvent> ChargeCancelledSub = null!;
+    [Inject] private ISubscriber<HeldTechniqueChangedEvent> HeldChangedSub = null!;
 
     // === Layout constants ===
     private const float MainSlotSize = 52f;
@@ -72,6 +90,27 @@ public partial class HotbarPanel : Panel
     private readonly TextureRect?[] _weaponIcons = new TextureRect?[2];
     private readonly string?[] _weaponIconKeys = new string?[2]; // QA-ключи
 
+    // === R26: индикация зарядки/удержания ===
+    private readonly ColorRect?[] _chargeOverlays = new ColorRect?[9];   // полоса заряда (низ→верх)
+    private readonly ColorRect?[] _ocTopBars = new ColorRect?[9];        // overcharge-полоска (верх, 4px)
+    private readonly Label?[] _chargeLabels = new Label?[9];             // «87%» / «×1.3»
+    private readonly Label?[] _heldMarks = new Label?[9];                // «◉» метка удержания
+
+    // Состояние зарядки игрока (только одна одновременно — модель заполнения).
+    private string? _chargingTechId;
+    private long _chargeQi;
+    private long _chargeCost;
+    private long _chargeCapacity;   // потолок перезарядки (potency 2000‰)
+    private int _chargePotency;
+
+    // Удержание в ауре (HeldTechniqueChangedEvent).
+    private string? _heldTechId;
+    private Element _heldElement = Element.Neutral;
+    private int _heldPotency;
+
+    private float _pulseTime;       // фаза пульса рамки
+    private readonly Color[] _baseBorders = new Color[9]; // дефолт рамок (возврат)
+
     // === Belt row (7 slots) ===
     private readonly Panel[] _beltPanels = new Panel[BeltService.SlotCount];
     private readonly Label[] _beltLabels = new Label[BeltService.SlotCount];
@@ -81,6 +120,12 @@ public partial class HotbarPanel : Panel
     private System.IDisposable? _techClearedToken;
     private System.IDisposable? _slotsToken;
     private System.IDisposable? _equipToken;
+    // R26: подписки зарядки/удержания.
+    private System.IDisposable? _chargeStartedToken;
+    private System.IDisposable? _chargeProgressToken;
+    private System.IDisposable? _chargeCompletedToken;
+    private System.IDisposable? _chargeCancelledToken;
+    private System.IDisposable? _heldChangedToken;
 
     // Кэш текста (чтобы не спамить Text-сеттер каждый кадр — грязный рендер).
     private readonly string?[] _nameCache = new string?[9];
@@ -99,8 +144,15 @@ public partial class HotbarPanel : Panel
         _slotsToken = SlotsSub?.Subscribe(OnBeltSlotsChanged);
         _equipToken = EquipSub?.Subscribe(OnEquipChanged);
 
+        // R26: зарядка/удержание → индикация в слотах.
+        _chargeStartedToken = ChargeStartedSub?.Subscribe(OnChargeStarted);
+        _chargeProgressToken = ChargeProgressSub?.Subscribe(OnChargeProgress);
+        _chargeCompletedToken = ChargeCompletedSub?.Subscribe(OnChargeCompleted);
+        _chargeCancelledToken = ChargeCancelledSub?.Subscribe(OnChargeCancelled);
+        _heldChangedToken = HeldChangedSub?.Subscribe(OnHeldChanged);
+
         RefreshAll();
-        GD.Print("[HotbarPanel] Ready (v2: techniques + cooldowns + belt row)");
+        GD.Print("[HotbarPanel] Ready (v2: techniques + cooldowns + belt row + charge/aura R26)");
     }
 
     public override void _ExitTree()
@@ -109,6 +161,11 @@ public partial class HotbarPanel : Panel
         _techClearedToken?.Dispose();
         _slotsToken?.Dispose();
         _equipToken?.Dispose();
+        _chargeStartedToken?.Dispose();
+        _chargeProgressToken?.Dispose();
+        _chargeCompletedToken?.Dispose();
+        _chargeCancelledToken?.Dispose();
+        _heldChangedToken?.Dispose();
     }
 
     private void BuildUI()
@@ -326,6 +383,70 @@ public partial class HotbarPanel : Panel
                 slotPanel.AddChild(cdLabel);
                 _cdLabels[i] = cdLabel;
 
+                // === R26: индикация зарядки ===
+                // Полоса заряда: снизу вверх, изумрудная (BottomWide).
+                var chargeOverlay = new ColorRect
+                {
+                    Color = new Color(0.22f, 0.8f, 0.45f, 0.38f),
+                    MouseFilter = MouseFilterEnum.Ignore,
+                    Visible = false,
+                    ZIndex = 2,
+                };
+                chargeOverlay.SetAnchorsAndOffsetsPreset(LayoutPreset.BottomWide);
+                chargeOverlay.OffsetTop = 0; // высота = прогресс (управляется из _Process)
+                chargeOverlay.OffsetBottom = 0;
+                slotPanel.AddChild(chargeOverlay);
+                _chargeOverlays[i] = chargeOverlay;
+
+                // Overcharge-полоска (верх слота, 4px, янтарь) — ChargedQi > QiCost.
+                var ocBar = new ColorRect
+                {
+                    Color = new Color(0.98f, 0.72f, 0.3f, 0.9f),
+                    MouseFilter = MouseFilterEnum.Ignore,
+                    Visible = false,
+                    ZIndex = 3,
+                };
+                ocBar.SetAnchorsAndOffsetsPreset(LayoutPreset.TopWide);
+                ocBar.OffsetLeft = 2; ocBar.OffsetRight = -2;
+                ocBar.OffsetTop = 2; ocBar.OffsetBottom = 6;
+                slotPanel.AddChild(ocBar);
+                _ocTopBars[i] = ocBar;
+
+                // Подпись «87%» / «×1.3» (под центром, над Qi-строкой).
+                var chargeLabel = new Label
+                {
+                    Text = "",
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    MouseFilter = MouseFilterEnum.Ignore,
+                    ZIndex = 6,
+                };
+                chargeLabel.AddThemeFontSizeOverride("font_size", 12);
+                chargeLabel.AddThemeColorOverride("font_color", new Color(0.55f, 0.95f, 0.7f));
+                chargeLabel.AddThemeColorOverride("font_outline_color", new Color(0f, 0f, 0f, 0.85f));
+                chargeLabel.AddThemeConstantOverride("outline_size", 2);
+                chargeLabel.SetAnchorsAndOffsetsPreset(LayoutPreset.Center);
+                chargeLabel.OffsetTop = -6; chargeLabel.OffsetBottom = 10;
+                slotPanel.AddChild(chargeLabel);
+                _chargeLabels[i] = chargeLabel;
+
+                // Метка удержания в ауре «◉» (левый-верхний угол).
+                var heldMark = new Label
+                {
+                    Text = "◉",
+                    MouseFilter = MouseFilterEnum.Ignore,
+                    ZIndex = 6,
+                    Visible = false,
+                };
+                heldMark.AddThemeFontSizeOverride("font_size", 11);
+                heldMark.AddThemeColorOverride("font_color", new Color(0.95f, 0.85f, 0.45f));
+                heldMark.AddThemeColorOverride("font_outline_color", new Color(0f, 0f, 0f, 0.85f));
+                heldMark.AddThemeConstantOverride("outline_size", 1);
+                heldMark.SetAnchorsAndOffsetsPreset(LayoutPreset.TopLeft);
+                heldMark.OffsetLeft = 2; heldMark.OffsetRight = 14;
+                heldMark.OffsetTop = 1; heldMark.OffsetBottom = 13;
+                slotPanel.AddChild(heldMark);
+                _heldMarks[i] = heldMark;
+
                 // Клик по слоту техники = каст (аналог клавиши 3..9).
                 int slotIndexForCast = hotbarIndex; // 3..9
                 slotPanel.GuiInput += @event =>
@@ -337,6 +458,7 @@ public partial class HotbarPanel : Panel
 
             _slotLabels[i] = label;
             _slotPanels[i] = slotPanel;
+            _baseBorders[i] = slotStyle.BorderColor; // R26: дефолт рамки (возврат)
             hbox.AddChild(slotPanel);
         }
 
@@ -413,6 +535,144 @@ public partial class HotbarPanel : Panel
                     ? new Color(0.55f, 0.85f, 0.55f, 0.95f)
                     : new Color(0.95f, 0.35f, 0.3f, 0.95f));
             }
+
+            // === R26: индикация зарядки / удержания в ауре ===
+            UpdateChargeVisuals(i, techId, delta);
+        }
+    }
+
+    /// <summary>
+    /// R26: визуал зарядки/удержания СЛОТА (идея 1 «слот-центричная»):
+    /// заряд — изумрудная полоса снизу + «%» (overcharge: янтарная полоска
+    /// сверху + «×N.N»), пульс рамки; удержание — рамка цвета стихии +
+    /// метка «◉». Прочие слоты — сброс к дефолту (кэш-гварды против
+    /// ежекадровых Text/BorderColor-мутаций).
+    /// </summary>
+    private void UpdateChargeVisuals(int i, string? techId, double delta)
+    {
+        _pulseTime += (float)delta;
+        var chargeOverlay = _chargeOverlays[i];
+        var ocBar = _ocTopBars[i];
+        var chargeLabel = _chargeLabels[i];
+        var heldMark = _heldMarks[i];
+        var style = _slotStyles[i];
+        if (chargeOverlay == null || ocBar == null || chargeLabel == null
+            || heldMark == null || style == null) return;
+
+        bool charging = techId != null && techId == _chargingTechId;
+        bool held = techId != null && techId == _heldTechId;
+
+        // --- Заряд идёт ---
+        if (charging && _chargeCost > 0)
+        {
+            // Полоса: 0..QiCost = вся высота слота (потолок Capacity — выше 100%
+            // полоса НЕ растёт: overcharge живёт отдельной янтарной полоской).
+            long fill = System.Math.Min(_chargeQi, _chargeCost);
+            float ratio = (float)((double)fill / _chargeCost);
+            float h = MainSlotSize * Godot.Mathf.Clamp(ratio, 0f, 1f);
+            chargeOverlay.Visible = true;
+            chargeOverlay.OffsetTop = -h;   // BottomWide: растём вверх от низа
+            chargeOverlay.OffsetBottom = 0;
+
+            // Overcharge: ChargedQi > QiCost → potency 1000..2000‰.
+            bool over = _chargeQi > _chargeCost;
+            ocBar.Visible = over;
+
+            string text;
+            if (over && _chargePotency > GameConstants.POTENCY_BASE_PERMIL)
+            {
+                // «×1.3» — множитель мощности (potency/1000).
+                text = $"×{(Godot.Mathf.Round(_chargePotency / 100f) / 10f):F1}";
+                chargeLabel.AddThemeColorOverride("font_color", new Color(0.98f, 0.78f, 0.35f));
+            }
+            else
+            {
+                int pct = (int)(ratio * 100f);
+                text = $"{pct}%";
+                chargeLabel.AddThemeColorOverride("font_color", new Color(0.55f, 0.95f, 0.7f));
+            }
+            if (_nameCache[i] != text) { chargeLabel.Text = text; }
+
+            // Пульс рамки (изумруд).
+            float pulse = 0.6f + 0.4f * System.Math.Abs(Godot.Mathf.Sin(_pulseTime * 3.2f));
+            style.BorderColor = new Color(0.3f * pulse + 0.2f, 0.85f * pulse, 0.5f * pulse, 0.9f);
+        }
+        else
+        {
+            chargeOverlay.Visible = false;
+            ocBar.Visible = false;
+            if (_nameCache[i] != null && chargeLabel.Text != "") chargeLabel.Text = "";
+        }
+
+        // --- Удержание в ауре ---
+        heldMark.Visible = held;
+        if (held)
+        {
+            // Рамка цвета стихии удерживаемой техники (пульс медленнее).
+            var elemColor = ElementStyle.ElementColor(_heldElement);
+            float pulse = 0.55f + 0.45f * System.Math.Abs(Godot.Mathf.Sin(_pulseTime * 1.6f));
+            if (!charging) // заряд приоритетнее по рамке
+                style.BorderColor = new Color(
+                    elemColor.R, elemColor.G, elemColor.B, 0.55f + 0.45f * pulse);
+            heldMark.SelfModulate = new Color(1f, 1f, 1f, 0.6f + 0.4f * pulse);
+        }
+
+        // --- Сброс рамки к дефолту (нет заряда/удержания) ---
+        if (!charging && !held)
+        {
+            style.BorderColor = _baseBorders[i];
+        }
+    }
+
+    // === R26: обработчики событий зарядки/удержания ===
+
+    private void OnChargeStarted(in TechniqueChargeStartedEvent e)
+    {
+        if (e.EntityId is not ("player" or "player_0")) return; // HUD только игрока
+        _chargingTechId = e.TechniqueId;
+        _chargeQi = 0;
+        _chargeCost = System.Math.Max(1, e.QiCost);
+        _chargeCapacity = e.Capacity > 0 ? e.Capacity : e.QiCost;
+        _chargePotency = GameConstants.POTENCY_BASE_PERMIL;
+    }
+
+    private void OnChargeProgress(in TechniqueChargeProgressEvent e)
+    {
+        if (e.EntityId is not ("player" or "player_0")) return;
+        if (e.TechniqueId != _chargingTechId) return; // чужая/устаревшая
+        _chargeQi = e.ChargedQi;
+        _chargeCost = System.Math.Max(1, e.QiCost);
+        _chargePotency = e.PotencyPermil;
+    }
+
+    private void OnChargeCompleted(in TechniqueChargeCompletedEvent e)
+    {
+        if (e.EntityId is not ("player" or "player_0")) return;
+        // Зарядка завершена: либо Hold в ауре (придёт HeldTechniqueChanged),
+        // либо немедленный выпуск — индикатор заряда гасим.
+        if (e.TechniqueId == _chargingTechId)
+            _chargingTechId = null;
+    }
+
+    private void OnChargeCancelled(in TechniqueChargeCancelledEvent e)
+    {
+        if (e.EntityId is not ("player" or "player_0")) return;
+        if (e.TechniqueId == _chargingTechId)
+            _chargingTechId = null;
+    }
+
+    private void OnHeldChanged(in HeldTechniqueChangedEvent e)
+    {
+        if (e.EntityId is not ("player" or "player_0")) return;
+        if (string.IsNullOrEmpty(e.TechniqueId))
+        {
+            _heldTechId = null; // аура пуста (release/dissipate)
+        }
+        else
+        {
+            _heldTechId = e.TechniqueId;
+            _heldElement = e.Element;
+            _heldPotency = e.PotencyPermil;
         }
     }
 

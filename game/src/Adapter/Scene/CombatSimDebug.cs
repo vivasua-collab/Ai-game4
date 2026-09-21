@@ -514,6 +514,111 @@ public partial class CombatSimDebug : Node
             }
         }
 
+        // 3g. R24-C (мультибой «реестр входов», выбор пользователя 2026-09-21):
+        // регресс-гварды CMB-2 (гейт участника 1v1 удалён).
+        // (a) NPC-vs-NPC «тихий» бой: пара без игрока НЕ открывает UI-сессию
+        //     (CombatStarted/стадии молчат), но урон летит по полному
+        //     пайплайну и месть включается (AIState Attacking/Fleeing);
+        // (b) толпа бьёт игрока: A открывает UI-сессию парой с игроком,
+        //     затем B — НЕ-участник UI-пары — наносит урон игроку
+        //     (прежде гейт «не участник» отклонял удар B — корень CMB-2).
+        // Детерминизм: прямые вызовы ExecuteAttack (паттерн 3e) +
+        // WaitForOwnCastClear + DebugSetReadinessPermil перед каждым ударом
+        // (гонка с NPCModule-автоатаками сужена до кадра).
+        bool multiOk = true;
+        if (_combatServiceImpl != null && _npcService != null && _bodyProvider != null)
+        {
+            // Изоляция: завершить висящий UI-бой (3e могла оставить).
+            if (_combatServiceImpl.IsInCombat)
+            {
+                _combatServiceImpl.AbandonCombat(PlayerCombatId);
+                GD.Print("[CombatSim] multi: previous UI-combat abandoned");
+            }
+
+            string? crowdA = _npcService.IsAlive(npcId) ? npcId : FindHostileNpc();
+            string? crowdB = FindSecondNpc(crowdA);
+            if (crowdA != null && crowdB != null)
+            {
+                // === (a) тихий NPC-NPC: B бьёт A ===
+                // Гонки с NPCModule-автоатаками (месть A→игроку может
+                // переоткрыть UI-сессию в любой паузе): «тихость» пары меряем
+                // В КАДРЕ вызова (до следующего тика), урон/месть — после паузы.
+                await WaitForOwnCastClearAsync(crowdB, 2.0f);
+                _combatServiceImpl.DebugSetReadinessPermil(crowdB, 1000);
+                int aHpBefore = _bodyProvider.GetCurrentHealth(crowdA);
+                var quietAcc = _combatServiceImpl.ExecuteAttack(crowdB, "npc_strike", crowdA, false);
+                // immediate: пара без игрока НЕ открыла UI-сессию этим ударом.
+                bool quietNoUiSession = !_combatServiceImpl.IsInCombat;
+                await ToSignal(GetTree().CreateTimer(1.6), SceneTreeTimer.SignalName.Timeout);
+                int aHpAfter = _bodyProvider.GetCurrentHealth(crowdA);
+                bool quietDamage = aHpAfter < aHpBefore;
+                var aState = _npcService.GetNPCState(crowdA);
+                // Месть: угроза A от B (Threats) — A мог уже быть Attacking
+                // (игрок бил его в 3/3e) — честный маркер: Threats[B] > 0.
+                bool revenge = aState != null && aState.Threats.ContainsKey(crowdB);
+                GD.Print($"[CombatSim] multi(a) quiet NPC-NPC: {crowdB}→{crowdA} acc={quietAcc}, " +
+                         $"A HP {aHpBefore}→{aHpAfter}, UI-in-frame={quietNoUiSession} (ожид true), " +
+                         $"revenge(threat B)={revenge} (AIState={aState?.AIState})");
+                multiOk &= quietAcc == AttackAcceptance.Accepted
+                    && quietNoUiSession && quietDamage && revenge;
+
+                // === (b) толпа бьёт игрока: сессия пары с игроком ===
+                // Сессию может открыть и автоатака A (месть — честно), и наш
+                // прямой удар: retry-цикл до открытия (гонка с NPCModule-кастами
+                // A — Reject «Каст уже идёт» ретраится).
+                int playerHpCrowd0 = _bodyProvider.GetCurrentHealth("player");
+                for (int attempt = 0; attempt < 5 && !_combatServiceImpl.IsInCombat; attempt++)
+                {
+                    await WaitForOwnCastClearAsync(crowdA, 2.0f);
+                    _combatServiceImpl.DebugSetReadinessPermil(crowdA, 1000);
+                    var acc = _combatServiceImpl.ExecuteAttack(crowdA, "npc_strike", PlayerCombatId, false);
+                    GD.Print($"[CombatSim] multi(b) attempt {attempt + 1}: {crowdA}→player acc={acc}");
+                    await ToSignal(GetTree().CreateTimer(0.8), SceneTreeTimer.SignalName.Timeout);
+                }
+                await ToSignal(GetTree().CreateTimer(1.0), SceneTreeTimer.SignalName.Timeout);
+                int playerHpCrowd1 = _bodyProvider.GetCurrentHealth("player");
+                bool uiSessionByPlayerPair = _combatServiceImpl.IsInCombat;
+                bool crowdDamage = playerHpCrowd1 < playerHpCrowd0;
+                GD.Print($"[CombatSim] multi(b) crowd opens UI: player HP {playerHpCrowd0}→{playerHpCrowd1}, " +
+                         $"UI-session={uiSessionByPlayerPair} (ожид true), damage={crowdDamage}");
+                multiOk &= uiSessionByPlayerPair && crowdDamage;
+
+                // === (b2) CMB-2 регресс: B — НЕ-участник UI-пары — бьёт игрока ===
+                // Retry: B участвует в тихой войне с A (касты каждые ~1с) —
+                // Reject «Каст уже идёт» ретраится до Accepted.
+                int playerHpCrowd2 = _bodyProvider.GetCurrentHealth("player");
+                var outsiderAcc = AttackAcceptance.Rejected;
+                for (int attempt = 0; attempt < 5; attempt++)
+                {
+                    await WaitForOwnCastClearAsync(crowdB, 2.0f);
+                    _combatServiceImpl.DebugSetReadinessPermil(crowdB, 1000);
+                    outsiderAcc = _combatServiceImpl.ExecuteAttack(crowdB, "npc_strike", PlayerCombatId, false);
+                    if (outsiderAcc == AttackAcceptance.Accepted) break;
+                    GD.Print($"[CombatSim] multi(b2) attempt {attempt + 1}: {crowdB}→player acc={outsiderAcc} (retry)");
+                    await ToSignal(GetTree().CreateTimer(0.4), SceneTreeTimer.SignalName.Timeout);
+                }
+                await ToSignal(GetTree().CreateTimer(1.2), SceneTreeTimer.SignalName.Timeout);
+                int playerHpCrowd3 = _bodyProvider.GetCurrentHealth("player");
+                bool outsiderDamage = playerHpCrowd3 < playerHpCrowd2;
+                GD.Print($"[CombatSim] multi(b2) outsider hits player: {crowdB}(не-участник)→player " +
+                         $"acc={outsiderAcc} (ожид Accepted, CMB-2), player HP {playerHpCrowd2}→{playerHpCrowd3}");
+                multiOk &= outsiderAcc == AttackAcceptance.Accepted && outsiderDamage;
+
+                // Чистота: закрываем UI-бой (тихая NPC-война продолжается — фича C).
+                if (_combatServiceImpl.IsInCombat)
+                    _combatServiceImpl.AbandonCombat(PlayerCombatId);
+            }
+            else
+            {
+                GD.Print("[CombatSim] WARN — multi phase skipped (need 2 alive NPCs)");
+                multiOk = false;
+            }
+        }
+        else
+        {
+            GD.Print("[CombatSim] WARN — multi phase skipped (no combat/npc/body services)");
+        }
+
         // 3f. R21 (репорт 20.09, №3/№4): регресс-гарды пайплайна защиты.
         // (a) DefenseProcessor — плоское вычитание eff.брони×0.5 ПОСЛЕ
         //     процентного + предметное «Снижение урона» (ALGORITHMS §5.2);
@@ -636,7 +741,7 @@ public partial class CombatSimDebug : Node
                  $"npc {npcHpBefore}→{npcHpAfter}, arrows now={_inventory?.GetItemCount(CombatRangeGateService.ArrowItemId) ?? -1}");
 
         bool pass = playerTookDamage && npcTookDamage && weaponWiringOk && rangedWiringOk && gatesOk && turnGateOk
-                    && r21ArmorOk && r21QiOk;
+                    && r21ArmorOk && r21QiOk && multiOk;
         if (!playerTookDamage)
             GD.Print("[CombatSim] FAIL — NPC→player damage did NOT apply (BodyService player-id mismatch?)");
         if (!npcTookDamage)
@@ -653,6 +758,8 @@ public partial class CombatSimDebug : Node
             GD.Print("[CombatSim] FAIL — r21-armor: плоское вычитание/DR-агрегат сломаны (репорт 20.09 №3?)");
         if (!r21QiOk)
             GD.Print("[CombatSim] FAIL — r21-qi: пассивная сырая Ци не работает (репорт 20.09 №4?)");
+        if (!multiOk)
+            GD.Print("[CombatSim] FAIL — multi (R24-C): тихий NPC-NPC бой / толпа-на-игрока сломаны (CMB-2 вернулся?)");
 
         PrintVerdict(pass);
     }
@@ -743,8 +850,23 @@ public partial class CombatSimDebug : Node
         return null;
     }
 
+    /// <summary>
+    /// R24-C: второй живой NPC (для «тихого» NPC-NPC боя и толпы) —
+    /// любой живой, кроме исключённого (мультибой требует ≥2 сущностей).
+    /// </summary>
+    private string? FindSecondNpc(string? excludeId)
+    {
+        if (_npcService == null) return null;
+        foreach (var id in _npcService.GetAllNPCIds())
+        {
+            if (id == excludeId) continue;
+            if (_npcService.IsAlive(id)) return id;
+        }
+        return null;
+    }
+
     private static void PrintVerdict(bool pass)
     {
-        GD.Print($"[CombatSim] VERDICT: {(pass ? "PASS — обе стороны боя получают урон (melee + ranged + LOS/ammo gates + readiness-gate)" : "FAIL")}");
+        GD.Print($"[CombatSim] VERDICT: {(pass ? "PASS — обе стороны боя получают урон (melee + ranged + LOS/ammo gates + readiness-gate + multi R24-C)" : "FAIL")}");
     }
 }

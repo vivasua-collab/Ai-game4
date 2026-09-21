@@ -1,5 +1,14 @@
 #nullable enable
 // Создано: 2026-05-09
+// Редактировано: 2026-09-21 — R24-C «мультибой: реестр входов» (план
+//   checkpoints/plans/2026-09-20_r23_multicombat_aoe_design.md §1-C, выбор
+//   пользователя 2026-09-21): гейт участника 1v1 УДАЛЁН (корень CMB-2);
+//   «слот» боя = UI-сессия игрока (HUD-пара/стадии/CombatStarted/Ended/
+//   таймаут) — её открывает ТОЛЬКО пара с участием игрока; NPC-vs-NPC
+//   дерутся «молча» (урон/месть/смерть через DamageAppliedEvent per-target,
+//   труп — NPCDeathEvent); реестр дерущихся (readiness/pendingCasts)
+//   живёт БЕЗ привязки к UI-бою: тик всегда, EndCombat чистит только пару;
+//   defender-резолв: участнику — пара, не-участнику — заявленная цель.
 // Редактировано: 2026-05-25 06:00:00 UTC — A3-2/A3-3/A3-4/A3-5 FIX: ExecuteAttack overload с targetId/isRanged, авто-начало боя, переключение цели
 // Редактировано: 2026-05-25 07:01:36 UTC — ЗАПРЕТ 3.9: _cachedConductivity float → _cachedConductivityPermil int, cast speed integer math
 // Редактировано: 2026-05-09 — CMB-A04: вызов IQiBufferService.Activate() для Shield
@@ -375,28 +384,26 @@ namespace CultivationGame.Modules.Combat
 
             _combatEndedPub.Publish(new CombatEndedEvent(winnerId, loserId, victory));
 
+            // R24-C: реестры дерущихся чистим ТОЛЬКО для участников UI-пары —
+            // тихие NPC-бои (толпы) продолжают жить в readiness/pendingCasts
+            // (раньше Clear() обрывал чужие стычки на полуслове). Мёртвые
+            // не-участники чистятся в BuildAndExecuteDamageRequest (смерть).
+            var uiInstigator = _instigatorId;
+            var uiTarget = _currentTargetId;
+
             // Сброс состояния
             _isInCombat = false;
             _currentStage = CombatStage.None;
             _currentTargetId = null;
             _instigatorId = null;
-            _readinessPermil.Clear();
             _combatTimer = 0f;
             _lastPlayerDefense = DefenseSubtype.None;
 
-            // R16-аудит (P1-1): гасим незавершённые касты. До R16 EndCombat
-            // вне резолва атаки был недостижим (MaxCombatDuration=0); R16
-            // добавил AbandonCombat (бегство/leash по инициативе NPC из
-            // NPCModule.Tick) — бой может завершиться ПОСЕРЕДИ чужого каста.
-            // R21-2: гасим ВСЕ пер-атакующие касты (словарь).
-            if (_pendingCasts.Count > 0)
-            {
-                foreach (var pt in _pendingCasts.Values)
-                {
-                    Console.WriteLine($"[Combat] EndCombat: прерываем незавершённый каст '{pt.TechniqueId}' ({pt.AttackerId}) — бой завершён");
-                }
-                _pendingCasts.Clear();
-            }
+            // R16-аудит (P1-1): гасим незавершённые касты УЧАСТНИКОВ UI-пары
+            // (бой завершён ПОСЕРЕДИНЕ — AbandonCombat/таймаут). R24-C: касты
+            // и готовность не-участников НЕ трогаем (NPC-бои продолжаются).
+            if (uiInstigator != null) RemoveFighter(uiInstigator);
+            if (uiTarget != null) RemoveFighter(uiTarget);
 
             // Освобождаем подписку
             _qiDepletedSubscription?.Dispose();
@@ -410,17 +417,23 @@ namespace CultivationGame.Modules.Combat
 
         /// <summary>
         /// R21-2: готовность удара участника (промилле). 0 = только что
-        /// бил; ≥ порога = готов ударить. Вне боя/не участник → 0.
+        /// бил; ≥ порога = готов ударить.
+        /// R24-C: реестр дерущихся живёт БЕЗ привязки к UI-бою (NPC-NPC
+        /// толпы дерутся «молча» — раньше `!_isInCombat → 0` навечно
+        /// запирал стычки без слота). Незарегистрированная сущность =
+        /// «инициатор» (готова к ПЕРВОМУ удару; запись заведётся при
+        /// ConsumeReadiness) — иначе NPCModule-гейт IsAttackReady не
+        /// пропускал бы первый интент свежей пары (deadlock).
         /// </summary>
         public int GetReadinessPermil(string entityId)
         {
-            if (string.IsNullOrEmpty(entityId) || !_isInCombat) return 0;
+            if (string.IsNullOrEmpty(entityId)) return 0;
             // Алиасы игрока: ключ словаря — канонический участник.
             foreach (var kvp in _readinessPermil)
             {
                 if (PlayerIdResolver.AreSameEntity(entityId, kvp.Key)) return kvp.Value;
             }
-            return 0;
+            return AttackThreshold; // R24-C: не в реестре — инициатор (первый удар готов)
         }
 
         /// <summary>R21-2: готов ли участник ударить (readiness ≥ порога).</summary>
@@ -502,6 +515,9 @@ namespace CultivationGame.Modules.Combat
                     return;
                 }
             }
+            // R24-C: незарегистрированный инициатор (первый замах «виртуальной»
+            // готовности) — заводим запись с 0: дальше тикает AccrueReadiness.
+            _readinessPermil[entityId] = 0;
         }
 
         /// <summary>Участник текущего боя (инстагатор или цель; алиасы игрока учитываются).</summary>
@@ -509,6 +525,40 @@ namespace CultivationGame.Modules.Combat
         {
             return PlayerIdResolver.AreSameEntity(entityId, _instigatorId)
                 || PlayerIdResolver.AreSameEntity(entityId, _currentTargetId);
+        }
+
+        /// <summary>
+        /// R24-C: резолв защитника для атаки. Участнику UI-боя — пара
+        /// (инстагатор бьёт цель слота, цель — инстагатора: прежняя
+        /// семантика M1/A3-3). Не-участнику (толпа, NPC-NPC «тихий» бой) —
+        /// ЗАЯВЛЕННАЯ цель интента. Вызывающие передают результат как
+        /// explicitDefenderId (pending) или напрямую (мгновенный/charged путь).
+        /// </summary>
+        private string ResolveDefenderIdFor(string attackerId, string declaredTargetId)
+        {
+            if (_isInCombat && IsParticipant(attackerId))
+                return PlayerIdResolver.AreSameEntity(attackerId, _instigatorId)
+                    ? _currentTargetId
+                    : _instigatorId;
+            return declaredTargetId;
+        }
+
+        /// <summary>
+        /// R24-C: убрать сущность из реестров дерущихся (readiness/pendingCasts).
+        /// Вызывается при смерти (тихие NPC-бои не чистятся EndCombat-ом UI-пары)
+        /// и при завершении UI-боя для его участников.
+        /// </summary>
+        private void RemoveFighter(string entityId)
+        {
+            if (string.IsNullOrEmpty(entityId)) return;
+            var readyKeys = new List<string>(_readinessPermil.Keys);
+            foreach (var k in readyKeys)
+                if (PlayerIdResolver.AreSameEntity(entityId, k))
+                    _readinessPermil.Remove(k);
+            var castKeys = new List<string>(_pendingCasts.Keys);
+            foreach (var k in castKeys)
+                if (PlayerIdResolver.AreSameEntity(entityId, k))
+                    _pendingCasts.Remove(k);
         }
 
         /// <summary>
@@ -543,28 +593,30 @@ namespace CultivationGame.Modules.Combat
         /// </summary>
         public AttackAcceptance ExecuteAttack(string attackerId, string techniqueId, string targetId, bool isRanged, int potencyPermil = 1000, bool isCharged = false)
         {
-            // A3-2 FIX: Авто-начало боя при наличии цели
+            // R24-C (мультибой «реестр входов», план 2026-09-20_r23 §1-C):
+            // «слот» боя остаётся ТОЛЬКО как UI-сессия игрока (HUD-пара,
+            // стадии, CombatStarted/Ended). Атака ЛЮБОЙ пары живых сущностей
+            // разрешена: толпа бьёт игрока, игрок бьёт толпу, NPC дерутся
+            // «молча» (урон/смерть/месть через DamageAppliedEvent — без
+            // сессии). Гейт участника 1v1 УДАЛЁН (корень CMB-2: эмерджентная
+            // стычка NPC-NPC где-то на карте блокировала атаки игрока).
             if (!_isInCombat)
             {
-                if (!string.IsNullOrEmpty(targetId))
+                if (string.IsNullOrEmpty(targetId))
+                {
+                    return AttackAcceptance.Rejected; // Без цели не бьём
+                }
+                // UI-сессию открывает ТОЛЬКО пара с участием игрока
+                // (HUD/стадии/таймаут — семантика CombatStarted/Ended).
+                // NPC-vs-NPC дерётся без сессии: урон идёт тем же
+                // пайплайном, месть — per-target (NPCAIService), труп —
+                // NPCCombatAdapter.OnDamageApplied → NPCDeathEvent.
+                bool pairHasPlayer = PlayerIdResolver.IsPlayer(attackerId)
+                    || PlayerIdResolver.IsPlayer(targetId);
+                if (pairHasPlayer)
                 {
                     StartCombat(attackerId, targetId);
                 }
-                else
-                {
-                    return AttackAcceptance.Rejected; // Вне боя без цели — ничего не делать
-                }
-            }
-
-            // === Review этап 3 (P1-4): гейт УЧАСТНИКА боя ===
-            // Бой 1v1 (MVP, см. COMBAT_SYSTEM): принимать интенты можно только
-            // от пары участников текущего боя. Раньше любой NPC на карте мог
-            // вмешаться и перетереть цель боя (NPC B переключал бой игрока с A).
-            if (!IsParticipant(attackerId))
-            {
-                PublishRejection(attackerId, techniqueId,
-                    "не участник текущего боя (бой 1v1)");
-                return AttackAcceptance.Rejected;
             }
 
             // === R21-2 (репорт 20.09 №2): гейт ГОТОВНОСТИ вместо владения ходом ===
@@ -598,7 +650,8 @@ namespace CultivationGame.Modules.Combat
             // _currentTargetId). Если указанная цель уже участвует в бою —
             // ничего не меняем: резолв защитника сам направит удар по врагу
             // (инстагатору или цели — в зависимости от того, кем является игрок).
-            if (!string.IsNullOrEmpty(targetId) && PlayerIdResolver.IsPlayer(attackerId)
+            if (_isInCombat
+                && !string.IsNullOrEmpty(targetId) && PlayerIdResolver.IsPlayer(attackerId)
                 && !PlayerIdResolver.AreSameEntity(targetId, attackerId)
                 && !PlayerIdResolver.AreSameEntity(targetId, _instigatorId)
                 && !PlayerIdResolver.AreSameEntity(targetId, _currentTargetId))
@@ -636,7 +689,10 @@ namespace CultivationGame.Modules.Combat
                 _lastAttackIsRanged = isRanged;
                 // R23-1 (CMB-1): ConsumeReadiness УДАЛЁН — зарядка была замахом
                 // (§8.2: «заряженные не расходывают готовность дополнительно»).
-                ApplyTechniqueImmediately(attackerId, techniqueId);
+                // R24-C: цель резолвится по текущим правилам (участник UI-боя —
+                // пара; толпа — заявленная цель интента).
+                ApplyTechniqueImmediately(attackerId, techniqueId,
+                    ResolveDefenderIdFor(attackerId, targetId));
                 return AttackAcceptance.Accepted;
             }
 
@@ -670,7 +726,11 @@ namespace CultivationGame.Modules.Combat
                 // M1 (2026-09-03): резолвим defender СЕЙЧАС и запоминаем в pending —
                 // смена _currentTargetId другими атакующими во время каста больше
                 // не перенаправляет выстрел (npc не бьёт сам себя).
-                string castTargetId = attackerId == _instigatorId ? _currentTargetId : _instigatorId;
+                // R24-C: участнику UI-боя — резолв пары (прежняя семантика M1);
+                // не-участнику (толпа бьёт игрока, NPC-NPC стычки) — заявленная
+                // цель интента (раньше не-участник получал defender = ЧУЖОЙ
+                // instigator слота — удар мимо заявленной цели).
+                string castTargetId = ResolveDefenderIdFor(attackerId, targetId);
                 // Отложенное применение — установить PendingTechnique
                 // (R21-2: per-attacker dictionary).
                 ConsumeReadiness(attackerId); // R21-2: замах свершен (расход при приёме)
@@ -699,8 +759,11 @@ namespace CultivationGame.Modules.Combat
 
             // Мгновенное применение (effectiveCastTime <= 0.15с)
             // Редактировано: 2026-05-22 13:50:00 UTC — Этап 3.1: рефакторинг дублирования P1-8.1
+            // R24-C: явная цель для не-участников (NPC-NPC толпа без UI-боя:
+            // _instigatorId == null — прежний внутренний резолв дал бы null → NRE).
             ConsumeReadiness(attackerId); // R21-2: замах свершен (расход при приёме)
-            BuildAndExecuteDamageRequest(attackerId, techniqueId);
+            BuildAndExecuteDamageRequest(attackerId, techniqueId,
+                ResolveDefenderIdFor(attackerId, targetId));
             return AttackAcceptance.Accepted;
         }
 
@@ -1005,15 +1068,28 @@ namespace CultivationGame.Modules.Combat
                 {
                     // Игрок погиб — поражение, EnemyKilledEvent НЕ публикуется.
                     _currentStage = CombatStage.Defeat;
+                    EndCombat();
+                    return;
                 }
-                else
+
+                // Жертва — NPC: если убил игрок — EnemyKilledEvent (лут/квесты).
+                if (isPlayerAttacker)
+                    _enemyKilledPub.Publish(new EnemyKilledEvent(defenderId));
+
+                // R24-C: смерть не-участника UI-пары (NPC-vs-NPC «тихий» бой,
+                // толпа) — завершается ТИХО: труп по NPCDeathEvent (NPCCombat
+                // Adapter слушает тот же DamageAppliedEvent), месть/лут уже
+                // отработали per-target. UI-бой (стадии/CombatEnded) — только
+                // если погибший участник UI-пары игрока.
+                if (_isInCombat && IsParticipant(defenderId))
                 {
-                    // Жертва — NPC: если убил игрок — EnemyKilledEvent (лут/квесты).
-                    if (isPlayerAttacker)
-                        _enemyKilledPub.Publish(new EnemyKilledEvent(defenderId));
                     _currentStage = CombatStage.Victory;
+                    EndCombat();
                 }
-                EndCombat();
+
+                // R24-C: мёртвый выбывает из реестров дерущихся (тихие бои
+                // толпы продолжаются без него).
+                RemoveFighter(defenderId);
                 return;
             }
 
@@ -1081,18 +1157,28 @@ namespace CultivationGame.Modules.Combat
         /// <summary>
         /// Обновление таймера боя (вызывается из CombatModule.Tick).
         /// Спринт 8 C11: обновление таймера каста.
+        /// R24-C: тик дерущихся — ВСЕГДА (readiness/касты NPC-боёв идут без
+        /// UI-сессии; раньше `!_isInCombat → return` замораживал стычки
+        /// толпы). Таймаут MaxCombatDuration и _combatTimer — только
+        /// активная UI-сессия игрока («тихие» NPC-бои завершаются
+        /// смертью/бегством по HP-правилам AI — план R23 §1-C).
         /// </summary>
         public void UpdateTimer(float deltaTime)
         {
-            if (!_isInCombat) return;
-            _combatTimer += deltaTime;
+            if (deltaTime <= 0f) return;
 
-            // Проверка таймаута боя
-            if (_config != null && _config.MaxCombatDuration > 0 && _combatTimer >= _config.MaxCombatDuration)
+            if (_isInCombat)
             {
-                _currentStage = CombatStage.Flee;
-                EndCombat();
-                return;
+                _combatTimer += deltaTime;
+
+                // Проверка таймаута боя (UI-сессия игрока)
+                if (_config != null && _config.MaxCombatDuration > 0 && _combatTimer >= _config.MaxCombatDuration)
+                {
+                    _currentStage = CombatStage.Flee;
+                    EndCombat();
+                    // R24-C: таймаут завершил UI-бой, но тихие NPC-касты
+                    // продолжают тикать ниже (EndCombat гасит только пару).
+                }
             }
 
             // R21-2 (attack-speed): НАЧИСЛЕНИЕ ГОТОВНОСТИ вместо тайм-аута
