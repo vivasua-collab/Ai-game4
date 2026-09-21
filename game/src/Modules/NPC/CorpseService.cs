@@ -32,7 +32,7 @@ namespace CultivationGame.Modules.NPC
     /// <summary>
     /// Реализация ICorpseService (R13 FULL-LOOT).
     /// </summary>
-    public class CorpseService : ICorpseService, IDisposable
+    public class CorpseService : ICorpseService, ISaveable, IDisposable
     {
         // === Зависимости ===
         private readonly NPCService _npcService;
@@ -220,6 +220,133 @@ namespace CultivationGame.Modules.NPC
                 RemoveInternal(_corpses[i], "world-reset");
             _nextCorpseSeq = 1;
             Console.WriteLine($"[CorpseService] ResetWorld: {total} трупов очищено");
+        }
+
+        // === AUDIT-0921 A5 (P1): ISaveable — трупы и full-loot переживают Load =====
+        //
+        // Прежде: сейв хранил факт смерти NPC (IsAlive=false), но CorpseService
+        // не был ISaveable — ResetWorld при LoadGame очищал _corpses, и лут
+        // убитого (экипировка/инвентарь/камни) терялся НАВСЕГДА после Save→Load
+        // до обыска. Теперь блок "corpses" пишется/читается агрегатором
+        // (отсутствие блока в старых сейвах — не ошибка, RestoreOne пропускает).
+        public string SaveKey => "corpses";
+
+        /// <summary>R11 P0-Save: тип state-блока для persistence round-trip.</summary>
+        public Type StateType => typeof(CorpseSaveState);
+
+        public object CaptureState()
+        {
+            var state = new CorpseSaveState
+            {
+                NextCorpseSeq = _nextCorpseSeq,
+                Entries = new CorpseSaveEntry[_corpses.Count]
+            };
+            for (int i = 0; i < _corpses.Count; i++)
+            {
+                var c = _corpses[i];
+                var entry = new CorpseSaveEntry
+                {
+                    CorpseId = c.CorpseId,
+                    NpcId = c.NpcId,
+                    DisplayName = c.DisplayName,
+                    SpeciesId = c.SpeciesId,
+                    PosX = c.Position.X,
+                    PosY = c.Position.Y,
+                    KillerId = c.KillerId,
+                    DiedAtGameSeconds = c.DiedAtGameSeconds,
+                    NpcLevel = c.NpcLevel,
+                    Items = new CorpseItemSaveEntry[c.Items.Count]
+                };
+                for (int j = 0; j < c.Items.Count; j++)
+                {
+                    var it = c.Items[j];
+                    entry.Items[j] = new CorpseItemSaveEntry
+                    {
+                        SlotId = it.SlotId,
+                        ItemId = it.ItemId,
+                        Count = it.Count,
+                        Rarity = (int)it.Rarity,
+                        Source = it.Source
+                    };
+                }
+                state.Entries[i] = entry;
+            }
+            return state;
+        }
+
+        public void RestoreState(object state)
+        {
+            if (state is not CorpseSaveState data) return;
+
+            // GameSession.LoadGame уже сделал ResetWorld (события очистки
+            // опубликованы) — просто наполняем список из блока.
+            _corpses.Clear();
+            if (data.Entries != null)
+            {
+                foreach (var e in data.Entries)
+                {
+                    if (string.IsNullOrEmpty(e.CorpseId)) continue;
+                    var corpse = new CorpseData
+                    {
+                        CorpseId = e.CorpseId,
+                        NpcId = e.NpcId ?? "",
+                        DisplayName = e.DisplayName ?? "",
+                        SpeciesId = e.SpeciesId ?? "unknown",
+                        Position = new Position2D(e.PosX, e.PosY),
+                        KillerId = e.KillerId ?? "",
+                        DiedAtGameSeconds = e.DiedAtGameSeconds,
+                        NpcLevel = e.NpcLevel
+                    };
+                    if (e.Items != null)
+                    {
+                        foreach (var it in e.Items)
+                        {
+                            if (string.IsNullOrEmpty(it.ItemId) || it.Count <= 0) continue;
+                            corpse.Items.Add(new CorpseItem(
+                                it.SlotId, it.ItemId, it.Count,
+                                (ItemRarity)it.Rarity, it.Source));
+                        }
+                    }
+                    // Пустые трупы не восстанавливаем (инвариант: труп без
+                    // предметов удаляется — RemoveOldCorpses/IsEmpty).
+                    if (!corpse.IsEmpty)
+                        _corpses.Add(corpse);
+                }
+            }
+            _nextCorpseSeq = Math.Max(1L, data.NextCorpseSeq);
+            Console.WriteLine($"[CorpseService] RestoreState: {_corpses.Count} трупов восстановлено " +
+                "(full-loot переживает Load, AUDIT-0921 A5)");
+        }
+
+        // === Сериализационные DTO (public для JSON round-trip) ===
+
+        public class CorpseSaveState
+        {
+            public long NextCorpseSeq = 1;
+            public CorpseSaveEntry[]? Entries;
+        }
+
+        public class CorpseSaveEntry
+        {
+            public string CorpseId = "";
+            public string NpcId = "";
+            public string DisplayName = "";
+            public string SpeciesId = "";
+            public int PosX;
+            public int PosY;
+            public string KillerId = "";
+            public float DiedAtGameSeconds;
+            public int NpcLevel;
+            public CorpseItemSaveEntry[]? Items;
+        }
+
+        public class CorpseItemSaveEntry
+        {
+            public Guid SlotId;
+            public string ItemId = "";
+            public int Count;
+            public int Rarity;
+            public string Source = "";
         }
 
         public void Dispose()

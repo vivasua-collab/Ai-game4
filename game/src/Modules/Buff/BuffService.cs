@@ -20,7 +20,7 @@ namespace CultivationGame.Modules.Buff
     /// Управляет наложением, снятием, тиканием и расчётом модификаторов баффов.
     /// ⛔ НЕ модифицирует: первичные статы, coreCapacity, qiDensity, qiRegen.
     /// </summary>
-    public class BuffService : IBuffService
+    public class BuffService : IBuffService, IWorldResettable
     {
         // === Зависимости (DI через конструктор) ===
         private readonly IPublisher<BuffAppliedEvent> _appliedPub;
@@ -109,8 +109,14 @@ namespace CultivationGame.Modules.Buff
                         if (existing.CurrentStacks < existing.MaxStacks)
                         {
                             existing.CurrentStacks++;
-                            // BF-I03: Стек учитывает potency — добавляем значение
-                            existing.Value += existing.Potency;
+                            // AUDIT-0921 B6 (P2, латентный): УДАЛЕНО
+                            // «existing.Value += existing.Potency» — двойной
+                            // учёт стеков. TotalValue = Value × Potency ×
+                            // CurrentStacks (BF-A02) уже масштабирует эффект
+                            // стеками; доп. инкремент Value давал 2 стака:
+                            // Value 0.2 → 1.2, TotalValue 2.4 (ожидалось 0.4).
+                            // Латентный: CreateBuffFromId ставит Refresh —
+                            // Stack-ветка не активна в текущем контенте.
                             existing.RemainingDuration = duration > 0 ? duration : existing.Duration;
                             _appliedPub.Publish(new BuffAppliedEvent(entityId, buffId, existing.Type, existing.RemainingDuration, potency));
                             // BF-A10: Публикуем событие изменения модификатора
@@ -644,5 +650,21 @@ namespace CultivationGame.Modules.Buff
         }
 
         private static readonly IReadOnlyList<ActiveBuffData> _emptyDataList = new List<ActiveBuffData>().AsReadOnly();
+
+        // === AUDIT-0921 B1: IWorldResettable =============================
+        //
+        // New Game: баффы/дебаффы прошлой сессии не должны переноситься
+        // на нового персонажа (entityId "player_0" совпадает! — постоянный
+        // дебафф/ампутационный SeveredX оставался на НОВОМ теле).
+        // События снятия не публикуем: мир разбирается, UI/статы
+        // пересоздаются фазами сборки (StatChangedEvent → VIT → HP).
+        public void ResetWorld()
+        {
+            if (_entityBuffs.Count > 0)
+            {
+                _entityBuffs.Clear();
+                Console.WriteLine("[BuffService] ResetWorld: entity buffs cleared (New Game)");
+            }
+        }
     }
 }

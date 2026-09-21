@@ -164,10 +164,20 @@ namespace CultivationGame.Modules.Charger
             var slot = _slots[slotIndex];
             if (!slot.HasStone) return false;
 
-            long extracted = slot.InsertedStone.ExtractQi((long)qiAmount);
+            // AUDIT-0921 B2 (P1): кламп запроса по СВОБОДНОМУ МЕСТУ буфера ДО
+            // извлечения. Прежде: ExtractQi(50) при свободных 20 → камень −50,
+            // буфер +20, 30 Qi исчезало (реальная потеря ресурса). Теперь
+            // извлекается ровно столько, сколько поместится (худший случай
+            // — остаток камня): камень и буфер в балансе.
+            long freeSpace = _buffer.Capacity - _buffer.CurrentQi;
+            if (freeSpace <= 0) return false;
+            long want = Math.Min((long)qiAmount, freeSpace);
+            if (want <= 0) return false;
+
+            long extracted = slot.InsertedStone.ExtractQi(want);
             if (extracted <= 0) return false;
 
-            // Ци из камня попадает в буфер зарядника
+            // Ци из камня попадает в буфер зарядника (want ≤ freeSpace → без потерь)
             long added = _buffer.AddQi(extracted);
             return added > 0;
         }
@@ -299,21 +309,31 @@ namespace CultivationGame.Modules.Charger
         private void ProcessChargerOperation(float deltaTime)
         {
             // 1. Извлекаем Ци из камней
+            // AUDIT-0921 B3 (P1/P0): ИЗВЛЕЧЕНИЕ-ПЕРВЫМ. Прежде: буфер получал
+            // Ци по СКОРОСТИ (AccumulateFromStones без знания об остатках
+            // камней), затем DepleteStones снимал пропорциональные доли с
+            // молчаливым клампом по остатку → при полупустых камнях буфер
+            // получал БОЛЬШЕ, чем отдавали камни (Ци из воздуха — нарушение
+            // экономики ресурса). Теперь: Peek (желаемое, кламп по свободному
+            // месту) → ExtractFromStonesCapped (клампы по остаткам + перенос
+            // дефицита на камни с запасом) → CommitAccumulation (буфер получает
+            // только подтверждённое). Инвариант: stones −N ⇔ buffer +N.
             float totalStoneRate = CalculateTotalStoneRate();
 
             if (totalStoneRate > 0 && !_buffer.IsFull)
             {
-                long added = _buffer.AccumulateFromStones(totalStoneRate, deltaTime);
-
-                if (added > 0)
+                long desired = _buffer.PeekAccumulation(totalStoneRate, deltaTime);
+                if (desired > 0)
                 {
-                    // Уменьшаем Ци в камнях пропорционально их вкладу
-                    DepleteStones(added, totalStoneRate);
-
-                    // CH-03: Тепло от накопления УБРАНО — legacy добавляет тепло
-                    // только от ИСПОЛЬЗОВАНИЯ Ци (техники), не от накопления буфера.
-                    // Накопление — естественный процесс, не вызывающий перегрев.
+                    long extracted = ExtractFromStonesCapped(desired, totalStoneRate);
+                    _buffer.CommitAccumulation(desired, extracted);
+                    // extracted == 0 (камни пусты в этом кадре) — intent всё равно
+                    // списан: rate-обещание не банкируется (см. CommitAccumulation).
                 }
+
+                // CH-03: Тепло от накопления УБРАНО — legacy добавляет тепло
+                // только от ИСПОЛЬЗОВАНИЯ Ци (техники), не от накопления буфера.
+                // Накопление — естественный процесс, не вызывающий перегрев.
             }
 
             // 2. Передаём Ци практику (если не в бою и есть проводимость)
@@ -359,54 +379,72 @@ namespace CultivationGame.Modules.Charger
         }
 
         /// <summary>
-        /// Уменьшить Ци в камнях пропорционально их вкладу.
-        /// Без этого камни дают бесконечное Ци.
+        /// AUDIT-0921 B3: извлечь до <paramref name="requested"/> Ци из камней
+        /// с УЧЁТОМ фактических остатков. Доли — по вкладу скорости; кламп
+        /// по CurrentQi каждого камня; дефицит (камень не смог отдать долю)
+        /// ПЕРЕНОСИТСЯ камням с остатком (проходы до исчерпания запроса или
+        /// камней). Возвращает подтверждённую сумму ≤ requested.
+        /// Замена DepleteStones: прежний метод снимал доли с молчаливым
+        /// клампом — разница «запрошено/снято» материализовалась в буфере
+        /// из воздуха. Наследует CH-17 (распределение остатка усечения).
         /// </summary>
-        private void DepleteStones(long totalAmount, float totalRate)
+        private long ExtractFromStonesCapped(long requested, float totalRate)
         {
-            if (totalAmount <= 0 || totalRate <= 0) return;
+            if (requested <= 0 || totalRate <= 0) return 0;
 
-            // Рассчитываем доли для каждого камня
-            var shares = new List<long>();
-            long distributed = 0;
-
+            // Активные камни с их скоростями (параллельно долям скорости).
+            var stones = new List<(ChargerSlot slot, float rate)>();
             foreach (var slot in _slots)
             {
                 if (slot.HasStone)
                 {
                     float stoneRate = slot.InsertedStone.GetEffectiveReleaseRate(_buffer.Conductivity);
                     stoneRate *= (1f + slot.AbsorptionBonus);
-                    float proportion = stoneRate / totalRate;
-                    long share = (long)(totalAmount * proportion);
-                    shares.Add(share);
-                    distributed += share;
+                    if (stoneRate > 0f)
+                        stones.Add((slot, stoneRate));
                 }
-                else
+            }
+            if (stones.Count == 0) return 0;
+
+            long extractedTotal = 0;
+            long remaining = requested;
+
+            // Проходы: в каждом снимаем пропорциональные доли, клампим по
+            // остаткам; дефицит (бюджет не выбран) переносится на следующий
+            // проход к камням, у которых ещё есть Ци.
+            while (remaining > 0)
+            {
+                float passRate = 0f;
+                foreach (var (slot, rate) in stones)
+                    if (slot.InsertedStone.CurrentQi > 0)
+                        passRate += rate;
+                if (passRate <= 0f) break; // все камни пусты
+
+                long budget = remaining;
+                long passExtracted = 0;
+
+                foreach (var (slot, rate) in stones)
                 {
-                    shares.Add(0);
+                    if (budget <= 0) break;
+                    long avail = slot.InsertedStone.CurrentQi;
+                    if (avail <= 0) continue;
+
+                    long share = (long)(budget * (rate / passRate));
+                    if (share <= 0) share = 1; // CH-17-наследник: минимальный прогресс
+                    if (share > budget) share = budget;
+                    if (share > avail) share = avail; // кламп по остатку камня
+
+                    long got = slot.InsertedStone.ExtractQi(share);
+                    passExtracted += got;
+                    budget -= got;
                 }
+
+                if (passExtracted <= 0) break; // прогресса нет — выходим
+                extractedTotal += passExtracted;
+                remaining -= passExtracted;
             }
 
-            // Распределяем остаток от целочисленного усечения
-            // CH-17: Убрано условие shares[i] > 0 — при малом totalAmount все shares = 0,
-            // и остаток никогда не распределялся, создавая бесконечные камни.
-            // Legacy-код не имеет этого условия.
-            long remainder = totalAmount - distributed;
-            for (int i = 0; i < remainder && i < shares.Count; i++)
-            {
-                shares[i] += 1;
-            }
-
-            // Применяем истощение
-            int shareIndex = 0;
-            foreach (var slot in _slots)
-            {
-                if (slot.HasStone && shareIndex < shares.Count)
-                {
-                    slot.InsertedStone.ExtractQi(shares[shareIndex]);
-                }
-                shareIndex++;
-            }
+            return extractedTotal;
         }
 
         /// <summary>Проверить и обработать пустые камни</summary>

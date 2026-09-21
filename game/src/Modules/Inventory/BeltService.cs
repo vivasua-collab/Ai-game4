@@ -49,6 +49,9 @@ public sealed class BeltService : ISaveable, IWorldResettable, IDisposable
 
     [Inject] private readonly IPublisher<BeltSlotsChangedEvent> _slotsChangedPub = null!;
     [Inject] private readonly IPublisher<ConsumableUsedEvent> _usedPub = null!;
+    // AUDIT-0921 A4 (belt-путь): тосты отказа — пояс не может съесть
+    // предмет с нереализованным эффектом молча.
+    [Inject] private readonly IPublisher<Core.Messaging.Contracts.ToastShownEvent> _toastPub = null!;
     [Inject] private readonly ISubscriber<EquipmentChangedEvent> _equipChangedSub = null!;
 
     // R19: единая маршрутизация эффектов (кейс-нормализация "Heal"→"heal",
@@ -176,6 +179,19 @@ public sealed class BeltService : ISaveable, IWorldResettable, IDisposable
         var slot = _slots[slotIndex];
         if (slot.Count <= 0 || string.IsNullOrEmpty(slot.ItemId)) return false;
         if (!_itemDb.TryGetItem(slot.ItemId, out var item)) return false;
+
+        // AUDIT-0921 A4 (P1, belt-путь): гейт реализуемости ДО списания —
+        // тот же контракт, что и ItemUseService.TryUseFromInventory
+        // (пояс/хотбар прежде мог съесть teleport/vitality_boost-material
+        // без эффекта; камни Ци — A6: «только зарядник H»).
+        var info = _itemUse.GetUseInfo(item);
+        if (!info.Usable)
+        {
+            _toastPub?.Publish(new Core.Messaging.Contracts.ToastShownEvent(
+                info.UnusableReason, 2.5f));
+            Console.WriteLine($"[Belt] Use refused (no supported effect): {slot.ItemId} — {info.UnusableReason}");
+            return false;
+        }
 
         // R19: применение эффектов — делегирование ItemUseService
         // (раньше — приватный ApplyEffect: heal/qi_restore с РЕГИСТРО-

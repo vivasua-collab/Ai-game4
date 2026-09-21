@@ -65,7 +65,7 @@ public sealed class SaveDataAggregator
         "player", "stats", "body", "qi",
         "inventory", "equipment", "belt",
         "techniques", "technique_slots", "formation",
-        "npc", "animals", "quests",
+        "npc", "corpses", "animals", "quests",
         "currency", "charger", "save_meta",
     };
 

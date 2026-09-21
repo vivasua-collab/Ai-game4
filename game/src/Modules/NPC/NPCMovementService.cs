@@ -280,7 +280,7 @@ namespace CultivationGame.Modules.NPC
             if (string.IsNullOrEmpty(state.TargetId)) return;
 
             // NPC-B05: пробуем получить позицию цели — сначала как NPC, затем как игрока
-            Vector2 targetPos = GetTargetPosition(state.TargetId);
+            Vector2 targetPos = GetTargetPosition(state.TargetId, state.Position);
             if (targetPos == Vector2.zero && _playerPosition == Vector2.zero) return;
 
             float distance = Vector2.Distance(state.Position, targetPos);
@@ -324,7 +324,7 @@ namespace CultivationGame.Modules.NPC
             if (string.IsNullOrEmpty(state.TargetId)) return;
 
             // NPC-B05: пробуем получить позицию цели — сначала как NPC, затем как игрока
-            Vector2 targetPos = GetTargetPosition(state.TargetId);
+            Vector2 targetPos = GetTargetPosition(state.TargetId, state.Position);
             if (targetPos == Vector2.zero && _playerPosition == Vector2.zero) return;
 
             float distance = Vector2.Distance(state.Position, targetPos);
@@ -341,16 +341,25 @@ namespace CultivationGame.Modules.NPC
 
         /// <summary>
         /// Получить позицию цели по ID.
-        /// NPC-B05: Сначала пробуем как NPC, затем используем кэш позиции игрока.
+        /// NPC-B05 + AUDIT-0921 B4: цель-NPC (в т.ч. умершая/удалённая из
+        /// реестра) — её позиция; ИГРОК — только по явному резолву
+        /// PlayerIdResolver (кэш позиции). Прежний фоллбек «любой
+        /// неизвестный ID = игрок» отправлял NPC с мёртвой/исчезнувшей
+        /// NPC-целью преследовать ИГРОКА — поведение «призрачной погони».
+        /// Неизвестный не-игрок → fallbackOwnPosition (стоим на месте).
         /// </summary>
-        private Vector2 GetTargetPosition(string targetId)
+        private Vector2 GetTargetPosition(string targetId, Vector2 fallbackOwnPosition)
         {
             var targetState = _npcService.GetNPCState(targetId);
             if (targetState != null)
                 return targetState.Position;
 
-            // Цель — не NPC (вероятно, игрок), используем кэш
-            return _playerPosition;
+            // Явная проверка: только резолвенный игрок → кэш позиции игрока
+            if (Core.Helpers.PlayerIdResolver.IsPlayer(targetId))
+                return _playerPosition;
+
+            // Неизвестный не-игрок: честный «нет цели» — не выдумываем игрока
+            return fallbackOwnPosition;
         }
 
         /// <summary>
@@ -418,7 +427,8 @@ namespace CultivationGame.Modules.NPC
             if (maxThreatSource == null) return Vector2.zero;
 
             // Пытаемся получить позицию источника угрозы
-            return GetTargetPosition(maxThreatSource);
+            // (AUDIT-0921 B4: неизвестный не-игрок → позиция самого NPC — стоим)
+            return GetTargetPosition(maxThreatSource, state.Position);
         }
 
         /// <summary>

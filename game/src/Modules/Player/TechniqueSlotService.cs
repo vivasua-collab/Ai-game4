@@ -30,7 +30,7 @@ namespace CultivationGame.Modules.Player
     /// 7 слотов (3-9). Каждый слот хранит ID техники (или пусто).
     /// ISaveable — сериализуется в save-файл.
     /// </summary>
-    public sealed class TechniqueSlotService : ISaveable, IDisposable
+    public sealed class TechniqueSlotService : ISaveable, IWorldResettable, IDisposable
     {
         // === Диапазон слотов ===
         /// <summary>Минимальный индекс слота (включительно).</summary>
@@ -165,6 +165,21 @@ namespace CultivationGame.Modules.Player
         {
             _forgottenToken?.Dispose();
             _forgottenToken = null;
+        }
+
+        // === AUDIT-0921 B1: IWorldResettable =============================
+        //
+        // New Game: назначения слотов 3–9 прошлой сессии не должны
+        // переноситься в новый мир (player ID снова player_0 — слоты
+        // выглядели «валидными», но техник в новой игре другие).
+        // LoadGame не задет (RestoreState сам очищает перед восстановлением).
+        public void ResetWorld()
+        {
+            if (_slots.Count > 0)
+            {
+                _slots.Clear();
+                Console.WriteLine("[TechniqueSlotService] ResetWorld: slot bindings cleared (New Game)");
+            }
         }
 
         // === Сериализационные DTO (public для JSON-сериализации) ===

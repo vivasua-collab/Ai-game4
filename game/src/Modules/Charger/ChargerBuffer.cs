@@ -106,33 +106,46 @@ namespace CultivationGame.Modules.Charger
 
         // === Накопление (кадровое) ===
 
+        // AUDIT-0921 B3 (P1/P0): AccumulateFromStones заменён парой
+        // PeekAccumulation/CommitAccumulation — схема «извлечение-первым».
+        // Прежний контракт (AddQi по СКОРОСТИ, DepleteStones долями с клампом)
+        // при полупустых камнях добавлял в буфер БОЛЬШЕ, чем извлекал из
+        // камней — Ци материализовалась из воздуха. Теперь буфер получает
+        // только подтверждённо извлеченное (см. ChargerService.ProcessChargerOperation).
+
         /// <summary>
-        /// Накопить Ци от камней за кадр.
-        /// Формула: effectiveRate = min(totalRate, conductivity) × (1 - efficiencyLoss)
+        /// Пик накопления: обновить дробный аккумулятор кадром и вернуть,
+        /// сколько буфер ГОТОВ принять (формула ФОРМ-CHR-01 + floor),
+        /// с клампом по свободному месту. БЕЗ AddQi — добавит только
+        /// CommitAccumulation с подтверждённым камнями объёмом.
         /// </summary>
-        /// <returns>Фактически накопленное Ци</returns>
-        public long AccumulateFromStones(float totalStoneRate, float deltaTime)
+        public long PeekAccumulation(float totalStoneRate, float deltaTime)
         {
-            if (IsFull) return 0;
+            if (IsFull) return 0; // аккумулятор заморожен (прежняя семантика)
 
             // ФОРМ-CHR-01: Унифицированная формула
             float effectiveRate = Math.Min(totalStoneRate, _conductivity) * (1f - _efficiencyLoss);
-            float qiThisFrame = effectiveRate * deltaTime;
+            _accumulationAccumulator += effectiveRate * deltaTime;
 
-            _accumulationAccumulator += qiThisFrame;
+            long desired = (long)Math.Floor(_accumulationAccumulator);
+            long freeSpace = _capacity - _currentQi;
+            if (desired > freeSpace) desired = freeSpace; // B2-инвариант: извлечение не превысит буфер
+            return desired;
+        }
 
-            if (_accumulationAccumulator >= 1f)
-            {
-                long toAdd = (long)Math.Floor(_accumulationAccumulator);
-                long added = AddQi(toAdd);
-                // CH-18: Вычитаем только реально добавленное количество.
-                // Раньше вычитали toAdd — при почти полном буфере Qi терялся:
-                // toAdd=5, added=2 → аккумулятор терял 5 вместо 2, 3 Qi исчезало.
-                _accumulationAccumulator -= added;
-                return added;
-            }
-
-            return 0;
+        /// <summary>
+        /// Завершить кадр накопления: списать rate-intent (желаемое) из
+        /// аккумулятора и добавить только confirmed (фактически извлечённое
+        /// из камней — ≤ intent ≤ freeSpace, AddQi без потерь).
+        /// Неисполненная часть intent исчезает: камни её не имели —
+        /// банкировать её = обещать Ци из воздуха.
+        /// </summary>
+        public long CommitAccumulation(long intent, long confirmed)
+        {
+            if (intent > 0)
+                _accumulationAccumulator = Math.Max(0f, _accumulationAccumulator - intent);
+            if (confirmed <= 0) return 0;
+            return AddQi(confirmed);
         }
 
         /// <summary>

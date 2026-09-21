@@ -1849,7 +1849,10 @@ public partial class GameWorldController : Node2D
             {
                 // Публикуем TechniqueCastRequestedEvent — PlayerTechniqueCaster обработает
                 // (валидация, зарядка, эффект). Position курсора — как в Z-касте.
-                var mousePos = GetViewport().GetMousePosition();
+                // AUDIT-0921 A3 (P1): МИРОВЫЕ координаты (GetGlobalMousePosition),
+                // не экранные (GetViewport().GetMousePosition) — при смещённой
+                // камере экранные координаты давали уехавший эпицентр AoE.
+                var mousePos = GetGlobalMousePosition();
                 int mx = (int)(mousePos.X * 1000);
                 int my = (int)(mousePos.Y * 1000);
                 TechniqueCastPub?.Publish(new Core.Messaging.Contracts.TechniqueCastRequestedEvent(

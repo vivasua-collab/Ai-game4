@@ -164,6 +164,20 @@ public class NPCModule : IModule, IWorldResettable
             if (string.IsNullOrEmpty(state.TargetId)) continue;
 
             var target = _npcServiceImpl.GetNPCState(state.TargetId);
+
+            // AUDIT-0921 B4 (P1): цель — МЁРТВЫЙ NPC → атакующий зависал в
+            // Attacking навсегда (удары по трупу отклонялись пайплайном,
+            // AIState/TargetId никто не сбрасывал). Труп — не противник:
+            // сброс цели + Wandering; новый выбор (месть/угрозы) — обычным
+            // путём EvaluateAndDecide. Игрок-цель не трогаем (его смерть —
+            // отдельный контур PlayerService).
+            if (target != null && !target.IsAlive)
+            {
+                state.TargetId = null;
+                _npcServiceImpl.SetAIState(state.NpcId, NPCAIState.Wandering);
+                continue;
+            }
+
             /// Цель — NPC или игрок: дистанция по тайлам (Position2D).
             int dx, dy;
             if (target != null)

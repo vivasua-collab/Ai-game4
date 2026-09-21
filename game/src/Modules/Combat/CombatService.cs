@@ -64,7 +64,7 @@ namespace CultivationGame.Modules.Combat
     /// - QI-C01: кросс-модульная подписка через MessagePipe
     /// - EVT-01: полная независимость модулей через событийную модель
     /// </summary>
-    public class CombatService : ICombatService, IDisposable
+    public class CombatService : ICombatService, IWorldResettable, IDisposable
     {
         // === Зависимости (DI через конструктор) ===
         private readonly IDamageService _damageService;
@@ -788,9 +788,15 @@ namespace CultivationGame.Modules.Combat
             // R24-C: явная цель для не-участников (NPC-NPC толпа без UI-боя:
             // _instigatorId == null — прежний внутренний резолв дал бы null → NRE).
             ConsumeReadiness(attackerId); // R21-2: замах свершен (расход при приёме)
+            // AUDIT-0921 A1 (харденинг; сам тезис опровергнут): мгновенный путь
+            // теперь передаёт potency/isRanged ЯВНО из интента (как pending/
+            // charged/хоуминг-пути) — контекст атаки не зависит от глобальных
+            // _lastAttack* полей. Утечки между участниками мультибоя не было
+            // (глобали освежались из текущего интента в :742 ДО этого вызова),
+            // но будущие пути вызова не должны наследовать хрупкость.
             BuildAndExecuteDamageRequest(attackerId, techniqueId,
                 ResolveDefenderIdFor(attackerId, targetId),
-                explicitPotencyPermil: null, explicitIsRanged: null,
+                explicitPotencyPermil: potencyPermil, explicitIsRanged: isRanged,
                 aimTileX: aimTileX, aimTileY: aimTileY);
             return AttackAcceptance.Accepted;
         }
@@ -1651,6 +1657,36 @@ namespace CultivationGame.Modules.Combat
             }
             // Базовая атака — 0 Ци
             return 0;
+        }
+
+        // === AUDIT-0921 B1: IWorldResettable ==================================
+        //
+        // New Game (меню → пересборка мира) обязан начинаться с чистого
+        // боевого состояния. Прежде CombatService не реализовывал контракт —
+        // WorldDomainResetPhase его не видел: бой/пары/касты/снаряды/
+        // готовность прошлой сессии наследовались в новый мир (DI-синглтоны
+        // живут весь процесс). LoadGame не задет: WorldDomainResetPhase
+        // SkipOnLoad=true, RestoreState идёт ПОСЛЕ сброса GameSession.LoadGame.
+        public void ResetWorld()
+        {
+            // UI-сессия игрока (HUD-пара) — разомкнута без событий (мир
+            // разбирается; CombatEndedEvent для старого мира бессмыслен).
+            _isInCombat = false;
+            _instigatorId = null;
+            _currentTargetId = null;
+            _currentStage = default;
+
+            // Реестры мультибоя R24-C / R28: pending-касты, снаряды,
+            // готовность всех сущностей — эфемерны (сейв их не хранит).
+            _pendingCasts.Clear();
+            _projectiles.Clear();
+            _readinessPermil.Clear();
+
+            // Кэши защит — «никто не защищался».
+            _lastPlayerDefense = DefenseSubtype.None;
+            LastNpcDefenseSelected = DefenseSubtype.None;
+
+            Console.WriteLine("[CombatService] ResetWorld: combat state cleared (New Game)");
         }
 
         public void Dispose()

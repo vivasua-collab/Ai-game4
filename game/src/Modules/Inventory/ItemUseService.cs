@@ -51,15 +51,15 @@ public sealed class ItemUseService : IItemUseService
     {
         if (item == null) return ItemUseInfo.NotUsable("Предмет не определён");
 
-        // 1) Камни Ци — поглощение Ци (этап 7 внедрения ЦИ, канон §10).
-        if (item is QiStoneData stone)
+        // 1) Камни Ци — прямое поглощение ЗАПРЕЩЕНО (репорт 21.09 №A6,
+        // решение пользователя: «жрать камни напрямую — не логично»).
+        // Камень — источник для зарядника (H); лор: неочищенная Ци камня
+        // обжигает меридианы — только аппарат проводит её безопасно
+        // (риск хаоса §10.2 остаётся атрибутом заряжника).
+        if (item is QiStoneData)
         {
-            string chaoticNote = stone.IsChaotic ? " · хаос: 10% риск −10% HP" : "";
-            return new ItemUseInfo(
-                usable: true,
-                actionLabel: $"Поглотить Ци камня (1 шт.): +{stone.QiAmount} ед.{chaoticNote}",
-                effectSummary: $"+{stone.QiAmount} Ци",
-                unusableReason: string.Empty);
+            return ItemUseInfo.NotUsable(
+                "Камень Ци нельзя поглотить напрямую — вставьте в зарядник (H)");
         }
 
         // 2) Расходники — по эффектам (нормализованные ключи).
@@ -103,6 +103,21 @@ public sealed class ItemUseService : IItemUseService
     {
         if (slotId == Guid.Empty || string.IsNullOrEmpty(expectedItemId)) return false;
         if (!_itemDb.TryGetItem(expectedItemId, out var item) || item == null) return false;
+
+        // AUDIT-0921 A4 (P1): гейт реализуемости ДО списания. Прежде:
+        // TryRemoveFromSlot → ApplyEffects (default: break — нереализованный
+        // teleport/vitality_boost/material) → return true → предмет ИСЧЕЗАЛ
+        // без эффекта. Теперь предмет с неподдерживаемым эффектом НЕ списывается.
+        // A6 (репорт 21.09): камни Ци тоже гейтятся («только зарядник H»).
+        // Политика смешанных эффектов: допустим ≥1 поддерживаемый ключ —
+        // применяются поддерживаемые, предмет расходуется (семантика R19).
+        var info = GetUseInfo(item);
+        if (!info.Usable)
+        {
+            PublishToast(info.UnusableReason);
+            Console.WriteLine($"[ItemUse] Refused (no supported effect): {expectedItemId} — {info.UnusableReason}");
+            return false;
+        }
 
         // Требуется хотя бы 1 шт. в адресованной кучке.
         int slotIndex = _inventory.FindSlotIndexBySlotId(slotId);
@@ -148,24 +163,12 @@ public sealed class ItemUseService : IItemUseService
         var result = new AppliedEffects();
         if (item == null) return result;
 
-        // Камень Ци: мгновенное поглощение (v1 этапа 7) + риск хаоса.
-        if (item is QiStoneData stone)
+        // Камень Ци: прямое поглощение ЗАПРЕЩЕНО (репорт 21.09 №A6).
+        // Гейт TryUseFromInventory (GetUseInfo) не пропускает камни к списанию;
+        // эта ветка — защитный заглушка для прямых вызовов ApplyEffects.
+        if (item is QiStoneData)
         {
-            long before = _qi?.CurrentQi ?? 0;
-            _qi?.AddQi(stone.QiAmount);
-            long gained = (_qi?.CurrentQi ?? 0) - before;
-            result.Items.Add(new AppliedEffect("qi_restore", stone.QiAmount, gained));
-
-            if (stone.IsChaotic)
-            {
-                var rng = new Random((int)DateTime.UtcNow.Ticks);
-                if (rng.NextDouble() < ChaoticRiskChance)
-                {
-                    int damage = ApplyChaoticDamage();
-                    result.ChaoticDamage = true;
-                    result.ChaoticDamageAmount = damage;
-                }
-            }
+            Console.WriteLine("[ItemUse] Blocked direct QiStone consumption (A6: charger-only)");
             return result;
         }
 

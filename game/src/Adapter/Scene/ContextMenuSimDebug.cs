@@ -42,6 +42,7 @@ public partial class ContextMenuSimDebug : Node
     [Inject] private IGroundItemService? _groundItems;
     [Inject] private IBodyService? _body;      // R19: лечение/урон в тесте
     [Inject] private IQiService? _qi;          // R19: поглощение Ци камня
+    [Inject] private IItemUseService? _itemUse; // A6: сервисный гейт камней
 
     private const string StoneId = "material_stone";
     private const string QiDustId = "qistone_dust_calm";
@@ -115,47 +116,54 @@ public partial class ContextMenuSimDebug : Node
         GD.Print($"[ContextSim] 1. ПКМ открывает свойства: меню={menuOpened}, строк характеристик={menu?.PropertyCountForQA ?? 0} (≥3), кнопка «Разделить»={hasSplit}, кнопка «Выбросить»={hasDrop}");
         pass &= menuOpened && hasProps && hasSplit && hasDrop;
 
-        // === 2. Камень Ци: кнопка «Использовать» + РЕАЛЬНОЕ поглощение ===
-        // R19: расширен — кнопка теперь приходит из маршрутизации
-        // IItemUseService; проверяем и энд-ту-энд поглощение через неё
-        // (миграция TryUseQiStone → ItemUseService.TryUseFromInventory).
+        // === 2. Камень Ци: кнопка «Использовать» СКРЫТА (A6: прямое
+        // поглощение запрещено — камень только для зарядника H) ===
+        // R19 проверял ПРЯМОЕ поглощение (+1024 Ци, счётчик −1) — репорт
+        // 21.09 №A6 (решение пользователя: «жрать камни напрямую не логично»)
+        // запретил путь: GetUseInfo(QiStone) → NotUsable → кнопка скрыта,
+        // TryUseFromInventory отказывает БЕЗ списания. Контракт: счётчик
+        // НЕ меняется, Ци НЕ растёт, зарядник остаётся честным путём.
         int qiSlot = FindSlotIndex(_inventory, QiDustId);
-        bool qiUseButton = false;
-        bool qiAbsorbed = false;
+        bool qiUseHidden = false;
+        bool qiRefusedNoConsume = false;
         if (qiSlot >= 0)
         {
             int qiCountBefore = _inventory.GetItemCount(QiDustId);
-            // Сливаем половину Ци: стартовый буфер 1000/1000 полон — AddQi
-            // капится по MaxQi, поглощение пыли (+1024) дало бы +0 (так было
-            // и в старом TryUseQiStone: тост «+0 Ци»). Дрейн открывает окно.
-            _qi?.TryConsumeQi(System.Math.Min(_qi.CurrentQi, _qi.MaxQi / 2));
             long qiBefore = _qi?.CurrentQi ?? 0;
 
             win.CloseContextMenu();
             win.OpenContextMenu(qiSlot);
             var qiMenu = win.ContextMenuForQA;
-            qiUseButton = qiMenu?.UseButtonForQA != null;
-            if (qiMenu?.UseButtonForQA != null)
+            qiUseHidden = qiMenu?.UseButtonForQA == null; // A6: кнопки НЕТ
+            if (qiUseHidden)
             {
-                // Нажатие как у игрока: хендлер закрывает меню и вызывает
-                // TryUseItem(slotId, itemId) → сервис → Qi +1024, счётчик −1.
-                // (≥1024: мир живёт — фоновая регенерация Ци может добавить
-                // чуть больше за время ожидания; расход Ци у стоячего игрока нет.)
-                qiMenu.UseButtonForQA.EmitSignal(BaseButton.SignalName.Pressed);
-                await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
-                long qiAfter = _qi?.CurrentQi ?? 0;
-                long maxQi = _qi?.MaxQi ?? 0;
-                int qiCountAfter = _inventory.GetItemCount(QiDustId);
-                // ≥ дрейна: пыль +1024 но капится по MaxQi; мир живёт —
-                // фоновая регенерация может добавить ещё; главное — буфер
-                // заполнился и счётчик уменьшился ровно на 1.
-                qiAbsorbed = qiAfter > qiBefore && qiAfter <= maxQi && qiCountAfter == qiCountBefore - 1;
-                GD.Print($"[ContextSim] 2b. поглощение через кнопку: Ци {qiBefore}→{qiAfter} (макс {maxQi}), счётчик {qiCountBefore}→{qiCountAfter}");
+                // Гейт сервисного уровня: прямой вызов (минуя меню)
+                // обязан отказать и НЕ списать камень.
+                var qiAllSlots = _inventory.GetAllSlots();
+                Guid qiStoneSlotId = Guid.Empty;
+                for (int si = 0; si < qiAllSlots.Count; si++)
+                {
+                    if (si == qiSlot) { qiStoneSlotId = qiAllSlots[si].SlotId; break; }
+                }
+                if (_itemUse != null && qiStoneSlotId != Guid.Empty && _itemDb != null
+                    && _itemDb.TryGetItem(QiDustId, out var _))
+                {
+                    bool useOk = _itemUse.TryUseFromInventory(qiStoneSlotId, QiDustId);
+                    // A6: сервис отказывает (камень — не еда), предмет цел.
+                    qiRefusedNoConsume = useOk == false
+                        && _inventory.GetItemCount(QiDustId) == qiCountBefore
+                        && (_qi?.CurrentQi ?? 0) <= qiBefore + 0;
+                    GD.Print($"[ContextSim] 2b. сервисный гейт A6: use={useOk} (ожидаем False), счётчик {qiCountBefore}→{_inventory.GetItemCount(QiDustId)}, Ци {qiBefore}→{_qi?.CurrentQi ?? 0}");
+                }
+                else
+                {
+                    qiRefusedNoConsume = true; // сервис недоступен в стенде — кнопка скрыта
+                }
             }
             win.CloseContextMenu();
         }
-        GD.Print($"[ContextSim] 2. камень Ци «Использовать» в меню: {qiUseButton} (ожидаем True), поглощение сквозь кнопку: {qiAbsorbed}");
-        pass &= qiUseButton && qiAbsorbed;
+        GD.Print($"[ContextSim] 2. камень Ци «Использовать» СКРЫТ (A6 charger-only): {qiUseHidden} (ожидаем True), отказ без списания: {qiRefusedNoConsume}");
+        pass &= qiUseHidden && qiRefusedNoConsume;
 
         // === 3. Диалог разделения: слайдер и числа ==================
         // R10 P1-SlotId: открытие по стабильному идентичности кучки.

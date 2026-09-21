@@ -51,7 +51,7 @@ namespace CultivationGame.Modules.Combat
     /// CMB-A06: LearnedTechnique.QiCost — long (Fix-01: все Qi-значения long).
     /// EVT-01: кэш Qi из QiChangedEvent вместо инъекции IQiService.
     /// </summary>
-    public class TechniqueService : IDisposable, ISaveable
+    public class TechniqueService : IDisposable, ISaveable, IWorldResettable
     {
         // === Библиотека (2026-08-28) ===
 
@@ -717,6 +717,24 @@ namespace CultivationGame.Modules.Combat
                 s.SelectedId != null && _learnedTechniques.ContainsKey(s.SelectedId)
                     ? s.SelectedId
                     : null;
+        }
+
+        // === AUDIT-0921 B1: IWorldResettable =============================
+        //
+        // New Game обязан начинаться с чистого набора техник. Прежде сервис
+        // не сбрасывался (не IWorldResettable): TechniqueGrantPhase ДОБАВЛЯЛ
+        // гранты в состояние прошлой сессии — изученное/кулдауны/мастерство/
+        // свитки/выбор «протекали» в новый мир. LoadGame не задет (фаза
+        // SkipOnLoad=true; RestoreState сам очищает перед восстановлением).
+        public void ResetWorld()
+        {
+            _learnedTechniques.Clear();
+            _cooldowns.Clear();
+            _orderedIds.Clear();
+            _masteryEcho.Clear();
+            _scrolls.Clear();
+            _selectedTechniqueId = null;
+            Console.WriteLine("[TechniqueService] ResetWorld: techniques cleared (New Game)");
         }
 
         public void Dispose()

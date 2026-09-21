@@ -26,7 +26,7 @@ namespace CultivationGame.Modules.Player
     /// Сервис удержания техники в ауре игрока (Stage 1, вариант В).
     /// Одиночный слот. Декей 1%/тик. Рассеивание при &lt; QiCost/2 (возврат 50%).
     /// </summary>
-    public sealed class AuraHoldService : IDisposable
+    public sealed class AuraHoldService : IDisposable, IWorldResettable
     {
         // === Зависимости ===
         private readonly IPublisher<HeldTechniqueChangedEvent> _heldPub;
@@ -164,6 +164,18 @@ namespace CultivationGame.Modules.Player
             _held = null;
             _saveStartedSubscription?.Dispose();
             _saveStartedSubscription = null;
+        }
+
+        // === AUDIT-0921 B1: IWorldResettable =============================
+        //
+        // New Game: удержанная техника ауры прошлой сессии не должна
+        // переживать пересборку мира (Dissipate — публичный контракт,
+        // UI получает HeldTechniqueChangedEvent(null)).
+        public void ResetWorld()
+        {
+            if (_held != null)
+                Dissipate("world_reset");
+            Console.WriteLine("[AuraHoldService] ResetWorld: hold cleared (New Game)");
         }
     }
 

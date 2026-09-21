@@ -272,6 +272,23 @@ namespace CultivationGame.Modules.NPC
                 }
             }
 
+            // AUDIT-0921 B4 (P1): цель — МЁРТВЫЙ NPC → выход из боя ДО гейта
+            // IsInCombat (прежде гейт «в бою не меняем состояние» замораживал
+            // Attacking по трупу навсегда — ProcessNpcAttacks продолжал слать
+            // интенты по мёртвому TargetId). Труп — не противник.
+            if (state.IsInCombat
+                && !string.IsNullOrEmpty(state.TargetId)
+                && !Core.Helpers.PlayerIdResolver.IsPlayer(state.TargetId))
+            {
+                var npcTarget = _npcService.GetNPCState(state.TargetId);
+                if (npcTarget != null && !npcTarget.IsAlive)
+                {
+                    PublishDisengage(state, "цель погибла");
+                    _npcService.SetAIState(state.NpcId, NPCAIState.Wandering);
+                    return;
+                }
+            }
+
             // В бою — не меняем AIState (боевое поведение управляется парой
             // Attacking + ProcessNpcAttacks; месть/бегство/leash выше уже отработали).
             if (state.IsInCombat) return;

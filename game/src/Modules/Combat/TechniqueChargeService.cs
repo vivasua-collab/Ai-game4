@@ -38,7 +38,7 @@ namespace CultivationGame.Modules.Combat
     /// IQiService (паттерн EVT-01). TechniqueService поставляет данные техники
     /// (qiCost, capacity, mastery). ITimeService.DeltaTime — единица времени (тик).
     /// </summary>
-    public class TechniqueChargeService : IDisposable
+    public class TechniqueChargeService : IDisposable, IWorldResettable
     {
         // === Зависимости ===
         private readonly ISubscriber<QiChangedEvent> _qiChangedSub;
@@ -412,6 +412,18 @@ namespace CultivationGame.Modules.Combat
             _qiChangedSubscription = null;
             _saveStartedSubscription?.Dispose();
             _saveStartedSubscription = null;
+        }
+
+        // === AUDIT-0921 B1: IWorldResettable =============================
+        //
+        // New Game: активные зарядки прошлой сессии не должны переживать
+        // пересборку мира (публичный контракт CancelAllCharges — тот же,
+        // что и при сейве: UI-подписчики получают события отмены).
+        public void ResetWorld()
+        {
+            if (_activeCharges.Count > 0)
+                CancelAllCharges("world_reset");
+            Console.WriteLine("[TechniqueChargeService] ResetWorld: charges cleared (New Game)");
         }
     }
 }

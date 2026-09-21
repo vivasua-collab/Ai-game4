@@ -103,9 +103,15 @@ public sealed class PlayerTechniqueCaster : IDisposable
         int mouseX = e.TargetMouseX;
         int mouseY = e.TargetMouseY;
 
-        // Stage 1 (вариант В): если аура удерживает технику → ВЫПУСК (второе нажатие)
+        // Stage 1 (вариант В): аура удерживает технику → ВЫПУСК (второе нажатие).
+        // AUDIT-0921 B5 (P2): спуск ТОЛЬКО при совпадении techniqueId —
+        // §5.4 «повторное нажатие той же клавиши (Z / 3-9 / клик слота)».
+        // Прежде ЛЮБАЯ другая техника (3–9) выпускала удержанную вместо
+        // начала собственной зарядки. Иная клавиша → удержание живёт,
+        // новая техника идёт обычным путём (завершение зарядки при занятой
+        // ауре → немедленный FireTechnique — §5.4 поток п.3).
         var held = _aura.Current;
-        if (held != null)
+        if (held != null && held.TechniqueId == e.TechniqueId)
         {
             var heldTech = _techniques.GetTechnique(held.TechniqueId);
             if (heldTech != null)
@@ -197,6 +203,37 @@ public sealed class PlayerTechniqueCaster : IDisposable
         int playerX = _player.Position.X;
         int playerY = _player.Position.Y;
 
+        // AUDIT-0921 A2 (P1): ПРЕ-ВАЛИДАЦИЯ ДО CompleteUse — техника не должна
+        // тратить кулдаун/мастерство, если эффект заведомо невозможен.
+        // Прежде: CompleteUse (кулдаун+мастерство) → проверки → PublishFail
+        // БЕЗ рефанда → «зарядил лечение, рана зажила за время зарядки» =
+        // техника потрачена впустую. Рефанд OnAttackRejected покрывал ТОЛЬКО
+        // отказы боевого пайплайна CombatService.
+        switch (tech.Type)
+        {
+            case TechniqueType.Combat:
+                if (FindTargetInRange(tech) == null)
+                {
+                    PublishFail(tech.TechniqueId, "Цель исчезла");
+                    return;
+                }
+                break;
+            case TechniqueType.Healing:
+                if (!_hasDamagedParts())
+                {
+                    PublishFail(tech.TechniqueId, "Тело не ранено");
+                    return;
+                }
+                break;
+            case TechniqueType.Formation:
+                if (_formations.CurrentStage != Core.Data.FormationStage.None)
+                {
+                    PublishFail(tech.TechniqueId, "Формация уже создаётся");
+                    return;
+                }
+                break;
+        }
+
         // CompleteUse: кулдаун + мастерство + TechniqueUsedEvent (БЕЗ расхода Ци —
         // уже списано тиками в TechniqueChargeService).
         if (!_techniques.CompleteUse(tech.TechniqueId))
@@ -221,6 +258,9 @@ public sealed class PlayerTechniqueCaster : IDisposable
                 var target = FindTargetInRange(tech);
                 if (target == null)
                 {
+                    // AUDIT-0921 A2: цель исчезла между пре-валидацией и выпуском
+                    // (безопасная ветка — кадр тот же) → рефанд, техника не сгорает.
+                    _techniques.RefundUse(tech.TechniqueId);
                     PublishFail(tech.TechniqueId, "Цель исчезла");
                     return;
                 }
@@ -298,6 +338,9 @@ public sealed class PlayerTechniqueCaster : IDisposable
                     _player.Position.X, _player.Position.Y);
                 if (!started)
                 {
+                    // AUDIT-0921 A2: старт не удался (не хватило Ци на контур) →
+                    // рефанд кулдауна+мастерства (паттерн R23-1 RefundUse).
+                    _techniques.RefundUse(tech.TechniqueId);
                     PublishFail(tech.TechniqueId, "Не хватает Ци на контур или уровень мал");
                     return;
                 }
