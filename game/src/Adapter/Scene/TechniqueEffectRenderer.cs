@@ -27,6 +27,9 @@ namespace CultivationGame.Adapter.Scene;
 /// <summary>
 /// Рендерер схематических эффектов техник. Node2D в мировом пространстве
 /// (child of world root), рисует в _Draw, обновляет активные визуалы в _Process.
+/// R29 (план R23 §6.7): + аура УДЕРЖАНИЯ техники (HeldTechniqueChangedEvent,
+/// контракт обещал «визуал ауры» цветом стихии) — пульсирующий обод +
+/// вращающиеся искры-руны вокруг игрока, пока техника запаркована в ауре.
 /// </summary>
 public partial class TechniqueEffectRenderer : Node2D
 {
@@ -34,6 +37,8 @@ public partial class TechniqueEffectRenderer : Node2D
     [Inject] private ISubscriber<TechniqueCastResultEvent> CastResultSub = null!;
     [Inject] private ISubscriber<MeditationStateChangedEvent> MeditationSub = null!;
     [Inject] private ISubscriber<QiBufferStateChangedEvent> QiBufferSub = null!;
+    // R29: аура удержания (техника запаркована в ауре — HeldTechniqueChangedEvent).
+    [Inject] private ISubscriber<HeldTechniqueChangedEvent> HeldChangedSub = null!;
 
     /// <summary>Вид визуала (соответствует TechniqueCastResultEvent.VisualKind).</summary>
     private enum VisualKind { Directional = 0, Expanding = 1, Self = 2, Heal = 3, Shield = 4, Meditation = 5 }
@@ -54,8 +59,17 @@ public partial class TechniqueEffectRenderer : Node2D
     private System.IDisposable? _castResultToken;
     private System.IDisposable? _meditationToken;
     private System.IDisposable? _qiBufferToken;
+    private System.IDisposable? _heldChangedToken;
     private bool _meditationVisible;
     private float _meditationPulse;
+
+    // === R29: аура удержания ===
+    // Цвет стихии удерживаемой техники; null — аура выключена.
+    private Color? _heldAuraColour;
+    private float _heldPulse;
+
+    // === QA-счётчик (GODOT_COMBAT_SIM 3k; инкремент на событии) ===
+    public static int TotalHoldAuraChanges;
 
     public override void _Ready()
     {
@@ -68,6 +82,7 @@ public partial class TechniqueEffectRenderer : Node2D
         _castResultToken = CastResultSub?.Subscribe(OnCastResult);
         _meditationToken = MeditationSub?.Subscribe(OnMeditationChanged);
         _qiBufferToken = QiBufferSub?.Subscribe(OnQiBufferChanged);
+        _heldChangedToken = HeldChangedSub?.Subscribe(OnHeldTechniqueChanged);
         GD.Print("[TechniqueEffectRenderer] Ready");
     }
 
@@ -76,6 +91,7 @@ public partial class TechniqueEffectRenderer : Node2D
         _castResultToken?.Dispose();
         _meditationToken?.Dispose();
         _qiBufferToken?.Dispose();
+        _heldChangedToken?.Dispose();
     }
 
     public override void _Process(double delta)
@@ -99,6 +115,7 @@ public partial class TechniqueEffectRenderer : Node2D
         }
 
         if (_meditationVisible) { _meditationPulse += dt; anyAlive = true; }
+        if (_heldAuraColour != null) { _heldPulse += dt; anyAlive = true; }
 
         if (anyAlive || _active.Count > 0) QueueRedraw();
     }
@@ -110,6 +127,10 @@ public partial class TechniqueEffectRenderer : Node2D
 
         if (_meditationVisible)
             DrawMeditationAura();
+
+        // R29: аура удержания — поверх остальных (заряженная техника видна).
+        if (_heldAuraColour != null)
+            DrawHeldAura(_heldAuraColour.Value);
     }
 
     // === Подписки ===
@@ -131,7 +152,7 @@ public partial class TechniqueEffectRenderer : Node2D
         v.Kind = kind;
         v.Origin = new Vector2(e.OriginX / 1000f, e.OriginY / 1000f);
         v.Target = new Vector2(e.TargetX / 1000f, e.TargetY / 1000f);
-        v.Color = ElementColor(e.Element);
+        v.Color = ElementPalette.ToColor(e.Element);
         v.Elapsed = 0f;
         v.Duration = kind switch
         {
@@ -182,7 +203,23 @@ public partial class TechniqueEffectRenderer : Node2D
         QueueRedraw();
     }
 
-    // === Рисование ===
+    // === R29: аура удержания ===
+
+    /// <summary>
+    /// R29: удержание техники в ауре изменилось (AuraHoldService).
+    /// TechniqueId ≠ "" → аура включена цветом стихии; "" → выключена.
+    /// Считает QA-статик (проводка события → рендерер, headless-безопасно).
+    /// </summary>
+    private void OnHeldTechniqueChanged(in HeldTechniqueChangedEvent e)
+    {
+        if (e.EntityId != "player" && e.EntityId != "player_0") return;
+        TotalHoldAuraChanges++;
+
+        _heldAuraColour = string.IsNullOrEmpty(e.TechniqueId)
+            ? null
+            : ElementPalette.ToColor(e.Element);
+        QueueRedraw();
+    }
 
     private void DrawVisual(ActiveVisual v)
     {
@@ -268,6 +305,30 @@ public partial class TechniqueEffectRenderer : Node2D
         }
     }
 
+    /// <summary>
+    /// R29: аура удержания — плотный пульсирующий обод цвета стихии +
+    /// 4 вращающиеся искры-руны («заряженная Ци кружит вокруг мастера»).
+    /// Радиус 34px — плотнее медитации (40) и щита (52): слои не сливаются.
+    /// </summary>
+    private void DrawHeldAura(Color colour)
+    {
+        var pos = PlayerPixelPos();
+        float pulse = Mathf.Sin(_heldPulse * 3.4f);
+        float radius = 34f + 4f * pulse;
+
+        DrawArc(pos, radius, 0f, Mathf.Tau, 40, WithAlpha(colour, 0.7f + 0.2f * pulse), 3f);
+        DrawArc(pos, radius * 0.62f, 0f, Mathf.Tau, 32, WithAlpha(colour, 0.35f), 1.5f);
+
+        // Вращающиеся искры-руны (орбита).
+        for (int i = 0; i < 4; i++)
+        {
+            float ang = _heldPulse * 1.6f + i * (Mathf.Pi / 2f);
+            var spark = pos + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * radius;
+            DrawCircle(spark, 3.5f, WithAlpha(colour, 0.9f));
+            DrawCircle(spark, 1.5f, new Color(1f, 1f, 1f, 0.85f));
+        }
+    }
+
     private Vector2 PlayerPixelPos()
     {
         if (Player == null) return Vector2.Zero;
@@ -285,17 +346,6 @@ public partial class TechniqueEffectRenderer : Node2D
         return copy;
     }
 
-    /// <summary>Цвет стихии (ELEMENTS_SYSTEM.md §2).</summary>
-    private static Color ElementColor(Element e) => e switch
-    {
-        Element.Fire => new Color(1.0f, 0.35f, 0.12f),
-        Element.Water => new Color(0.2f, 0.5f, 1.0f),
-        Element.Earth => new Color(0.6f, 0.4f, 0.2f),
-        Element.Air => new Color(0.75f, 0.78f, 0.75f),
-        Element.Lightning => new Color(0.95f, 0.88f, 0.25f),
-        Element.Void => new Color(0.42f, 0.1f, 0.55f),
-        Element.Light => new Color(1.0f, 0.9f, 0.45f),
-        Element.Poison => new Color(0.5f, 0.15f, 0.7f),
-        _ => new Color(0.95f, 0.95f, 0.95f),
-    };
+    // R29: цвета стихий вынесены в общий ElementPalette (чистый перенос
+    // значений — источник один для всех мировых VFX-рендереров).
 }

@@ -403,6 +403,17 @@ public sealed class PlayerTechniqueCaster : IDisposable
 
     private void PublishSuccess(LearnedTechnique tech, int px, int py, string? targetId, int visualKind = 0)
     {
+        // R29 (план R23 §6.7): подавление дублей визуалов — у AoE-залпов и
+        // хоуминг-снарядов теперь ТОЧНЫЕ рендеры по их собственным событиям:
+        //   • RangedAoe   → AoeImpactEvent (форма/эпицентр/цели) → AoeFxRenderer;
+        //   • IsHoming    → ProjectileSpawnedEvent (реальный полёт с закруткой)
+        //                   → HomingProjectileRenderer.
+        // Прежние generic-визуалы (Expanding-круг / Directional-фейк-прямая)
+        // давали бы двойную картинку и врали о траектории. Потребитель
+        // TechniqueCastResultEvent один — TechniqueEffectRenderer.
+        if (tech.Subtype == CombatSubtype.RangedAoe) return;
+        if (tech.Subtype == CombatSubtype.RangedProjectile && tech.IsHoming) return;
+
         int tx = px, ty = py;
         if (targetId != null)
         {

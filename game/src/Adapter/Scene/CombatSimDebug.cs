@@ -58,6 +58,8 @@ public partial class CombatSimDebug : Node
     [Inject] private ISubscriber<Core.Messaging.Contracts.PlayerTargetChangedEvent>? _targetChangedSub;
     // R28: самонаводящиеся снаряды — событие выпуска (трекинг полёта).
     [Inject] private ISubscriber<Core.Messaging.Contracts.ProjectileSpawnedEvent>? _projectileSpawnedSub;
+    // R29: аура удержания (визуал кольца стихии вокруг игрока — Hold/Release).
+    [Inject] private Modules.Player.AuraHoldService? _auraHold;
 
     private System.IDisposable? _damageToken;
     private System.IDisposable? _intentEchoToken;
@@ -89,11 +91,31 @@ public partial class CombatSimDebug : Node
 
     private const string PlayerCombatId = "player_0"; // NPCAIService.PlayerId
 
+    // R29-харденинг: GameWorldController._PhysicsProcess каждый кадр
+    // синхронизирует ЛОГИКУ к _visualPosition (визуал — источник истины
+    // движения) → прямой PlayerService.SetPosition откатывается в тот же
+    // кадр: волей «в тот же кадр» работает, но после любого ожидания
+    // позиция уже старая (инциденты vfx_shot2-4: болт из базы, игрок вне
+    // конуса 3h(c), камера вне скриншота). DEBUG_TeleportPlayer двигает
+    // ОБЕ позиции. Родитель CombatSimDebug = GameWorldController
+    // (AddChild в его _Ready, строка ~492).
+    private GameWorldController? _gwc;
+
+    /// <summary>Телепорт игрока «навсегда» (логика+визуал+камера).</summary>
+    private void TeleportPlayer(int x, int y)
+    {
+        if (_gwc != null) _gwc.DEBUG_TeleportPlayer(x, y);
+        else _playerService?.SetPosition(new Position2D(x, y));
+    }
+
     public override void _Ready()
     {
         var container = Scene.GameBoot.Container;
         if (container != null)
             ContainerAdapter.InjectProperties(this, container);
+
+        // R29-харденинг: телепорт игрока через визуал (см. TeleportPlayer).
+        _gwc = GetParent() as GameWorldController;
 
         // Диагностика: публикатор/подписчик/время (null → DI-проблема).
         GD.Print($"[CombatSim] diag: pub={_attackIntentPub != null} sub={_attackIntentSub != null} " +
@@ -619,7 +641,10 @@ public partial class CombatSimDebug : Node
                 // прямой удар: retry-цикл до открытия (гонка с NPCModule-кастами
                 // A — Reject «Каст уже идёт» ретраится).
                 int playerHpCrowd0 = _bodyProvider.GetCurrentHealth("player");
-                for (int attempt = 0; attempt < 5 && !_combatServiceImpl.IsInCombat; attempt++)
+                for (int attempt = 0; attempt < 5 && (attempt == 0 || !_combatServiceImpl.IsInCombat); attempt++)
+                // R29-харденинг: гонка «UI-пара уже открыта NPC-AI до входа»
+                // (vfx_shot4: 0 попыток → damage=False) — attempt 0 ВСЕГДА:
+                // минимум один явный удар для damage-гарда.
                 {
                     await WaitForOwnCastClearAsync(crowdA, 2.0f);
                     _combatServiceImpl.DebugSetReadinessPermil(crowdA, 1000);
@@ -727,14 +752,32 @@ public partial class CombatSimDebug : Node
             if (coneLearned)
             {
                 var p = _playerService.Position;
+                // R29-харденинг (флейки vfx_shot2/3 под opengl3): базовая зона
+                // p замусорена — мстители ранних фаз толпятся у игрока и
+                // попадают в конус NPC-залпа (MaxTargets-срез выталкивает
+                // crowd1 → «месть соседа» не регистрируется), а их удары
+                // копятся и УБИВАЮТ игрока (респавн-телепорт в центр рвёт
+                // поздние фазы — инцидент vfx_shot2: болт 3k вылетел из
+                // (25,25)). Чистая зона (паттерн 3i/3j) + leash 30т
+                // отсекают третьих лиц. ВАЖНО: зона обязана быть В ГРАНИЦАХ
+                // карты (QA-мир 50×50!) — _PhysicsProcess-кламп логики иначе
+                // разводит логику и визуал по разным углам (vfx_shot5:
+                // залп «из угла» = 0 целей).
+                int mapW = _tileService != null && _tileService.MapWidth > 0
+                    ? _tileService.MapWidth : 50;
+                int mapH = _tileService != null && _tileService.MapHeight > 0
+                    ? _tileService.MapHeight : 50;
+                var clean = new Position2D(
+                    Mathf.Min(p.X + 60, mapW - 6), Mathf.Min(p.Y + 60, mapH - 6));
+                TeleportPlayer(clean.X, clean.Y); // логика+визуал: «прилипает»
                 // Толпа клином в направлении +X от игрока (внутри конуса 45°):
                 // (ближняя цель), (дальнее крыло), (нижнее крыло).
                 string? crowd1 = _npcSpawner.SpawnNPC("human", NPCRole.Enemy, 1,
-                    new Position2D(p.X + 2, p.Y), 99001);
+                    new Position2D(clean.X + 2, clean.Y), 99001);
                 string? crowd2 = _npcSpawner.SpawnNPC("human", NPCRole.Enemy, 1,
-                    new Position2D(p.X + 4, p.Y + 1), 99002);
+                    new Position2D(clean.X + 4, clean.Y + 1), 99002);
                 string? crowd3 = _npcSpawner.SpawnNPC("human", NPCRole.Enemy, 1,
-                    new Position2D(p.X + 3, p.Y - 2), 99003);
+                    new Position2D(clean.X + 3, clean.Y - 2), 99003);
                 int crowdCount = (crowd1 != null ? 1 : 0) + (crowd2 != null ? 1 : 0) + (crowd3 != null ? 1 : 0);
 
                 if (crowdCount >= 2 && crowd1 != null)
@@ -747,11 +790,11 @@ public partial class CombatSimDebug : Node
                     int hp2a = crowd2 != null ? _bodyProvider.GetCurrentHealth(crowd2) : int.MaxValue;
                     int hp3a = crowd3 != null ? _bodyProvider.GetCurrentHealth(crowd3) : int.MaxValue;
 
-                    // Заряженный выпуск (1500‰): aim = (p.X+4, p.Y) — конус +X.
+                    // Заряженный выпуск (1500‰): aim = (clean.X+4, clean.Y) — конус +X.
                     var aoeAcc = _combatServiceImpl.ExecuteAttack(
                         PlayerCombatId, coneTech.TechniqueId, crowd1, true,
                         potencyPermil: 1500, isCharged: true,
-                        aimTileX: p.X + 4, aimTileY: p.Y);
+                        aimTileX: clean.X + 4, aimTileY: clean.Y);
 
                     int hp1b = _bodyProvider.GetCurrentHealth(crowd1);
                     int hp2b = crowd2 != null ? _bodyProvider.GetCurrentHealth(crowd2) : int.MaxValue;
@@ -766,14 +809,20 @@ public partial class CombatSimDebug : Node
 
                     // Месть «нейтралов»: задетые площадью (не заявленная цель)
                     // получают угрозу игрока — RetaliateOrFlee включается сама.
+                    // R29-фикс: замер НЕМЕДЛЕННО (синхронная регистрация
+                    // Threats) — затухание угроз не должно рвать проверку
+                    // (паттерн aoe(c)-фикса, флейк vfx_shot6).
+                    var st2Now = crowd2 != null ? _npcService.GetNPCState(crowd2) : null;
+                    var st3Now = crowd3 != null ? _npcService.GetNPCState(crowd3) : null;
+                    bool revengeBystander =
+                        (st2Now != null && st2Now.Threats.ContainsKey(PlayerCombatId))
+                        || (st3Now != null && st3Now.Threats.ContainsKey(PlayerCombatId));
                     await ToSignal(GetTree().CreateTimer(1.2), SceneTreeTimer.SignalName.Timeout);
                     var st2 = crowd2 != null ? _npcService.GetNPCState(crowd2) : null;
                     var st3 = crowd3 != null ? _npcService.GetNPCState(crowd3) : null;
-                    bool revengeBystander =
-                        (st2 != null && st2.Threats.ContainsKey(PlayerCombatId))
-                        || (st3 != null && st3.Threats.ContainsKey(PlayerCombatId));
                     GD.Print($"[CombatSim] aoe(b) bystander revenge: crowd2={st2?.Threats.ContainsKey(PlayerCombatId)}, " +
-                             $"crowd3={st3?.Threats.ContainsKey(PlayerCombatId)} (ожид хотя бы один true — «мир жесток»)");
+                             $"crowd3={st3?.Threats.ContainsKey(PlayerCombatId)} (immediate={revengeBystander}; " +
+                             $"post-wait — затухание, информ.; ожид хотя бы один true — «мир жесток»)");
                     aoeOk &= revengeBystander;
 
                     // === (c) AoE-залп NPC: crowd2 площадью по игроку+crowd1 ===
@@ -785,26 +834,65 @@ public partial class CombatSimDebug : Node
                         if (_combatServiceImpl.IsInCombat)
                             _combatServiceImpl.AbandonCombat(PlayerCombatId);
                         _aoeImpactCount = -1;
+                        // R29-харденинг (vfx_shot9): HP-дельта врёт при
+                        // (а) уклонении игрока, (б) попадании в УЖЕ
+                        // разрушенную часть (сумма клампится, событие
+                        // честно пишет 105, HP 215→215). Критерий = прирост
+                        // суммы DamageAppliedEvent по игроку (синхронная
+                        // публикация) ИЛИ HP-дельта; ретрай ×3 (честные
+                        // уклонения перебрасываются).
+                        int playerDmgA = _damageByTarget.TryGetValue(PlayerCombatId, out int pdA) ? pdA : 0;
                         int hpPlA = _bodyProvider.GetCurrentHealth("player");
                         int hp1c = _bodyProvider.GetCurrentHealth(crowd1);
-                        var npcAoeAcc = _combatServiceImpl.ExecuteAttack(
-                            crowd2, coneTech.TechniqueId, PlayerCombatId, true,
-                            potencyPermil: 1500, isCharged: true,
-                            aimTileX: p.X, aimTileY: p.Y);
-                        int hpPlB = _bodyProvider.GetCurrentHealth("player");
-                        int hp1d = _bodyProvider.GetCurrentHealth(crowd1);
-                        bool npcAoeHitPlayer = hpPlB < hpPlA;
+                        var npcAoeAcc = AttackAcceptance.Rejected;
+                        var bestAcc = AttackAcceptance.Rejected;
+                        int hpPlB = hpPlA, hp1d = hp1c, playerDmgB = playerDmgA;
+                        for (int volley = 0; volley < 3; volley++)
+                        {
+                            if (volley > 0)
+                            {
+                                await WaitForOwnCastClearAsync(crowd2, 2.0f);
+                                _combatServiceImpl.DebugSetReadinessPermil(crowd2, 1000);
+                                if (_combatServiceImpl.IsInCombat)
+                                    _combatServiceImpl.AbandonCombat(PlayerCombatId);
+                            }
+                            npcAoeAcc = _combatServiceImpl.ExecuteAttack(
+                                crowd2, coneTech.TechniqueId, PlayerCombatId, true,
+                                potencyPermil: 1500, isCharged: true,
+                                aimTileX: clean.X, aimTileY: clean.Y);
+                            hpPlB = _bodyProvider.GetCurrentHealth("player");
+                            hp1d = _bodyProvider.GetCurrentHealth(crowd1);
+                            if (npcAoeAcc == AttackAcceptance.Accepted && bestAcc != AttackAcceptance.Accepted)
+                                bestAcc = AttackAcceptance.Accepted;
+                            playerDmgB = _damageByTarget.TryGetValue(PlayerCombatId, out int pdB) ? pdB : 0;
+                            if (npcAoeAcc == AttackAcceptance.Accepted && playerDmgB > playerDmgA) break;
+                            GD.Print($"[CombatSim] aoe(c) volley retry {volley + 1}: acc={npcAoeAcc}, " +
+                                     $"dmg-sum {playerDmgA}→{playerDmgB}, HP {hpPlA}→{hpPlB} (уклон/кламп части)");
+                        }
+                        bool npcAoeHitPlayer = hpPlB < hpPlA || playerDmgB > playerDmgA;
                         bool npcAoeHitNeighbor = hp1d < hp1c;
-                        GD.Print($"[CombatSim] aoe(c) NPC volley: {crowd2}→player acc={npcAoeAcc} " +
-                                 $"(ожид Accepted), player {hpPlA}→{hpPlB}, crowd1 {hp1c}→{hp1d}");
-                        aoeOk &= npcAoeAcc == AttackAcceptance.Accepted && npcAoeHitPlayer;
+                        GD.Print($"[CombatSim] aoe(c) NPC volley: {crowd2}→player acc={npcAoeAcc} (best={bestAcc}) " +
+                                 $"(ожид Accepted), player {hpPlA}→{hpPlB} (dmg-sum {playerDmgA}→{playerDmgB}), " +
+                                 $"crowd1 {hp1c}→{hp1d}");
+                        aoeOk &= bestAcc == AttackAcceptance.Accepted && npcAoeHitPlayer;
 
                         // Месть соседа на NPC-кастера (задет площадью).
+                        // R29-фикс (флейк vfx_shot6): DamageAppliedEvent →
+                        // NPCAIService.OnDamageApplied регистрирует Threats
+                        // СИНХРОННО публикацией — но угрозы ЗАТУХАЮТ
+                        // (NPCAIService: decay + Threats.Remove при ~0):
+                        // слабый удар (1 урон → threat 2.0) стирается за
+                        // 1.2с паузы. Замер НЕМЕДЛЕННО (детерминизм), пауза —
+                        // только для AI-переходов и alive-проверки.
+                        var st1Now = _npcService.GetNPCState(crowd1);
+                        bool revengeOnNpcCaster = st1Now != null
+                            && st1Now.Threats.ContainsKey(crowd2);
                         await ToSignal(GetTree().CreateTimer(1.2), SceneTreeTimer.SignalName.Timeout);
                         var st1 = _npcService.GetNPCState(crowd1);
-                        bool revengeOnNpcCaster = st1 != null && st1.Threats.ContainsKey(crowd2);
+                        bool postWaitRevenge = st1 != null && st1.Threats.ContainsKey(crowd2);
                         GD.Print($"[CombatSim] aoe(c) neighbor revenge on NPC caster: {revengeOnNpcCaster} " +
-                                 $"(crowd1 Threats[{crowd2}]; допустимо false если crowd1 погиб до проверки)");
+                                 $"(immediate; post-wait={postWaitRevenge} — затухание, информ.); " +
+                                 $"допустимо false если crowd1 погиб до проверки");
                         // Мягкая проверка: если crowd1 жив после залпа — месть обязана быть.
                         bool crowd1AliveAfter = _npcService.IsAlive(crowd1);
                         aoeOk &= !crowd1AliveAfter || revengeOnNpcCaster;
@@ -820,6 +908,7 @@ public partial class CombatSimDebug : Node
                     if (crowd1 != null) _npcSpawner.DespawnNPC(crowd1);
                     if (crowd2 != null) _npcSpawner.DespawnNPC(crowd2);
                     if (crowd3 != null) _npcSpawner.DespawnNPC(crowd3);
+                    TeleportPlayer(p.X, p.Y); // R29-харденинг: возврат (мстители ушли с leash)
                 }
                 else
                 {
@@ -1000,6 +1089,206 @@ public partial class CombatSimDebug : Node
             homingOk = false;
         }
 
+        // 3k. R29 (2026-09-21, план R23 §6.7 «Графика боя (VFX)»): проводка
+        // событий → новые рендереры. QA-статики рендереров инкрементятся В
+        // ОБРАБОТЧИКЕ события (паттерн StrikeFx — headless без рендера всё
+        // равно считает; рендереры висят в том же дереве мира, что и этот
+        // сим — GameWorldController добавляет обоих):
+        // (a) AoE-залп (конус в 2 NPC): AoeFxRenderer.TotalVolleys +1 и
+        //     TotalTargetFlashes ≥ +2 (маркер на каждой задетой цели);
+        // (b) хоуминг-пуск: HomingProjectileRenderer.TotalLaunches +1
+        //     (полный полёт/контакт — гард 3j; здесь только проводка события);
+        // (c) аура удержания: Hold/Release → TechniqueEffectRenderer
+        //     .TotalHoldAuraChanges ровно +2 (вкл/выкл).
+        // Скриншоты: GODOT_VFX_SHOT=prefix — Xvfb + opengl3, прецедент R16/R19
+        // (пользователь без локальных тестов до конца дня — визуальную
+        // честность проверяем мы: _aoe.png / _homing.png / _hold.png, VLM).
+        bool vfxOk = true;
+        if (_combatServiceImpl != null && _techniqueService != null && _techniqueGenerator != null
+            && _npcSpawner != null && _playerService != null && _bodyProvider != null
+            && _auraHold != null)
+        {
+            // R29-надёжность (инцидент vfx_shot2): накопленный урон ранних
+            // фаз может УБИТЬ игрока — респавн-таймер (3с → лечение +
+            // телепорт в ЦЕНТР КАРТЫ) выстреливает посреди 3k и рвёт
+            // геометрию фазы (болт вылетел из (25,25)=центр, а не из clean).
+            // Мёртвый игрок → deterministic-ожидание завершения респавна,
+            // ПОТОМ берём позицию под контроль.
+            if (_bodyProvider.GetCurrentHealth("player") <= 0)
+            {
+                GD.Print("[CombatSim] vfx: игрок мёртв (урон фаз) — жду респавн 3.5с (телепорт в центр)");
+                await ToSignal(GetTree().CreateTimer(3.5), SceneTreeTimer.SignalName.Timeout);
+            }
+            var p = _playerService.Position;
+            // Чистая зона В ГРАНИЦАХ карты (QA-мир 50×50: p+80 вне — кламп
+            // логики разведёт её с визуалом; vfx_shot5: залп из угла, 0 целей).
+            int mapW2 = _tileService != null && _tileService.MapWidth > 0
+                ? _tileService.MapWidth : 50;
+            int mapH2 = _tileService != null && _tileService.MapHeight > 0
+                ? _tileService.MapHeight : 50;
+            var clean = new Position2D(
+                Mathf.Min(p.X + 80, mapW2 - 8), Mathf.Min(p.Y + 80, mapH2 - 8));
+            TeleportPlayer(clean.X, clean.Y);
+            string? vfxShot = System.Environment.GetEnvironmentVariable("GODOT_VFX_SHOT");
+
+            // Камера: сглаживание (speed 8) догоняет телепорт ~1с — кадры
+            // VFX должны быть В РАМКЕ (инцидент vfx_shot3: эффекты рисовались
+            // в чистой зоне, камера — в базовой).
+            await ToSignal(GetTree().CreateTimer(1.0), SceneTreeTimer.SignalName.Timeout);
+
+            // Перепозиционирование (погоня/респавн могли сдвинуть игрока):
+            // сцена фазы должна быть стабильна для скриншотов.
+            System.Action recenter = () =>
+            {
+                if (_playerService.Position.X != clean.X || _playerService.Position.Y != clean.Y)
+                    TeleportPlayer(clean.X, clean.Y);
+            };
+
+            // === (a) AoE-залп → вспышка формы + маркеры целей ===
+            _techniqueService.ExtraLibraryCapacity += 2;
+            int vfxLevel = _qiService != null ? (int)_qiService.CultivationLevel : 1;
+            if (vfxLevel < 1) vfxLevel = 1;
+            var vfxCone = _techniqueGenerator.GenerateAoe(AoeShape.Cone, vfxLevel, vfxLevel, 99040);
+            if (_techniqueService.LearnTechnique(vfxCone))
+            {
+                string? fx1 = _npcSpawner.SpawnNPC("human", NPCRole.Enemy, 1,
+                    new Position2D(clean.X + 2, clean.Y), 99041);
+                string? fx2 = _npcSpawner.SpawnNPC("human", NPCRole.Enemy, 1,
+                    new Position2D(clean.X + 4, clean.Y + 1), 99042);
+
+                if (fx1 != null && fx2 != null)
+                {
+                    await WaitForOwnCastClearAsync(PlayerCombatId, 2.0f);
+                    _combatServiceImpl.DebugSetReadinessPermil(PlayerCombatId, 1000);
+                    if (_combatServiceImpl.IsInCombat)
+                        _combatServiceImpl.AbandonCombat(PlayerCombatId);
+
+                    int volleysBefore = AoeFxRenderer.TotalVolleys;
+                    int flashesBefore = AoeFxRenderer.TotalTargetFlashes;
+                    var vfxAcc = _combatServiceImpl.ExecuteAttack(
+                        PlayerCombatId, vfxCone.TechniqueId, fx1, true,
+                        potencyPermil: 1500, isCharged: true,
+                        aimTileX: clean.X + 4, aimTileY: clean.Y);
+                    int volleyDelta = AoeFxRenderer.TotalVolleys - volleysBefore;
+                    int flashDelta = AoeFxRenderer.TotalTargetFlashes - flashesBefore;
+                    GD.Print($"[CombatSim] vfx(a) aoe: acc={vfxAcc} (ожид Accepted), " +
+                             $"volleys +{volleyDelta} (ожид +1), target-flashes +{flashDelta} (ожид ≥2), " +
+                             $"draws={AoeFxRenderer.TotalDrawCalls} (рендер-пайплайн жив; headless тоже тикает)");
+                    vfxOk &= vfxAcc == AttackAcceptance.Accepted && volleyDelta == 1 && flashDelta >= 2;
+
+                    if (!string.IsNullOrEmpty(vfxShot))
+                    {
+                        await ToSignal(GetTree().CreateTimer(0.28), SceneTreeTimer.SignalName.Timeout);
+                        var img = GetViewport().GetTexture().GetImage();
+                        img.SavePng(vfxShot + "_aoe.png");
+                        GD.Print($"[CombatSim] vfx shot: {vfxShot}_aoe.png");
+                    }
+
+                    if (_combatServiceImpl.IsInCombat)
+                        _combatServiceImpl.AbandonCombat(PlayerCombatId);
+                    _npcSpawner.DespawnNPC(fx1);
+                    _npcSpawner.DespawnNPC(fx2);
+                }
+                else
+                {
+                    GD.Print("[CombatSim] WARN — vfx(a) skipped (spawn failed, лимит NPC?)");
+                    vfxOk = false;
+                }
+            }
+            else
+            {
+                GD.Print("[CombatSim] WARN — vfx(a) skipped (AoE technique not learned)");
+                vfxOk = false;
+            }
+
+            // === (b) хоуминг-пуск → визуальный болт рождается в полёте ===
+            recenter();
+            // Камера после возможного ре-телепорта — дать догнать (~0.8с).
+            await ToSignal(GetTree().CreateTimer(0.8), SceneTreeTimer.SignalName.Timeout);
+            var vfxHoming = _techniqueGenerator.GenerateHoming(1, 1, 99043);
+            if (_techniqueService.LearnTechnique(vfxHoming))
+            {
+                string? flyNpc = _npcSpawner.SpawnNPC("human", NPCRole.Enemy, 1,
+                    new Position2D(clean.X + 5, clean.Y), 99044);
+                if (flyNpc != null)
+                {
+                    await WaitForOwnCastClearAsync(PlayerCombatId, 2.0f);
+                    _combatServiceImpl.DebugSetReadinessPermil(PlayerCombatId, 1000);
+                    if (_combatServiceImpl.IsInCombat)
+                        _combatServiceImpl.AbandonCombat(PlayerCombatId);
+
+                    int launchesBefore = HomingProjectileRenderer.TotalLaunches;
+                    var launchAcc = _combatServiceImpl.ExecuteAttack(
+                        PlayerCombatId, vfxHoming.TechniqueId, flyNpc, true,
+                        potencyPermil: 1500, isCharged: true);
+                    int launchDelta = HomingProjectileRenderer.TotalLaunches - launchesBefore;
+                    GD.Print($"[CombatSim] vfx(b) homing: acc={launchAcc} (ожид Accepted), " +
+                             $"launches +{launchDelta} (ожид +1 — болт родился), " +
+                             $"draws={HomingProjectileRenderer.TotalDrawCalls}");
+                    vfxOk &= launchAcc == AttackAcceptance.Accepted && launchDelta == 1;
+
+                    if (!string.IsNullOrEmpty(vfxShot))
+                    {
+                        // 0.25с (не 0.45): полёт ~0.52с — на низком FPS
+                        // llvmpipe кадр «0.45с» реально снялся ПОСЛЕ контакта
+                        // (vfx_shot7: только вспышка удара); 0.25с — болт
+                        // гарантированно в полёте (~2 тайла от игрока).
+                        await ToSignal(GetTree().CreateTimer(0.25), SceneTreeTimer.SignalName.Timeout);
+                        var img = GetViewport().GetTexture().GetImage();
+                        img.SavePng(vfxShot + "_homing.png");
+                        GD.Print($"[CombatSim] vfx shot: {vfxShot}_homing.png");
+                    }
+
+                    // Полёт догорает в сим-тике (визуал — не источник истины).
+                    await ToSignal(GetTree().CreateTimer(2.0), SceneTreeTimer.SignalName.Timeout);
+                    if (_combatServiceImpl.IsInCombat)
+                        _combatServiceImpl.AbandonCombat(PlayerCombatId);
+                    _npcSpawner.DespawnNPC(flyNpc);
+                }
+                else
+                {
+                    GD.Print("[CombatSim] WARN — vfx(b) skipped (spawn failed)");
+                    vfxOk = false;
+                }
+            }
+            else
+            {
+                GD.Print("[CombatSim] WARN — vfx(b) skipped (homing technique not learned)");
+                vfxOk = false;
+            }
+
+            // === (c) аура удержания → кольцо стихии вокруг игрока ===
+            // Hold/Release напрямую (сервис в DI; публикация события →
+            // TechniqueEffectRenderer.OnHeldTechniqueChanged → статик).
+            recenter();
+            await ToSignal(GetTree().CreateTimer(0.6), SceneTreeTimer.SignalName.Timeout);
+            {
+                int auraBefore = TechniqueEffectRenderer.TotalHoldAuraChanges;
+                bool held = _auraHold.Hold(vfxHoming.TechniqueId, 1500, 600, 100, Element.Fire);
+
+                if (!string.IsNullOrEmpty(vfxShot) && held)
+                {
+                    await ToSignal(GetTree().CreateTimer(0.35), SceneTreeTimer.SignalName.Timeout);
+                    var img = GetViewport().GetTexture().GetImage();
+                    img.SavePng(vfxShot + "_hold.png");
+                    GD.Print($"[CombatSim] vfx shot: {vfxShot}_hold.png");
+                }
+
+                var released = _auraHold.Release();
+                int auraDelta = TechniqueEffectRenderer.TotalHoldAuraChanges - auraBefore;
+                GD.Print($"[CombatSim] vfx(c) aura: hold={held}, release={released != null}, " +
+                         $"aura-changes +{auraDelta} (ожид +2 — вкл/выкл)");
+                vfxOk &= held && released != null && auraDelta == 2;
+            }
+
+            TeleportPlayer(p.X, p.Y); // R29: через визуал — возврат «прилипает»
+        }
+        else
+        {
+            GD.Print("[CombatSim] WARN — vfx phase skipped (no combat/technique/aura services)");
+            vfxOk = false;
+        }
+
         // 3f. R21 (репорт 20.09, №3/№4): регресс-гарды пайплайна защиты.
         // (a) DefenseProcessor — плоское вычитание eff.брони×0.5 ПОСЛЕ
         //     процентного + предметное «Снижение урона» (ALGORITHMS §5.2);
@@ -1122,7 +1411,7 @@ public partial class CombatSimDebug : Node
                  $"npc {npcHpBefore}→{npcHpAfter}, arrows now={_inventory?.GetItemCount(CombatRangeGateService.ArrowItemId) ?? -1}");
 
         bool pass = playerTookDamage && npcTookDamage && weaponWiringOk && rangedWiringOk && gatesOk && turnGateOk
-                    && r21ArmorOk && r21QiOk && multiOk && aoeOk && targetingOk && homingOk;
+                    && r21ArmorOk && r21QiOk && multiOk && aoeOk && targetingOk && homingOk && vfxOk;
         if (!playerTookDamage)
             GD.Print("[CombatSim] FAIL — NPC→player damage did NOT apply (BodyService player-id mismatch?)");
         if (!npcTookDamage)
@@ -1147,6 +1436,8 @@ public partial class CombatSimDebug : Node
             GD.Print("[CombatSim] FAIL — targeting (R27): Tab-цикл/радиус/сброс сломаны (план R23 §3.1?)");
         if (!homingOk)
             GD.Print("[CombatSim] FAIL — homing (R28): наведение/полёт/контакт сломаны (план R23 §3.2-A?)");
+        if (!vfxOk)
+            GD.Print("[CombatSim] FAIL — vfx (R29): проводка событий→рендереры сломана (план R23 §6.7?)");
 
         PrintVerdict(pass);
     }
@@ -1254,6 +1545,6 @@ public partial class CombatSimDebug : Node
 
     private static void PrintVerdict(bool pass)
     {
-        GD.Print($"[CombatSim] VERDICT: {(pass ? "PASS — обе стороны боя получают урон (melee + ranged + LOS/ammo gates + readiness-gate + multi R24-C)" : "FAIL")}");
+        GD.Print($"[CombatSim] VERDICT: {(pass ? "PASS — обе стороны боя получают урон (melee + ranged + LOS/ammo gates + readiness-gate + multi R24-C + vfx R29)" : "FAIL")}");
     }
 }

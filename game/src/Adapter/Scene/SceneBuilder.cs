@@ -64,6 +64,10 @@ public partial class SceneBuilder : Node
         SetupProjectiles();
         // R16 (2026-09-10): анимация удара — дуги-слэши/искры (melee).
         SetupStrikeFx();
+        // R29 (2026-09-21, план R23 §6.7): VFX-фаза боя — вспышки AoE-залпов
+        // (форма/стихия/маркеры целей) + полёты самонаводящихся снарядов.
+        SetupAoeFx();
+        SetupHomingProjectiles();
     }
 
     /// <summary>
@@ -241,6 +245,34 @@ public partial class SceneBuilder : Node
     {
         _strikeFxRenderer = new StrikeFxRenderer();
         _worldRoot.AddChild(_strikeFxRenderer);
+    }
+
+    /// <summary>
+    /// R29 (2026-09-21): вспышки площадных залпов — AoeImpactEvent (R25)
+    /// → контур формы (круг/конус/полукруг/линия) + маркеры целей,
+    /// цвет стихии (ElementPalette). После StrikeFx в дереве при равном
+    /// ZIndex (Objects+2) — вспышка поверх свипа.
+    /// </summary>
+    private AoeFxRenderer? _aoeFxRenderer;
+
+    private void SetupAoeFx()
+    {
+        _aoeFxRenderer = new AoeFxRenderer();
+        _worldRoot.AddChild(_aoeFxRenderer);
+    }
+
+    /// <summary>
+    /// R29 (2026-09-21): полёты самонаводящихся снарядов —
+    /// ProjectileSpawnedEvent (R28) → летящий болт стихии с хвостом,
+    /// визуальное наведение на живую цель + вспышка контакта. ZIndex
+    /// Objects+4 (паттерн стрел: снаряд поверх боевого текста).
+    /// </summary>
+    private HomingProjectileRenderer? _homingFxRenderer;
+
+    private void SetupHomingProjectiles()
+    {
+        _homingFxRenderer = new HomingProjectileRenderer();
+        _worldRoot.AddChild(_homingFxRenderer);
     }
 
     /// <summary>
