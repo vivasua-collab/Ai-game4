@@ -44,6 +44,10 @@ public partial class NPCSpriteRenderer : Node2D
     [Inject] private IPlayerService? _playerService;
     [Inject] private ISubscriber<AttackIntentEvent>? _attackIntentSub;
     private System.IDisposable? _attackIntentToken;
+    // R27 (2026-09-21): выбранная игроком цель (Tab) — рамка-подсветка.
+    [Inject] private ISubscriber<PlayerTargetChangedEvent>? _targetChangedSub;
+    private System.IDisposable? _targetChangedToken;
+    private string _selectedTargetId = string.Empty;
 
     private int _tilePixels;
     private readonly List<string> _idSnapshot = new();
@@ -81,6 +85,8 @@ public partial class NPCSpriteRenderer : Node2D
 
     private static readonly Color OutlineColour = new(0.05f, 0.04f, 0.02f, 0.85f);
     private static readonly Color ShadowColour = new(0f, 0f, 0f, 0.30f);
+    // R27: рамка выбранной цели — янтарная (сёчь цели в толпе).
+    private static readonly Color SelectedTargetColour = new(0.98f, 0.76f, 0.19f, 0.95f);
 
     public override void _Ready()
     {
@@ -97,6 +103,13 @@ public partial class NPCSpriteRenderer : Node2D
         // R16: интенты атак NPC → замах оружия (melee; ranged — трассер).
         _attackIntentToken = _attackIntentSub?.Subscribe(OnAttackIntentForSwing);
 
+        // R27: выбор цели игрока (Tab) → рамка-подсветка выбранного NPC.
+        _targetChangedToken = _targetChangedSub?.Subscribe((in PlayerTargetChangedEvent e) =>
+        {
+            _selectedTargetId = e.TargetId;
+            QueueRedraw();
+        });
+
         GD.Print("[NPCSpriteRenderer] Ready");
     }
 
@@ -104,6 +117,8 @@ public partial class NPCSpriteRenderer : Node2D
     {
         _attackIntentToken?.Dispose();
         _attackIntentToken = null;
+        _targetChangedToken?.Dispose();
+        _targetChangedToken = null;
     }
 
     public override void _PhysicsProcess(double delta)
@@ -250,6 +265,15 @@ public partial class NPCSpriteRenderer : Node2D
             float spriteSize = tex.GetWidth();
             var pos = new Vector2(cx - spriteSize / 2f, cy - spriteSize / 2f);
             DrawTexture(tex, pos);
+
+            // R27: рамка-подсветка ВЫБРАННОЙ цели (Tab-цикл TargetingService):
+            // янтарная рамка вокруг спрайта — игрок видит, КГО бьют
+            // Space/техники в толпе (мультибой R24-C). Пустой выбор — нет рамки.
+            if (!string.IsNullOrEmpty(_selectedTargetId) && id == _selectedTargetId)
+            {
+                DrawRect(new Rect2(pos.X - 3f, pos.Y - 3f, spriteSize + 6f, spriteSize + 6f),
+                    SelectedTargetColour, false, 2.5f);
+            }
 
             // R15: overlay оружия в руке — hand-спрайт поверх тела.
             DrawNpcWeapon(id, cx, cy, spriteSize);

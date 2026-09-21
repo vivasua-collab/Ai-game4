@@ -53,6 +53,9 @@ public static class InputMapInitializer
         // Этап 2 внедрения ЦИ: каст выбранной техники (Z).
         AddKeyAction("cast_technique", Key.Z);
 
+        // R27 (2026-09-21): цикл выбора цели (Tab) — TargetingService.
+        AddKeyAction("cycle_target", Key.Tab);
+
         // Pause / Esc
         AddKeyAction("pause", Key.Escape);
 

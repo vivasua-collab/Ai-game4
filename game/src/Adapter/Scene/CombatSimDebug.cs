@@ -53,14 +53,21 @@ public partial class CombatSimDebug : Node
     [Inject] private ISubscriber<Core.Messaging.Contracts.AoeImpactEvent>? _aoeImpactSub;
     // R25 QA: спавн толпы для конуса (спавн — отдельный сервис, не INPCService).
     [Inject] private INPCSpawnerService? _npcSpawner;
+    // R27: выбор цели игрока (Tab-цикл) — TargetingService + событие.
+    [Inject] private Modules.Player.TargetingService? _targeting;
+    [Inject] private ISubscriber<Core.Messaging.Contracts.PlayerTargetChangedEvent>? _targetChangedSub;
 
     private System.IDisposable? _damageToken;
     private System.IDisposable? _intentEchoToken;
     private System.IDisposable? _rejectedToken;
     private System.IDisposable? _aoeImpactToken;
+    private System.IDisposable? _targetChangedToken;
 
     // R25: количество целей последнего AoE-залпа (AoeImpactEvent.TargetIds).
     private int _aoeImpactCount = -1;
+
+    // R27: последний PlayerTargetChangedEvent (TargetId-строка для assert-ов).
+    private string _lastTargetChanged = "<none>";
 
     // Phase 8 ч.3: трекинг отклонений (причины — LOS/стрелы/каст).
     private int _rejectedCount;
@@ -122,6 +129,13 @@ public partial class CombatSimDebug : Node
                      $"r={e.RadiusTiles} targets={_aoeImpactCount}");
         });
 
+        // R27: трекинг выбора цели игрока (Tab-цикл TargetingService).
+        _targetChangedToken = _targetChangedSub?.Subscribe((in Core.Messaging.Contracts.PlayerTargetChangedEvent e) =>
+        {
+            _lastTargetChanged = string.IsNullOrEmpty(e.TargetId) ? "<cleared>" : e.TargetId;
+            GD.Print($"[CombatSim] target changed: '{_lastTargetChanged}' @ ({e.TargetX},{e.TargetY}) dist={e.DistanceTiles}");
+        });
+
         GD.Print("[CombatSim] Ready — scripted combat verification starts in 2s");
         _ = RunSequenceAsync();
     }
@@ -136,6 +150,8 @@ public partial class CombatSimDebug : Node
         _intentEchoToken = null;
         _rejectedToken = null;
         _aoeImpactToken = null;
+        _targetChangedToken?.Dispose();
+        _targetChangedToken = null;
     }
 
     private async System.Threading.Tasks.Task RunSequenceAsync()
@@ -807,6 +823,72 @@ public partial class CombatSimDebug : Node
             aoeOk = false;
         }
 
+        // 3i. R27 (2026-09-21, план R23 §3.1): TargetingService — Tab-цикл.
+        // (a) кольцо: 2 NPC → cycle×3 возвращает к первой цели (событие каждый раз);
+        // (b) радиус: выбранная в радиусе → true; вне радиуса → false (выбор жив);
+        // (c) ClearTarget → сброс + событие "<cleared>".
+        bool targetingOk = true;
+        if (_targeting != null && _npcSpawner != null && _playerService != null && _npcService != null)
+        {
+            var p = _playerService.Position;
+            // Чистая зона: уводим игрока от NPC ранних фаз (кольцо радиуса 12
+            // вокруг стартовой позиции шумит посторонними целями — стражи/
+            // месть-толпа/звери). Фазы ниже (3f) не позиционные — возврат
+            // после теста честный.
+            var clean = new Position2D(p.X + 60, p.Y + 60);
+            _playerService.SetPosition(clean);
+            string? tgtA = _npcSpawner.SpawnNPC("human", NPCRole.Enemy, 1,
+                new Position2D(clean.X + 3, clean.Y), 99021);
+            string? tgtB = _npcSpawner.SpawnNPC("human", NPCRole.Enemy, 1,
+                new Position2D(clean.X + 2, clean.Y + 1), 99022);
+            if (tgtA != null && tgtB != null)
+            {
+                // (a) кольцо цикла: A → B → A (сортировка по дистанции: B ближе).
+                _targeting.CycleTarget();
+                bool cycle1 = _lastTargetChanged == tgtB;
+                _targeting.CycleTarget();
+                bool cycle2 = _lastTargetChanged == tgtA;
+                _targeting.CycleTarget();
+                bool cycle3 = _lastTargetChanged == tgtB; // кольцо замкнулось
+                GD.Print($"[CombatSim] targeting(a) cycle: {cycle1}/{cycle2}/{cycle3} " +
+                         $"(ожид B/A/B — сортировка по дистанции, кольцо)");
+                targetingOk &= cycle1 && cycle2 && cycle3;
+
+                // (b) радиус действия: после cycle3 выбран tgtB (дистанция 2)
+                // в радиусе 2.5 → true. Вне радиуса (0.5) → false, выбор жив.
+                bool inRange = _targeting.TryGetSelectedTargetInRange(2.5f, out string selId, out _);
+                bool rangeOk = inRange && selId == tgtB;
+                // Вне радиуса (0.5 при дистанции 2) → false, но выбор сохранён.
+                bool outOfRange = !_targeting.TryGetSelectedTargetInRange(0.5f, out _, out _);
+                GD.Print($"[CombatSim] targeting(b) range: selected={selId == tgtB} " +
+                         $"inRange={inRange}, outOfRange={outOfRange} (ожид true/true/true)");
+                targetingOk &= rangeOk && outOfRange;
+
+                // (c) явный сброс: событие "<cleared>", выбор пуст.
+                _targeting.ClearTarget(tgtB);
+                bool cleared = _lastTargetChanged == "<cleared>"
+                    && !_targeting.TryGetSelectedTargetInRange(12f, out _, out _);
+                GD.Print($"[CombatSim] targeting(c) clear: event={_lastTargetChanged}, " +
+                         $"selected-empty={cleared} (ожид <cleared>/true)");
+                targetingOk &= cleared;
+
+                // Чистота толпы + возврат игрока.
+                _npcSpawner.DespawnNPC(tgtA);
+                _npcSpawner.DespawnNPC(tgtB);
+                _playerService.SetPosition(p);
+            }
+            else
+            {
+                GD.Print("[CombatSim] WARN — targeting phase skipped (spawn failed)");
+                targetingOk = false;
+            }
+        }
+        else
+        {
+            GD.Print("[CombatSim] WARN — targeting phase skipped (no targeting service)");
+            targetingOk = false;
+        }
+
         // 3f. R21 (репорт 20.09, №3/№4): регресс-гарды пайплайна защиты.
         // (a) DefenseProcessor — плоское вычитание eff.брони×0.5 ПОСЛЕ
         //     процентного + предметное «Снижение урона» (ALGORITHMS §5.2);
@@ -929,7 +1011,7 @@ public partial class CombatSimDebug : Node
                  $"npc {npcHpBefore}→{npcHpAfter}, arrows now={_inventory?.GetItemCount(CombatRangeGateService.ArrowItemId) ?? -1}");
 
         bool pass = playerTookDamage && npcTookDamage && weaponWiringOk && rangedWiringOk && gatesOk && turnGateOk
-                    && r21ArmorOk && r21QiOk && multiOk && aoeOk;
+                    && r21ArmorOk && r21QiOk && multiOk && aoeOk && targetingOk;
         if (!playerTookDamage)
             GD.Print("[CombatSim] FAIL — NPC→player damage did NOT apply (BodyService player-id mismatch?)");
         if (!npcTookDamage)
@@ -950,6 +1032,8 @@ public partial class CombatSimDebug : Node
             GD.Print("[CombatSim] FAIL — multi (R24-C): тихий NPC-NPC бой / толпа-на-игрока сломаны (CMB-2 вернулся?)");
         if (!aoeOk)
             GD.Print("[CombatSim] FAIL — aoe (R25): геометрия/залп/месть нейтралов/AoeImpact сломаны (план R23 §2.2-A?)");
+        if (!targetingOk)
+            GD.Print("[CombatSim] FAIL — targeting (R27): Tab-цикл/радиус/сброс сломаны (план R23 §3.1?)");
 
         PrintVerdict(pass);
     }

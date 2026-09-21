@@ -50,6 +50,8 @@ public sealed class PlayerCombatAdapter : IDisposable
     // R16: публикация стойки защиты (клавиша G → DefenseIntentEvent →
     // CombatModule → ICombatService.ExecuteDefense).
     [Inject] private readonly IPublisher<DefenseIntentEvent> _defenseIntentPub = null!;
+    // R27 (2026-09-21): выбор цели игрока (Tab) — атаки предпочитают выбранную.
+    [Inject] private readonly TargetingService? _targeting = null;
     [Inject] private readonly ISubscriber<AttackRejectedEvent> _attackRejectedSub = null!;
     // R16-аудит (P3-3): подписки CombatStarted/DamageApplied удалены (пустые
     // обработчики, никто не читал).
@@ -189,6 +191,14 @@ public sealed class PlayerCombatAdapter : IDisposable
         // не должен глотать защитный ввод).
         TickDefenseStance(deltaTime);
 
+        // R27: Tab — цикл выбора цели (до кулдауна атаки: выбор не «удар»,
+        // глотать его замахом нельзя). Публикует PlayerTargetChangedEvent
+        // (рамка-подсветка на рендере); Space ниже предпочтёт выбранную цель.
+        if (_input.IsCycleTargetPressed && _targeting != null)
+        {
+            _targeting.CycleTarget();
+        }
+
         // §8.1: тикт кулдауна базовой атаки (секунды на Normal).
         if (_attackCooldownSec > 0f)
         {
@@ -205,9 +215,40 @@ public sealed class PlayerCombatAdapter : IDisposable
         bool isRanged = rangedWeapon != null;
         float attackRange = isRanged ? rangedWeapon!.AttackRange : AttackRangeTiles;
 
+        // R27: ВЫБРАННАЯ цель (Tab) имеет приоритет — толпа R24-C требует
+        // ручного прицеливания (ближайший может быть не тем, кого бьёт игрок).
+        // Условия те же, что у авто-выбора: жива + в радиусе атаки + LOS (ranged).
+        // Выбранная цель вне радиуса/за камнем → прежний авто-выбор ближайшего.
+        int blockedByLos = 0;
+        string? target = null;
+        if (_targeting != null
+            && _targeting.TryGetSelectedTargetInRange(attackRange, out string selId, out var selPos))
+        {
+            bool selLosOk = !isRanged || _tiles == null
+                || CombatLos.HasLineOfSight(_tiles, _player.Position.X, _player.Position.Y,
+                    selPos.X, selPos.Y);
+            if (selLosOk)
+            {
+                target = selId;
+            }
+            else
+            {
+                // Выбранная цель видима игроку, но стреле мешает препятствие —
+                // честный тост (игрок понимает, КТО перекрыт), пауза анти-спам.
+                _attackRejectedPub.Publish(new AttackRejectedEvent(
+                    _player.PlayerId, "basic_attack",
+                    "выбранная цель за препятствием — нет линии огня"));
+                _attackCooldownSec = LosRetryCooldownSec;
+                return;
+            }
+        }
+
         // Phase 8 ч.3: ranged — прицеливание только в ВИДИМЫЕ цели (LOS).
         // Ближайший по дистанции, но за камнем → берём ближайшего видимого.
-        string? target = FindNearestTarget(attackRange, isRanged, out int blockedByLos);
+        if (target == null)
+        {
+            target = FindNearestTarget(attackRange, isRanged, out blockedByLos);
+        }
         if (target == null)
         {
             // Цели в радиусе ЕСТЬ, но все перекрыты препятствием → тост

@@ -120,6 +120,9 @@ public partial class InputAdapter : Node
         // R16: стойка защиты (G) — как attack: только не поверх UI.
         if (!_isOverUI && GodotInput.IsActionJustPressed("defend"))
             _stickyKeys.Add("defend");
+        // R27: цикл выбора цели (Tab) — только не поверх UI.
+        if (!_isOverUI && GodotInput.IsActionJustPressed("cycle_target"))
+            _stickyKeys.Add("cycle_target");
         // Этап 7 внедрения ЦИ: чит-меню (F2, работает даже поверх UI) —
         // 2026-08-28: переехало с F1 на F2 (F1 — окно-справка).
         if (GodotInput.IsActionJustPressed("cheat_menu"))      _stickyKeys.Add("cheat_menu");

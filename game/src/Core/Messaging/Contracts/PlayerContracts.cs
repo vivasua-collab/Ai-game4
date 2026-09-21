@@ -93,3 +93,35 @@ public readonly struct CurrencyChangedEvent
         Delta = delta;
     }
 }
+
+// --- R27 (2026-09-21): выбор цели игрока (TargetingService) ---
+
+/// <summary>
+/// R27 (план R23 §3.1): игрок переключил выбранную цель (Tab-цикл).
+/// Публикуется TargetingService.CycleTarget. Потребители:
+/// NPCSpriteRenderer/AnimalSpriteRenderer (рамка-подсветка выбранной),
+/// HUD (имя цели), PlayerCombatAdapter/PlayerTechniqueCaster (атаки
+/// предпочитают выбранную цель). TargetId пуст — выбор сброшен (цель
+/// умерла/вышла из радиуса). Позиция — для VFX-подсветки без повторного
+/// резолва (int-геометрия, ЗАПРЕТ 3.9).
+/// </summary>
+public readonly struct PlayerTargetChangedEvent
+{
+    /// <summary>ID выбранной цели (пусто = сброс)</summary>
+    public readonly string TargetId;
+
+    /// <summary>Позиция цели в тайлах (для рамки-подсветки)</summary>
+    public readonly int TargetX;
+    public readonly int TargetY;
+
+    /// <summary>Чебышёв-дистанция до игрока (для UI)</summary>
+    public readonly int DistanceTiles;
+
+    public PlayerTargetChangedEvent(string targetId, int targetX, int targetY, int distanceTiles)
+    {
+        TargetId = targetId ?? string.Empty;
+        TargetX = targetX;
+        TargetY = targetY;
+        DistanceTiles = distanceTiles;
+    }
+}

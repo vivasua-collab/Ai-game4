@@ -31,6 +31,9 @@ namespace CultivationGame.Core.Interfaces
         /// <summary>Нажата ли защита (K, однократное)</summary>
         bool IsDefendPressed { get; }
 
+        /// <summary>R27: Tab — цикл выбора цели (sticky, one-shot).</summary>
+        bool IsCycleTargetPressed { get; }
+
         /// <summary>Нажато ли взаимодействие (E, однократное)</summary>
         bool IsInteractPressed { get; }
 

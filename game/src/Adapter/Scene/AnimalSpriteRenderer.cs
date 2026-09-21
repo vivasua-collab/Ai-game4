@@ -12,7 +12,9 @@ using Godot;
 using System.Collections.Generic;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.DI;
+using CultivationGame.Core.Events;
 using CultivationGame.Core.Interfaces;
+using CultivationGame.Core.Messaging.Contracts;
 using CultivationGame.Adapter.Di;
 using CultivationGame.Adapter.Persistence;
 using CultivationGame.Modules.NPC;
@@ -35,6 +37,10 @@ public partial class AnimalSpriteRenderer : Node2D
     // R18-1: HP зверей — тот же per-entity провайдер, что у NPC (Quadruped
     // тела регистрирует AnimalService в IBodyDataProvider).
     [Inject] private IBodyDataProvider? _bodyProvider;
+    // R27 (2026-09-21): выбранная игроком цель (Tab) — рамка-подсветка.
+    [Inject] private ISubscriber<PlayerTargetChangedEvent>? _targetChangedSub;
+    private System.IDisposable? _targetChangedToken;
+    private string _selectedTargetId = string.Empty;
 
     // Cache species → colour to avoid switch per frame.
     private static readonly Dictionary<string, Color> SpeciesColours = new()
@@ -46,6 +52,8 @@ public partial class AnimalSpriteRenderer : Node2D
 
     private static readonly Color OutlineColour = new(0.05f, 0.04f, 0.02f, 0.85f);
     private static readonly Color ShadowColour = new(0f, 0f, 0f, 0.30f);
+    // R27: рамка выбранной цели — янтарная (паттерн NPCSpriteRenderer).
+    private static readonly Color SelectedTargetColour = new(0.98f, 0.76f, 0.19f, 0.95f);
 
     private int _tilePixels;
     // Re-allocated every frame — avoid GC by reusing a single list.
@@ -62,7 +70,21 @@ public partial class AnimalSpriteRenderer : Node2D
         }
         _tilePixels = GameConstants.TILE_PIXELS;
         ZIndex = (int)RenderLayer.Objects;
+
+        // R27: выбор цели игрока (Tab) → рамка-подсветка выбранного зверя.
+        _targetChangedToken = _targetChangedSub?.Subscribe((in PlayerTargetChangedEvent e) =>
+        {
+            _selectedTargetId = e.TargetId;
+            QueueRedraw();
+        });
+
         GD.Print($"[AnimalSpriteRenderer] Ready — tilePixels={_tilePixels}");
+    }
+
+    public override void _ExitTree()
+    {
+        _targetChangedToken?.Dispose();
+        _targetChangedToken = null;
     }
 
     public override void _PhysicsProcess(double delta)
@@ -103,6 +125,13 @@ public partial class AnimalSpriteRenderer : Node2D
             float spriteSize = tex.GetWidth();
             var pos = new Vector2(cx - spriteSize / 2f, cy - spriteSize / 2f);
             DrawTexture(tex, pos);
+
+            // R27: рамка-подсветка ВЫБРАННОЙ цели (паттерн NPCSpriteRenderer).
+            if (!string.IsNullOrEmpty(_selectedTargetId) && animal.EntityId == _selectedTargetId)
+            {
+                DrawRect(new Rect2(pos.X - 3f, pos.Y - 3f, spriteSize + 6f, spriteSize + 6f),
+                    SelectedTargetColour, false, 2.5f);
+            }
 
             // R18-1: HP-бар над зверем — повреждён ИЛИ hostile (месть),
             // под глобальным тумблером ShowEnemyVitals. Паттерн NPC-бара

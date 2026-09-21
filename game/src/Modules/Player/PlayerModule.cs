@@ -226,6 +226,10 @@ public static class PlayerModuleServices
         // NPC_COMBAT_PREP Phase 6: player combat bridge (attack intent with
         // resolved NPC target). Ticked from the Adapter scene controller.
         builder.Register<PlayerCombatAdapter>(Lifetime.Singleton);
+
+        // R27 (2026-09-21): выбор цели игрока (Tab-цикл) — атаки игрока
+        // предпочитают выбранную цель; PlayerTargetChangedEvent для подсветки.
+        builder.Register<TargetingService>(Lifetime.Singleton);
         // Этап 2 внедрения ЦИ (2026-08-23): каст техник игрока
         // (TechniqueCastRequestedEvent → эффекты по типам).
         builder.Register<PlayerTechniqueCaster>(Lifetime.Singleton);

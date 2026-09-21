@@ -44,6 +44,8 @@ public sealed class PlayerTechniqueCaster : IDisposable
     [Inject] private readonly TechniqueChargeService _chargeService = null!;
     [Inject] private readonly AuraHoldService _aura = null!;
     [Inject] private readonly IFormationService _formations = null!;
+    // R27 (2026-09-21): выбранная цель (Tab) — приоритет для техник.
+    [Inject] private readonly TargetingService? _targeting = null;
     [Inject] private readonly IFormationGeneratorService _formationGenerator = null!;
     [Inject] private readonly IPublisher<AttackIntentEvent> _attackIntentPub = null!;
     [Inject] private readonly IPublisher<QiBufferActivateRequestEvent> _qiBufferActivatePub = null!;
@@ -331,6 +333,14 @@ public sealed class PlayerTechniqueCaster : IDisposable
     {
         float rangeTiles = Math.Max(MinAttackRangeTiles, tech.Range / GameConstants.TILE_SIZE_M);
         var pos = _player.Position;
+
+        // R27: ВЫБРАННАЯ цель (Tab) в радиусе техники — приоритет (жива
+        // и в радиусе проверяет сервис; протухшая — авто-сброс внутри).
+        if (_targeting != null
+            && _targeting.TryGetSelectedTargetInRange(rangeTiles, out string selId, out _))
+        {
+            return selId;
+        }
         string? best = null;
         int bestDist = int.MaxValue;
 
