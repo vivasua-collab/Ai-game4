@@ -305,6 +305,13 @@ namespace CultivationGame.Modules.Generator
             if (subtype == CombatSubtype.RangedAoe)
                 ApplyAoeParams(technique, PickAoeShape(rng), level);
 
+            // R28 (план R23 §3.2-A): 25% снарядных техник — самонаводящиеся.
+            if (subtype == CombatSubtype.RangedProjectile && rng.NextBool(0.25f))
+            {
+                technique.IsHoming = true;
+                technique.ProjectileSpeedTilesPerSec = 8;
+            }
+
             // === Шаг 6.10: Регистрация в TechniqueRegistry ===
             _registry.Register(technique);
 
@@ -328,6 +335,26 @@ namespace CultivationGame.Modules.Generator
             var technique = BuildCore(TechniqueType.Combat, TechniqueGrade.Common,
                 level, cultivationLevel, seed,
                 forcedSubtype: CombatSubtype.RangedAoe, forcedAoeShape: shape);
+            _registry.Register(technique);
+            return technique;
+        }
+
+        /// <summary>
+        /// R28 (2026-09-21, план R23 §3.2-A): сгенерировать САМОНАВОДЯЩУЮСЯ
+        /// технику (Subtype=RangedProjectile, IsHoming) — тест-набор игрока/QA.
+        /// Снаряд-сущность летит в CombatService-тике (turn-budget), контакт →
+        /// полный пайплайн. ЗАРЕГИСТРИРОВАНА в реестре (поиск по id).
+        /// </summary>
+        /// <param name="level">Уровень техники (1..9)</param>
+        /// <param name="cultivationLevel">Уровень культивации практика (1-10)</param>
+        /// <param name="seed">Seed для детерминированной генерации</param>
+        public TechniqueData GenerateHoming(int level, int cultivationLevel, long seed)
+        {
+            var technique = BuildCore(TechniqueType.Combat, TechniqueGrade.Common,
+                level, cultivationLevel, seed,
+                forcedSubtype: CombatSubtype.RangedProjectile);
+            technique.IsHoming = true;
+            technique.ProjectileSpeedTilesPerSec = 8; // тайлов/сек (Чебышёв)
             _registry.Register(technique);
             return technique;
         }
@@ -464,6 +491,14 @@ namespace CultivationGame.Modules.Generator
             // если не задана явно через forcedAoeShape)
             if (subtype == CombatSubtype.RangedAoe)
                 ApplyAoeParams(technique, forcedAoeShape ?? PickAoeShape(rng), level);
+
+            // R28 (план R23 §3.2-A): 25% снарядных техник — самонаводящиеся
+            // («Ци-стрела, читающая след цели»); редкая специализация.
+            if (subtype == CombatSubtype.RangedProjectile && rng.NextBool(0.25f))
+            {
+                technique.IsHoming = true;
+                technique.ProjectileSpeedTilesPerSec = 8;
+            }
 
             return technique;
         }

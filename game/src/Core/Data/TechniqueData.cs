@@ -131,5 +131,19 @@ namespace CultivationGame.Core.Data
         /// результат всегда «не союзник» (хук всегда false, поле для будущих аур).
         /// </summary>
         public int SpareAlliesPermil = 0;
+
+        // === R28 (2026-09-21): самонаводящиеся снаряды (план R23 §3.2-A) ===
+
+        /// <summary>
+        /// Техника выпускает СНАРЯД-СУЩНОСТЬ симуляции (Subtype=RangedProjectile):
+        /// урон НЕ мгновенный — CombatService создаёт Projectile, летящий к цели
+        /// (Reynolds seek + ограничение поворота: анти «turn on a dime» — кайт
+        /// честен, AGI-уклонение осмысленно). Контакт → полный пайплайн урона.
+        /// Снаряды эфемерны (сейв не затронут).
+        /// </summary>
+        public bool IsHoming = false;
+
+        /// <summary>Скорость снаряда в тайлах/сек (0 = дефолт 8; тайл = Чебышёв).</summary>
+        public int ProjectileSpeedTilesPerSec = 0;
     }
 }

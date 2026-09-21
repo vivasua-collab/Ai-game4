@@ -343,6 +343,17 @@ TechniqueSnapshotDto при сохранении):
 - Резолв залпа — COMBAT_SYSTEM §4.4 (AoEResolver, per-target полный
   пайплайн, месть нейтралов, AoeImpactEvent для VFX).
 
+### 5.6. Самонаводящиеся техники (R28, 2026-09-21)
+
+TechniqueData/LearnedTechnique/DTO + `IsHoming` (bool) и
+`ProjectileSpeedTilesPerSec` (int, 0 = дефолт 8):
+
+- 25% снарядных техник генератора (`RangedProjectile`) — самонаводящиеся
+  («Ци-стрела, читающая след цели»); `GenerateHoming(level,
+  cultivationLevel, seed)` — детерминированная генерация (QA + тест-набор).
+- Полёт/наведение/контакт — COMBAT_SYSTEM §4.6 (ProjectileSteering:
+  turn-budget 45°/тик, милли-тайловые позиции, эфемерность — сейв чист).
+
 ---
 
 ## 6. Архитектура «Матрёшка» (генерация техник)

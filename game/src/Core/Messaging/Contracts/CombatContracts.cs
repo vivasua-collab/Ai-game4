@@ -353,3 +353,46 @@ public readonly struct AoeImpactEvent
         TargetIds = targetIds;
     }
 }
+
+// === R28 (2026-09-21): самонаводящиеся снаряды (хоуминг A, §3.2) ===
+
+/// <summary>
+/// R28: снаряд-сущность создан и летит (CombatService-тик: Reynolds seek +
+/// ограничение поворота). Урон НЕ мгновенный: контакт (Чебышёв ≤ 1 тайл)
+/// → полный пайплайн по цели. Публикуется при ВЫПУСКЕ (позже снаряд живёт
+/// в тике симуляции; координаты — милли-тайлы int, ЗАПРЕТ 3.9). VFX-фаза
+/// (R29+) интерполирует полёт от FromX/Y без дополнительного события.
+/// </summary>
+public readonly struct ProjectileSpawnedEvent
+{
+    /// <summary>Кастер (владелец снаряда)</summary>
+    public readonly string CasterId;
+
+    /// <summary>Техника снаряда (урон при контакте)</summary>
+    public readonly string TechniqueId;
+
+    /// <summary>Цель самонаведения (снаряд доворачивает каждый тик)</summary>
+    public readonly string TargetId;
+
+    /// <summary>Точка выпуска (милли-тайлы)</summary>
+    public readonly int FromX;
+    public readonly int FromY;
+
+    /// <summary>Скорость (тайлов/сек; тайл = Чебышёв)</summary>
+    public readonly int SpeedTilesPerSec;
+
+    /// <summary>Стихия снаряда (цвет VFX)</summary>
+    public readonly Element Element;
+
+    public ProjectileSpawnedEvent(string casterId, string techniqueId, string targetId,
+        int fromX, int fromY, int speedTilesPerSec, Element element)
+    {
+        CasterId = casterId;
+        TechniqueId = techniqueId;
+        TargetId = targetId;
+        FromX = fromX;
+        FromY = fromY;
+        SpeedTilesPerSec = speedTilesPerSec;
+        Element = element;
+    }
+}

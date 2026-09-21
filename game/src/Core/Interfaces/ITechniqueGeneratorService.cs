@@ -85,5 +85,16 @@ namespace CultivationGame.Core.Interfaces
         /// <param name="cultivationLevel">Уровень культивации практика (1-10)</param>
         /// <param name="seed">Seed для детерминированной генерации</param>
         TechniqueData GenerateAoe(AoeShape shape, int level, int cultivationLevel, long seed);
+
+        /// <summary>
+        /// R28 (2026-09-21, план R23 §3.2-A): сгенерировать САМОНАВОДЯЩУЮСЯ
+        /// технику (RangedProjectile + IsHoming) — тест-набор игрока и QA.
+        /// Снаряд летит в тике симуляции (Reynolds seek + turn-budget),
+        /// контакт → полный пайплайн урона. ЗАРЕГИСТРИРОВАНА в реестре.
+        /// </summary>
+        /// <param name="level">Уровень техники (1..9)</param>
+        /// <param name="cultivationLevel">Уровень культивации практика (1-10)</param>
+        /// <param name="seed">Seed для детерминированной генерации</param>
+        TechniqueData GenerateHoming(int level, int cultivationLevel, long seed);
     }
 }

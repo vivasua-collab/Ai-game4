@@ -300,7 +300,11 @@ namespace CultivationGame.Modules.Combat
                 AoeHalfAngleDeg = data.AoeHalfAngleDeg,
                 AoeFalloffPermil = data.AoeFalloffPermil,
                 AoeMaxTargets = data.AoeMaxTargets,
-                SpareAlliesPermil = data.SpareAlliesPermil
+                SpareAlliesPermil = data.SpareAlliesPermil,
+
+                // R28: хоуминг-снаряды
+                IsHoming = data.IsHoming,
+                ProjectileSpeedTilesPerSec = data.ProjectileSpeedTilesPerSec
             };
 
             // Эхо мастерства: «осмысление» профиля (тип+стихия) даёт новой
@@ -770,6 +774,10 @@ namespace CultivationGame.Modules.Combat
         public int AoeMaxTargets { get; set; }
         public int SpareAlliesPermil { get; set; }
 
+        // R28: хоуминг-снаряды
+        public bool IsHoming { get; set; }
+        public int ProjectileSpeedTilesPerSec { get; set; }
+
         public static TechniqueSnapshotDto FromLearned(LearnedTechnique t) => new()
         {
             TechniqueId = t.TechniqueId,
@@ -796,6 +804,10 @@ namespace CultivationGame.Modules.Combat
             AoeFalloffPermil = t.AoeFalloffPermil,
             AoeMaxTargets = t.AoeMaxTargets,
             SpareAlliesPermil = t.SpareAlliesPermil,
+
+            // R28: хоуминг
+            IsHoming = t.IsHoming,
+            ProjectileSpeedTilesPerSec = t.ProjectileSpeedTilesPerSec,
         };
 
         public static TechniqueSnapshotDto FromData(string scrollId, TechniqueData d) => new()
@@ -826,6 +838,10 @@ namespace CultivationGame.Modules.Combat
             AoeFalloffPermil = d.AoeFalloffPermil,
             AoeMaxTargets = d.AoeMaxTargets,
             SpareAlliesPermil = d.SpareAlliesPermil,
+
+            // R28: хоуминг
+            IsHoming = d.IsHoming,
+            ProjectileSpeedTilesPerSec = d.ProjectileSpeedTilesPerSec,
         };
 
         public LearnedTechnique ToLearned() => new()
@@ -854,6 +870,10 @@ namespace CultivationGame.Modules.Combat
             AoeFalloffPermil = AoeFalloffPermil,
             AoeMaxTargets = AoeMaxTargets,
             SpareAlliesPermil = SpareAlliesPermil,
+
+            // R28: хоуминг
+            IsHoming = IsHoming,
+            ProjectileSpeedTilesPerSec = ProjectileSpeedTilesPerSec,
         };
 
         public TechniqueData ToData() => new()
@@ -884,6 +904,10 @@ namespace CultivationGame.Modules.Combat
             AoeFalloffPermil = AoeFalloffPermil,
             AoeMaxTargets = AoeMaxTargets,
             SpareAlliesPermil = SpareAlliesPermil,
+
+            // R28: хоуминг
+            IsHoming = IsHoming,
+            ProjectileSpeedTilesPerSec = ProjectileSpeedTilesPerSec,
         };
     }
 
@@ -921,5 +945,9 @@ namespace CultivationGame.Modules.Combat
         public int AoeFalloffPermil;
         public int AoeMaxTargets;
         public int SpareAlliesPermil;     // §6.4 хук «бережной» версии (future)
+
+        // R28: самонаводящиеся снаряды (копия из TechniqueData)
+        public bool IsHoming;
+        public int ProjectileSpeedTilesPerSec;
     }
 }

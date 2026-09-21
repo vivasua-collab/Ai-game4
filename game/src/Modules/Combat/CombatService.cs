@@ -87,6 +87,12 @@ namespace CultivationGame.Modules.Combat
         private readonly AoEResolver _aoeResolver;
         private readonly IPublisher<AoeImpactEvent>? _aoeImpactPub;
 
+        // R28 (2026-09-21): хоуминг A — снаряды-сущности (план R23 §3.2-A).
+        // Реестр живёт в UpdateTimer (рядом с pendingCasts); эфемерен — сейв
+        // не затронут (как pendingCasts). Контакт → полный пайплайн урона.
+        private readonly List<Projectile> _projectiles = new();
+        private readonly IPublisher<ProjectileSpawnedEvent>? _projectileSpawnedPub;
+
         // EVT-01: подписки на кросс-модульные события (вместо инъекции IQiService/IQiBufferService)
         private readonly ISubscriber<QiChangedEvent> _qiChangedSub;
         private readonly ISubscriber<QiBufferStateChangedEvent> _qiBufferStateChangedSub;
@@ -216,7 +222,8 @@ namespace CultivationGame.Modules.Combat
             IQiDataProvider qiDataProvider, // Фаза 3 (3.I)
             IBodyDataProvider? bodyDataProvider = null, // 2026-09-11 (аудит боя): смерть защитника по правилам тел
             AoEResolver? aoeResolver = null, // R25: площадные техники
-            IPublisher<AoeImpactEvent>? aoeImpactPub = null) // R25: событие залпа для VFX
+            IPublisher<AoeImpactEvent>? aoeImpactPub = null, // R25: событие залпа для VFX
+            IPublisher<ProjectileSpawnedEvent>? projectileSpawnedPub = null) // R28: хоуминг-снаряды
         {
             _damageService = damageService;
             _techniqueService = techniqueService;
@@ -239,6 +246,7 @@ namespace CultivationGame.Modules.Combat
             // деградируют до одиночной цели — см. ExecuteAoeVolley)
             _aoeResolver = aoeResolver ?? new AoEResolver();
             _aoeImpactPub = aoeImpactPub;
+            _projectileSpawnedPub = projectileSpawnedPub;
 
             // EVT-01: подписка на кэш состояния Ци
             _qiChangedSubscription = _qiChangedSub.Subscribe((in QiChangedEvent e) => {
@@ -807,6 +815,148 @@ namespace CultivationGame.Modules.Combat
         }
 
         /// <summary>
+        /// R28 (план R23 §3.2-A): выпустить самонаводящийся снаряд-сущность.
+        /// Урон отложен до контакта (Чебышёв ≤ 1 тайл): снаряд летит в тике
+        /// UpdateTimer, доворачивая к ТЕКУЩЕЙ позиции цели (seek) на ≤45°/тик
+        /// (turn-budget — кайт честен, AGI-уклонение осмысленно). Цель умерла
+        /// в полёте → снаряд долетает до последней точки и тает (без урона).
+        /// TechniqueUsedEvent — при ВЫПУСКЕ (Ци/кулдаун потрачены честно);
+        /// ProjectileSpawnedEvent — для VFX-фазы (R29+ интерполяция полёта).
+        /// Возвращает false (деградация): кастер без позиции или цель не
+        /// резолвится — вызывающий гейт падает в обычный мгновенный удар.
+        /// </summary>
+        private bool TrySpawnHomingProjectile(string attackerId, string techniqueId,
+            LearnedTechnique tech, string explicitDefenderId,
+            int? explicitPotencyPermil, bool? explicitIsRanged)
+        {
+            // Цель: явная (intent/pending) → резолв пары боя (мгновенный путь)
+            string targetId = explicitDefenderId;
+            if (string.IsNullOrEmpty(targetId))
+                targetId = PlayerIdResolver.AreSameEntity(attackerId, _instigatorId)
+                    ? _currentTargetId
+                    : _instigatorId;
+            if (string.IsNullOrEmpty(targetId)) return false;
+
+            // Позиция кастера (нет → деградация)
+            if (!_aoeResolver.TryResolveTile(attackerId, out int cx, out int cy))
+                return false;
+            // Позиция цели (нет → деградация: снаряду некуда лететь)
+            if (!_aoeResolver.TryResolveTile(targetId, out int tx, out int ty))
+                return false;
+
+            int potency = explicitPotencyPermil ?? _lastAttackPotencyPermil;
+            int speedTilesPerSec = tech.ProjectileSpeedTilesPerSec > 0
+                ? tech.ProjectileSpeedTilesPerSec
+                : ProjectileSteering.DefaultSpeedTilesPerSec;
+
+            var prj = new Projectile
+            {
+                CasterId = attackerId,
+                TechniqueId = techniqueId,
+                TargetId = targetId,
+                PosX = cx * 1000,
+                PosY = cy * 1000,
+                Octant = ProjectileSteering.OctantFromDelta(tx * 1000 - cx * 1000, ty * 1000 - cy * 1000),
+                SpeedMilliPerSec = ProjectileSteering.SpeedMilliPerSec(speedTilesPerSec),
+                PotencyPermil = potency,
+                LifeSec = ProjectileSteering.LifeSec,
+                Element = tech.Element,
+                // Последняя точка цели: цель умрёт в полёте — снаряд долетит сюда
+                LastTargetX = tx * 1000,
+                LastTargetY = ty * 1000
+            };
+            _projectiles.Add(prj);
+
+            // Пуск = использование (Ци уже списана тиками зарядки/ CompleteUse
+            // до интента; TechniqueUsedEvent — информационный, 1× на пуск).
+            _techniqueUsedPub.Publish(new TechniqueUsedEvent(
+                attackerId, techniqueId, GetTechniqueQiCost(techniqueId)));
+
+            // VFX-фаза (R29+): рендерер интерполирует полёт по этому событию
+            _projectileSpawnedPub?.Publish(new ProjectileSpawnedEvent(
+                attackerId, techniqueId, targetId,
+                prj.PosX, prj.PosY, speedTilesPerSec, tech.Element));
+            return true;
+        }
+
+        /// <summary>
+        /// R28: тик снарядов (вызывается из UpdateTimer — рядом с pendingCasts).
+        /// Снимок: контакт-резолв может модифицировать список (смерть цели
+        /// завершает чей-то UI-бой и чистит реестры).
+        /// </summary>
+        private void UpdateProjectiles(float deltaTime)
+        {
+            if (_projectiles.Count == 0) return;
+
+            // Снимок: резолв внутри итерации меняет _projectiles (контакт).
+            var snapshot = new List<Projectile>(_projectiles);
+            foreach (var prj in snapshot)
+            {
+                // Время жизни: «Ци рассеивается вдали от мастера»
+                prj.LifeSec -= deltaTime;
+                if (prj.LifeSec <= 0f)
+                {
+                    _projectiles.Remove(prj);
+                    continue;
+                }
+
+                // Seek: цель жива → обновляем точку самонаведения
+                bool targetAlive = _aoeResolver.TryResolveTile(prj.TargetId, out int tx, out int ty);
+                if (targetAlive)
+                {
+                    prj.LastTargetX = tx * 1000;
+                    prj.LastTargetY = ty * 1000;
+                }
+
+                // Turn-budget (≤45°/тик): доворот к цели — НЕ мгновенный разворот
+                int desOct = ProjectileSteering.OctantFromDelta(
+                    prj.LastTargetX - prj.PosX, prj.LastTargetY - prj.PosY);
+                prj.Octant = ProjectileSteering.TurnToward(prj.Octant, desOct);
+
+                // Полёт (милли-тайлы; скорость × время — Time API, позиция int)
+                ProjectileSteering.VectorFromOctant(prj.Octant, out int dx, out int dy);
+                int step = (int)(prj.SpeedMilliPerSec * deltaTime);
+                prj.PosX += dx * step;
+                prj.PosY += dy * step;
+
+                // Контакт (Чебышёв ≤ ~1 тайл + запас на перелёт шага):
+                // цель жива → ПОЛНЫЙ пайплайн урона (suppressTechUsed —
+                // контактный резолв, не новый пуск); мертва → тает в точке.
+                int cdx = Math.Abs(prj.PosX - prj.LastTargetX);
+                int cdy = Math.Abs(prj.PosY - prj.LastTargetY);
+                if (Math.Max(cdx, cdy) <= ProjectileSteering.ContactRangeMilliTiles + step)
+                {
+                    _projectiles.Remove(prj);
+                    if (targetAlive)
+                    {
+                        BuildAndExecuteDamageRequest(prj.CasterId, prj.TechniqueId,
+                            prj.TargetId, prj.PotencyPermil, true,
+                            suppressTechUsed: true);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// R28: снаряд-сущность симуляции (эфемерен — НЕ сохраняется, как
+        /// pendingCasts). Позиция — МИЛЛИ-ТАЙЛЫ (int, ЗАПРЕТ 3.9): суб-тайловая
+        /// точность полёта при тайловой сетке мира.
+        /// </summary>
+        private sealed class Projectile
+        {
+            public string CasterId;
+            public string TechniqueId;
+            public string TargetId;
+            public int PosX, PosY;          // милли-тайлы
+            public int Octant;              // направление (8 сторон, Чебышёв-мир)
+            public int SpeedMilliPerSec;    // тайлы/сек × 1000
+            public int PotencyPermil;       // сила выпуска (зарядка игрока)
+            public float LifeSec;           // время жизни
+            public Element Element;
+            public int LastTargetX, LastTargetY; // милли-тайлы: точка самонаведения
+        }
+
+        /// <summary>
         /// R25 (2026-09-21, план R23 §2.2-A — выбор пользователя): площадной
         /// залп. НЕ одна цель: AoEResolver собирает ВСЕХ в форме (NPC ∪ звери ∪
         /// игрок; нейтралы ЗАДЕВАЮТСЯ — «мир жесток», месть включается сама
@@ -912,21 +1062,37 @@ namespace CultivationGame.Modules.Combat
             bool? explicitIsRanged = null, int aimTileX = -1, int aimTileY = -1,
             bool suppressTechUsed = false)
         {
-            // R25 (план R23 §2.2-A): площадная техника — МГНОВЕННЫЙ ЗАЛП по всем
-            // целям в форме (AoEResolver; нейтралы ЗАДЕВАЮТСЯ — месть включается
-            // сама через DamageAppliedEvent → RetaliateOrFlee). Per-target —
-            // полный 11-слойный пайплайн: броня/щит Ци/парирование честны для
-            // КАЖДОЙ цели, спад силы — множитель potency per-target.
-            // suppressTechUsed — защита от рекурсии: per-target вызовы идут
-            // напрямую (цель зафиксирована), не через AoE-гейт.
+            // R28 (план R23 §3.2-A): САМОНАВОДЯЩИЙСЯ снаряд — урон НЕ мгновенный:
+            // создаём Projectile (Reynolds seek + turn-budget 45°/тик — кайт
+            // честен), контакт → полный пайплайн (ниже, по тику UpdateTimer).
+            // suppressTechUsed = контактный резолв (снаряд уже прилетел).
+            // Деградация: кастер без позиции / без цели → обычный мгновенный удар.
             if (!suppressTechUsed)
             {
-                var aoeTech = _techniqueService.GetTechnique(techniqueId);
-                if (aoeTech != null
-                    && aoeTech.Subtype == CombatSubtype.RangedAoe
-                    && aoeTech.AoeShape != AoeShape.None)
+                // gateTech: имя не конфликтует с телом метода ниже (var tech)
+                var gateTech = _techniqueService.GetTechnique(techniqueId);
+                if (gateTech != null
+                    && gateTech.Subtype == CombatSubtype.RangedProjectile
+                    && gateTech.IsHoming)
                 {
-                    ExecuteAoeVolley(attackerId, techniqueId, aoeTech, explicitDefenderId,
+                    bool spawned = TrySpawnHomingProjectile(attackerId, techniqueId, gateTech,
+                        explicitDefenderId, explicitPotencyPermil, explicitIsRanged);
+                    if (spawned) return;
+                    // деградация: падаем в обычный мгновенный резолв ниже
+                }
+
+                // R25 (план R23 §2.2-A): площадная техника — МГНОВЕННЫЙ ЗАЛП по всем
+                // целям в форме (AoEResolver; нейтралы ЗАДЕВАЮТСЯ — месть включается
+                // сама через DamageAppliedEvent → RetaliateOrFlee). Per-target —
+                // полный 11-слойный пайплайн: броня/щит Ци/парирование честны для
+                // КАЖДОЙ цели, спад силы — множитель potency per-target.
+                // suppressTechUsed — защита от рекурсии: per-target вызовы идут
+                // напрямую (цель зафиксирована), не через AoE-гейт.
+                if (gateTech != null
+                    && gateTech.Subtype == CombatSubtype.RangedAoe
+                    && gateTech.AoeShape != AoeShape.None)
+                {
+                    ExecuteAoeVolley(attackerId, techniqueId, gateTech, explicitDefenderId,
                         explicitPotencyPermil, explicitIsRanged, aimTileX, aimTileY);
                     return;
                 }
@@ -1358,6 +1524,10 @@ namespace CultivationGame.Modules.Combat
                     }
                 }
             }
+
+            // R28 (2026-09-21): тик снарядов-сущностей (хоуминг A) — ВСЕГДА,
+            // не только в UI-бое (снаряды летят и в «тихих» NPC-стычках).
+            UpdateProjectiles(deltaTime);
         }
 
         // === Вспомогательные методы для получения данных техники ===

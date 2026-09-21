@@ -56,18 +56,24 @@ public partial class CombatSimDebug : Node
     // R27: выбор цели игрока (Tab-цикл) — TargetingService + событие.
     [Inject] private Modules.Player.TargetingService? _targeting;
     [Inject] private ISubscriber<Core.Messaging.Contracts.PlayerTargetChangedEvent>? _targetChangedSub;
+    // R28: самонаводящиеся снаряды — событие выпуска (трекинг полёта).
+    [Inject] private ISubscriber<Core.Messaging.Contracts.ProjectileSpawnedEvent>? _projectileSpawnedSub;
 
     private System.IDisposable? _damageToken;
     private System.IDisposable? _intentEchoToken;
     private System.IDisposable? _rejectedToken;
     private System.IDisposable? _aoeImpactToken;
     private System.IDisposable? _targetChangedToken;
+    private System.IDisposable? _projectileSpawnedToken;
 
     // R25: количество целей последнего AoE-залпа (AoeImpactEvent.TargetIds).
     private int _aoeImpactCount = -1;
 
     // R27: последний PlayerTargetChangedEvent (TargetId-строка для assert-ов).
     private string _lastTargetChanged = "<none>";
+
+    // R28: количество ProjectileSpawnedEvent за симуляцию (хоуминг-пуски).
+    private int _projectileSpawns;
 
     // Phase 8 ч.3: трекинг отклонений (причины — LOS/стрелы/каст).
     private int _rejectedCount;
@@ -136,6 +142,14 @@ public partial class CombatSimDebug : Node
             GD.Print($"[CombatSim] target changed: '{_lastTargetChanged}' @ ({e.TargetX},{e.TargetY}) dist={e.DistanceTiles}");
         });
 
+        // R28: трекинг пусков хоуминг-снарядов (полёт — в CombatService-тике).
+        _projectileSpawnedToken = _projectileSpawnedSub?.Subscribe((in Core.Messaging.Contracts.ProjectileSpawnedEvent e) =>
+        {
+            _projectileSpawns++;
+            GD.Print($"[CombatSim] projectile spawned: {e.CasterId} → {e.TargetId} " +
+                     $"from ({e.FromX},{e.FromY}) speed={e.SpeedTilesPerSec} t/s ({e.Element})");
+        });
+
         GD.Print("[CombatSim] Ready — scripted combat verification starts in 2s");
         _ = RunSequenceAsync();
     }
@@ -152,6 +166,8 @@ public partial class CombatSimDebug : Node
         _aoeImpactToken = null;
         _targetChangedToken?.Dispose();
         _targetChangedToken = null;
+        _projectileSpawnedToken?.Dispose();
+        _projectileSpawnedToken = null;
     }
 
     private async System.Threading.Tasks.Task RunSequenceAsync()
@@ -889,6 +905,101 @@ public partial class CombatSimDebug : Node
             targetingOk = false;
         }
 
+        // 3j. R28 (2026-09-21, план R23 §3.2-A «снаряды-сущности», выбор
+        // пользователя): хоуминг — урон отложен до КОНТАКТА (не мгновенный),
+        // полёт с turn-budget ≤45°/тик (анти «turn on a dime» — кайт честен).
+        // (a) юнит-стенд наведения: октанты из дельты + доворот по ±1;
+        // (b) полёт: выпуск по NPC на 5 тайлов → в кадре пуска урона НЕТ
+        //     (снаряд в полёте) → контакт через ~0.7с → урон + событие пуска.
+        bool homingOk = true;
+        if (_combatServiceImpl != null && _techniqueService != null && _techniqueGenerator != null
+            && _npcSpawner != null && _playerService != null && _bodyProvider != null)
+        {
+            // === (a) стенд наведения (int, без сервисов) ===
+            {
+                int o0 = ProjectileSteering.OctantFromDelta(3000, 0);
+                int o2 = ProjectileSteering.OctantFromDelta(0, 3000);
+                int o4 = ProjectileSteering.OctantFromDelta(-3000, 0);
+                int o1 = ProjectileSteering.OctantFromDelta(2000, 2000);
+                int o7 = ProjectileSteering.OctantFromDelta(2000, -2000);
+                int o2b = ProjectileSteering.OctantFromDelta(1000, 3000); // yDom-грань
+                // Разворот 0→4: ровно 4 тика по ±1 октанту (180° честной погони)
+                int t = 0;
+                t = ProjectileSteering.TurnToward(t, 4); t = ProjectileSteering.TurnToward(t, 4);
+                t = ProjectileSteering.TurnToward(t, 4); t = ProjectileSteering.TurnToward(t, 4);
+                bool fullTurn = t == 4;
+                // Краткий доворот 0→7: один шаг (по часовой)
+                bool quickTurn = ProjectileSteering.TurnToward(0, 7) == 7;
+                homingOk &= o0 == 0 && o2 == 2 && o4 == 4 && o1 == 1 && o7 == 7
+                    && o2b == 2 && fullTurn && quickTurn;
+                GD.Print($"[CombatSim] homing(a) steering: octants {o0}/{o2}/{o4}/{o1}/{o7}/{o2b} " +
+                         $"(ожид 0/2/4/1/7/2), turn 0→4 за 4 тика={fullTurn}, 0→7 за 1={quickTurn}");
+            }
+
+            // === (b) полёт до контакта ===
+            _techniqueService.ExtraLibraryCapacity += 2;
+            var homingTech = _techniqueGenerator.GenerateHoming(1, 1, 99030);
+            bool homingLearned = _techniqueService.LearnTechnique(homingTech);
+            if (homingLearned)
+            {
+                var p = _playerService.Position;
+                // Чистая зона (паттерн 3i): ранние фазы оставили мстящих NPC.
+                var clean = new Position2D(p.X + 60, p.Y + 60);
+                _playerService.SetPosition(clean);
+                string? flyTarget = _npcSpawner.SpawnNPC("human", NPCRole.Enemy, 1,
+                    new Position2D(clean.X + 5, clean.Y), 99031);
+
+                if (flyTarget != null)
+                {
+                    await WaitForOwnCastClearAsync(PlayerCombatId, 2.0f);
+                    _combatServiceImpl.DebugSetReadinessPermil(PlayerCombatId, 1000);
+                    if (_combatServiceImpl.IsInCombat)
+                        _combatServiceImpl.AbandonCombat(PlayerCombatId);
+
+                    int hpA = _bodyProvider.GetCurrentHealth(flyTarget);
+                    int spawnsBefore = _projectileSpawns;
+
+                    // Заряженный выпуск (1500‰): снаряд создан, урона ЕЩЁ нет.
+                    var launchAcc = _combatServiceImpl.ExecuteAttack(
+                        PlayerCombatId, homingTech.TechniqueId, flyTarget, true,
+                        potencyPermil: 1500, isCharged: true);
+                    int hpInFrame = _bodyProvider.GetCurrentHealth(flyTarget);
+                    bool launchedNotInstant = hpInFrame == hpA; // урон отложен!
+                    bool spawnEvent = _projectileSpawns > spawnsBefore;
+
+                    // Полёт: 5 тайлов / 8 тайл-сек ≈ 0.7с (+ turn-budget) — ждём.
+                    await ToSignal(GetTree().CreateTimer(2.5), SceneTreeTimer.SignalName.Timeout);
+                    int hpB = _bodyProvider.GetCurrentHealth(flyTarget);
+                    bool contactDamage = hpB < hpA;
+                    GD.Print($"[CombatSim] homing(b) flight: launch={launchAcc} (ожид Accepted), " +
+                             $"in-frame dmg NO={launchedNotInstant}, spawn-event={spawnEvent}, " +
+                             $"{flyTarget} HP {hpA}→{hpInFrame}→{hpB} (контакт ≈0.7с)");
+                    homingOk &= launchAcc == AttackAcceptance.Accepted
+                        && launchedNotInstant && spawnEvent && contactDamage;
+
+                    if (_combatServiceImpl.IsInCombat)
+                        _combatServiceImpl.AbandonCombat(PlayerCombatId);
+                    _npcSpawner.DespawnNPC(flyTarget);
+                    _playerService.SetPosition(p);
+                }
+                else
+                {
+                    GD.Print("[CombatSim] WARN — homing(b) skipped (spawn failed)");
+                    homingOk = false;
+                }
+            }
+            else
+            {
+                GD.Print("[CombatSim] WARN — homing(b) skipped (technique not learned)");
+                homingOk = false;
+            }
+        }
+        else
+        {
+            GD.Print("[CombatSim] WARN — homing phase skipped (no combat/npc/generator services)");
+            homingOk = false;
+        }
+
         // 3f. R21 (репорт 20.09, №3/№4): регресс-гарды пайплайна защиты.
         // (a) DefenseProcessor — плоское вычитание eff.брони×0.5 ПОСЛЕ
         //     процентного + предметное «Снижение урона» (ALGORITHMS §5.2);
@@ -1011,7 +1122,7 @@ public partial class CombatSimDebug : Node
                  $"npc {npcHpBefore}→{npcHpAfter}, arrows now={_inventory?.GetItemCount(CombatRangeGateService.ArrowItemId) ?? -1}");
 
         bool pass = playerTookDamage && npcTookDamage && weaponWiringOk && rangedWiringOk && gatesOk && turnGateOk
-                    && r21ArmorOk && r21QiOk && multiOk && aoeOk && targetingOk;
+                    && r21ArmorOk && r21QiOk && multiOk && aoeOk && targetingOk && homingOk;
         if (!playerTookDamage)
             GD.Print("[CombatSim] FAIL — NPC→player damage did NOT apply (BodyService player-id mismatch?)");
         if (!npcTookDamage)
@@ -1034,6 +1145,8 @@ public partial class CombatSimDebug : Node
             GD.Print("[CombatSim] FAIL — aoe (R25): геометрия/залп/месть нейтралов/AoeImpact сломаны (план R23 §2.2-A?)");
         if (!targetingOk)
             GD.Print("[CombatSim] FAIL — targeting (R27): Tab-цикл/радиус/сброс сломаны (план R23 §3.1?)");
+        if (!homingOk)
+            GD.Print("[CombatSim] FAIL — homing (R28): наведение/полёт/контакт сломаны (план R23 §3.2-A?)");
 
         PrintVerdict(pass);
     }
