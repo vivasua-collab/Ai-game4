@@ -37,7 +37,7 @@ namespace CultivationGame.Modules.Player;
 /// <summary>
 /// R27: выбор цели игрока (Tab-цикл по целям в радиусе).
 /// </summary>
-public sealed class TargetingService
+public sealed class TargetingService : IWorldResettable
 {
     /// <summary>
     /// Радиус циклирования (тайлы, Чебышёв): «видимый бой» вокруг игрока.
@@ -122,6 +122,24 @@ public sealed class TargetingService
 
     private void PublishChange(string id, int x, int y, int dist)
         => _targetChangedPub?.Publish(new PlayerTargetChangedEvent(id, x, y, dist));
+
+    // === АУДИТ-0921_2030 Ф4 (P2): IWorldResettable ======================
+    //
+    // CurrentTargetId — singleton-состояние, переживал NewGame. Ленивая
+    // валидация чистит «протухшую» цель при чтении (умерла/исчезла), но
+    // ID нового мира могут ПОВТОРЯТЬСЯ (npc_001 прошлого мира → npc_001
+    // нового) — старый выбор внезапно становился валидной целью нового
+    // мира. ResetWorld публикует пустой PlayerTargetChangedEvent — рендеры
+    // (рамка-подсветка NPC/AnimalSpriteRenderer) снимают выделение.
+    public void ResetWorld()
+    {
+        if (!string.IsNullOrEmpty(CurrentTargetId))
+        {
+            CurrentTargetId = string.Empty;
+            PublishChange(string.Empty, 0, 0, 0);
+            Console.WriteLine("[TargetingService] ResetWorld: выбор цели сброшен (New Game)");
+        }
+    }
 
     /// <summary>
     /// Живые кандидаты (NPC ∪ звери) в радиусе циклирования от игрока,

@@ -29,7 +29,7 @@ namespace CultivationGame.Modules.Player;
 /// тост-отклонение + пауза прицеливания (анти-спам). Третья санкционированная
 /// инъекция — ITileService (позиционная проверка LOS, паттерн NPC-B05).
 /// </summary>
-public sealed class PlayerCombatAdapter : IDisposable
+public sealed class PlayerCombatAdapter : IDisposable, IWorldResettable
 {
     [Inject] private readonly IPlayerService _player = null!;
     [Inject] private readonly IPlayerInputService _input = null!;
@@ -423,6 +423,25 @@ public sealed class PlayerCombatAdapter : IDisposable
         // PlayerModule гейтил действия по рассинхронизированному значению.
         // Сброс здесь синхронизирует адаптер с пайплайном.
         CurrentDefenseStance = DefenseSubtype.None;
+    }
+
+    // === АУДИТ-0921_2030 Ф4 (P2): IWorldResettable ======================
+    //
+    // Адаптер — DI-синглтон; его боевые состояния переживали NewGame:
+    //   • CurrentDefenseStance — частично лечился CombatEndedEvent, но при
+    //     жёсткой пересборке мира события конца боя может не быть;
+    //   • CurrentWeaponMode — игрок мог закончить прошлый мир в Ranged
+    //     (лук), а новый мир стартует с НУЛЕВОЙ экипировкой (кулаки):
+    //     Space искал бы дальнюю цель при пустом колчане;
+    //   • кулдауны _attackCooldownSec/_defenseSwitchCooldownSec — мелочь,
+    //     но «свежий мир = свежий адаптер» (семантика контракта).
+    public void ResetWorld()
+    {
+        CurrentDefenseStance = DefenseSubtype.None;
+        CurrentWeaponMode = WeaponMode.Melee;
+        _attackCooldownSec = 0f;
+        _defenseSwitchCooldownSec = 0f;
+        Console.WriteLine("[PlayerCombatAdapter] ResetWorld: стойка/режим оружия/кулдауны сброшены (New Game)");
     }
 
     public void Dispose()

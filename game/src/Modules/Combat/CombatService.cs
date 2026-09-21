@@ -434,6 +434,14 @@ namespace CultivationGame.Modules.Combat
         private int AttackThreshold => _config?.AttackThresholdPermil ?? 1000;
 
         /// <summary>
+        /// АУДИТ-0921_2030 Ф3-4: смещение «центр тайла» в милли-тайлах.
+        /// Семантика координат сущностей (рендеры: pos*tile + tile/2) —
+        /// тайловая координата N означает ЦЕНТР клетки N, в милли-тайлах
+        /// это N*1000 + 500. Хоуминг-снаряды используют ту же конвенцию.
+        /// </summary>
+        private const int TileCenterOffsetMilli = 500;
+
+        /// <summary>
         /// R21-2: готовность удара участника (промилле). 0 = только что
         /// бил; ≥ порога = готов ударить.
         /// R24-C: реестр дерущихся живёт БЕЗ привязки к UI-бою (NPC-NPC
@@ -624,8 +632,20 @@ namespace CultivationGame.Modules.Combat
             {
                 if (string.IsNullOrEmpty(targetId))
                 {
-                    return AttackAcceptance.Rejected; // Без цели не бьём
+                    // АУДИТ-0921_2030 Ф3-2 (P1): AoE в ПУСТУЮ область — легальный
+                    // каст: эпицентр = точка прицеливания (R25 §2.2: «эпицентр —
+                    // точка прицеливания, а не обязательная сущность»), entity-цель
+                    // опциональна (CombatService.ExecuteAoeVolley честно поддерживает
+                    // пустой залп — «Ци срывается волной в пустоту»). Гейт пустой
+                    // цели остаётся для НЕ-AoE: одиночный удар без цели не имеет смысла.
+                    var targetlessTech = _techniqueService.GetTechnique(techniqueId);
+                    bool isAoeVolley = targetlessTech != null
+                        && targetlessTech.Subtype == CombatSubtype.RangedAoe;
+                    if (!isAoeVolley || (aimTileX < 0 || aimTileY < 0))
+                        return AttackAcceptance.Rejected; // Без цели/прицела не бьём
                 }
+                else
+                {
                 // UI-сессию открывает ТОЛЬКО пара с участием игрока
                 // (HUD/стадии/таймаут — семантика CombatStarted/Ended).
                 // NPC-vs-NPC дерётся без сессии: урон идёт тем же
@@ -636,6 +656,7 @@ namespace CultivationGame.Modules.Combat
                 if (pairHasPlayer)
                 {
                     StartCombat(attackerId, targetId);
+                }
                 }
             }
 
@@ -855,21 +876,31 @@ namespace CultivationGame.Modules.Combat
                 ? tech.ProjectileSpeedTilesPerSec
                 : ProjectileSteering.DefaultSpeedTilesPerSec;
 
+            // АУДИТ-0921_2030 Ф3-4 (P2): координата сущности = ЦЕНТР тайла
+            // (единая семантика с рендерами NPC/звери/игрок = pos*tile + tile/2).
+            // Прежде PosX = cx*1000 — угол тайла: болт визуально рождался из
+            // верхнего-левого угла клетки кастера (пол-тайла рассинхрона с
+            // сущностью). Дельты направления не меняются (обе точки +500).
+            int startX = cx * 1000 + TileCenterOffsetMilli;
+            int startY = cy * 1000 + TileCenterOffsetMilli;
+            int targetX = tx * 1000 + TileCenterOffsetMilli;
+            int targetY = ty * 1000 + TileCenterOffsetMilli;
+
             var prj = new Projectile
             {
                 CasterId = attackerId,
                 TechniqueId = techniqueId,
                 TargetId = targetId,
-                PosX = cx * 1000,
-                PosY = cy * 1000,
-                Octant = ProjectileSteering.OctantFromDelta(tx * 1000 - cx * 1000, ty * 1000 - cy * 1000),
+                PosX = startX,
+                PosY = startY,
+                Octant = ProjectileSteering.OctantFromDelta(targetX - startX, targetY - startY),
                 SpeedMilliPerSec = ProjectileSteering.SpeedMilliPerSec(speedTilesPerSec),
                 PotencyPermil = potency,
                 LifeSec = ProjectileSteering.LifeSec,
                 Element = tech.Element,
                 // Последняя точка цели: цель умрёт в полёте — снаряд долетит сюда
-                LastTargetX = tx * 1000,
-                LastTargetY = ty * 1000
+                LastTargetX = targetX,
+                LastTargetY = targetY
             };
             _projectiles.Add(prj);
 
@@ -907,11 +938,15 @@ namespace CultivationGame.Modules.Combat
                 }
 
                 // Seek: цель жива → обновляем точку самонаведения
-                bool targetAlive = _aoeResolver.TryResolveTile(prj.TargetId, out int tx, out int ty);
+                // (АУДИТ-0921_2030 Ф3-3: TryResolveAliveTile — мёртвая цель
+                // НЕ обновляет точку: снаряд летит в последнюю известную
+                // позицию и тает БЕЗ урона, как задокументировано в §4.6;
+                // прежний позиционный резолв считал труп «живой целью»).
+                bool targetAlive = _aoeResolver.TryResolveAliveTile(prj.TargetId, out int tx, out int ty);
                 if (targetAlive)
                 {
-                    prj.LastTargetX = tx * 1000;
-                    prj.LastTargetY = ty * 1000;
+                    prj.LastTargetX = tx * 1000 + TileCenterOffsetMilli;
+                    prj.LastTargetY = ty * 1000 + TileCenterOffsetMilli;
                 }
 
                 // Turn-budget (≤45°/тик): доворот к цели — НЕ мгновенный разворот
@@ -1685,6 +1720,12 @@ namespace CultivationGame.Modules.Combat
             // Кэши защит — «никто не защищался».
             _lastPlayerDefense = DefenseSubtype.None;
             LastNpcDefenseSelected = DefenseSubtype.None;
+
+            // АУДИТ-0921_2030 Ф4-хвост: глобальные кэши последней атаки
+            // (potency/ranged — фолбэки для путей без explicit-параметров).
+            // Новый мир = «атак ещё не было», не наследуем чужой контекст.
+            _lastAttackPotencyPermil = GameConstants.POTENCY_BASE_PERMIL;
+            _lastAttackIsRanged = false;
 
             Console.WriteLine("[CombatService] ResetWorld: combat state cleared (New Game)");
         }

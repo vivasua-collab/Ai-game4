@@ -3,6 +3,7 @@
 // Фаза 4, задача 4.2 — сервис перков NPC для бонусов проводимости.
 // Перки реализованы как постоянные баффы (duration=float.MaxValue) через IBuffService.
 // Проводимость обновляется через IQiDataProvider при изменении перков.
+using System;
 using System.Collections.Generic;
 using CultivationGame.Core;
 using CultivationGame.Modules.NPC.Data;
@@ -23,7 +24,7 @@ namespace CultivationGame.Modules.NPC
     /// - Внутренний справочник _entityPerks отслеживает перки per-entity
     /// - _entityBaseConductivity хранит базовую проводимость (до перков) для пересчёта
     /// </summary>
-    public sealed class PerkService : IPerkService
+    public sealed class PerkService : IPerkService, IWorldResettable
     {
         // === Зависимости (DI через конструктор) ===
         private readonly IBuffService _buffService;
@@ -249,6 +250,25 @@ namespace CultivationGame.Modules.NPC
             long currentQi = _qiDataProvider.GetCurrentQi(entityId);
             long maxQi = _qiDataProvider.GetMaxQi(entityId);
             _qiDataProvider.SetQiState(entityId, currentQi, maxQi, effectiveConductivity);
+        }
+
+        // === АУДИТ-0921_2030 Ф4 (P1): IWorldResettable ======================
+        //
+        // PerkService — DI-синглтон с world-scoped состоянием: _entityPerks +
+        // _entityBaseConductivity переживали пересборку мира. Прежний дефект
+        // (двойной остаток): внутренний реестр перков + permanent-бафф в
+        // BuffService (сам BuffService сбрасывается с r30-1 B1, а этот реестр
+        // — нет). При повторном использовании entity ID в новом мире HasPerk()
+        // возвращал true → новый NPC НЕ получал свой перк повторно.
+        // PerkRegistry — процесс-scoped справочник конфигурации, НЕ сбрасывается
+        // (семантика IWorldResettable: «свежий процесс», каталоги не трогаем).
+        public void ResetWorld()
+        {
+            int perks = _entityPerks.Count;
+            _entityPerks.Clear();
+            _entityBaseConductivity.Clear();
+            if (perks > 0)
+                Console.WriteLine($"[PerkService] ResetWorld: {perks} записей перков очищено (New Game)");
         }
     }
 }

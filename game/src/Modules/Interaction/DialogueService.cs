@@ -24,7 +24,7 @@ namespace CultivationGame.Modules.Interaction
     /// - NPCInteractedEvent → подписка (автостарт диалога при AI-инициированном talk)
     /// - InteractionCompletedEvent → подписка (автостарт диалога при клике игрока)
     /// </summary>
-    public class DialogueService : IDialogueService, IDisposable
+    public class DialogueService : IDialogueService, IWorldResettable, IDisposable
     {
         // === MessagePipe: паблишеры ===
         private readonly IPublisher<DialogueStartedEvent> _dialogueStartedPub;
@@ -222,6 +222,23 @@ namespace CultivationGame.Modules.Interaction
             _typewriter.Stop();
 
             _dialogueEndedPub.Publish(new DialogueEndedEvent(npcId, dialogueId));
+        }
+
+        // === АУДИТ-0921_2030 Ф4 (P2): IWorldResettable ====================
+        //
+        // Обычное закрытие чинит состояние через EndDialogue(), но переход
+        // меню → NewGame/LoadGame НЕ гарантирует вызова: новый мир мог бы
+        // начать с _isInDialogue=true (StartDialogue отказывает «уже в
+        // диалоге» — навсегда). Reuse через EndDialogue: он идемпотентен
+        // (тихий return вне диалога) и публикует DialogueEndedEvent —
+        // UI-окно снимается штатным путём.
+        public void ResetWorld()
+        {
+            if (_isInDialogue)
+            {
+                EndDialogue();
+                Console.WriteLine("[DialogueService] ResetWorld: диалог принудительно закрыт (New Game)");
+            }
         }
 
         public bool IsInDialogue => _isInDialogue;

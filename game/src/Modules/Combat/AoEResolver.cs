@@ -124,6 +124,48 @@ public sealed class AoEResolver
     }
 
     /// <summary>
+    /// АУДИТ-0921_2030 Ф3-3 (P2): позиция ТОЛЬКО ЖИВОЙ сущности — семантика
+    /// для хоуминг-снарядов (seek). Прежний TryResolveTile позиционен:
+    /// мёртвый NPC остаётся в реестре (IsAlive=false), зверь — тоже
+    /// (AnimalService держит труп до обыска), поэтому UpdateProjectiles
+    /// считал цель «живой», снаряд корректировал траекторию к трупу и
+    /// контакт запускал полный damage pipeline по мёртвому. Здесь живость
+    /// проверяется явно: NPC — IsAlive, зверь — AnimalInfo.IsAlive,
+    /// игрок — позиция (смерть игрока обрабатывается своим доменом).
+    /// </summary>
+    public bool TryResolveAliveTile(string entityId, out int x, out int y)
+    {
+        x = y = -1;
+
+        if (PlayerIdResolver.IsPlayer(entityId))
+        {
+            if (_player == null) return false;
+            x = _player.Position.X;
+            y = _player.Position.Y;
+            return true;
+        }
+
+        var npc = _npcs?.GetNPC(entityId);
+        if (npc != null)
+        {
+            if (_npcs != null && !_npcs.IsAlive(entityId)) return false;
+            x = npc.Position.X;
+            y = npc.Position.Y;
+            return true;
+        }
+
+        var animal = _animals?.TryGetAnimal(entityId);
+        if (animal.HasValue && animal.Value.IsValid)
+        {
+            if (!animal.Value.IsAlive) return false;
+            x = animal.Value.Position.X;
+            y = animal.Value.Position.Y;
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
     /// Собрать цели в форме. Порядок: сортировка по Чебышёв-дистанции от
     /// источника спада (круг — эпицентр, прочие — кастер), срез MaxTargets.
     /// Friendly-fire: НЕЙТРАЛЫ ЗАДЕВАЮТСЯ (решение пользователя — месть

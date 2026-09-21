@@ -909,6 +909,43 @@ public partial class CombatSimDebug : Node
                     if (crowd2 != null) _npcSpawner.DespawnNPC(crowd2);
                     if (crowd3 != null) _npcSpawner.DespawnNPC(crowd3);
                     TeleportPlayer(p.X, p.Y); // R29-харденинг: возврат (мстители ушли с leash)
+
+                    // === (d) АУДИТ-0921_2030 Ф3-2: AoE в ПУСТУЮ область =====
+                    // Прежде гейт «Без цели не бьём» отклонял RangedAoe-каст
+                    // без entity-цели, хотя ExecuteAoeVolley честно поддерживает
+                    // пустой залп («Ци срывается волной в пустоту»). Проверяем:
+                    //   1) пустой target + валидный aim → Accepted + залп-событие;
+                    //   2) AoE БЕЗ прицела (aim -1) → Rejected;
+                    //   3) НЕ-AoE техника с пустой целью → Rejected (гейт жив).
+                    await WaitForOwnCastClearAsync(PlayerCombatId, 2.0f);
+                    if (_combatServiceImpl.IsInCombat)
+                        _combatServiceImpl.AbandonCombat(PlayerCombatId);
+                    _combatServiceImpl.DebugSetReadinessPermil(PlayerCombatId, 1000);
+                    _aoeImpactCount = -1;
+                    var emptyAoeAcc = _combatServiceImpl.ExecuteAttack(
+                        PlayerCombatId, coneTech.TechniqueId, null, true,
+                        potencyPermil: 1500, isCharged: true,
+                        aimTileX: p.X + 2, aimTileY: p.Y);
+                    bool emptyAoeFired = _aoeImpactCount >= 0; // залп-событие пришло (целей может быть 0)
+                    GD.Print($"[CombatSim] aoe(d) empty-area volley: acc={emptyAoeAcc} (ожид Accepted), " +
+                             $"AoeImpact fired={emptyAoeFired} (targets={_aoeImpactCount})");
+                    aoeOk &= emptyAoeAcc == AttackAcceptance.Accepted && emptyAoeFired;
+
+                    _aoeImpactCount = -1;
+                    var noAimAcc = _combatServiceImpl.ExecuteAttack(
+                        PlayerCombatId, coneTech.TechniqueId, null, true,
+                        potencyPermil: 1500, isCharged: true,
+                        aimTileX: -1, aimTileY: -1);
+                    GD.Print($"[CombatSim] aoe(d) no-aim rejection: acc={noAimAcc} (ожид Rejected — прицел не задан)");
+                    aoeOk &= noAimAcc == AttackAcceptance.Rejected;
+
+                    var noTargetMeleeAcc = _combatServiceImpl.ExecuteAttack(
+                        PlayerCombatId, "basic_attack", null, false);
+                    GD.Print($"[CombatSim] aoe(d) non-AoE empty-target rejection: acc={noTargetMeleeAcc} " +
+                             "(ожид Rejected — одиночный удар без цели невозможен)");
+                    aoeOk &= noTargetMeleeAcc == AttackAcceptance.Rejected;
+                    if (_combatServiceImpl.IsInCombat)
+                        _combatServiceImpl.AbandonCombat(PlayerCombatId);
                 }
                 else
                 {

@@ -39,6 +39,9 @@ public sealed class PlayerTechniqueCaster : IDisposable
     // техники (Z/панель 3-9) видели только NPC — волки живут в
     // AnimalService → FindTargetInRange молча возвращал «цель исчезла».
     [Inject] private readonly IAnimalService? _animals = null;
+    // АУДИТ-0921_2030 Ф3-2: границы карты для валидации прицела AoE
+    // (эпицентр вне мира = бессмысленный каст).
+    [Inject] private readonly ITileService? _tiles = null;
     [Inject] private readonly IBodyService _body = null!;
     [Inject] private readonly TechniqueService _techniques = null!;
     [Inject] private readonly TechniqueChargeService _chargeService = null!;
@@ -137,13 +140,28 @@ public sealed class PlayerTechniqueCaster : IDisposable
         }
 
         // Stage 0: для Combat — ранняя валидация цели (чтобы не тратить Ци впустую)
+        // АУДИТ-0921_2030 Ф3-2 (P1): RangedAoe НЕ требует entity-цель — эпицентр =
+        // точка прицеливания (курсор), CombatService честно поддерживает пустой
+        // залп («Ци срывается волной в пустоту»). Вместо цели валидируем ПРИЦЕЛ:
+        // тайл в границах карты + в радиусе техники от игрока.
         if (tech.Type == TechniqueType.Combat)
         {
-            var target = FindTargetInRange(tech);
-            if (target == null)
+            if (tech.Subtype == CombatSubtype.RangedAoe)
             {
-                PublishFail(e.TechniqueId, "Нет цели в радиусе");
-                return;
+                if (!IsAoeAimValid(tech, mouseX, mouseY, out string aimReason))
+                {
+                    PublishFail(e.TechniqueId, aimReason);
+                    return;
+                }
+            }
+            else
+            {
+                var target = FindTargetInRange(tech);
+                if (target == null)
+                {
+                    PublishFail(e.TechniqueId, "Нет цели в радиусе");
+                    return;
+                }
             }
         }
 
@@ -212,7 +230,16 @@ public sealed class PlayerTechniqueCaster : IDisposable
         switch (tech.Type)
         {
             case TechniqueType.Combat:
-                if (FindTargetInRange(tech) == null)
+                if (tech.Subtype == CombatSubtype.RangedAoe)
+                {
+                    // Ф3-2: прицел AoE мог уйти за карту/радиус за время зарядки.
+                    if (!IsAoeAimValid(tech, mouseX, mouseY, out string aimReason))
+                    {
+                        PublishFail(tech.TechniqueId, aimReason);
+                        return;
+                    }
+                }
+                else if (FindTargetInRange(tech) == null)
                 {
                     PublishFail(tech.TechniqueId, "Цель исчезла");
                     return;
@@ -255,14 +282,30 @@ public sealed class PlayerTechniqueCaster : IDisposable
         {
             case TechniqueType.Combat:
             {
-                var target = FindTargetInRange(tech);
+                // АУДИТ-0921_2030 Ф3-2: AoE — цель ОПЦИОНАЛЬНА (эпицентр = прицел;
+                // найденная цель лишь задаёт pair-путь CombatModule). Для AoE при
+                // null-цели публикуем пустой TargetId — контракт AttackIntentEvent
+                // явно допускает пустую цель (легаси «авто-выбор»), а CombatService
+                // пропускает безцелевой AoE-залп в ExecuteAoeVolley.
+                string? target = FindTargetInRange(tech);
                 if (target == null)
                 {
-                    // AUDIT-0921 A2: цель исчезла между пре-валидацией и выпуском
-                    // (безопасная ветка — кадр тот же) → рефанд, техника не сгорает.
-                    _techniques.RefundUse(tech.TechniqueId);
-                    PublishFail(tech.TechniqueId, "Цель исчезла");
-                    return;
+                    if (tech.Subtype != CombatSubtype.RangedAoe)
+                    {
+                        // AUDIT-0921 A2: цель исчезла между пре-валидацией и выпуском
+                        // (безопасная ветка — кадр тот же) → рефанд, техника не сгорает.
+                        _techniques.RefundUse(tech.TechniqueId);
+                        PublishFail(tech.TechniqueId, "Цель исчезла");
+                        return;
+                    }
+                    // Ф3-2: для AoE цели может не быть — это НЕ ошибка; вместо
+                    // неё финальная проверка прицела в момент выпуска.
+                    if (!IsAoeAimValid(tech, mouseX, mouseY, out string aimReason))
+                    {
+                        _techniques.RefundUse(tech.TechniqueId);
+                        PublishFail(tech.TechniqueId, aimReason);
+                        return;
+                    }
                 }
                 bool isRanged = tech.Subtype is CombatSubtype.RangedProjectile
                                              or CombatSubtype.RangedBeam
@@ -273,7 +316,7 @@ public sealed class PlayerTechniqueCaster : IDisposable
                 int aimTileX = mouseX / (1000 * GameConstants.TILE_PIXELS);
                 int aimTileY = mouseY / (1000 * GameConstants.TILE_PIXELS);
                 _attackIntentPub.Publish(new AttackIntentEvent(
-                    _player.PlayerId, target, tech.TechniqueId, isRanged, potencyPermil, isCharged: true,
+                    _player.PlayerId, target ?? "", tech.TechniqueId, isRanged, potencyPermil, isCharged: true,
                     aimTileX, aimTileY));
                 PublishSuccess(tech, playerX, playerY, target);
                 return;
@@ -412,6 +455,46 @@ public sealed class PlayerTechniqueCaster : IDisposable
         }
 
         return best;
+    }
+
+    /// <summary>
+    /// АУДИТ-0921_2030 Ф3-2: валидация ТОЧКИ ПРИЦЕЛИВАНИЯ AoE (курсор,
+    /// милли-пиксели → тайлы). Требования: тайл в границах карты и в
+    /// радиусе техники от игрока (Чебышёв, int — ЗАПРЕТ 3.9). Для
+    /// конуса/полукруга/линии прицел задаёт направление — проверка
+    /// радиуса та же (дальность прицеливания = дальность техники).
+    /// </summary>
+    private bool IsAoeAimValid(LearnedTechnique tech, int mouseX, int mouseY, out string reason)
+    {
+        reason = "";
+        int aimTileX = mouseX / (1000 * GameConstants.TILE_PIXELS);
+        int aimTileY = mouseY / (1000 * GameConstants.TILE_PIXELS);
+
+        // Границы карты (курсор при зуме может выходить за пределы мира).
+        if (_tiles != null && _tiles.MapWidth > 0 && _tiles.MapHeight > 0)
+        {
+            if (aimTileX < 0 || aimTileY < 0 || aimTileX >= _tiles.MapWidth || aimTileY >= _tiles.MapHeight)
+            {
+                reason = "Прицел вне мира";
+                return false;
+            }
+        }
+        else if (aimTileX < 0 || aimTileY < 0)
+        {
+            reason = "Прицел вне мира";
+            return false;
+        }
+
+        // Радиус техники от игрока (эпицентр/направление не дальше Range).
+        float rangeTiles = Math.Max(MinAttackRangeTiles, tech.Range / GameConstants.TILE_SIZE_M);
+        var p = _player.Position;
+        int dist = Math.Max(Math.Abs(aimTileX - p.X), Math.Abs(aimTileY - p.Y));
+        if (dist > (int)Math.Ceiling(rangeTiles))
+        {
+            reason = "Прицел вне радиуса техники";
+            return false;
+        }
+        return true;
     }
 
     private bool _hasDamagedParts()

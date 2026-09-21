@@ -279,6 +279,26 @@ public partial class SaveLoadSimDebug : Node
         Require(animals1 == animals0 + 1 && qaAnimal != null, "звери-QA-спаун",
             $"SpawnAnimal(deer): {animals0}→{animals1} — поголовье не выросло", problems);
 
+        // 1m. АУДИТ-0921_2030 Ф4: отношения NPC — обида по игроку (-15).
+        //     Прежде блок npc_relationships не существовал: после Load все
+        //     отношения возвращались в Neutral (боевые обиды «терялись»).
+        var relationshipSvc = _resolver.Resolve<Modules.NPC.NPCRelationshipService>();
+        var npcSvc = _resolver.Resolve<INPCService>();
+        string relNpcId = npcSvc.GetAllNPCIds().FirstOrDefault() ?? "";
+        int relScore0 = 0;
+        if (relNpcId.Length > 0)
+        {
+            relScore0 = relationshipSvc.GetAttitudeScore(relNpcId, "player");
+            relationshipSvc.ModifyAttitude(relNpcId, "player", -15);
+            int relScore1 = relationshipSvc.GetAttitudeScore(relNpcId, "player");
+            Require(relScore1 == relScore0 - 15, "отношения-обида",
+                $"ModifyAttitude(-15): {relScore0}→{relScore1} — обида не применилась, проверка тривиальна", problems);
+        }
+        else
+        {
+            GD.Print("[SaveLoadSim] 1m. WARN — отношений-мутация пропущена (NPC не найден)");
+        }
+
         bool step1Ok = problems.Count == 0;
         GD.Print($"[SaveLoadSim] 1. мутации ДО Save (integrity {(step1Ok ? "OK" : "FAIL")}): " +
                  $"камни {stoneCount0}+5→{stoneCount1}, HP {ratioBefore:0.00}→{ratio1:0.00}, " +
@@ -327,6 +347,10 @@ public partial class SaveLoadSimDebug : Node
         if (snapshot.TryGetValue("animals", out var anJson) && qaAnimal != null)
             Require(anJson.Contains(qaAnimal.EntityId), "маркер animals",
                 $"в снимке нет '{qaAnimal.EntityId}' — сейв не отражает QA-зверя", problems);
+        // АУДИТ-0921_2030 Ф4: маркер отношений — обида обязана попасть в сейв.
+        if (relNpcId.Length > 0 && snapshot.TryGetValue("npc_relationships", out var relJson))
+            Require(relJson.Contains(relNpcId), "маркер npc_relationships",
+                $"в снимке нет '{relNpcId}' — сейв не отражает обиду NPC", problems);
         if (snapshot.TryGetValue("player", out var plrJson))
             Require(plrJson.Contains(pos1.X.ToString()) && plrJson.Contains(pos1.Y.ToString()), "маркер player",
                 $"в снимке нет координат ({pos1.X},{pos1.Y}) — сейв не отражает позицию игрока", problems);
@@ -385,6 +409,14 @@ public partial class SaveLoadSimDebug : Node
         float strMutated = _stats.GetStat(StatType.Strength);
 
         if (qaAnimal != null) qaAnimal.IsAlive = false; // QA-зверь «умер» (без событий)
+
+        // АУДИТ-0921_2030 Ф4: отношения после Save — примирение (+30 ≠ снимку −15).
+        int relScoreMutated = relScore0;
+        if (relNpcId.Length > 0)
+        {
+            relationshipSvc.ModifyAttitude(relNpcId, "player", 30); // -15 → +15
+            relScoreMutated = relationshipSvc.GetAttitudeScore(relNpcId, "player");
+        }
 
         Require(qiAfterMut == 0 && qiAfterMut != qi1, "ци-сброс",
             $"Ци {qi1}→{qiAfterMut} — расход не сработал, проверка была бы тривиальна", problems);
@@ -459,6 +491,11 @@ public partial class SaveLoadSimDebug : Node
         bool qaItemRestored = _itemDb.TryGetItem(QaItemId, out _);
         int animals2 = _animals.GetAllAnimals().Count;
         var qaAnimalRestored = _animals.GetAllAnimals().FirstOrDefault(a => a.EntityId == qaAnimal?.EntityId);
+        // АУДИТ-0921_2030 Ф4: обида восстановлена == до Save (-15).
+        int relScore2 = relNpcId.Length > 0
+            ? relationshipSvc.GetAttitudeScore(relNpcId, "player") : int.MinValue;
+        bool relationshipOk = relNpcId.Length == 0
+            || (relScore2 == relScore0 - 15 && relScoreMutated == relScore0 + 15);
         bool r17DomainOk = qi2 == qi1
             && balance2 == balance1
             && questStatus2 == QuestStatus.Active
@@ -466,10 +503,12 @@ public partial class SaveLoadSimDebug : Node
             && Math.Abs(str2 - str1) < 0.001f
             && qaItemRestored
             && animals2 == animals1
-            && qaAnimalRestored != null && qaAnimalRestored.IsAlive;
+            && qaAnimalRestored != null && qaAnimalRestored.IsAlive
+            && relationshipOk;
         GD.Print($"[SaveLoadSim] 7c. R17-домены: Ци {qi1}→{qi2} (==), баланс {balance1}→{balance2} (==), " +
                  $"квест {questStatus1}→{questStatus2} (==), поз {pos1}→{pos2} (==), STR {str1:0.##}→{str2:0.##} (==), " +
-                 $"каталог {QaItemId}={qaItemRestored}, звери {animals1}→{animals2} (==, QA-зверь жив={qaAnimalRestored?.IsAlive})");
+                 $"каталог {QaItemId}={qaItemRestored}, звери {animals1}→{animals2} (==, QA-зверь жив={qaAnimalRestored?.IsAlive}); " +
+                 $"Ф4-отношения '{relNpcId}': {relScore0 - 15}→(мутация {relScoreMutated})→{relScore2} (обида восстановлена={relationshipOk})");
         pass &= r17DomainOk;
 
         // === 8. Чистка =================================================
@@ -485,7 +524,7 @@ public partial class SaveLoadSimDebug : Node
         }
         pass &= problems.Count == 0;
 
-        GD.Print($"[SaveLoadSim] VERDICT: {(pass ? "PASS — Save/Load round-trip: 19 блоков (R17 полнота: qi/quests/currency/belt/equipment/stats/player/world/world_time/item_db/animals), типизация, IncludeFields, честный success, РЕАЛЬНЫЕ мутации (анти-тривиальность)" : "FAIL")}");
+        GD.Print($"[SaveLoadSim] VERDICT: {(pass ? "PASS — Save/Load round-trip: 20 блоков (R17 полнота + Ф4: corpses/npc_relationships), типизация, IncludeFields, честный success, РЕАЛЬНЫЕ мутации (анти-тривиальность)" : "FAIL")}");
 
         // QA-режим: сим терминален — завершаем процесс сразу.
         GetTree().Quit();

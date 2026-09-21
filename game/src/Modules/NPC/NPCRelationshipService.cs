@@ -46,8 +46,18 @@ namespace CultivationGame.Modules.NPC
     /// Затухание: после AttitudeDecayStartDays дней без взаимодействия,
     /// счёт уменьшается на AttitudeDecayPerDay в день.
     /// Семейные и клятвенные отношения НЕ затухают.
+    ///
+    /// АУДИТ-0921_2030 Ф4 (P1): до этого сервиса не было НИ в reset, НИ в
+    /// save — при этом GetAttitude() (через NPCService) читает ИМЕННО
+    /// отсюда. Дефект был двойной: (a) _relationships переживали NewGame
+    /// (месть/дружба прошлого мира наследовалась, а при переиспользовании
+    /// NPC ID — «призрачные» отношения); (b) сейв хранил NPCSaveEntry.
+    /// AttitudeScore, но RestoreState его никуда не возвращал — после Load
+    /// ВСЕ отношения сбрасывались в Neutral (боевые обиды -20 «терялись»,
+    /// «NPCService хранит мёртвое поле»). Теперь: IWorldResettable + свой
+    /// блок сейва "npc_relationships" (полные записи, не только счёт).
     /// </summary>
-    public class NPCRelationshipService : IDisposable
+    public class NPCRelationshipService : IDisposable, IWorldResettable, ISaveable
     {
         // === Зависимости ===
         private readonly NPCConfig _config;
@@ -236,6 +246,98 @@ namespace CultivationGame.Modules.NPC
             if (score <= 49) return Attitude.Friendly;
             if (score <= 79) return Attitude.Allied;
             return Attitude.SwornAlly;
+        }
+
+        // === АУДИТ-0921_2030 Ф4: IWorldResettable ========================
+
+        /// <summary>
+        /// Пересборка мира (меню → NewGame/LoadGame до RestoreState):
+        /// отношения привязаны к сущностям конкретного мира — очищаются
+        /// целиком. День возвращается к «до событий» (DayChangedEvent
+        /// нового мира обновит его при первом тике времени).
+        /// </summary>
+        public void ResetWorld()
+        {
+            int total = _relationships.Count;
+            _relationships.Clear();
+            _currentDay = 0;
+            if (total > 0)
+                Console.WriteLine($"[NPCRelationshipService] ResetWorld: {total} отношений очищено (New Game)");
+        }
+
+        // === АУДИТ-0921_2030 Ф4: ISaveable — блок "npc_relationships" ====
+
+        public string SaveKey => "npc_relationships";
+
+        /// <summary>R11 P0-Save: тип state-блока для persistence round-trip.</summary>
+        public Type StateType => typeof(NpcRelationshipSaveState);
+
+        public object CaptureState()
+        {
+            // Полные записи (счёт + флаги + день последнего взаимодействия +
+            // счётчик): затухание/семейные связи продолжаются после Load.
+            var state = new NpcRelationshipSaveState
+            {
+                Entries = new NpcRelationshipSaveEntry[_relationships.Count]
+            };
+            int i = 0;
+            foreach (var kvp in _relationships)
+            {
+                state.Entries[i++] = new NpcRelationshipSaveEntry
+                {
+                    NpcId = kvp.Key.npcId ?? "",
+                    TargetId = kvp.Key.targetId ?? "",
+                    AttitudeScore = kvp.Value.AttitudeScore,
+                    LastInteractionDay = kvp.Value.LastInteractionDay,
+                    HasFamilyFlag = kvp.Value.HasFamilyFlag,
+                    HasSwornFlag = kvp.Value.HasSwornFlag,
+                    InteractionCount = kvp.Value.InteractionCount
+                };
+            }
+            return state;
+        }
+
+        public void RestoreState(object state)
+        {
+            if (state is not NpcRelationshipSaveState data) return;
+
+            // GameSession.LoadGame уже сделал ResetWorld — наполняем словарь.
+            _relationships.Clear();
+            if (data.Entries != null)
+            {
+                foreach (var e in data.Entries)
+                {
+                    if (string.IsNullOrEmpty(e.NpcId) || string.IsNullOrEmpty(e.TargetId)) continue;
+                    _relationships[(e.NpcId, e.TargetId)] = new RelationshipRecord
+                    {
+                        AttitudeScore = Math.Clamp(e.AttitudeScore, -100, 100),
+                        LastInteractionDay = e.LastInteractionDay,
+                        HasFamilyFlag = e.HasFamilyFlag,
+                        HasSwornFlag = e.HasSwornFlag,
+                        InteractionCount = e.InteractionCount
+                    };
+                }
+            }
+            Console.WriteLine($"[NPCRelationshipService] RestoreState: {_relationships.Count} отношений восстановлено " +
+                "(боевые обиды/дружба переживают Load, АУДИТ-0921_2030 Ф4)");
+        }
+
+        // === Сериализационные DTO (public-поля; IncludeFields — SaveJson) ===
+
+        public class NpcRelationshipSaveState
+        {
+            public NpcRelationshipSaveEntry[]? Entries;
+        }
+
+        public class NpcRelationshipSaveEntry
+        {
+            public string NpcId = "";
+            public string TargetId = "";
+            public int AttitudeScore;
+            public int LastInteractionDay;
+            public bool HasFamilyFlag;
+            public bool HasSwornFlag;
+            public int InteractionCount;
         }
 
         public void Dispose()

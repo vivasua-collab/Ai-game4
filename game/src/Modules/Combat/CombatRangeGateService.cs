@@ -38,12 +38,19 @@ public sealed class CombatRangeGateService
     [Inject] private readonly ITileService? _tiles = null;
     [Inject] private readonly IPlayerService? _player = null;
     [Inject] private readonly INPCService? _npcs = null;
+    [Inject] private readonly IAnimalService? _animals = null;
     [Inject] private readonly IInventoryService? _inventory = null;
 
     /// <summary>
-    /// Есть ли линия огня между двумя сущностями (игрок/NPC в любых
-    /// комбинациях). Неизвестные сущности → true (не блокируем:
-    /// животные/будущие сущности без позиционного резолва).
+    /// Есть ли линия огня между двумя сущностями (игрок/NPC/зверь в любых
+    /// комбинациях). Неизвестные сущности → true (не блокируем: будущие
+    /// типы без позиционного резолва).
+    /// АУДИТ-0921_2030 Ф3-1 (P1): звери — полноценные боевые цели
+    /// (PlayerCombatAdapter/TargetingService/AoEResolver) с R18, но
+    /// TryResolveTile их не резолвил → HasLineOfSight возвращал true
+    /// («неизвестная сущность — не блокируем») и стрела летела СКВОЗЬ
+    /// дерево/камень по волку. Теперь звери резолвятся позиционно и
+    /// LOS честен для всех боевых типов.
     /// </summary>
     public bool HasLineOfSight(string attackerId, string targetId)
     {
@@ -85,7 +92,10 @@ public sealed class CombatRangeGateService
     public int GetArrowCount()
         => _inventory?.GetItemCount(ArrowItemId) ?? 0;
 
-    /// <summary>Тайловая позиция сущности: игрок (оба исторических ID) или NPC.</summary>
+    /// <summary>
+    /// Тайловая позиция сущности: игрок (оба исторических ID), NPC или зверь
+    /// (АУДИТ-0921_2030 Ф3-1: звери — боевые цели с R18, LOS обязан их видеть).
+    /// </summary>
     private bool TryResolveTile(string entityId, out int x, out int y)
     {
         x = y = -1;
@@ -105,6 +115,14 @@ public sealed class CombatRangeGateService
             y = npc.Position.Y;
             return true;
         }
-        return false; // животные/неизвестные — LOS не проверяем
+
+        var animal = _animals?.TryGetAnimal(entityId);
+        if (animal.HasValue && animal.Value.IsValid)
+        {
+            x = animal.Value.Position.X;
+            y = animal.Value.Position.Y;
+            return true;
+        }
+        return false; // неизвестный тип — не блокируем (см. HasLineOfSight)
     }
 }

@@ -33,6 +33,12 @@ public partial class ProjectileRenderer : Node2D
     [Inject] private ISubscriber<Core.Messaging.Contracts.DamageAppliedEvent>? _damageSub;
     [Inject] private INPCService? _npcService;
     [Inject] private IPlayerService? _playerService;
+    // АУДИТ-0921_2030 Ф3-5: звери — легальные ranged-цели (Space/лук,
+    // PlayerCombatAdapter → AnimalService) с R18, но ResolvePixelPos их не
+    // резолвил (null) → стрела по волку/оленю наносила урон БЕЗ полёта и
+    // вспышки («урон из ниоткуда» — ровно тот дефект, ради которого
+    // создан этот рендерер, только для животных).
+    [Inject] private IAnimalService? _animalService;
 
     private System.IDisposable? _damageToken;
 
@@ -169,12 +175,19 @@ public partial class ProjectileRenderer : Node2D
         if (npc != null)
             return new Vector2(npc.Position.X * tile + tile / 2f, npc.Position.Y * tile + tile / 2f);
 
+        // АУДИТ-0921_2030 Ф3-5: звери — тот же центр тайла, что NPC/игрок.
+        var animal = _animalService?.TryGetAnimal(entityId);
+        if (animal.HasValue)
+            return new Vector2(
+                animal.Value.Position.X * tile + tile / 2f,
+                animal.Value.Position.Y * tile + tile / 2f);
+
         if (IsPlayer(entityId) && _playerService != null)
             return new Vector2(
                 _playerService.Position.X * tile + tile / 2f,
                 _playerService.Position.Y * tile + tile / 2f);
 
-        return null; // животные/неизвестные — без визуала
+        return null; // неизвестный тип — без визуала
     }
 
     private static bool IsPlayer(string id) => id == "player" || id == "player_0";
