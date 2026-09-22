@@ -20,6 +20,9 @@
 // Редактировано: 2026-05-22 13:08:27 UTC — P0-X1 FIX: QiConsumeRequestEvent + EntityId; P2-4.2 FIX: buffReduction в noArmorContext
 // Редактировано: 2026-05-22 13:48:17 UTC — Этап 2.1: QiBuffer расчёт → integer math (ЗАПРЕТ 3.9)
 // Редактировано: 2026-05-25 07:01:36 UTC — ЗАПРЕТ 3.9: _cachedTotalArmor float → int, конвертация на границе события
+// Редактировано: 2026-09-22 — P1-12 FIX (аудит 09.22, Фазы 9/10): DamageType.Pure
+//   фильтруется ДО CalculateBufferAbsorption() — Ци-буфер не считается и Ци
+//   не расходуется (прежде: списание Qi + пост-фактум обнуление результата).
 // Реализация IDamageService — ЕДИНЫЙ пайплайн урона.
 // Заменяет legacy два несовместимых пайплайна (ICombatant.DealDamage / ICombatTarget.TakeDamage).
 // КРИТИЧЕСКАЯ: Все типы урона проходят через этот сервис.
@@ -234,8 +237,18 @@ namespace CultivationGame.Modules.Combat
             // Спринт 4 B8: per-entity QiBuffer — для NPC через IQiDataProvider,
             // для игрока — из кэша QiBufferStateChangedEvent
             // Этап 2.1: ЗАПРЕТ 3.9 — piercingDamage в integer
+            //
+            // P1-12 (аудит 09.22, Фазы 9/10): Чистый урон НЕ входит в Ци-буфер
+            // ВООБЩЕ — фильтрация ДО CalculateBufferAbsorption(). Прежде буфер
+            // рассчитывался (и Qi РАСХОДОВАЛОСЬ: QiConsumeRequestEvent игрока /
+            // TryConsumeQi NPC), и только ПОСЛЕ результат обнулялся пост-фактум
+            // (absorbedByQi=0, piercing=postDefense) — «урон проходит сквозь
+            // Ци, но Ци тратится» (runtime: Pure 100 → absorbed=0, Ци −400).
+            // Контракт DamageType.Pure: абсолютный урон — Ци-щит его не
+            // поглощает и НЕ оплачивает. Броня/материал (слой 6-8) применяются.
             int absorbedByQi = 0;
             int piercingDamage = postDefenseActionDamage;
+            bool isPureDamage = request.Type == DamageType.Pure;
 
             bool bufferActive;
             QiBufferMode bufferMode;
@@ -269,20 +282,15 @@ namespace CultivationGame.Modules.Combat
                 targetCurrentQi = _qiDataProvider.GetCurrentQi(request.TargetId);
             }
 
-            if (bufferActive)
+            if (bufferActive && !isPureDamage)
             {
                 var bufferResult = CalculateBufferAbsorption(
                     piercingDamage, request.Type, bufferMode, bufferQiInvested, targetCurrentQi, request.TargetId);
                 absorbedByQi = bufferResult.AbsorbedDamage;
                 piercingDamage = bufferResult.PiercingDamage;
             }
-
-            // Чистый урон игнорирует броню и Ци-буфер
-            if (request.Type == DamageType.Pure)
-            {
-                piercingDamage = postDefenseActionDamage;
-                absorbedByQi = 0;
-            }
+            // Pure: ветка буфера пропущена целиком — поглощения нет (0),
+            // пробитие = postDefenseActionDamage, Ци НЕ списывается.
 
             // === СЛОЙ 6-8: Защита (броня + материал тела) ===
             // CMB-A08: используем DefenderMaterial из запроса вместо хардкода

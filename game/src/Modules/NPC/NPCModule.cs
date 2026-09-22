@@ -82,8 +82,17 @@ public class NPCModule : IModule, IWorldResettable
 
     public string ModuleName => "NPC";
 
+        // P1-10 (аудит 09.22, Фазы 7/10): идемпотентный Start — повторный вызов
+    // (прямой вызов вне GameEntryPoint / повторная инстанциация сцены) не
+    // дублирует подписки/инициализацию. Флаг — только при УСПЕШНОМ завершении
+    // (провал остаётся ретраимым). Основной слой защиты — GameEntryPoint
+    // (_startedModules, resume from failure); это страховка от прямых вызовов.
+    private bool _startCompleted;
+
     public void Start()
     {
+        if (_startCompleted) return;
+
         // IMPL-3: Config injected via DI. Inner services also receive it via constructor injection.
         _isConfigured = true;
 
@@ -102,6 +111,8 @@ public class NPCModule : IModule, IWorldResettable
         _corpseService?.Initialize();
         // M2: позиция игрока → кэш (дистанция атаки NPC→игрок).
         _playerPosSubscription = _playerPosSub.Subscribe(OnPlayerPositionChanged);
+    
+        _startCompleted = true;
     }
 
     /// <summary>

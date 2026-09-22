@@ -72,8 +72,17 @@ public class CombatModule : IModule
 
     public string ModuleName => "Combat";
 
+        // P1-10 (аудит 09.22, Фазы 7/10): идемпотентный Start — повторный вызов
+    // (прямой вызов вне GameEntryPoint / повторная инстанциация сцены) не
+    // дублирует подписки/инициализацию. Флаг — только при УСПЕШНОМ завершении
+    // (провал остаётся ретраимым). Основной слой защиты — GameEntryPoint
+    // (_startedModules, resume from failure); это страховка от прямых вызовов.
+    private bool _startCompleted;
+
     public void Start()
     {
+        if (_startCompleted) return;
+
         // IMPL-3: Config injected via DI. Flag still used by Tick/handlers.
         _isConfigured = true;
 
@@ -100,6 +109,8 @@ public class CombatModule : IModule
         // R16: стойка защиты игрока (G) и выход NPC из боя (бегство/leash).
         _defenseIntentSubscription = _defenseIntentSub.Subscribe(OnDefenseIntent);
         _combatDisengageSubscription = _combatDisengageSub.Subscribe(OnCombatDisengage);
+    
+        _startCompleted = true;
     }
 
     public void Tick(int tickCount)

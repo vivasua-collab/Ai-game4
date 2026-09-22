@@ -3055,3 +3055,64 @@ checkpoints/09_22_r33_ext_audit_phase4.md.
 NEXT: ответ аудитора (матрица state→reset→save→restore→dispose→tick по 17
 модулям); P2-бэклог — приоритизация пользователем; план аудита доков R31 —
 мораторий в силе.
+
+---
+
+## R34 — 2026-09-22 (финальные фазы 6–10 аудита 09.22: P1-9 / P1-10 / P1-12)
+
+Источник: upload/audit_09_22_10_00 (Фазы 6–10: lifecycle-матрица 17 модулей →
+runtime loop/EventBus/Save-граница → Save/Load integrity → боевой пайплайн →
+cross-system проход). Базлайн R33 70dc4d2 (совпадает с HEAD на старте).
+Директива Фазы 10: закрыть три P1, полный regression, P2 — следующим слоем.
+
+Верификация: все три P1 подтверждены runtime ПРЕФИКС-прогоном расширенного
+сима №19 (секции I/J/K — написаны ДО фиксов под постфикс-контракт):
+- P1-9: «ExecuteAsync при падении домена → успех (исключение ПРОГЛОЧЕНО —
+  сборка мира продолжится)» — фаза-0 глотала ResetWorld-провал, оркестратор
+  MarkAsCompleted, мир собирался из смеси сброшенного/старого.
+- P1-10: «SubscriberCount 1 → 2 — ПОДПИСКА ПРОДУБЛИРОВАНА», StartCalls 2/2 —
+  сценарий аудитора (A PASS, B PASS, C THROW, retry → A/B снова) воспроизведён.
+- P1-12: Pure→player «absorbed=0, Ци 1000→600»; Pure→NPC «Ци 500→100» —
+  Qi списывалось до пост-фактум обнуления результата.
+
+Фиксы R34:
+- WorldDomainResetPhase: FAIL-CLOSED (P1-9/P1-11) — все домены получают
+  ResetWorld за попытку (полная диагностика), провалы → AggregateException
+  наружу с именем домена → MarkAsFailed/SceneAssemblyFailed → GameSession
+  возвращает сессию в MainMenu. Rollback отклонён by-design (P2-20: reset
+  не транзакционен, контракт = «world-transition неуспешна»). Единая
+  семантика с LoadGame-путём.
+- GameEntryPoint: retry = resume from failure (P1-10) — _startedModules
+  (HashSet по ссылке, живёт через ретраи): успешные модули при ретрае
+  ПРОПУСКАЮТСЯ (двойной Start = утечка+дубль подписок), ретраятся только
+  провал/не-стартованные. G3-контракт сохранён (ретрай не игнорируется).
+- Идемпотентные Start() ВСЕХ модулей (директива «по всем IStartable, не
+  латать NPC»): гвард _startCompleted в 22 Start() (17 IModule +
+  SeveredDebuffSystem/AnimalService/TechniqueSlotService/
+  PlayerCombatAdapter/PlayerTechniqueCaster; TradeModule поверх своего
+  dispose-паттерна). Флаг только при успехе — провал ретраим. Закрывает и
+  прямые вызовы вне бута: GameWorldController._Ready() зовёт
+  CombatAdapter/TechniqueCaster.Start() на каждой инстанциации сцены мира —
+  потенциальная двойная подписка при повторной сборке погашена.
+- DamageService: Pure фильтруется ДО CalculateBufferAbsorption() (P1-12) —
+  ветка буфера пропущена целиком: ни QiConsumeRequestEvent (игрок), ни
+  TryConsumeQi (NPC); удалён пост-фактум-блок «обнуление после списания».
+  Броня к Pure применяется как раньше (аудитор Фазы 9: без подтверждения
+  спецификации броню не трогал) — контракт закреплён в COMBAT_SYSTEM §5.
+- Audit0922SimDebug: секции I/J/K (+12 проверок) + L-ДИАГНОСТИКА P2-22
+  (runtime-чек по запросу Фазы 7, БЕЗ фикса — «следующий слой»; вердикт не
+  гейтит): «maxDepth=3 — guard ПОТЕРЯН в дрене: queued self-publish идёт
+  прямой рекурсией» — вывод аудитора подтверждён runtime.
+
+Доки: DI_AND_EVENTBUS §1.8 (контракт 2 — retry-resume; новый контракт 5 —
+world-reset fail-closed), COMBAT_SYSTEM §5 (Pure-исключение Ци-буфера),
+TESTING_RULES §0.1 (сим №19: секции I/J/K/L). Чекпоинт аудитору:
+checkpoints/09_22_r34_ext_audit_final_phases.md (§2 развилки, §3 пруфы
+до/после, §4 P2-22-диагностика, §5 нетронутый P2-бэклог).
+
+Проверено: build 0 err; AUDIT0922 PASS (36 проверок A–K + L-диагностика);
+полная регрессия 19/19 PASS; префикс/постфикс-логи в checkpoints/logs/.
+
+NEXT: P2-пачки по приоритету аудитора/пользователя (первая: P2-22 фикс
+queued-drain guard + P2-23/P2-18 required/optional save-блоки); план
+аудита доков R31 — мораторий в силе.

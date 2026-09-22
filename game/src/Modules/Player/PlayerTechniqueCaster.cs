@@ -78,12 +78,23 @@ public sealed class PlayerTechniqueCaster : IDisposable
     private long _lastFiredAtMs;
     private readonly Random _formationRng = new();
 
+        // P1-10 (аудит 09.22, Фазы 7/10): идемпотентный Start — повторный вызов
+    // (прямой вызов вне GameEntryPoint / повторная инстанциация сцены) не
+    // дублирует подписки/инициализацию. Флаг — только при УСПЕШНОМ завершении
+    // (провал остаётся ретраимым). Основной слой защиты — GameEntryPoint
+    // (_startedModules, resume from failure); это страховка от прямых вызовов.
+    private bool _startCompleted;
+
     public void Start()
     {
+        if (_startCompleted) return;
+
         _castRequestToken = _castRequestSub.Subscribe(OnCastRequested);
         _chargeCompletedToken = _chargeCompletedSub.Subscribe(OnChargeCompleted);
         _formationActivatedToken = _formationActivatedSub.Subscribe(OnFormationActivated);
         _attackRejectedToken = _attackRejectedSub.Subscribe(OnAttackRejected);
+    
+        _startCompleted = true;
     }
 
     private IDisposable? _attackRejectedToken;

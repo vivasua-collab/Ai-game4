@@ -29,8 +29,17 @@ public sealed class TileModule : IModule
     private IDisposable? _locationSubToken;
     private TileConfig _config = new();
 
+        // P1-10 (аудит 09.22, Фазы 7/10): идемпотентный Start — повторный вызов
+    // (прямой вызов вне GameEntryPoint / повторная инстанциация сцены) не
+    // дублирует подписки/инициализацию. Флаг — только при УСПЕШНОМ завершении
+    // (провал остаётся ретраимым). Основной слой защиты — GameEntryPoint
+    // (_startedModules, resume from failure); это страховка от прямых вызовов.
+    private bool _startCompleted;
+
     public void Start()
     {
+        if (_startCompleted) return;
+
         _locationSubToken = _locationChangedSub.Subscribe(OnLocationChanged);
 
         // Review этап 6 (P0-1): TileService подписывается на respawn-события
@@ -88,6 +97,8 @@ public sealed class TileModule : IModule
         sw.Stop();
         _mapGenPublisher.Publish(new TileMapGeneratedEvent(width, height, seed));
         Console.WriteLine($"[TileModule] Started — generated {width}x{height} grid in {sw.ElapsedMilliseconds} ms");
+    
+        _startCompleted = true;
     }
 
     public void Tick(int tickCount)

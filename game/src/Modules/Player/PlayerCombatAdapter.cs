@@ -158,8 +158,17 @@ public sealed class PlayerCombatAdapter : IDisposable, IWorldResettable
         CurrentWeaponMode = WeaponMode.Melee;
     }
 
+        // P1-10 (аудит 09.22, Фазы 7/10): идемпотентный Start — повторный вызов
+    // (прямой вызов вне GameEntryPoint / повторная инстанциация сцены) не
+    // дублирует подписки/инициализацию. Флаг — только при УСПЕШНОМ завершении
+    // (провал остаётся ретраимым). Основной слой защиты — GameEntryPoint
+    // (_startedModules, resume from failure); это страховка от прямых вызовов.
+    private bool _startCompleted;
+
     public void Start()
     {
+        if (_startCompleted) return;
+
         // R16-аудит (P3-3): подписки OnCombatStarted/OnDamageApplied удалены —
         // пустые обработчики («handled by PlayerService» — не соответствует
         // коду: PlayerService на эти события не подписан).
@@ -167,6 +176,8 @@ public sealed class PlayerCombatAdapter : IDisposable, IWorldResettable
         _combatEndedToken = _combatEndedSub.Subscribe(OnCombatEnded);
         // Review этап 3 (P0-1): бэкофф-подписка на отклонения атак игрока.
         _attackRejectedToken = _attackRejectedSub.Subscribe(OnAttackRejected);
+    
+        _startCompleted = true;
     }
 
     /// <summary>

@@ -63,9 +63,18 @@ namespace CultivationGame.Modules.Player
         }
 
         /// <summary>Запустить подписки. Вызывается из PlayerModule.Start или DI.</summary>
+                // P1-10 (аудит 09.22, Фазы 7/10): идемпотентный Start — повторный вызов
+        // не дублирует подписки/инициализацию (флаг — только при успешном
+        // завершении, провал остаётся ретраимым). Страховка прямых вызовов
+        // (GameWorldController._Ready и пр.); основной слой — GameEntryPoint.
+        private bool _startCompleted;
+
         public void Start()
         {
+            if (_startCompleted) return;
+
             _forgottenToken = _forgottenSub.Subscribe(OnTechniqueForgotten);
+            _startCompleted = true;
         }
 
         /// <summary>

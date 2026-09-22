@@ -29,8 +29,17 @@ public sealed class WorldModule : IModule
     private WorldConfig _config = new();
     private int _lastDay = -1, _lastMonth = -1, _lastYear = -1;
 
+        // P1-10 (аудит 09.22, Фазы 7/10): идемпотентный Start — повторный вызов
+    // (прямой вызов вне GameEntryPoint / повторная инстанциация сцены) не
+    // дублирует подписки/инициализацию. Флаг — только при УСПЕШНОМ завершении
+    // (провал остаётся ретраимым). Основной слой защиты — GameEntryPoint
+    // (_startedModules, resume from failure); это страховка от прямых вызовов.
+    private bool _startCompleted;
+
     public void Start()
     {
+        if (_startCompleted) return;
+
         _saveSubToken = _saveSub.Subscribe(OnSaveRequested);
 
         // Register a default test location and activate it.
@@ -78,6 +87,8 @@ public sealed class WorldModule : IModule
             var t0 = tsCal.CurrentTime;
             _lastDay = t0.Day; _lastMonth = t0.Month; _lastYear = t0.Year;
         }
+    
+        _startCompleted = true;
     }
 
     public void Tick(int tickCount)

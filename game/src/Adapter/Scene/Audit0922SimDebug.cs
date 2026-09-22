@@ -11,6 +11,25 @@
 // порядок регистрации), P2-13 (startup fail-closed, _initialized после
 // Start), P2-14 (настоящий cycle detection по construction path).
 //
+// 2026-09-22 (финальные фазы 6–10, upload/audit_09_22_10_00): ДОПОЛНЕНА
+// секциями I/J/K — три оставшихся P1 реестра Фазы 10:
+//   I. P1-9 (Фазы 6/7/10): WorldDomainResetPhase глотал исключение
+//      ResetWorld() → фаза «успешна», оркестратор продолжал Spawn/Init/Ready,
+//      мир собирался из смеси сброшенного/несброшенного состояния.
+//      Постфикс-контракт: ExecuteAsync бросает AggregateException (fail-closed,
+//      полная диагностика одной попытки — как startup P2-13).
+//   J. P1-10 (Фазы 7/10): retry startup повторно Start()ил уже успешно
+//      стартовавшие модули → дублирование EventBus-подписок (один игровой
+//      event обрабатывается дважды). Постфикс-контракт: стартовая попытка =
+//      транзакция с точкой продолжения — успешно стартовавшие модули при
+//      ретрае НЕ перезапускаются (SubscriberCount не растёт), провалившийся
+//      модуль ретраится.
+//   K. P1-12 (Фазы 9/10): Pure damage проходил через CalculateBuffer-
+//      Absorption() (Qi списывалось: QiConsumeRequestEvent/TryConsumeQi),
+//      и только ПОСЛЕ результат обнулялся пост-фактум. Постфикс-контракт:
+//      Pure не входит в Qi-буфер вовсе — Ци не тратится ни у игрока, ни у
+//      NPC; контрольная серия — Physical Ци тратит (буфер жив).
+//
 // Сим написан под ПОСТФИКС-контракт (как должен вести себя исправленный код):
 //   A. EventBus (P1-5): исключение в одном подписчике НЕ прерывает fan-out
 //      (подписчики после падавшего получают событие), НЕ покидает Publish,
@@ -36,6 +55,16 @@
 //   H. Cycle detection (P2-14, Фаза 4): конструкторский цикл ловится на
 //      ПЕРВОМ повторном входе с точным путём «A → B → A» (не после 51-го
 //      уровня); самоссылка ловится; линейная цепочка не даёт ложного срабатывания.
+//   I. WorldDomainResetPhase (P1-9, Фазы 6/7/10): сброс мира fail-closed —
+//      исключение ResetWorld() любого домена = AggregateException наружу,
+//      сборка мира останавливается (не «успешная фаза + полу-сброшенный мир»);
+//      за одну попытку диагностируются ВСЕ домены.
+//   J. Startup retry (P1-10, Фазы 7/10): повторный Start() после провала
+//      НЕ перезапускает уже успешно стартовавшие модули (подписки не
+//      дублируются — SubscriberCount стабилен), провалившийся — ретраится.
+//   K. Pure damage (P1-12, Фазы 9/10): DamageType.Pure не входит в
+//      Qi-буфер (Ци не расходуется у игрока и NPC); Physical — контроль
+//      (Ци расходуется, поглощение > 0).
 //
 // ДО фиксов прогон даёт VERDICT: FAIL со строками «DEFECT (audit 09.22 …)» —
 // это runtime-подтверждение дефектов для чекпоинта аудитора. После фиксов —
@@ -53,6 +82,7 @@ using CultivationGame.Core.Interfaces;
 using CultivationGame.Core.Events;
 using CultivationGame.Adapter.Di;
 using CultivationGame.Entry;
+using CultivationGame.Entry.Phases;
 using CultivationGame.Modules.Save;
 
 namespace CultivationGame.Adapter.Scene;
@@ -93,6 +123,43 @@ public partial class Audit0922SimDebug : Node
         public int Ticks;
         public void Start() => throw new InvalidOperationException("phase4 startup probe: intentional failure");
         public void Tick(int tickCount) => Ticks++;
+    }
+
+    // ── Тестовые классы финальных фаз 6–10 (upload/audit_09_22_10_00) ──
+    // I (P1-9): IWorldResettable-пробы для WorldDomainResetPhase.
+    private interface IResetProbeDomain : IWorldResettable { int ResetCount { get; } }
+    private sealed class ResetOkProbeA : IResetProbeDomain { public int ResetCount { get; private set; } public void ResetWorld() => ResetCount++; }
+    private sealed class ResetOkProbeB : IResetProbeDomain { public int ResetCount { get; private set; } public void ResetWorld() => ResetCount++; }
+    private sealed class ResetThrowProbe : IResetProbeDomain
+    {
+        public int ResetCount { get; private set; }
+        public void ResetWorld()
+        {
+            ResetCount++;
+            throw new InvalidOperationException("phase6 reset probe: intentional domain failure");
+        }
+    }
+
+    // J (P1-10): модуль, успешно стартующий с ПОДПИСКОЙ (сценарий аудитора:
+    // SubscriberCount до/после retry), + счётчик вызовов Start.
+    private readonly struct BootProbeMsg { }
+    private sealed class SubscribingStartable : IStartable
+    {
+        private readonly EventBus _bus;
+        public int StartCalls;
+        public SubscribingStartable(EventBus bus) => _bus = bus;
+        public void Start()
+        {
+            StartCalls++;
+            // Поле-присваивание без dispose-старого — паттерн модулей NPC/Qi/
+            // Combat: повторный Start = УТЕЧКА подписки + двойная обработка.
+            _ = _bus.Subscribe<BootProbeMsg>(static (in BootProbeMsg _) => { });
+        }
+    }
+    private sealed class CountingStartable : IStartable
+    {
+        public int StartCalls;
+        public void Start() => StartCalls++;
     }
 
     // P2-13: минимальная сессия для мини-контейнера GameEntryPoint
@@ -166,9 +233,27 @@ public partial class Audit0922SimDebug : Node
         try { RunCycleDetectionTest(); }
         catch (Exception ex) { GD.Print($"[Audit0922Sim] DEFECT H-крэш: {ex.GetType().Name}: {ex.Message}"); _allPass = false; }
 
+        // === I. WorldDomainResetPhase fail-closed (P1-9, Фазы 6/7/10) =======
+        try { RunWorldDomainResetFailClosedTest(); }
+        catch (Exception ex) { GD.Print($"[Audit0922Sim] DEFECT I-крэш: {ex.GetType().Name}: {ex.Message}"); _allPass = false; }
+
+        // === J. Startup retry без повторного Start (P1-10, Фазы 7/10) ========
+        try { RunStartupRetryTest(); }
+        catch (Exception ex) { GD.Print($"[Audit0922Sim] DEFECT J-крэш: {ex.GetType().Name}: {ex.Message}"); _allPass = false; }
+
+        // === K. Pure damage не расходует Ци (P1-12, Фазы 9/10) ===============
+        try { RunPureDamageTest(); }
+        catch (Exception ex) { GD.Print($"[Audit0922Sim] DEFECT K-крэш: {ex.GetType().Name}: {ex.Message}"); _allPass = false; }
+
+        // === L. P2-22 (диагностика, бэклог): queued-drain re-entrancy =========
+        // Запрос аудитора (Фаза 7): runtime-чек edge-case-а. Фикс — «следующий
+        // слой» реестра Фазы 10, в этот эпизод НЕ входит → вердикт не гейтит.
+        try { RunQueueDrainReentrancyDiagnostic(); }
+        catch (Exception ex) { GD.Print($"[Audit0922Sim] diag-крэш L: {ex.GetType().Name}: {ex.Message}"); }
+
         GD.Print($"[Audit0922Sim] VERDICT: {(_allPass
-            ? "PASS — EventBus isolation/re-entrancy, path sanitisation, DI override prune, DeleteSave honesty, Trade/Corpse reset-контракты, ResolveAll registration order, startup fail-closed, cycle detection (Фаза 4: P2-12/P2-13/P2-14)"
-            : "FAIL — см. DEFECT-строки выше (runtime-подтверждение аудита 09.22 + Фаза 4)")}");
+            ? "PASS — EventBus isolation/re-entrancy, path sanitisation, DI override prune, DeleteSave honesty, Trade/Corpse reset-контракты, ResolveAll registration order, startup fail-closed, cycle detection (Фаза 4: P2-12/P2-13/P2-14), world-reset fail-closed (P1-9), startup retry без дублей (P1-10), Pure без расхода Ци (P1-12)"
+            : "FAIL — см. DEFECT-строки выше (runtime-подтверждение аудита 09.22 + Фаза 4 + финальные фазы 6–10)")}");
 
         // Чистка временных каталогов теста B/D.
         await ToSignal(GetTree().CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
@@ -506,6 +591,242 @@ public partial class Audit0922SimDebug : Node
         var c3 = b3.Build();
         var dep3 = c3.Resolve<Dep3>();
         Check(dep3 != null && dep3.D2 != null, "H3 цепочка Dep3 → Dep2 → Dep1 резолвится (нет ложного цикла)", "P2-14");
+    }
+
+    // ── I. P1-9 (Фазы 6/7/10): WorldDomainResetPhase fail-closed =============
+    private void RunWorldDomainResetFailClosedTest()
+    {
+        GD.Print("[Audit0922Sim] === I. WorldDomainResetPhase: ResetWorld exception → fail-closed (P1-9) ===");
+
+        // Мини-контейнер с доменами: OK, OK, THROW — ResolveAll по порядку
+        // регистрации (P2-12) даёт детерминированную последовательность.
+        var b = new ContainerBuilder();
+        b.Register<IResetProbeDomain, ResetOkProbeA>(Lifetime.Singleton);
+        b.Register<IResetProbeDomain, ResetThrowProbe>(Lifetime.Singleton);
+        b.Register<IResetProbeDomain, ResetOkProbeB>(Lifetime.Singleton);
+        var c = b.Build();
+
+        // Фаза — реальный production-класс (не копия): только [Inject]-
+        // зависимости подставляем отражением (как это делает живой контейнер).
+        var phase = new WorldDomainResetPhase();
+        ContainerAdapter.InjectProperties(phase, c);
+
+        // I1: исключение ResetWorld() одного домена ДОЛЖНО покидать ExecuteAsync
+        // (fail-closed). Прежде — catch+лог: фаза «успешна», оркестратор
+        // MarkAsCompleted, мир собирается из смеси сброшенного/старого
+        // состояния (Фаза 7 P1-11: последующие 14 фаз считают reset чистым).
+        AggregateException? resetEx = null;
+        try
+        {
+            phase.ExecuteAsync().GetAwaiter().GetResult();
+        }
+        catch (AggregateException ex) { resetEx = ex; }
+        catch (Exception ex)
+        {
+            GD.Print($"[Audit0922Sim] DEFECT I-неАгрегат: ExecuteAsync бросил {ex.GetType().Name}");
+            _allPass = false;
+        }
+        bool i1 = resetEx != null;
+        GD.Print($"[Audit0922Sim] diag: ExecuteAsync при падении одного домена → " +
+                 (resetEx == null ? "успех (исключение ПРОГЛОЧЕНО — сборка мира продолжится)" : $"AggregateException ({resetEx.InnerExceptions.Count} провал)"));
+        Check(i1, "I1 исключение ResetWorld() покидает фазу (fail-closed, не лог)", "P1-9");
+
+        // I2: агрегат называет домен-виновник (диагностика).
+        bool i2 = resetEx != null && resetEx.InnerExceptions.Any(i =>
+            i.Message.Contains("ResetThrowProbe") ||
+            (i.InnerException?.Message ?? "").Contains("intentional domain failure"));
+        Check(i2, "I2 AggregateException называет упавший домен", "P1-9");
+
+        // I3: полная диагностика одной попытки — ВСЕ домены получили ResetWorld
+        // (как startup P2-13: один бут = вся картина провалов). Пробы созданы
+        // контейнером — резолвим конкретные типы (мульти-форвард-ключи живы).
+        var okA = c.Resolve<ResetOkProbeA>();
+        var okB = c.Resolve<ResetOkProbeB>();
+        var bad = c.Resolve<ResetThrowProbe>();
+        GD.Print($"[Audit0922Sim] diag: ResetCount okA={okA.ResetCount} throw={bad.ResetCount} okB={okB.ResetCount} (ожид 1/1/1)");
+        Check(okA.ResetCount == 1 && okB.ResetCount == 1 && bad.ResetCount == 1,
+            "I3 все домены диагностированы за одну попытку (полная картина, как startup)", "P1-9");
+
+        // I4: контракт состояния фазы — после провала ExecuteAsync фаза НЕ
+        // помечена успешной. Оркестратор вызвал бы MarkAsFailed (не в тесте:
+        // он вызывается по исключению); здесь проверяем, что САМА фаза не
+        // врёт о успехе: State остаётся Running (не Completed) — MarkAsCompleted
+        // ставит ТОЛЬКО оркестратор после успешного await, а исключение
+        // отправляет его в catch-ветку MarkAsFailed. Достаточная проверка:
+        // ExecuteAsync бросил → MarkAsCompleted недостижим (см. I1).
+        Check(phase.State != SceneAssemblyPhaseState.Completed,
+            "I4 фаза после провала не считается успешной (MarkAsCompleted недостижим)", "P1-9");
+    }
+
+    // ── J. P1-10 (Фазы 7/10): retry не перезапускает успешные модули =========
+    private void RunStartupRetryTest()
+    {
+        GD.Print("[Audit0922Sim] === J. GameEntryPoint: retry без повторного Start успешных модулей (P1-10) ===");
+
+        // Сценарий аудитора Фазы 7: Start A → PASS (с подпиской!), Start B → PASS,
+        // Start C → THROW → startup FAILED; retry → A/B НЕ перезапускаются,
+        // C ретраится. Проверка: SubscriberCount<BootProbeMsg> до/после retry
+        // + счётчик StartCalls.
+        var bus = new EventBus();
+        var subscribing = new SubscribingStartable(bus);
+        var counting = new CountingStartable();
+        var probe = new ThrowingStartable();
+
+        var b = new ContainerBuilder();
+        b.RegisterInstance<IGameSession>(new FakeGameSession());
+        b.RegisterInstance(subscribing);
+        b.RegisterInstance(counting);
+        b.RegisterInstance(probe);
+        b.Register<GameEntryPoint>(Lifetime.Singleton);
+        var c = b.Build();
+        var entry = c.Resolve<GameEntryPoint>();
+
+        // Первая попытка: подписывающийся и счётчик стартуют успешно,
+        // ThrowingStartable валит бут (AggregateException, P2-13).
+        bool firstThrew = false;
+        try { entry.Start(); }
+        catch (AggregateException) { firstThrew = true; }
+        int subsAfterFirst = bus.SubscriberCount<BootProbeMsg>();
+        Check(firstThrew && subsAfterFirst == 1,
+            "J1 первый бут: провален AggregateException-ом, успешный модуль подписался 1 раз", "P1-10");
+
+        // J2 (ГЛАВНЫЙ): retry не удваивает подписки. Прежде: ретрай = полный
+        // повтор бута → SubscribingStartable.Start() ВТОРОЙ раз → утечка
+        // старого токена + двойная обработка событий (SubscriberCount=2).
+        bool retryThrew = false;
+        try { entry.Start(); }
+        catch (AggregateException) { retryThrew = true; }
+        int subsAfterRetry = bus.SubscriberCount<BootProbeMsg>();
+        GD.Print($"[Audit0922Sim] diag: SubscriberCount<BootProbe> {subsAfterFirst} → {subsAfterRetry} " +
+                 (subsAfterRetry > subsAfterFirst ? $"— ПОДПИСКА ПРОДУБЛИРОВАНА ({subsAfterRetry}x)" : "— стабилен"));
+        Check(subsAfterRetry == subsAfterFirst,
+            "J2 retry НЕ дублирует подписки успешного модуля (SubscriberCount стабилен)", "P1-10");
+
+        // J3: повторный вызов Start у успешного модуля не случился вовсе.
+        GD.Print($"[Audit0922Sim] diag: StartCalls: subscribing={subscribing.StartCalls}, counting={counting.StartCalls} (ожид 1/1)");
+        Check(subscribing.StartCalls == 1 && counting.StartCalls == 1,
+            "J3 успешные модули НЕ получают второй Start() при ретрае", "P1-10");
+
+        // J4: провалившийся модуль ретраится (G3-контракт сохранён: бут можно
+        // повторять с полной диагностикой — точка продолжения, не игнор).
+        Check(retryThrew,
+            "J4 проваленный модуль ретраится (бут остаётся честным fail-closed)", "P1-10");
+    }
+
+    // ── K. P1-12 (Фазы 9/10): Pure damage не расходует Ци =====================
+    private void RunPureDamageTest()
+    {
+        GD.Print("[Audit0922Sim] === K. DamageService: Pure damage не входит в Qi-буфер (P1-12) ===");
+        var container = GameBoot.Container;
+        if (container == null)
+        {
+            GD.Print("[Audit0922Sim] DEFECT контейнер недоступен");
+            _allPass = false;
+            return;
+        }
+
+        var damage = container.Resolve<IDamageService>();
+        var qiService = container.Resolve<IQiService>();
+        var qiProvider = container.Resolve<IQiDataProvider>();
+
+        // --- K1/K2: игрок. Гарантируем Ци ≥ 500 (буфер активен: RawQi ≥ MIN),
+        // замеряем до/после Pure-удара. IsPlayerTarget=true — кэш игрока в
+        // DamageService (QiChangedEvent). Стойка None + DefenderAGI=0 →
+        // dodge/parry/block не роллятся (CombatSim 3f-паттерн).
+        long qiBefore = qiService.CurrentQi;
+        if (qiBefore < 500) qiService.AddQi(500 - qiBefore);
+        qiBefore = qiService.CurrentQi;
+
+        var purePlayerReq = new DamageRequest("qa_k12_att", "player", 100,
+            DamageType.Pure, Element.Neutral, Element.Neutral,
+            AttackType.Normal, TechniqueGrade.Common, 1000, 1, 1,
+            DefenseSubtype.None, BodyMaterial.Organic,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            Morphology.Humanoid, 10, true, CombatSubtype.None);
+        var purePlayerRes = damage.CalculateDamage(purePlayerReq);
+        long qiAfterPure = qiService.CurrentQi;
+        GD.Print($"[Audit0922Sim] diag: Pure→player: absorbed={purePlayerRes.AbsorbedByQi}, " +
+                 $"final={purePlayerRes.FinalDamage}, Ци {qiBefore}→{qiAfterPure}");
+        Check(purePlayerRes.AbsorbedByQi == 0,
+            "K1 Pure→player: AbsorbedByQi = 0 (результат без Ци-поглощения)", "P1-12");
+        Check(qiAfterPure == qiBefore,
+            "K2 Pure→player: Ци игрока НЕ расходуется (главный инвариант)", "P1-12");
+
+        // --- K3: NPC-путь (QiConsumeRequest + прямой TryConsumeQi — «NPC Qi
+        // списывается отдельно» — тоже не должен срабатывать для Pure).
+        qiProvider.SetQiState("qa_k12_npc", 500, 1000, 1f);
+        long npcQiBefore = qiProvider.GetCurrentQi("qa_k12_npc");
+        var pureNpcReq = new DamageRequest("qa_k12_att", "qa_k12_npc", 100,
+            DamageType.Pure, Element.Neutral, Element.Neutral,
+            AttackType.Normal, TechniqueGrade.Common, 1000, 1, 1,
+            DefenseSubtype.None, BodyMaterial.Organic,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            Morphology.Humanoid, 10, false, CombatSubtype.None);
+        var pureNpcRes = damage.CalculateDamage(pureNpcReq);
+        long npcQiAfter = qiProvider.GetCurrentQi("qa_k12_npc");
+        GD.Print($"[Audit0922Sim] diag: Pure→npc: absorbed={pureNpcRes.AbsorbedByQi}, " +
+                 $"final={pureNpcRes.FinalDamage}, Ци {npcQiBefore}→{npcQiAfter}");
+        Check(npcQiAfter == npcQiBefore && pureNpcRes.AbsorbedByQi == 0,
+            "K3 Pure→NPC: Ци не расходуется, поглощения нет (TryConsumeQi не вызван)", "P1-12");
+
+        // --- K4: контроль — Physical Ци расходует (буфер жив, фикс не сломал
+        // обычный путь: пассивная сырая Ци, 5:1).
+        var physReq = new DamageRequest("qa_k12_att", "qa_k12_npc", 100,
+            DamageType.Physical, Element.Neutral, Element.Neutral,
+            AttackType.Normal, TechniqueGrade.Common, 1000, 1, 1,
+            DefenseSubtype.None, BodyMaterial.Organic,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            Morphology.Humanoid, 10, false, CombatSubtype.None);
+        var physRes = damage.CalculateDamage(physReq);
+        long npcQiAfterPhys = qiProvider.GetCurrentQi("qa_k12_npc");
+        GD.Print($"[Audit0922Sim] diag: Physical→npc (контроль): absorbed={physRes.AbsorbedByQi}, " +
+                 $"Ци {npcQiAfter}→{npcQiAfterPhys}");
+        Check(physRes.AbsorbedByQi > 0 && npcQiAfterPhys < npcQiAfter,
+            "K4 контроль Physical: Ци расходуется (Qi-буфер не отключён фиксом)", "P1-12");
+    }
+
+    // ── L. P2-22 (диагностика, бэклог): queued-drain re-entrancy guard ======
+    // Сценарий аудитора (Фазы 6/7): Publish(A) → handler → Publish(A) → queue;
+    // внешний Publish закончился, _publishing(T) снят; дрен исполняет queued A
+    // через queue[i]() → InvokeHandlers БЕЗ добавления T в _publishing →
+    // self-publish из queued-хендлера идёт ПРЯМОЙ рекурсией, а не в очередь.
+    // Изоляция от «stale queue» (P1-5, r32) — отдельный дефект: тот фикс честен,
+    // здесь теряется именно guard в момент дрен а.
+    // Классификация аудитора: P2 hardening (нужен патологический
+    // self-publish-цикл), НЕ P1 — фиксы «следующего слоя» (Фаза 10) —
+    // поставляем runtime-доказательство, вердикт НЕ гейтим.
+    private void RunQueueDrainReentrancyDiagnostic()
+    {
+        GD.Print("[Audit0922Sim] === L. EventBus: queued-drain re-entrancy guard (P2-22 — диагностика, бэклог) ===");
+        var bus = new EventBus();
+        int depth = 0, maxDepth = 0, deliveries = 0;
+        var tok = bus.Subscribe<PingMsg>((in PingMsg msg) =>
+        {
+            depth++;
+            try
+            {
+                if (depth > maxDepth) maxDepth = depth;
+                deliveries++;
+                // Ограниченная цепочка self-publish (id < 6) — StackOverflow
+                // исключён; глубина рекурсии = детектор потери guard-а.
+                if (msg.Id < 6) bus.Publish(new PingMsg(msg.Id + 1));
+            }
+            finally { depth--; }
+        });
+        bus.Publish(new PingMsg(1));
+        tok.Dispose();
+
+        // Починенный контракт: во время дрен queued-события повторный Publish
+        // ТОГО ЖЕ типа ставится в очередь (guard) → maxDepth ≤ 2. Текущий код:
+        // guard снят после внешнего Publish → прямая рекурсия растёт с длиной
+        // цепочки (maxDepth == длина цепочки).
+        bool guardHeldDuringDrain = maxDepth <= 2;
+        GD.Print($"[Audit0922Sim] diag: L queued-drain maxDepth={maxDepth}, deliveries={deliveries} (цепочка 6) — " +
+                 (guardHeldDuringDrain
+                     ? "guard держится в дрене (P2-22 закрыт)"
+                     : "guard ПОТЕРЯН в дрене: queued self-publish идёт прямой рекурсией " +
+                       "(P2-22 runtime-подтверждён; классификация P2 — бэклог следующего слоя, " +
+                       "по указанию аудитора Фазы 10 в этот эпизод не входит)"));
     }
 
     private static void CleanupTemp()

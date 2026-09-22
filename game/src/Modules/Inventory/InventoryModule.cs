@@ -50,8 +50,17 @@ public class InventoryModule : IModule
 
     public string ModuleName => "Inventory";
 
+        // P1-10 (аудит 09.22, Фазы 7/10): идемпотентный Start — повторный вызов
+    // (прямой вызов вне GameEntryPoint / повторная инстанциация сцены) не
+    // дублирует подписки/инициализацию. Флаг — только при УСПЕШНОМ завершении
+    // (провал остаётся ретраимым). Основной слой защиты — GameEntryPoint
+    // (_startedModules, resume from failure); это страховка от прямых вызовов.
+    private bool _startCompleted;
+
     public void Start()
     {
+        if (_startCompleted) return;
+
         _inventoryServiceImpl.Configure(_config);
         _craftingServiceImpl.RegisterRecipes(_config.Recipes);
 
@@ -66,6 +75,8 @@ public class InventoryModule : IModule
         _itemAddRequestSubscription = _itemAddRequestSub.Subscribe(OnItemAddRequest);
         _equipChangedSubscription = _equipChangedSub.Subscribe(OnEquipmentChanged);
         _craftCompletedSubscription = _craftCompletedSub.Subscribe(OnCraftCompleted);
+    
+        _startCompleted = true;
     }
 
     public void Tick(int tickCount)

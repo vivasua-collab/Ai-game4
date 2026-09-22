@@ -32,8 +32,17 @@ public sealed class PlayerModule : IModule
     private int _tickCount;
     private Position2D? _mouseDestination;  // null = keyboard movement, non-null = mouse-click movement
 
+        // P1-10 (аудит 09.22, Фазы 7/10): идемпотентный Start — повторный вызов
+    // (прямой вызов вне GameEntryPoint / повторная инстанциация сцены) не
+    // дублирует подписки/инициализацию. Флаг — только при УСПЕШНОМ завершении
+    // (провал остаётся ретраимым). Основной слой защиты — GameEntryPoint
+    // (_startedModules, resume from failure); это страховка от прямых вызовов.
+    private bool _startCompleted;
+
     public void Start()
     {
+        if (_startCompleted) return;
+
         // AUDIT-0911 PLR-2 FIX: врождённые статы игрока (раньше никто не
         // вызывал SetBaseStat → GetStat=0 всегда → бой без STR/AGI/INT/Luck,
         // «AGI-ускорение атаки» §8.2 мертво). Идемпотентно: тёплый рестарт
@@ -48,6 +57,8 @@ public sealed class PlayerModule : IModule
         // C2: запуск подписок TechniqueSlotService (TechniqueForgottenEvent для авто-очистки слотов)
         _techniqueSlots?.Start();
         Console.WriteLine($"[PlayerModule] Started — stat svc wired={_statService != null}");
+    
+        _startCompleted = true;
     }
 
     /// <summary>

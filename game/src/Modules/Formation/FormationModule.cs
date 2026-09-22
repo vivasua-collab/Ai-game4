@@ -31,11 +31,22 @@ public class FormationModule : IModule
 
     public string ModuleName => "Formation";
 
+        // P1-10 (аудит 09.22, Фазы 7/10): идемпотентный Start — повторный вызов
+    // (прямой вызов вне GameEntryPoint / повторная инстанциация сцены) не
+    // дублирует подписки/инициализацию. Флаг — только при УСПЕШНОМ завершении
+    // (провал остаётся ретраимым). Основной слой защиты — GameEntryPoint
+    // (_startedModules, resume from failure); это страховка от прямых вызовов.
+    private bool _startCompleted;
+
     public void Start()
     {
+        if (_startCompleted) return;
+
         _formationServiceImpl.Initialize(_config);
         // Этап 5: обновить кэш Qi создателя (см. комментарий в шапке файла).
         _qiAddRequestPub.Publish(new QiAddRequestEvent(0, "FormationModule.Start"));
+    
+        _startCompleted = true;
     }
 
     public void Tick(int tickCount)

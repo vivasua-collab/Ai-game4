@@ -43,8 +43,17 @@ public sealed class SaveModule : IModule
     /// <summary>R17: единый слот автосейва (перезапись, не autosave_NNNN-плодовение).</summary>
     private const string AutoSaveSlotName = "autosave";
 
+        // P1-10 (аудит 09.22, Фазы 7/10): идемпотентный Start — повторный вызов
+    // (прямой вызов вне GameEntryPoint / повторная инстанциация сцены) не
+    // дублирует подписки/инициализацию. Флаг — только при УСПЕШНОМ завершении
+    // (провал остаётся ретраимым). Основной слой защиты — GameEntryPoint
+    // (_startedModules, resume from failure); это страховка от прямых вызовов.
+    private bool _startCompleted;
+
     public void Start()
     {
+        if (_startCompleted) return;
+
         _saveSubToken = _saveSub.Subscribe(OnSaveRequested);
         _loadSubToken = _loadSub.Subscribe(OnLoadRequested);
 
@@ -62,6 +71,8 @@ public sealed class SaveModule : IModule
             registered++;
         }
         Console.WriteLine($"[SaveModule] Started — {registered} ISaveable service(s) registered");
+    
+        _startCompleted = true;
     }
 
     public void Tick(int tickCount)

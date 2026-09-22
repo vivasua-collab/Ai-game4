@@ -40,8 +40,16 @@ namespace CultivationGame.Modules.Trade
 
         public string ModuleName => "Trade";
 
+                // P1-10 (аудит 09.22, Фазы 7/10): идемпотентный Start — повторный вызов
+        // не дублирует подписки/инициализацию (флаг — только при успешном
+        // завершении, провал остаётся ретраимым). Страховка прямых вызовов
+        // (GameWorldController._Ready и пр.); основной слой — GameEntryPoint.
+        private bool _startCompleted;
+
         public void Start()
         {
+            if (_startCompleted) return;
+
             _tradeRequestedSubscription?.Dispose();
             _tradeRequestedSubscription = _tradeRequestedSub.Subscribe(OnTradeRequested);
 
@@ -51,6 +59,8 @@ namespace CultivationGame.Modules.Trade
                 Environment.GetEnvironmentVariable("GODOT_TRADE_HOLD") == "1";
 
             Console.WriteLine("[TradeModule] Started");
+        
+            _startCompleted = true;
         }
 
         public void Tick(int tickCount)

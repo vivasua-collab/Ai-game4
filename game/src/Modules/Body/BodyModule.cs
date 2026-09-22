@@ -54,8 +54,17 @@ public class BodyModule : IModule
 
     public string ModuleName => "Body";
 
+    // P1-10 (аудит 09.22, Фазы 7/10): идемпотентный Start — повторный вызов
+    // (прямой вызов вне GameEntryPoint / повторная инстанциация сцены) не
+    // дублирует подписки/инициализацию. Флаг — только при УСПЕШНОМ завершении
+    // (провал остаётся ретраимым). Основной слой защиты — GameEntryPoint
+    // (_startedModules, resume from failure); это страховка от прямых вызовов.
+    private bool _startCompleted;
+
     public void Start()
     {
+        if (_startCompleted) return;
+
         // IMPL-3: Config injected via DI (replaces obsolete SetConfig()).
         _bodyService.Initialize(
             _config.EntityId,
@@ -69,6 +78,8 @@ public class BodyModule : IModule
 
         // П.24: Подписка на StatChangedEvent (VIT) — пересчёт HP
         _statChangedSubscription = _statChangedSub.Subscribe(OnStatChanged);
+
+        _startCompleted = true;
     }
 
     public void Tick(int tickCount)
