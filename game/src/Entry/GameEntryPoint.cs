@@ -18,11 +18,22 @@ namespace CultivationGame.Entry;
 /// <para><b>Start:</b> collects every <see cref="IStartable"/> and
 /// <see cref="ITickable"/> from the container (excluding self to avoid
 /// recursion) and calls <c>Start()</c> on each in registration order
-/// (modules first, then Entry services, then <c>GameEntryPoint</c> last
-/// via the external <c>Start()</c> call from the adapter).</para>
-/// <para><b>Tick:</b> forwards the tick to every collected
-/// <see cref="ITickable"/> in order. Guarded by a re-entrancy flag in
-/// case the adapter calls <c>Tick</c> from a re-entrant context.</para>
+/// (P2-12: ResolveAll iterates the ordered registration list; modules
+/// first, then Entry services, then <c>GameEntryPoint</c> last via the
+/// external <c>Start()</c> call from the adapter).</para>
+/// <para><b>Startup contract — FAIL-CLOSED (P2-13, аудит 09.22 Фаза 4):</b>
+/// все модули получают <c>Start()</c> (полная диагностика одной попытки),
+/// затем при любом провале наружу летит <see cref="AggregateException"/>;
+/// <c>_initialized</c> НЕ выставляется — тик-луп остаётся заглушён
+/// (полуинициализированные модули не симулируют и не автосейвят).
+/// Прежнее поведение (fail-open + <c>_initialized=true</c> до старта)
+/// делало частично инициализированное состояние постоянным.</para>
+/// <para><b>Tick — fail-open (изоляция сбоя):</b> упавший в рантайме
+/// <see cref="ITickable"/> логируется и пропускается, симуляция
+/// продолжается. Контракт зеркален fail-closed startup: единичная
+/// ошибка в установившемся рантайме не должна останавливать мир.
+/// Re-entrancy-guarded: nested <c>Tick</c> (например, из
+/// <c>Start()</c> модуля) — no-op; тики до успешного старта — no-op.</para>
 /// </remarks>
 public sealed class GameEntryPoint : IStartable, ITickable
 {
@@ -47,6 +58,13 @@ public sealed class GameEntryPoint : IStartable, ITickable
             return;
         }
 
+        // P2-13: повторный Start() (после проваленного бута или до успешного)
+        // пересобирает списки С НАУЛЯ — дубликатов не накапливаем (ретрай =
+        // полный повтор бута; повторный Start успешно стартовавших модулей —
+        // их идемпотентность отдельный бэклог-вопрос P2-10/P2-11).
+        _startables.Clear();
+        _tickables.Clear();
+
         // Collect startables (exclude self to prevent recursion).
         var startables = _resolver.ResolveAll<IStartable>();
         foreach (var s in startables)
@@ -62,9 +80,18 @@ public sealed class GameEntryPoint : IStartable, ITickable
             if (!ReferenceEquals(t, this)) _tickables.Add(t);
         }
 
-        // Mark initialised BEFORE invoking Start() so any startable that
-        // queries GameEntryPoint via DI sees the initialised state.
-        _initialized = true;
+        // P2-13 (аудит 09.22, Фаза 4): контракт startup = FAIL-CLOSED.
+        // Прежде: (1) _initialized выставлялся ДО запуска модулей; (2) исключение
+        // любого Start() глоталось с логом — игра продолжала работать с частично
+        // инициализированным состоянием (модуль без подписок EventBus/без
+        // обязательной инициализации), повторный Start() уже игнорировался —
+        // повреждение становилось постоянным. Теперь: все модули стартуют
+        // (полная диагностика одной попытки), провалы агрегируются, бут
+        // завершается AggregateException-ом; _initialized НЕ выставляется —
+        // Tick остаётся заглушён. «Mark initialised BEFORE Start» удалено:
+        // тики во время старта теперь отбрасываются гейтом !_initialized —
+        // полуинициализированные модули тикать не должны.
+        var failures = new List<Exception>();
 
         foreach (var s in _startables)
         {
@@ -74,7 +101,8 @@ public sealed class GameEntryPoint : IStartable, ITickable
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[GameEntryPoint] Startable {s.GetType().Name} threw: {ex.GetType().Name}: {ex.Message}");
+                Console.WriteLine($"[GameEntryPoint] Startable {s.GetType().Name} FAILED: {ex.GetType().Name}: {ex.Message}");
+                failures.Add(new InvalidOperationException($"Startable {s.GetType().FullName} failed to start", ex));
             }
         }
 
@@ -97,7 +125,19 @@ public sealed class GameEntryPoint : IStartable, ITickable
         catch (Exception ex)
         {
             Console.WriteLine($"[GameEntryPoint] Location catalog registration FAILED: {ex.GetType().Name}: {ex.Message}");
+            // P2-13: каталог локаций — стартовый критический шаг (R17 E-3:
+            // без него LoadGame не может восстановить локацию сейва) —
+            // fail-closed вместе с остальным startup.
+            failures.Add(new InvalidOperationException("Location catalog registration failed (R17 WT-3)", ex));
         }
+
+        if (failures.Count > 0)
+            throw new AggregateException(
+                $"Game startup FAILED: {failures.Count} failure(s) — fail-closed contract (P2-13): " +
+                "partial initialisation is not a runnable state",
+                failures);
+
+        _initialized = true;
 
         Console.WriteLine(
             $"[GameEntryPoint] Started. {_startables.Count} startables, {_tickables.Count} tickables, session={_session.GetType().Name}");
@@ -105,9 +145,11 @@ public sealed class GameEntryPoint : IStartable, ITickable
 
     /// <summary>
     /// Forward a fixed tick to every collected <see cref="ITickable"/>.
-    /// Re-entrancy-guarded: if Tick is invoked while already ticking
-    /// (e.g. a startable triggers a tick during Start), the nested call
-    /// is a no-op.
+    /// No-op until startup has fully succeeded (P2-13: полуинициализированные
+    /// модули не тикают), and re-entrancy-guarded: if Tick is invoked while
+    /// already ticking (e.g. a startable triggers a tick during Start), the
+    /// nested call is a no-op. Per-tickable failures are isolated (fail-open:
+    /// logged, skipped — см. контракт в class remarks).
     /// </summary>
     /// <param name="tickCount">Monotonic tick counter (1 tick = 1 game minute).</param>
     public void Tick(int tickCount)

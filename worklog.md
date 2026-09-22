@@ -3017,3 +3017,41 @@ NEXT: аудитор → следующая фаза (матрица state→res
 план аудита доков R31 — в силе (мораторий), +2-3 новых дрейф-пункта
 от R32-фиксов (Trade reset-контракт, DeleteSave семантика, EventBus
 изоляция, DI prune) — в следующий проход плана.
+
+---
+## R33 — 2026-09-22 (пропущенная Фаза 4 аудита 09.22: DI/Container/Startup/Lifecycle)
+
+Аудитор доставил отдельно Фазу 4, отсутствовавшую в файле аудита
+(перескок Ф3→Ф5, зафиксировано в 09_22_r32). Зафиксирована по 949391c;
+обработана по e1c4a6b (r32).
+
+Верификация: P1-6 подтверждён для 949391c, но уже закрыт r32 (реконструкция
+по строке итога была верна); P2-12/P2-13/P2-14 подтверждены по обоим
+состояниям (Container игнорировал ordered-параметр ctor-а; _initialized=true
+до Start + fail-open; depth>50 ≠ cycle detection).
+
+Фиксы R33:
+- Container.cs: ResolveAll итерирует _orderedRegistrations (контракт
+  «registration order»); builder согласует ordered↔словарь (мёртвые
+  регистрации не воскрешаются — иначе P1-6 вернулся бы через ResolveAll);
+  cycle detection по _constructionPath («A → B → C → A» на первом повторном
+  входе; depth>50 — страховка).
+- GameEntryPoint.cs: startup FAIL-CLOSED (все модули стартуют →
+  AggregateException; _initialized только при полном успехе; ретрай
+  пересобирает списки); tick — fail-open (документированный контракт).
+- GameBoot.cs: ловит агрегат старта — PushError по провалам, _bootFailed
+  глушит тик-луп, ранний return.
+- Audit0922SimDebug: секции F/G/H (+10 проверок: порядок, ровно один
+  handler после override, дедуп мульти-форварда, AggregateException,
+  заглушённый тик-луп, ретрай, цикл с путём, self-cycle, без ложных
+  срабатываний).
+- Доки: DI_AND_EVENTBUS §1.8 (контракты lifecycle/ResolveAll),
+  TESTING_RULES (секции F/G/H сима №19).
+
+Проверено: build 0 err; AUDIT0922 PASS (A–H); полная регрессия 19/19 PASS.
+Ответы аудитору (развилки P2-12/P2-13, статус «уже известных»):
+checkpoints/09_22_r33_ext_audit_phase4.md.
+
+NEXT: ответ аудитора (матрица state→reset→save→restore→dispose→tick по 17
+модулям); P2-бэклог — приоритизация пользователем; план аудита доков R31 —
+мораторий в силе.

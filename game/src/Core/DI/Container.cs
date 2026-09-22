@@ -28,7 +28,9 @@ internal sealed class Registration
 
 /// <summary>
 /// Minimal but functional DI container builder. Stores registrations in a
-/// flat dictionary keyed by service type. Build() returns an immutable
+/// flat dictionary keyed by service type (resolution) and an ordered list
+/// (iteration order for <c>ResolveAll</c> — the documented "registration
+/// order" contract, P2-12). Build() returns an immutable
 /// <see cref="Container"/>.
 /// </summary>
 public sealed class ContainerBuilder : IContainerBuilder
@@ -91,11 +93,24 @@ public sealed class ContainerBuilder : IContainerBuilder
     /// Инстанс-оверрайд маркер-мульти-провайдерского ключа (напр. ISaveable)
     /// запрещён по построению — семантику «все провайдеры» он бы вычистил.
     /// </para>
+    /// <para>
+    /// P2-12 (аудит 09.22, Фаза 4): <see cref="_orderedRegistrations"/> — теперь
+    /// источник итерации <c>ResolveAll</c> (контракт «registration order»).
+    /// Согласованность со словарём ключей: сместившаяся регистрация (ключ
+    /// перезаписан соседней регистрацией или хвосты сняты prune-ом P1-6),
+    /// не владеющая больше НИ ОДНИМ ключом, МЕРТВА и удаляется из ordered —
+    /// иначе ResolveAll, идущий по ordered, воскресил бы её (в т.ч. stale
+    /// concrete из P1-6, чего страж C2 не допускает). Живая мульти-интерфейсная
+    /// регистрация (владеет своим primary-ключом, форвард-ключ мог быть
+    /// украден соседом — паттерн NPCService, страж C5) остаётся в списке.
+    /// </para>
     /// </summary>
     private void SetRegistration(Type key, Registration reg, bool pruneStaleForwarding)
     {
+        _registrations.TryGetValue(key, out var old);
+
         if (pruneStaleForwarding
-            && _registrations.TryGetValue(key, out var old)
+            && old is not null
             && !ReferenceEquals(old, reg)
             && old.ServiceType == key)
         {
@@ -105,6 +120,18 @@ public sealed class ContainerBuilder : IContainerBuilder
             foreach (var t in doomed) _registrations.Remove(t);
         }
         _registrations[key] = reg;
+
+        // P2-12: ordered-список не должен содержать мёртвых регистраций.
+        if (old is not null && !ReferenceEquals(old, reg) && !OwnsAnyKey(old))
+            _orderedRegistrations.Remove(old);
+    }
+
+    /// <summary>Владеет ли регистрация хотя бы одним живым ключом словаря.</summary>
+    private bool OwnsAnyKey(Registration candidate)
+    {
+        foreach (var kv in _registrations)
+            if (ReferenceEquals(kv.Value, candidate)) return true;
+        return false;
     }
 
     public Container Build() => new Container(_registrations, _orderedRegistrations);
@@ -117,19 +144,28 @@ public sealed class ContainerBuilder : IContainerBuilder
 ///   <item>Constructor injection (greediest public ctor).</item>
 ///   <item>Property injection via <see cref="InjectAttribute"/>.</item>
 ///   <item>Pre-built instances via <c>RegisterInstance</c>.</item>
-///   <item>Circular dependency detection (depth &gt; 50 → throws).</item>
+///   <item>ResolveAll iterates registrations in registration order (P2-12).</item>
+///   <item>Circular dependency detection: construction path gives the exact
+///   cycle («A → B → C → A», P2-14); depth &gt; 50 remains a safety net.</item>
 /// </list>
 /// </summary>
 public sealed class Container : IResolver, IDisposable
 {
     private readonly Dictionary<Type, Registration> _registrations;
+    private readonly List<Registration> _orderedRegistrations;
     private readonly Dictionary<Type, object> _singletons;
+    // P2-14 (аудит 09.22, Фаза 4): типы в ТЕКУЩЕЙ цепочке конструирования
+    // (стек разрешения). Доступ — только под _lock, вложенные Resolve
+    // рекурсивны на том же потоке (Monitor реентерабелен), потому обычный
+    // List корректен без ThreadStatic.
+    private readonly List<Type> _constructionPath = new();
     private readonly object _lock = new();
     private bool _disposed;
 
     internal Container(Dictionary<Type, Registration> registrations, List<Registration> ordered)
     {
         _registrations = registrations;
+        _orderedRegistrations = ordered;
         _singletons = new Dictionary<Type, object>();
         // Self-register so IResolver can be injected.
         _singletons[typeof(IResolver)] = this;
@@ -159,9 +195,16 @@ public sealed class Container : IResolver, IDisposable
         // по ImplementationType (impl-ключ всегда указывает на корректную
         // регистрацию своего типа), матчинг — по фактическому типу инстанса,
         // дедуп — по ссылке на инстанс (не по Registration-объекту).
+        //
+        // P2-12 (аудит 09.22, Фаза 4): итерация — по _orderedRegistrations
+        // (порядок вызовов Register*/RegisterInstance), а не по Dictionary.Values:
+        // словарь после удалений (prune P1-6) порядок НЕ гарантирует, а
+        // GameEntryPoint документирует контракт «Start() … in registration
+        // order». Мёртвые регистрации (не владеющие ни одним ключом)
+        // ContainerBuilder из ordered уже удалил — см. SetRegistration.
         var seen = new HashSet<object>(
             System.Collections.Generic.ReferenceEqualityComparer.Instance);
-        foreach (var reg in _registrations.Values)
+        foreach (var reg in _orderedRegistrations)
         {
             object? instance;
             if (reg.HasInstance)
@@ -258,21 +301,60 @@ public sealed class Container : IResolver, IDisposable
                 throw new InvalidOperationException(
                     $"Registration for '{serviceType.FullName}' has no implementation type and no instance.");
 
-            object instance = Construct(reg.ImplementationType, depth);
-            InjectProperties(instance, depth);
+            // P2-14 (аудит 09.22, Фаза 4): настоящий cycle detection — по
+            // construction path (типы в текущей цепочке конструирования), а
+            // не только depth-limit. Цикл ловится на ПЕРВОМ повторном входе
+            // с точным путём «A → B → C → A», без 51-го лишнего конструирования.
+            // Кэш синглтонов НЕ мешает: инстанс попадает в _singletons ПОСЛЕ
+            // завершения Construct — повторный вход в недостроенный тип это
+            // по определению цикл. Depth>50 остаётся страховкой (циклы через
+            // фабрики/Activator path не оставляют).
+            var implType = reg.ImplementationType;
+            int cycleAt = _constructionPath.IndexOf(implType);
+            if (cycleAt >= 0)
+                throw new InvalidOperationException(
+                    $"Circular dependency detected while resolving '{serviceType.FullName}': " +
+                    FormatConstructionPath(cycleAt, implType));
 
-            if (reg.Lifetime != Lifetime.Transient)
+            _constructionPath.Add(implType);
+            try
             {
-                _singletons[serviceType] = instance;
-                // Cache under the implementation type too, so that subsequent
-                // resolves via the forwarded concrete-type key hit the cache
-                // and return the same singleton.
-                if (reg.ImplementationType != serviceType)
-                    _singletons[reg.ImplementationType] = instance;
-            }
+                object instance = Construct(implType, depth);
+                InjectProperties(instance, depth);
 
-            return instance;
+                if (reg.Lifetime != Lifetime.Transient)
+                {
+                    _singletons[serviceType] = instance;
+                    // Cache under the implementation type too, so that subsequent
+                    // resolves via the forwarded concrete-type key hit the cache
+                    // and return the same singleton.
+                    if (implType != serviceType)
+                        _singletons[implType] = instance;
+                }
+
+                return instance;
+            }
+            finally
+            {
+                _constructionPath.RemoveAt(_constructionPath.Count - 1);
+            }
         }
+    }
+
+    /// <summary>
+    /// P2-14: путь цикла от первого вхождения повторного типа до текущего
+    /// конца цепочки + сам повтор: «A → B → C → A».
+    /// </summary>
+    private string FormatConstructionPath(int cycleAt, Type repeated)
+    {
+        var sb = new System.Text.StringBuilder();
+        for (int i = cycleAt; i < _constructionPath.Count; i++)
+        {
+            sb.Append(_constructionPath[i].Name);
+            sb.Append(" → ");
+        }
+        sb.Append(repeated.Name);
+        return sb.ToString();
     }
 
     private object Construct(Type implType, int depth)

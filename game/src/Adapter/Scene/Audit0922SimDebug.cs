@@ -5,6 +5,12 @@
 // аудитора («проверить реальным runtime-тестом, результат выгрузить в
 // checkpoints/»), плюс смежные инфраструктурные контракты P1-1/P1-4/P1-6/P1-7.
 //
+// 2026-09-22 (позже тем же днём): ДОПОЛНЕНА Фаза 4 того же аудита (DI/
+// Container/Startup/Lifecycle — доставлена отдельно от файла, зафиксирована
+// аудитором по 949391c, в r32 P1-6 уже был закрыт): P2-12 (ResolveAll —
+// порядок регистрации), P2-13 (startup fail-closed, _initialized после
+// Start), P2-14 (настоящий cycle detection по construction path).
+//
 // Сим написан под ПОСТФИКС-контракт (как должен вести себя исправленный код):
 //   A. EventBus (P1-5): исключение в одном подписчике НЕ прерывает fan-out
 //      (подписчики после падавшего получают событие), НЕ покидает Publish,
@@ -20,6 +26,16 @@
 //      (FileHandler → Aggregator → SaveService).
 //   E. World-reset контракты (P1-1/P1-4): TradeService и CorpseService
 //      реализуют IWorldResettable (ResolveAll<IWorldResettable> их видит).
+//   F. ResolveAll (P2-12, Фаза 4): итерация в ПОРЯДКЕ РЕГИСТРАЦИИ;
+//      мёртвые регистрации (P1-6 prune / украденный ключ) из ordered-списка
+//      не воскресают; мульти-форвард + дедуп по ссылке — порядок стабилен.
+//   G. Startup контракт (P2-13, Фаза 4): провал любого Start() →
+//      AggregateException (все модули диагностируются за одну попытку),
+//      тик-луп после проваленного бута заглушён, повторный Start() не
+//      игнорируется (boot не помечен инициализированным).
+//   H. Cycle detection (P2-14, Фаза 4): конструкторский цикл ловится на
+//      ПЕРВОМ повторном входе с точным путём «A → B → A» (не после 51-го
+//      уровня); самоссылка ловится; линейная цепочка не даёт ложного срабатывания.
 //
 // ДО фиксов прогон даёт VERDICT: FAIL со строками «DEFECT (audit 09.22 …)» —
 // это runtime-подтверждение дефектов для чекпоинта аудитора. После фиксов —
@@ -36,6 +52,7 @@ using CultivationGame.Core.Data;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Core.Events;
 using CultivationGame.Adapter.Di;
+using CultivationGame.Entry;
 using CultivationGame.Modules.Save;
 
 namespace CultivationGame.Adapter.Scene;
@@ -53,6 +70,48 @@ public partial class Audit0922SimDebug : Node
     // Register<ISaveable,X>): два интерфейсных ключа форвардят один impl.
     private sealed class DummyImplA : IDummySvc, IOtherSvc { public int Tag => 1; }
     private sealed class DummyImplB : IDummySvc, IOtherSvc { public int Tag => 2; }
+
+    // ── Тестовые классы Фазы 4 (DI/lifecycle: P2-12/P2-13/P2-14) ──
+    // P2-12: порядок ResolveAll = порядок регистрации (регистрируем B, C, A).
+    private interface IOrderProbe { int Tag { get; } }
+    private sealed class OrderProbeB : IOrderProbe { public int Tag => 2; }
+    private sealed class OrderProbeC : IOrderProbe { public int Tag => 3; }
+    private sealed class OrderProbeA : IOrderProbe { public int Tag => 1; }
+
+    // P2-14: конструкторский цикл CycA → CycB → CycA и самоссылка SelfCyc.
+    private sealed class CycA { public CycA(CycB b) { _ = b; } }
+    private sealed class CycB { public CycB(CycA a) { _ = a; } }
+    private sealed class SelfCyc { public SelfCyc(SelfCyc s) { _ = s; } }
+    // P2-14: линейная цепочка (не цикл) — детектор без ложных срабатываний.
+    private sealed class Dep1 { }
+    private sealed class Dep2 { public Dep2(Dep1 d) { _ = d; } }
+    private sealed class Dep3 { public Dep2 D2 = null!; public Dep3(Dep2 d2) { D2 = d2; } }
+
+    // P2-13: стартуемый модуль, падающий на Start() и считающий доставленные тики.
+    private sealed class ThrowingStartable : IStartable, ITickable
+    {
+        public int Ticks;
+        public void Start() => throw new InvalidOperationException("phase4 startup probe: intentional failure");
+        public void Tick(int tickCount) => Ticks++;
+    }
+
+    // P2-13: минимальная сессия для мини-контейнера GameEntryPoint
+    // (настоящая сессия тащит весь граф зависимостей — тут проверяется
+    // ТОЛЬКО контракт startup, зависимости не нужны).
+    private sealed class FakeGameSession : IGameSession
+    {
+        public SessionState State => SessionState.MainMenu;
+        public GameSessionData Data { get; } = new();
+        public void NewGame(int startVariant) { }
+        public void NewGame(int startVariant, string locationId) { }
+        public void LoadGame(string slotName) { }
+        public void LoadGame(SaveSlot slot) { }
+        public void Pause() { }
+        public void Resume() { }
+        public void SaveAndQuit() { }
+        public void QuitWithoutSaving() { }
+        public event Action<SessionState>? OnStateChanged { add { } remove { } }
+    }
 
     private sealed class FakeAdapterFileHandler : ISaveFileHandler
     {
@@ -95,9 +154,21 @@ public partial class Audit0922SimDebug : Node
         try { RunWorldResetContractTest(); }
         catch (Exception ex) { GD.Print($"[Audit0922Sim] DEFECT E-крэш: {ex.GetType().Name}: {ex.Message}"); _allPass = false; }
 
+        // === F. ResolveAll: порядок регистрации (P2-12, Фаза 4) ==============
+        try { RunResolveAllOrderTest(); }
+        catch (Exception ex) { GD.Print($"[Audit0922Sim] DEFECT F-крэш: {ex.GetType().Name}: {ex.Message}"); _allPass = false; }
+
+        // === G. Startup fail-closed (P2-13, Фаза 4) ==========================
+        try { RunStartupContractTest(); }
+        catch (Exception ex) { GD.Print($"[Audit0922Sim] DEFECT G-крэш: {ex.GetType().Name}: {ex.Message}"); _allPass = false; }
+
+        // === H. Cycle detection (P2-14, Фаза 4) ==============================
+        try { RunCycleDetectionTest(); }
+        catch (Exception ex) { GD.Print($"[Audit0922Sim] DEFECT H-крэш: {ex.GetType().Name}: {ex.Message}"); _allPass = false; }
+
         GD.Print($"[Audit0922Sim] VERDICT: {(_allPass
-            ? "PASS — EventBus isolation/re-entrancy, path sanitisation, DI override prune, DeleteSave honesty, Trade/Corpse reset-контракты"
-            : "FAIL — см. DEFECT-строки выше (runtime-подтверждение аудита 09.22)")}");
+            ? "PASS — EventBus isolation/re-entrancy, path sanitisation, DI override prune, DeleteSave honesty, Trade/Corpse reset-контракты, ResolveAll registration order, startup fail-closed, cycle detection (Фаза 4: P2-12/P2-13/P2-14)"
+            : "FAIL — см. DEFECT-строки выше (runtime-подтверждение аудита 09.22 + Фаза 4)")}");
 
         // Чистка временных каталогов теста B/D.
         await ToSignal(GetTree().CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
@@ -297,6 +368,144 @@ public partial class Audit0922SimDebug : Node
         GD.Print($"[Audit0922Sim] diag: CorpseService is IWorldResettable → {corpseResettable}" +
                  (corpseResettable ? "" : " (сброс есть, но транзитивно через NPCModule — контракт неявный)"));
         Check(corpseResettable, "E2 CorpseService реализует IWorldResettable (явный контракт)", "P1-4");
+    }
+
+    // ── F. P2-12 (Фаза 4): ResolveAll — порядок регистрации ====================
+    private void RunResolveAllOrderTest()
+    {
+        GD.Print("[Audit0922Sim] === F. ResolveAll: порядок регистрации + мёртвые регистрации (P2-12) ===");
+
+        // F1: ResolveAll возвращает инстансы в ПОРЯДКЕ РЕГИСТРАЦИИ (B, C, A).
+        // Прежде итерировался Dictionary.Values — порядок фактический, но
+        // негарантированный (и ломается удалениями prune-а P1-6).
+        var b1 = new ContainerBuilder();
+        b1.Register<IOrderProbe, OrderProbeB>(Lifetime.Singleton);
+        b1.Register<IOrderProbe, OrderProbeC>(Lifetime.Singleton);
+        b1.Register<IOrderProbe, OrderProbeA>(Lifetime.Singleton);
+        var c1 = b1.Build();
+        var tags = c1.ResolveAll<IOrderProbe>().Select(p => p.Tag).ToArray();
+        GD.Print($"[Audit0922Sim] diag: ResolveAll<IOrderProbe> → [{string.Join(", ", tags)}] (ожидался 2, 3, 1)");
+        Check(tags.SequenceEqual(new[] { 2, 3, 1 }),
+            "F1 ResolveAll — порядок = порядок регистрации (B, C, A)", "P2-12");
+
+        // F2: связка P1-6+P2-12 — ПРЯМАЯ находка Фазы 4: ResolveAll<ISaveFileHandler>
+        // обязан видеть РОВНО ОДНУ реализацию (адаптер), а не «две одновременно»
+        // (старая + overridden). Включает self-bound ключ, умирающий от форварда
+        // (Register<SaveFileHandler> + Register<ISaveFileHandler, SaveFileHandler>),
+        // и инстанс-оверрайд с prune-ом.
+        var b2 = new ContainerBuilder();
+        b2.Register<SaveFileHandler>(Lifetime.Singleton);                    // self-bound (умирает от форварда)
+        b2.Register<ISaveFileHandler, SaveFileHandler>(Lifetime.Singleton);  // модульный дефолт
+        var adapter = new FakeAdapterFileHandler();
+        b2.RegisterInstance<ISaveFileHandler>(adapter);                      // GameBoot-оверрайд
+        var c2 = b2.Build();
+        var handlers = c2.ResolveAll<ISaveFileHandler>().ToArray();
+        GD.Print($"[Audit0922Sim] diag: ResolveAll<ISaveFileHandler> → {handlers.Length} реализация(й)");
+        Check(handlers.Length == 1 && ReferenceEquals(handlers[0], adapter),
+            "F2 ResolveAll<ISaveFileHandler> — ровно адаптер (мёртвый дефолт не воскресает)", "P2-12/P1-6");
+
+        // F3: мульти-форвард (NPC-паттерн) + last-wins — дедуп по ссылке и
+        // стабильный порядок: A (через IDummySvc-форвард) один раз, затем B.
+        var b3 = new ContainerBuilder();
+        b3.Register<IDummySvc, DummyImplA>(Lifetime.Singleton); // как INPCService→NPCService
+        b3.Register<IOtherSvc, DummyImplA>(Lifetime.Singleton); // как ISaveable→NPCService
+        b3.Register<IOtherSvc, DummyImplB>(Lifetime.Singleton); // как PlayerModule: ISaveable→PlayerService
+        var c3 = b3.Build();
+        var others = c3.ResolveAll<IOtherSvc>().ToArray();
+        Check(others.Length == 2 && others[0] is DummyImplA && others[1] is DummyImplB,
+            "F3 мульти-форвард + last-wins — дедуп по ссылке, порядок стабилен (A, B)", "P2-12-регресс");
+    }
+
+    // ── G. P2-13 (Фаза 4): startup fail-closed ==================================
+    private void RunStartupContractTest()
+    {
+        GD.Print("[Audit0922Sim] === G. GameEntryPoint: startup fail-closed (P2-13) ===");
+        GD.Print("[Audit0922Sim] diag: позитивный контроль — сам этот сим исполняется только после успешного fail-closed Start() живого контейнера");
+
+        var probe = new ThrowingStartable();
+        var b = new ContainerBuilder();
+        b.RegisterInstance<IGameSession>(new FakeGameSession());
+        b.RegisterInstance(probe);
+        b.Register<GameEntryPoint>(Lifetime.Singleton);
+        var c = b.Build();
+        var entry = c.Resolve<GameEntryPoint>();
+
+        // G1: провал любого Start() → AggregateException наружу (fail-closed).
+        // Прежде исключение глоталось с логом — бут считался успешным.
+        AggregateException? bootEx = null;
+        try { entry.Start(); }
+        catch (AggregateException ex) { bootEx = ex; }
+        catch (Exception ex)
+        {
+            GD.Print($"[Audit0922Sim] DEFECT G-неАгрегат: Start() бросил {ex.GetType().Name} вместо AggregateException");
+            _allPass = false;
+        }
+        bool g1 = bootEx != null && bootEx.InnerExceptions.Any(i => i.Message.Contains("ThrowingStartable"));
+        if (bootEx != null)
+            GD.Print($"[Audit0922Sim] diag: AggregateException с {bootEx.InnerExceptions.Count} провалом(и): " +
+                     string.Join("; ", bootEx.InnerExceptions.Select(i => i.Message)));
+        Check(g1, "G1 провал startup → AggregateException с именем модуля (fail-closed)", "P2-13");
+
+        // G2: тик-луп после проваленного бута заглушён — полуинициализированные
+        // модули не тикают (прежде _initialized=true ДО Start() открывал тики).
+        entry.Tick(1);
+        entry.Tick(2);
+        Check(probe.Ticks == 0, "G2 Tick после проваленного Start() не доставляется (луп заглушён)", "P2-13");
+
+        // G3: _initialized НЕ выставлен на провале — повторный Start() не
+        // игнорируется («already initialised»-маска не сработала), бут можно
+        // ретраить целиком с повторной диагностикой.
+        bool secondThrows = false;
+        try { entry.Start(); }
+        catch (AggregateException) { secondThrows = true; }
+        Check(secondThrows, "G3 повторный Start() повторяет диагностику (не помечен инициализированным)", "P2-13");
+    }
+
+    // ── H. P2-14 (Фаза 4): настоящий cycle detection ===========================
+    private void RunCycleDetectionTest()
+    {
+        GD.Print("[Audit0922Sim] === H. Container: cycle detection по construction path (P2-14) ===");
+
+        // H1: конструкторский цикл CycA → CycB → CycA ловится СРАЗУ с точным путём.
+        var b1 = new ContainerBuilder();
+        b1.Register<CycA>(Lifetime.Singleton);
+        b1.Register<CycB>(Lifetime.Singleton);
+        var c1 = b1.Build();
+        try
+        {
+            c1.Resolve<CycA>();
+            Check(false, "H1 цикл CycA → CycB → CycA обнаружен (исключение)", "P2-14");
+        }
+        catch (InvalidOperationException ex)
+        {
+            GD.Print($"[Audit0922Sim] diag: {ex.Message}");
+            Check(ex.Message.Contains("Circular") && ex.Message.Contains("CycA") && ex.Message.Contains("CycB"),
+                "H1 цикл CycA → CycB → CycA обнаружен с точным путём (не depth-51)", "P2-14");
+        }
+
+        // H2: самоссылка SelfCyc → SelfCyc.
+        var b2 = new ContainerBuilder();
+        b2.Register<SelfCyc>(Lifetime.Singleton);
+        var c2 = b2.Build();
+        try
+        {
+            c2.Resolve<SelfCyc>();
+            Check(false, "H2 self-cycle SelfCyc → SelfCyc обнаружен", "P2-14");
+        }
+        catch (InvalidOperationException ex)
+        {
+            GD.Print($"[Audit0922Sim] diag: {ex.Message}");
+            Check(ex.Message.Contains("Circular"), "H2 self-cycle SelfCyc → SelfCyc обнаружен", "P2-14");
+        }
+
+        // H3: линейная цепочка Dep3 → Dep2 → Dep1 резолвится — без ложного срабатывания.
+        var b3 = new ContainerBuilder();
+        b3.Register<Dep1>(Lifetime.Singleton);
+        b3.Register<Dep2>(Lifetime.Singleton);
+        b3.Register<Dep3>(Lifetime.Singleton);
+        var c3 = b3.Build();
+        var dep3 = c3.Resolve<Dep3>();
+        Check(dep3 != null && dep3.D2 != null, "H3 цепочка Dep3 → Dep2 → Dep1 резолвится (нет ложного цикла)", "P2-14");
     }
 
     private static void CleanupTemp()

@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using Godot;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Interfaces;
@@ -23,6 +24,11 @@ public partial class GameBoot : Node
 
     private GameEntryPoint? _entry;
     private ITimeService? _timeService;
+    // P2-13 (аудит 09.22, Фаза 4): провал fail-closed старта — тик-луп и
+    // всю пост-стартовую автоматизацию глушим: полуинициализированные модули
+    // не должны симулировать/автосейвить. Раньше исключение Start()
+    // глоталось внутри GameEntryPoint — GameBoot об провале даже не знал.
+    private bool _bootFailed;
     // R17 (аудит-0911 E-4): гейт тик-лупа по состоянию сессии — симуляция
     // (и автосейв) живут ТОЛЬКО в активной игровой сессии. Раньше тики шли
     // с бутстрапа: в главном меню fallback-мир симулировал, SaveModule писал
@@ -66,7 +72,36 @@ public partial class GameBoot : Node
         _session = Container.Resolve<IGameSession>();
 
         // Start all IStartable modules.
-        _entry.Start();
+        // P2-13: startup fail-closed — AggregateException = бут провалился:
+        // громко логируем каждый провал (PushError — видно и в Godot-консоли,
+        // и в headless-логах QA), глушим тик-луп (_bootFailed) и НЕ входим в
+        // игру/автоматизацию. В headless-QA такой бут не напечатает VERDICT —
+        // сим честно падает по таймауту как FAIL (прежде — тихо «зелёный»
+        // прогон с проглоченным стартом).
+        try
+        {
+            _entry.Start();
+        }
+        catch (Exception ex)
+        {
+            _bootFailed = true;
+            GD.PushError($"[GameBoot] Startup FAILED (fail-closed, P2-13): {ex.Message}");
+            switch (ex)
+            {
+                case AggregateException agg:
+                    foreach (var inner in agg.InnerExceptions)
+                    {
+                        var root = inner;
+                        while (root.InnerException != null) root = root.InnerException;
+                        GD.PushError($"[GameBoot]   • {inner.Message} — {root.GetType().Name}: {root.Message}");
+                    }
+                    break;
+                default:
+                    GD.PushError(ex.ToString());
+                    break;
+            }
+            return;
+        }
 
         GD.Print("[GameBoot] Game initialized. Container built and entry point started.");
 
@@ -101,6 +136,10 @@ public partial class GameBoot : Node
     public override void _PhysicsProcess(double delta)
     {
         if (_entry == null || _timeService == null)
+            return;
+
+        // P2-13: проваленный бут не симулируется — ни тиков, ни автосейвов.
+        if (_bootFailed)
             return;
 
         // R17 (E-4): симуляция — только в активной сессии. MainMenu/Loading/
