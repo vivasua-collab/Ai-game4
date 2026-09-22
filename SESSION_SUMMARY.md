@@ -1,6 +1,6 @@
 # Сводка сессий (обновляется при завершении каждой сессии)
 
-Обновлено: 2026-09-22 (main Z.ai Code, сессии R32+R33+R34; main = R34-коммит)
+Обновлено: 2026-09-22 (main Z.ai Code, сессии R32+R33+R34+R35; main = R35-коммит)
 
 ## Проект
 Cultivation World Simulator (Ai-game4), Godot 4.7.2 .NET, C#
@@ -9,6 +9,24 @@ Cultivation World Simulator (Ai-game4), Godot 4.7.2 .NET, C#
 ---
 
 ## Последние сессии (5 дней)
+
+### 2026-09-22 R35 (фазы 11–14 внешнего аудита 09.22 12:00 — 8 P1 + 6 P2)
+- Источник: upload/audit_09_22_12_00 (верификация R34 принята + Фазы 11–14).
+  Претензия верификатора к R34: prefix/postfix логи не были в git — теперь
+  checkpoints/logs/09_22_r35_{prefix,postfix}_audit0922.log коммитятся.
+- Сим №19 расширен секциями M/N/O/P/Q/R (+35 проверок): prefix = VERDICT
+  FAIL с 32 DEFECT по всем восьми P1, postfix = PASS (76 OK / 0 DEFECT).
+- Закрыто: P1-13 (честный catch-up: TickCatchUpClock + BulkAdvanceTicks +
+  TimeHitchedEvent; инвариант учёта времени), P1-14 (ResetWorld сбрасывает
+  Speed), P1-15 (WorldModule : IWorldResettable — тихая ре-синхронизация
+  календарных маркеров), P1-16 (counter-based ItemId: коллизии 5/1005
+  устранены), P1-17 (гейты экипировки реальны: RequiredCultivationLevel +
+  StatRequirements), P1-18 (одноручное → WeaponOff), P1-19 (StorageRing
+  ISaveable+IWorldResettable: блок storage_rings), P1-20 (конвейер статов
+  по канону: продюсеры §5.1/§5.2 + ConsolidateSleep §6.2/§6.4 + сон до
+  авто-пробуждения); P2-31/32/43/44/45/46/49.
+- Build 0 errors; QA-регрессия 19/19 PASS; доки TIME_SYSTEM/STAT_THRESHOLD/
+  INVENTORY/TESTING_RULES; чекпоинт 09_22_r35_ext_audit_phases_11_14.md.
 
 ### 2026-09-22 R34 (финальные фазы 6–10 аудита 09.22 — P1-9/P1-10/P1-12)
 - Источник: upload/audit_09_22_10_00 (Фазы 6–10). Директива Фазы 10:

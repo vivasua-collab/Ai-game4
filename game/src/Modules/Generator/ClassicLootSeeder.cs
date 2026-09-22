@@ -24,6 +24,14 @@ namespace CultivationGame.Modules.Generator
     {
         private static bool _seeded = false;
 
+        /// <summary>
+        /// R35 (Фаза 12 / P2-32): сброс process-гварда сидера при пересборке
+        /// мира. ItemDatabaseService.ResetWorld очищает каталог и вызывает
+        /// Seed заново — канонический контент обязан вернуться в чистый
+        /// каталог (GeneratorModule.Start сеет его только один раз при буте).
+        /// </summary>
+        public static void ResetForNewWorld() => _seeded = false;
+
         /// <summary>Зарегистрировать канонические предметы лута в БД.</summary>
         public static void Seed(IItemDatabaseService database)
         {

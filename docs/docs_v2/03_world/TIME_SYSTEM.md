@@ -104,6 +104,37 @@
 
 ---
 
+### 4.3 Контракт fixed-timestep catch-up и сброса мира (R35, аудит 09.22 Фаза 11)
+
+Реализация (Godot): `GameBoot._PhysicsProcess` → `TickCatchUpClock.Advance(delta, speed, out bulkSkipped)`
++ `TimeService.BulkAdvanceTicks(n)`. Контракты:
+
+**Catch-up (P1-13) — «честный» догон:**
+- Бюджет симуляции: `max(8, speed×2)` тиков за один physics-кадр (spiral-of-death
+  guard; при Quick = 30 — hitch одного-двух кадров погашается полностью).
+- Накопленный долг НЕ сбрасывается молча — расплачивается на следующих кадрах.
+- **Инвариант учёта:** `смоделировано + bulk-skipped + остаток долга == Σ(delta × speed)`
+  (регрессионный страж — сим №19, секция M).
+- Долг выше `MaxCatchupSeconds` (5с реального времени × speed) → излишек
+  продвигает мировые часы **скачком** (`BulkAdvanceTicks`): календарь/счётчики
+  честны, пертиковые эффекты (реген/баффы/NPC) пропущенных минут не получают,
+  публикуется `TimeHitchedEvent` + видимое предупреждение в лог. Календарные
+  Day/Month/Year ловит `WorldModule.Tick` на первом тике после скачка
+  (переход даты легитимен). Process-tick (`GameBoot._currentTick`) синхронно +n —
+  каденция автосейва не рвётся.
+
+**Сброс мира (P1-14/P1-15):**
+- `TimeService.ResetWorld()` сбрасывает и **скорость** → `Normal` (протёкший
+  Quick/Paused делал тёплую NewGame «замороженной» при Playing). Сейв скорость
+  не хранит: LoadGame = Normal (канон, соотв. `GameSessionData.IsPaused=false`).
+- `WorldModule : IWorldResettable`: календарные маркеры `_lastDay/Month/Year` —
+  world-scoped. Сброс ставит dirty-флаг; первый `Tick` после сброса
+  ре-синхронизирует маркеры **тихо** (без событий) — фантомных Day/Month/Year
+  (SurviveDays/старение NPC) на границе миров нет. Легитимные переходы внутри
+  живого мира — событиями, как прежде.
+
+---
+
 ## 5. Структура времени (WorldTime)
 
 ### 5.1 Поля

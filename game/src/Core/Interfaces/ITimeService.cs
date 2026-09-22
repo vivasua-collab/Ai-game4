@@ -23,5 +23,15 @@ namespace CultivationGame.Core.Interfaces
         WorldTime CurrentTime { get; }
         void Pause();
         void Resume();
+
+        /// <summary>
+        /// R35 (аудит 09.22 12:00, Фаза 11 / P1-13): продвинуть мировые часы
+        /// СКАЧКОМ на <paramref name="ticks"/> минут БЕЗ посимвольной симуляции
+        /// (hitch: реальный лаг превысил потолок честного догона —
+        /// TickCatchUpClock.MaxCatchupSeconds). Календарь/счётчики остаются
+        /// честными; пертиковые эффекты (реген/баффы/NPC) пропущенных минут
+        /// не получают. Публикует TimeHitchedEvent + видимое предупреждение.
+        /// </summary>
+        void BulkAdvanceTicks(int ticks);
     }
 }

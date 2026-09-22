@@ -135,31 +135,111 @@ public sealed class StatService : IStatService, ISaveable, IWorldResettable
     public float GetVirtualDelta(StatType type)
         => _virtualDelta.TryGetValue(type, out var v) ? v : 0f;
 
+    // ── R35 (Фаза 14 / P1-20 + P2-49): конвейер развития по канону ──
+    // STAT_THRESHOLD_SYSTEM.md §2/§4.2/§9: дельты — ТОЛЬКО для первичных
+    // статов, НЕотрицательные, с капами (STR/AGI/VIT 10.0, INT 15.0).
+    // Прежде AddVirtualDelta принимал ЛЮБЫЕ значения (отрицательные,
+    // вторичные статы, без потолка) — при появлении продюсеров это
+    // превращалось бы в дыру инвариантов.
+    private static readonly Dictionary<StatType, float> VirtualDeltaCaps = new()
+    {
+        [StatType.Strength] = 10f,
+        [StatType.Agility] = 10f,
+        [StatType.Vitality] = 10f,
+        [StatType.Intelligence] = 15f,
+    };
+
+    /// <summary>Только первичные статы развиваются физическими действиями (§2).</summary>
+    private static bool IsPrimaryStat(StatType type)
+        => type is StatType.Strength or StatType.Agility
+                    or StatType.Vitality or StatType.Intelligence;
+
     public void AddVirtualDelta(StatType type, float amount)
     {
+        // P2-49: инварианты — не-отрицательная, только первичная, с капом.
+        if (amount <= 0f) return; // отрицательные/нулевые — не прогресс
+        if (!IsPrimaryStat(type)) return; // вторичные не развиваются (§2)
         _virtualDelta.TryGetValue(type, out var cur);
-        _virtualDelta[type] = cur + amount;
+        // §4.2: «Если дельта достигла капа — дальнейший прирост невозможен,
+        // пока часть не будет закреплена сном».
+        float cap = VirtualDeltaCaps.TryGetValue(type, out var c) ? c : 10f;
+        float next = Math.Min(cur + amount, cap);
+        if (next <= cur) return;
+        _virtualDelta[type] = next;
     }
 
+    /// <summary>
+    /// R35 (Фаза 14 / P1-20 + P2-43) ФИКС: закрепление при сне — ПО КАНОНУ
+    /// STAT_THRESHOLD_SYSTEM §6:
+    ///   1. Минимум 4 часа — иначе закрепления нет (дельта сохраняется).
+    ///   2. consolidated = min(virtualDelta, sleepHours × 0.025) — переносится
+    ///      в реальную характеристику (дробно; максимум +0.20 при 8ч).
+    ///   3. ОСТАТОК дельты сохраняется (прежде — Clear() терял прогресс).
+    ///   4. §6.4: после закрепления, пока delta ≥ threshold — стат +1,
+    ///      delta -= threshold (дискретный шаг развития).
+    /// Прежде: virtualDelta × 0.20 + Clear() — формула игнорировала часы,
+    /// остаток терялся, порог не проверялся.
+    /// </summary>
     public void ConsolidateSleep(float hours)
     {
-        // V1: convert virtual delta to base stat at the configured rate.
-        // Real formula lives in StatCalculator; this is a placeholder.
-        if (hours < 4f) return;
-        foreach (var kvp in _virtualDelta)
+        if (hours < MinSleepHours) return; // §6.1: минимум 4 часа
+
+        // Снапшот: внутри цикла мутируем словарь (Remove/перезапись дельты).
+        // Путь холодный (сон 1-2 раза в игровые сутки) — аллокация ок.
+        var snapshot = new List<KeyValuePair<StatType, float>>(_virtualDelta);
+        foreach (var kvp in snapshot)
         {
-            float consolidate = kvp.Value * 0.20f;
-            _base.TryGetValue(kvp.Key, out var cur);
-            _base[kvp.Key] = cur + consolidate;
-            // AUDIT-0911: закрепление сна — тоже мутация статов → событие
-            // (BodyModule пересчитает HP при росте VIT).
-            PublishStatChanged(kvp.Key, cur, cur + consolidate);
+            StatType type = kvp.Key;
+            if (!IsPrimaryStat(type)) continue; // чужие записи не трогаем
+            float delta = kvp.Value;
+            if (delta <= 0f) continue;
+
+            // §6.2: перенос в стат (дробный).
+            float consolidate = Math.Min(delta, hours * ConsolidationPerHour);
+            if (consolidate > 0f)
+            {
+                _base.TryGetValue(type, out var cur);
+                float next = Math.Min(cur + consolidate, Core.Data.GameConstants.MAX_STAT_VALUE);
+                _base[type] = next;
+                // AUDIT-0911: закрепление сна — тоже мутация статов → событие
+                // (BodyModule пересчитает HP при росте VIT).
+                PublishStatChanged(type, cur, next);
+                delta -= consolidate;
+            }
+
+            // §6.4: дискретный шаг повышения, пока дельты хватает на порог.
+            while (delta >= GetThreshold(type) && delta > 0f)
+            {
+                float threshold = GetThreshold(type);
+                _base.TryGetValue(type, out var cur);
+                if (cur >= Core.Data.GameConstants.MAX_STAT_VALUE) break; // M-35 жёсткий кап
+                _base[type] = Math.Min(cur + 1f, Core.Data.GameConstants.MAX_STAT_VALUE);
+                PublishStatChanged(type, cur, _base[type]);
+                delta -= threshold;
+            }
+
+            if (delta <= 0f) _virtualDelta.Remove(type);
+            else _virtualDelta[type] = delta;
         }
-        _virtualDelta.Clear();
     }
 
+    /// <summary>§6.1: минимум часов сна для закрепления.</summary>
+    public const float MinSleepHours = 4f;
+
+    /// <summary>§6.2: скорость закрепления (максимум +0.20 за 8ч).</summary>
+    public const float ConsolidationPerHour = 0.025f;
+
     public float GetThreshold(StatType type)
-        => _threshold.TryGetValue(type, out var v) ? v : 100f;
+    {
+        // R35 (Фаза 14 / P1-20) ФИКС: порог — по канону §3.1
+        // threshold = max(1.0, floor(currentStat / 10)). Прежде — константа
+        // 100 (никакой producer её не мог бы преодолеть). Явный override
+        // (SetThreshold — модификаторы §3.3 будущего) имеет приоритет.
+        if (_threshold.TryGetValue(type, out var stored)) return stored;
+        if (!IsPrimaryStat(type)) return 100f; // вторичные не развиваются — порог неважен
+        float stat = GetStat(type);
+        return MathF.Max(1f, MathF.Floor(stat / 10f));
+    }
 
     public bool CanAdvance(StatType type)
     {

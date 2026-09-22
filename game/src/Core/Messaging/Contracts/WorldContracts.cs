@@ -46,6 +46,20 @@ public readonly struct TimeSpeedChangedEvent
 }
 
 /// <summary>
+/// R35 (аудит 09.22 12:00, Фаза 11 / P1-13): hitch — реальный лаг превысил
+/// потолок честного догона (TickCatchUpClock.MaxCatchupSeconds). Мировые
+/// часы продвинуты СКАЧКОМ на SkippedTicks минут без посимвольной
+/// симуляции (календарь честен; пертиковые эффекты пропущены — видимое
+/// предупреждение в логе). Потребители: UI-тост (будущее), диагностика.
+/// </summary>
+public readonly struct TimeHitchedEvent
+{
+    /// <summary>Сколько игровых минут прошло скачком без симуляции.</summary>
+    public readonly int SkippedTicks;
+    public TimeHitchedEvent(int skippedTicks) { SkippedTicks = skippedTicks; }
+}
+
+/// <summary>
 /// Публикуется WorldModule каждый тик симуляции (1 тик = 1 минута).
 /// Несёт порядковый номер тика и snapshot текущего WorldTime.
 /// Сервисы, не зависящие от ITimeService напрямую, могут подписаться

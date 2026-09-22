@@ -13,6 +13,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using CultivationGame.Core;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.Interfaces;
@@ -26,6 +27,17 @@ namespace CultivationGame.Modules.Inventory
     /// Сервис колец хранения.
     /// Реализует IStorageRingService.
     ///
+    /// R35 (Фаза 12 / P1-19, аудит 09.22 12:00): сервис — ISaveable +
+    /// IWorldResettable. Прежде фактическое содержимое колец (_rings →
+    /// StoredItems) не сохранялось и не сбрасывалось: warm-load УТЕЧКА
+    /// (ResetWorld не существовал: EquipmentService.RestoreState
+    /// реактивировал кольцо с содержимым прошлого мира), cold-load ПОТЕРЯ
+    /// (содержимое вообще не в сейве). Теперь: блок "storage_rings"
+    /// (полный снапшот; RestoreOrder — после "equipment") + сброс домена
+    /// при пересборке мира. Контракт «реактивация не чистит» сохранён:
+    /// LoadGame = ResetWorld (чисто) → equipment-restore реактивирует
+    /// ПУСТОЕ кольцо → блок storage_rings восстанавливает содержимое сейва.
+    ///
     /// STR-MODEL: вместимость определяется объёмом (maxVolume, литры),
     /// а не количеством слотов. Предмет добавляется, если
     /// CurrentVolume + item.Volume ≤ MaxVolume.
@@ -34,7 +46,7 @@ namespace CultivationGame.Modules.Inventory
     /// При экипировке кольца активируется его хранилище.
     /// При снятии — деактивируется, но предметы ОСТАЮТСЯ внутри.
     /// </summary>
-    public class StorageRingService : IStorageRingService, IDisposable
+    public class StorageRingService : IStorageRingService, ISaveable, IWorldResettable, IDisposable
     {
         // === Зависимости (DI через конструктор) ===
         private readonly ISubscriber<EquipmentChangedEvent> _equipChangedSub;
@@ -429,6 +441,104 @@ namespace CultivationGame.Modules.Inventory
         {
             _equipChangedSubscription?.Dispose();
             _equipChangedSubscription = null;
+        }
+
+        // ════════════════════════════════════════════════════════════
+        // R35 (Фаза 12 / P1-19): ISaveable — блок "storage_rings".
+        // RestoreOrder: ПОСЛЕ "equipment" (реакция на EquipmentChangedEvent
+        // при восстановлении экипировки создаёт пустые записи — блок
+        // заполняет их содержимым сейва) и ПОСЛЕ "item_db"
+        // (RecalculateVolume резолвит объёмы предметов).
+        // ════════════════════════════════════════════════════════════
+
+        /// <summary>Типизированный state-блок для round-trip десериализации.</summary>
+        public sealed class StorageRingsSaveState
+        {
+            public List<RingEntrySave> Rings = new();
+        }
+
+        /// <summary>Снапшот одного кольца.</summary>
+        public sealed class RingEntrySave
+        {
+            public string RingItemId = "";
+            public int Tier;
+            public float MaxVolume;
+            public int Capacity;
+            public bool IsActive;
+            public List<InventorySlot> StoredItems = new();
+        }
+
+        public string SaveKey => "storage_rings";
+        public Type StateType => typeof(StorageRingsSaveState);
+
+        public object CaptureState()
+        {
+            var data = new StorageRingsSaveState();
+            foreach (var kvp in _rings)
+            {
+                var entry = kvp.Value;
+                var saved = new RingEntrySave
+                {
+                    RingItemId = entry.RingItemId,
+                    Tier = entry.Tier,
+                    MaxVolume = entry.MaxVolume,
+                    Capacity = entry.Capacity,
+                    IsActive = entry.IsActive,
+                };
+                foreach (var slot in entry.StoredItems)
+                    if (!slot.IsEmpty)
+                        saved.StoredItems.Add(slot);
+                data.Rings.Add(saved);
+            }
+            return data;
+        }
+
+        public void RestoreState(object state)
+        {
+            if (state is not StorageRingsSaveState data || data == null) return;
+
+            // Полная замена (не merge): LoadGame перед этим сбросил домен
+            // (IWorldResettable ниже) — прямые вызовы тоже получают чистый
+            // словарь, содержимое прошлого мира не протекает.
+            _rings.Clear();
+
+            int restored = 0;
+            if (data.Rings != null)
+            {
+                foreach (var saved in data.Rings)
+                {
+                    if (saved == null || string.IsNullOrEmpty(saved.RingItemId)) continue;
+                    var entry = new StorageRingEntry(saved.RingItemId, saved.Tier,
+                        saved.MaxVolume, saved.Capacity)
+                    {
+                        IsActive = saved.IsActive,
+                    };
+                    if (saved.StoredItems != null)
+                        foreach (var slot in saved.StoredItems)
+                            if (slot is { IsEmpty: false })
+                                entry.StoredItems.Add(slot);
+                    entry.RecalculateVolume(_itemDatabase);
+                    _rings[saved.RingItemId] = entry;
+                    restored++;
+                }
+            }
+
+            Console.WriteLine($"[StorageRingService] RestoreState: {restored} колец восстановлено " +
+                              $"(предметов: {_rings.Values.Sum(r => r.StoredItems.Count)})");
+        }
+
+        // ── R35 (Фаза 12 / P1-19): IWorldResettable ───────────────────
+        /// <summary>
+        /// Пересборка мира (NewGame/LoadGame — сброс ДО RestoreState):
+        /// хранилища колец world-scoped → полностью очищаются. Warm-load:
+        /// EquipmentService.RestoreState реактивирует кольца из сейва
+        /// (EquipmentChangedEvent) — реактивация в ПУСТОМ словаре создаёт
+        /// чистые записи; затем блок storage_rings восстановит содержимое.
+        /// </summary>
+        public void ResetWorld()
+        {
+            _rings.Clear();
+            Console.WriteLine("[StorageRingService] ResetWorld: хранилища колец очищены (P1-19)");
         }
     }
 }

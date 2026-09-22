@@ -63,7 +63,7 @@ public sealed class SaveDataAggregator
     {
         "world", "world_time", "item_db",
         "player", "stats", "body", "qi",
-        "inventory", "equipment", "belt",
+        "inventory", "equipment", "storage_rings", "belt",
         "techniques", "technique_slots", "formation",
         "npc", "npc_relationships", "corpses", "animals", "quests",
         "currency", "charger", "save_meta",

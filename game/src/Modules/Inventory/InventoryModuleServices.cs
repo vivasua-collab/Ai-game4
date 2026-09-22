@@ -21,6 +21,10 @@ public static class InventoryModuleServices
         builder.Register<IEquipmentDataProvider, EquipmentDataProvider>(Lifetime.Singleton);
         builder.Register<ICraftingService, CraftingService>(Lifetime.Singleton);
         builder.Register<IStorageRingService, StorageRingService>(Lifetime.Singleton);
+        // R35 (Фаза 12 / P1-19): содержимое колец — в сейве (блок "storage_rings",
+        // RestoreOrder после "equipment"). IWorldResettable подхватывается
+        // ResolveAll по фактическому типу инстанса (как у TradeService P1-1).
+        builder.Register<ISaveable, StorageRingService>(Lifetime.Singleton);
 
         // === Внутренние сервисы ===
         builder.Register<MaterialService>(Lifetime.Singleton);

@@ -26,6 +26,10 @@ public sealed class PlayerService : IPlayerService, ISaveable, IWorldResettable,
     [Inject] private readonly ISubscriber<QiChangedEvent> _qiChangedSub = null!;
     [Inject] private readonly ISubscriber<BodyCriticalEvent> _bodyCriticalSub = null!;
     [Inject] private readonly IBodyService _bodyService = null!;
+    // R35 (Фаза 14 / P1-20): закрепление дельт при пробуждении. StatService —
+    // сервис ТОГО ЖЕ модуля (Player) — инъекция через Core-интерфейс
+    // корректна (архитектурный запрет касается IQi/IBody/ICombat).
+    [Inject] private readonly IStatService? _statService = null;
 
     private readonly CharacterData _data = new();
     private readonly List<string> _assignedTechniques = new();
@@ -80,19 +84,45 @@ public sealed class PlayerService : IPlayerService, ISaveable, IWorldResettable,
 
     public IReadOnlyList<string> GetAssignedTechniques() => _assignedTechniques;
 
+    // === R35 (Фаза 14 / P1-20): сон — реальные часы =====================
+    // Прежде StartSleep(hours) принимал часы и НИГДЕ их не хранил; состояние
+    // FallingAsleep→Sleeping переключалось в Tick, но PlayerService.Tick
+    // никто не вызывал, пробуждения/закрепления не существовало. Теперь:
+    // считаем ФАКТИЧЕСКИ проспанные минуты (1 тик = 1 игровая минута,
+    // наращивает PlayerModule.Tick), авто-пробуждение по плану, пробуждение
+    // (авто или WakeUp) → StatService.ConsolidateSleep(фактические часы).
+    private float _plannedSleepHours;
+    private int _sleptMinutes;
+
     public void StartSleep(float hours)
     {
         if (!IsAlive) return;
         if (SleepState != PlayerSleepState.Awake) return;
+        _plannedSleepHours = hours > 0 ? hours : 8f;
+        _sleptMinutes = 0;
         SleepState = PlayerSleepState.FallingAsleep;
-        Console.WriteLine($"[PlayerService] StartSleep({hours}h)");
+        Console.WriteLine($"[PlayerService] StartSleep({_plannedSleepHours}h)");
     }
 
     public void WakeUp()
     {
         if (SleepState == PlayerSleepState.Awake) return;
         SleepState = PlayerSleepState.Awake;
-        Console.WriteLine("[PlayerService] WakeUp");
+
+        // P1-20: закрепление дельт по канону §6 (минимум 4ч — внутри
+        // ConsolidateSleep; меньше — дельта просто сохраняется).
+        float sleptHours = _sleptMinutes / 60f;
+        if (_statService != null && sleptHours > 0f)
+        {
+            _statService.ConsolidateSleep(sleptHours);
+            Console.WriteLine($"[PlayerService] WakeUp: сон {sleptHours:0.#}ч — дельты закреплены (§6)");
+        }
+        else
+        {
+            Console.WriteLine($"[PlayerService] WakeUp (сон {sleptHours:0.#}ч — без закрепления)");
+        }
+        _plannedSleepHours = 0f;
+        _sleptMinutes = 0;
     }
 
     public void SetPosition(Position2D position)
@@ -113,6 +143,19 @@ public sealed class PlayerService : IPlayerService, ISaveable, IWorldResettable,
         if (SleepState == PlayerSleepState.FallingAsleep)
         {
             SleepState = PlayerSleepState.Sleeping;
+        }
+
+        // R35 (P1-20): счёт фактических минут сна (1 тик = 1 игровая минута;
+        // Tick вызывается из PlayerModule.Tick). Авто-пробуждение — по
+        // запланированным часам (WakeUp сам делает ConsolidateSleep).
+        if (SleepState == PlayerSleepState.Sleeping && _plannedSleepHours > 0f)
+        {
+            _sleptMinutes++;
+            if (_sleptMinutes >= _plannedSleepHours * 60f)
+            {
+                Console.WriteLine($"[PlayerService] Авто-пробуждение: проспано {_sleptMinutes} мин (план {_plannedSleepHours}ч)");
+                WakeUp();
+            }
         }
     }
 
@@ -170,7 +213,42 @@ public sealed class PlayerService : IPlayerService, ISaveable, IWorldResettable,
         _deathAnnounced = false;
         _data.Health = 100f;
         Stance = PlayerStance.Normal;
+
+        // R35 (Фаза 14 / P2-44) ФИКС: оживить ТЕЛО. IsAlive делегирован
+        // BodyService (vital Head/Heart RedHP ≤ 0 = мёртв) — прежде Revive
+        // менял только _deathAnnounced/_data.Health и «оживал» при фактически
+        // мёртвом теле: событие ревайва при IsAlive=false. Vital-части
+        // восстанавливаются: Disabled/разрушенная — HealPart (до максимума,
+        // событие BodyPartHealedEvent → UI/дебаффы); SEVERED (ампутированная
+        // при смертельном уроне) — ReattachPart с её же Max-значениями
+        // (событие BodyPartReattachedEvent → SeveredDebuffSystem снимет
+        // дебаффы ампутации).
+        if (_bodyService != null && !_bodyService.IsEntityAlive(_bodyService.EntityId))
+        {
+            RestoreVitalPart(BodyPartType.Head);
+            RestoreVitalPart(BodyPartType.Heart);
+        }
+
         _revivePub.Publish(new PlayerReviveEvent());
+    }
+
+    /// <summary>P2-44: восстановить vital-часть (HealPart или Reattach при ампутации).</summary>
+    private void RestoreVitalPart(BodyPartType type)
+    {
+        if (_bodyService == null) return;
+        if (_bodyService.IsPartSevered(type))
+        {
+            foreach (var p in _bodyService.GetAllParts())
+            {
+                if (p.Type != type) continue;
+                _bodyService.ReattachPart(type, System.Math.Max(1, p.MaxRedHP), System.Math.Max(0, p.MaxBlackHP));
+                break;
+            }
+        }
+        else
+        {
+            _bodyService.HealPart(type, int.MaxValue / 4);
+        }
     }
 
     private void OnQiChanged(in QiChangedEvent e)

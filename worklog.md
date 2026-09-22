@@ -3116,3 +3116,59 @@ checkpoints/09_22_r34_ext_audit_final_phases.md (§2 развилки, §3 пр�
 NEXT: P2-пачки по приоритету аудитора/пользователя (первая: P2-22 фикс
 queued-drain guard + P2-23/P2-18 required/optional save-блоки); план
 аудита доков R31 — мораторий в силе.
+
+---
+## R35 — внешний аудит 09.22 12:00 (upload/audit_09_22_12_00): фазы 11–14
+
+**Эпизод**: верификация R34 принята (3 P1 закрыты; претензия — prefix/postfix
+логи не были в git-tree) + новые фазы 11–14: 8 P1 (P1-13…P1-20) + P2-31/32/43/
+44/45/49 в скоупе. Базлайн 3caea0c7 (R34).
+
+**Директива**: 8 P1 → runtime-пруфы до/после → регрессия; P2 пачками после;
+логи — ОБЯЗАТЕЛЬНО в git (ответ на претензию верификатора).
+
+- План-чекпоинт ДО правок: checkpoints/09_22_r35_ext_audit_phases_11_14.md.
+- Сим №19 расширен секциями M/N/O/P/Q/R (+35 проверок). **Prefix: VERDICT
+  FAIL, 32 DEFECT** — все 8 P1 runtime-подтверждены
+  (logs/09_22_r35_prefix_audit0922.log).
+- Фиксы:
+  - **P1-13** GameBoot catch-up: TickCatchUpClock (budget max(8,speed×2),
+    долг НЕ сбрасывается, излишек >5с×speed → TimeService.BulkAdvanceTicks
+    скачком + TimeHitchedEvent + GD.PushWarning; инвариант учёта
+    моделирование+bulk+остаток = Σ(delta×speed)).
+  - **P1-14** TimeService.ResetWorld → Speed=Normal (обе двери New/Load).
+  - **P1-15** WorldModule : IWorldResettable (dirty → тихая ре-синхронизация
+    маркеров в первом Tick; фантомных Day/Month/Year нет).
+  - **P1-16** ItemGeneratorService: counter-based NextId во всех 4
+    генераторах (сид 5 vs 1005 больше не коллидирует; определения стако́в
+    не подменяются).
+  - **P2-31/32** ItemDatabaseService: category-index по СТАРОЙ категории,
+    RestoreState очищает, IWorldResettable (clear + счётчики 0 + ре-сид
+    ClassicLoot через ResetForNewWorld).
+  - **P1-17** EquipmentValidator: честные гейты RequiredCultivationLevel/
+    StatRequirements (IQiService/IStatService в EquipmentService; NPC —
+    мимо валидатора). Побочно: CombatSim 3b/3c и WeaponVis генерируют экип
+    по фактическому уровню игрока.
+  - **P1-18** гибкий слот OneHand ↔ weapon_main/weapon_off (двуручное —
+    запрет сохранён).
+  - **P1-19** StorageRingService : ISaveable+IWorldResettable: блок
+    "storage_rings" (RestoreOrder после equipment), ResetWorld очищает;
+    warm-load без утечки, cold-load восстанавливает, реактивация не чистит.
+  - **P1-20+P2-43/49** конвейер статов: StatService (порог §3.1, капы
+    §4.2, ConsolidateSleep §6.2/§6.4, MAX_STAT_VALUE) + StatProgressProducer
+    (§5.1 бой + §5.2 медитация per-tick) + сон (StartSleep → минуты →
+    авто-вейк → закрепление).
+  - **P2-44** Revive оживляет тело (HealPart/ReattachPart vital).
+  - **P2-45** dash-клэмп (ComputeDashTarget + Math.Clamp).
+  - **P2-46** PublishSuccess только при не-отклонённом интенте.
+- **Postfix: VERDICT PASS, 76 OK / 0 DEFECT**
+  (logs/09_22_r35_postfix_audit0922.log — В GIT).
+- Build 0 errors; полная QA-регрессия чанками: **19/19 PASS**.
+- Доки: TIME_SYSTEM §4.3 (контракт catch-up/сброса), STAT_THRESHOLD_SYSTEM
+  (§6.3-примечание таблицы + §10 статус реализации), INVENTORY_SYSTEM
+  (§4.2-гейты + §4.2.1 storage_rings), TESTING_RULES §0.1 (сим №19 M–R).
+- WorldDomainReset: 29 → 32 домена.
+
+**NEXT**: P2-бэклог пачками (P2-26…30, P2-33…36, P2-37…42, P2-47/48/50) по
+приоритету аудитора; интеграционная контрольная фаза аудита
+(Time→NPC→Cultivation→Techniques→Combat→Save→Time resumes).

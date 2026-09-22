@@ -11,8 +11,18 @@ namespace CultivationGame.Modules.World;
 /// <summary>
 /// World module — owns time &amp; world (locations) services. Advances time
 /// every tick and publishes TimeTickEvent on the bus.
+///
+/// R35 (Фаза 11 / P1-15, аудит 09.22 12:00): модуль — IWorldResettable.
+/// Календарные маркеры _lastDay/Month/Year инициализировались только в
+/// Start() (один раз за процесс): тёплая NewGame/Load сбрасывала время,
+/// но маркеры оставались от прошлого мира → первый тик фантомно публиковал
+/// Day/Month/Year-события (QuestProgressTracker.SurviveDays +N, NPCModule
+/// старение на год). Фикс: ResetWorld ставит _calendarMarkersDirty — первый
+/// Tick после сброса синхронизирует маркеры ТИХО (событий НЕТ, независимо
+/// от порядка сброса доменов). Легитимные переходы внутри живого мира —
+/// как прежде, событиями.
 /// </summary>
-public sealed class WorldModule : IModule
+public sealed class WorldModule : IModule, IWorldResettable
 {
     public string ModuleName => "World";
 
@@ -28,6 +38,8 @@ public sealed class WorldModule : IModule
     private IDisposable? _saveSubToken;
     private WorldConfig _config = new();
     private int _lastDay = -1, _lastMonth = -1, _lastYear = -1;
+    // R35 (P1-15): маркеры требуют тихой ре-синхронизации (см. ResetWorld).
+    private bool _calendarMarkersDirty;
 
         // P1-10 (аудит 09.22, Фазы 7/10): идемпотентный Start — повторный вызов
     // (прямой вызов вне GameEntryPoint / повторная инстанциация сцены) не
@@ -97,6 +109,17 @@ public sealed class WorldModule : IModule
         // (allowed inside module per DI_AND_EVENTBUS §1.7 rule 2).
         if (_timeService is TimeService ts)
         {
+            // R35 (P1-15): после сброса мира (NewGame/Load) маркеры
+            // ре-синхронизируются ТИХО — фантомных Day/Month/Year нет
+            // (независимо от порядка сброса доменов: dirty-флаг, не
+            // чтение времени в ResetWorld).
+            if (_calendarMarkersDirty)
+            {
+                var tSync = ts.CurrentTime;
+                _lastDay = tSync.Day; _lastMonth = tSync.Month; _lastYear = tSync.Year;
+                _calendarMarkersDirty = false;
+            }
+
             ts.AdvanceTick();
             var t = ts.CurrentTime;
             _tickPublisher.Publish(new TimeTickEvent(ts.TickCount, t.Day, t.Hour, t.Minute));
@@ -124,6 +147,23 @@ public sealed class WorldModule : IModule
     private void OnSaveRequested(in SaveRequestedEvent e)
     {
         Console.WriteLine($"[WorldModule] SaveRequested('{e.SlotName}', {e.SlotType}) noted");
+    }
+
+    // ── R35 (Фаза 11 / P1-15): IWorldResettable ─────────────────────────
+    /// <summary>
+    /// Пересборка мира (NewGame ИЛИ LoadGame — сброс выполняет
+    /// WorldDomainResetPhase/GameSession ДО RestoreState): календарные
+    /// маркеры — world-scoped. Тихая ре-синхронизация происходит в первом
+    /// Tick (dirty-флаг — порядок сброса доменов не важен; чтение
+    /// CurrentTime здесь опоздало бы, если TimeService сбрасывался ПОЗЖЕ).
+    /// Событий НЕ публикуем: переход «прошлый мир → сейв» — НЕ игровой
+    /// переход календаря (SurviveDays/старение не должны срабатывать).
+    /// </summary>
+    public void ResetWorld()
+    {
+        _calendarMarkersDirty = true;
+        Console.WriteLine("[WorldModule] ResetWorld: календарные маркеры будут тихо " +
+                          "ре-синхронизированы на первом тике (P1-15)");
     }
 
     public void Dispose()

@@ -44,6 +44,23 @@ namespace CultivationGame.Modules.Generator
         /// <summary>R17 (G-3): восстановление счётчика при LoadGame.</summary>
         public static void SetGenerationCounter(long value) => _generationCounter = value < 0 ? 0 : value;
 
+        /// <summary>
+        /// R35 (Фаза 12 / P1-16, аудит 09.22 12:00): counter-based ID по паттерну
+        /// EquipmentGenerator.NextId — счётчик ВСЕГДА инкрементится (независимо
+        /// от сида), поэтому два вызова с «коллизионными» сидами (например,
+        /// 5 и 1005 — одинаковый остаток %1000) дают РАЗНЫЕ ID. Прежде
+        /// {prefix}_{level}_{seed%1000:D3} давал ≤1000 ID на уровень: повторная
+        /// генерация ЗАМЕНЯЛА определение в базе (Register — replace), а инвентарь
+        /// хранит стак по ItemId → существующий стак «менял эффекты» (мерчант
+        /// мутирует часть расходников на qi_restore). Счётчик снапшотится в блок
+        /// item_db и восстанавливается при Load — коллизий между мирами нет.
+        /// </summary>
+        private static string NextId(string prefix, int level, long seed)
+        {
+            long counter = System.Threading.Interlocked.Increment(ref _generationCounter);
+            return $"{prefix}_{level}_{seed:x8}_{counter:x6}";
+        }
+
         // === Суффиксы грейда для русских названий ===
         private static readonly string[] GradeSuffixRu = new string[]
         {
@@ -83,7 +100,8 @@ namespace CultivationGame.Modules.Generator
             var weapon = new EquipmentData();
 
             // === Идентификация ===
-            weapon.ItemId = $"weapon_{cultivationLevel}_{effectiveSeed % 1000:D3}";
+            // R35 (P1-16): counter-based ID (см. NextId).
+            weapon.ItemId = NextId("weapon", cultivationLevel, effectiveSeed);
             weapon.NameRu = $"Меч уровня {cultivationLevel}{GradeSuffixRu[(int)grade]}";
             weapon.NameEn = $"Sword Level {cultivationLevel}";
             weapon.Description = $"Сгенерированное оружие для уровня культивации {cultivationLevel}";
@@ -145,7 +163,8 @@ namespace CultivationGame.Modules.Generator
             var armor = new EquipmentData();
 
             // === Идентификация ===
-            armor.ItemId = $"armor_{cultivationLevel}_{effectiveSeed % 1000:D3}";
+            // R35 (P1-16): counter-based ID (см. NextId).
+            armor.ItemId = NextId("armor", cultivationLevel, effectiveSeed);
             armor.NameRu = $"Броня уровня {cultivationLevel}{GradeSuffixRu[(int)grade]}";
             armor.NameEn = $"Armor Level {cultivationLevel}";
             armor.Description = $"Сгенерированная броня для уровня культивации {cultivationLevel}";
@@ -222,7 +241,8 @@ namespace CultivationGame.Modules.Generator
             var charger = new EquipmentData();
 
             // === Идентификация ===
-            charger.ItemId = $"charger_{cultivationLevel}_{effectiveSeed % 1000:D3}";
+            // R35 (P1-16): counter-based ID (см. NextId).
+            charger.ItemId = NextId("charger", cultivationLevel, effectiveSeed);
             charger.NameRu = $"Зарядник Ци{GradeSuffixRu[(int)grade]}";
             charger.NameEn = $"Qi Charger{GradeSuffixRu[(int)grade]}";
             charger.Description = $"Зарядник Ци для ускорения накачки техник. Уровень культивации {cultivationLevel}.";
@@ -284,7 +304,10 @@ namespace CultivationGame.Modules.Generator
             var consumable = new ItemData();
 
             // === Идентификация ===
-            consumable.ItemId = $"consumable_{cultivationLevel}_{effectiveSeed % 1000:D3}";
+            // R35 (P1-16): counter-based ID (см. NextId) — расходники были главным
+            // дефектом фазы (мерчант мутирует Effects на qi_restore: подмена
+            // определения ломала стаки «Лекарство ↔ Пилюля Ци»).
+            consumable.ItemId = NextId("consumable", cultivationLevel, effectiveSeed);
             consumable.NameRu = $"Лекарство уровня {cultivationLevel}";
             consumable.NameEn = $"Medicine Level {cultivationLevel}";
             consumable.Description = $"Сгенерированное лекарство для уровня культивации {cultivationLevel}";

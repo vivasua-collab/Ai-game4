@@ -28,6 +28,10 @@ public sealed class PlayerModule : IModule
     [Inject] private readonly AuraHoldService _auraHold = null!;
     // C2 (2026-08-26): слоты быстрого доступа техник (3-9)
     [Inject] private readonly TechniqueSlotService _techniqueSlots = null!;
+    // R35 (Фаза 14 / P1-20): продюсер виртуальных дельт статов
+    // (DamageAppliedEvent/TechniqueUsedEvent/MeditationStateChangedEvent →
+    // AddVirtualDelta; медитационный прирост — per-tick ниже в Tick).
+    [Inject] private readonly StatProgressProducer? _statProgress = null;
 
     private int _tickCount;
     private Position2D? _mouseDestination;  // null = keyboard movement, non-null = mouse-click movement
@@ -56,6 +60,8 @@ public sealed class PlayerModule : IModule
         }
         // C2: запуск подписок TechniqueSlotService (TechniqueForgottenEvent для авто-очистки слотов)
         _techniqueSlots?.Start();
+        // R35 (P1-20): продюсеры дельт статов (§5.1/§5.2 канона).
+        _statProgress?.Start();
         Console.WriteLine($"[PlayerModule] Started — stat svc wired={_statService != null}");
     
         _startCompleted = true;
@@ -82,6 +88,18 @@ public sealed class PlayerModule : IModule
         // Stage 1 (2026-08-25, GLM-5.3): декей удержания техники в ауре
         // (1% QiCost/тик; рассеяние при < QiCost/2 с возвратом 50%).
         _auraHold?.Tick(_timeService.DeltaTime);
+
+        // R35 (Фаза 14 / P1-20): сон-конвейер — PlayerService.Tick ведёт счёт
+        // фактических минут сна/авто-пробуждение (WakeUp → ConsolidateSleep).
+        // Ранее PlayerService.Tick вообще никем не вызывался (сон-машина
+        // была мёртвым кодом).
+        if (_playerService is PlayerService ps)
+            ps.Tick(_timeService.DeltaTime);
+
+        // R35 (P1-20): медитация → INT +0.01/игровую минуту (§5.2) —
+        // per-tick, только при активной медитации (зеркало состояния —
+        // StatProgressProducer по MeditationStateChangedEvent).
+        _statProgress?.TickMeditation();
 
         // Movement is now handled by GameWorldController.HandleFreeMovement()
         // (pixel-based, continuous). PlayerModule.Tick() no longer moves the player.
@@ -244,6 +262,8 @@ public static class PlayerModuleServices
         // Этап 2 внедрения ЦИ (2026-08-23): каст техник игрока
         // (TechniqueCastRequestedEvent → эффекты по типам).
         builder.Register<PlayerTechniqueCaster>(Lifetime.Singleton);
+        // R35 (Фаза 14 / P1-20): продюсеры дельт статов §5.1/§5.2.
+        builder.Register<StatProgressProducer>(Lifetime.Singleton);
         // Stage 1 (2026-08-25, GLM-5.3): удержание заряженной техники в ауре
         // (вариант В — аура держит одну). Декей из PlayerModule.Tick.
         builder.Register<AuraHoldService>(Lifetime.Singleton);

@@ -51,6 +51,11 @@ namespace CultivationGame.Modules.Inventory
         private readonly IEquipmentDataProvider? _equipmentDataProvider;
         // R17 (INV-4): резолв itemId → EquipmentData при RestoreState.
         private readonly IItemDatabaseService? _itemDatabase;
+        // R35 (Фаза 12 / P1-17): гейты требований для ИГРОКА (RequiredCultivation
+        // Level / StatRequirements). Core-интерфейсы — межмодульный доступ
+        // разрешён (DI_AND_EVENTBUS §1.7). Optional: легаси-тесты без DI-графа.
+        private readonly IQiService? _qiService;
+        private readonly IStatService? _statService;
 
         // === Состояние ===
         private readonly Dictionary<EquipmentSlot, EquipmentData> _equipment = new();
@@ -70,19 +75,25 @@ namespace CultivationGame.Modules.Inventory
         /// <summary>
         /// Конструктор (VContainer). Phase 8: +IEquipmentDataProvider — пуш экипировки
         /// игрока в per-entity провайдер (CombatService читает боевые статы оттуда).
+        /// R35 (P1-17): +IQiService/IStatService — данные для гейтов валидатора
+        /// (уровень культивации/статы игрока; NPC экипируются мимо этого сервиса).
         /// </summary>
         public EquipmentService(
             IPublisher<EquipmentChangedEvent> equipChangedPub,
             IPublisher<EquipmentBlockedEvent> equipBlockedPub,
             ISubscriber<BodyPartSeveredEvent> severedSub,
             IEquipmentDataProvider? equipmentDataProvider = null,
-            IItemDatabaseService? itemDatabase = null)
+            IItemDatabaseService? itemDatabase = null,
+            IQiService? qiService = null,
+            IStatService? statService = null)
         {
             _equipChangedPub = equipChangedPub;
             _equipBlockedPub = equipBlockedPub;
             _severedSub = severedSub;
             _equipmentDataProvider = equipmentDataProvider;
             _itemDatabase = itemDatabase;
+            _qiService = qiService;
+            _statService = statService;
         }
 
         /// <summary>
@@ -117,8 +128,12 @@ namespace CultivationGame.Modules.Inventory
                 return false;
             }
 
-            // Валидация через EquipmentValidator (без IBodyService — используем кэш)
-            if (!EquipmentValidator.ValidateEquip(item, slot, _blockedSlots, _equipment, out var reason))
+            // Валидация через EquipmentValidator (без IBodyService — используем кэш).
+            // R35 (P1-17): передаём уровень культивации и статы игрока —
+            // RequiredCultivationLevel/StatRequirements теперь честные гейты.
+            int playerCultLevel = _qiService != null ? (int)_qiService.CultivationLevel : -1;
+            if (!EquipmentValidator.ValidateEquip(item, slot, _blockedSlots, _equipment, out var reason,
+                    playerCultLevel, _statService))
             {
                 _equipBlockedPub.Publish(new EquipmentBlockedEvent(_entityId ?? "unknown", slot, reason));
                 return false;

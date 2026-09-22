@@ -128,7 +128,9 @@ public partial class WeaponVisSimDebug : Node
         if (!initialVisible || initialKey == null || !initialKey.StartsWith("dagger|")) pass = false;
 
         // Экип копья (2H) → ключ меняется.
-        var spear = _generator.GenerateWeapon(2, "spear", 9201);
+        // R35 (P1-17): уровень игрока (L1) — валидатор честно гейтит
+        // RequiredCultivationLevel (тир копья L1 == тиру L2 → визуал тот же).
+        var spear = _generator.GenerateWeapon(1, "spear", 9201);
         bool equipped = _equipment.TryEquip(EquipmentSlot.WeaponMain, spear);
         await ToSignal(GetTree().CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
         string? spearKey = _world.MainHandTextureId;
@@ -144,7 +146,7 @@ public partial class WeaponVisSimDebug : Node
 
         // Повторный экип меча → рука восстановлена (item возвращён в инвентарь;
         // экипируем свежесгенерированный).
-        var sword = _generator.GenerateWeapon(2, "sword", 9202);
+        var sword = _generator.GenerateWeapon(1, "sword", 9202);
         _equipment.TryEquip(EquipmentSlot.WeaponMain, sword);
         await ToSignal(GetTree().CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
         string? swordKey = _world.MainHandTextureId;

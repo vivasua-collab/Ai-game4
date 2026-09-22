@@ -297,7 +297,10 @@ public partial class CombatSimDebug : Node
             // weapon wiring без прерывания каста.
             GD.Print("[CombatSim] letting round pendings settle (cast-interrupt mechanics)...");
             await ToSignal(GetTree().CreateTimer(1.4), SceneTreeTimer.SignalName.Timeout);
-            var weapon = _equipmentGenerator.GenerateWeapon(level: 3);
+            var weapon = _equipmentGenerator.GenerateWeapon(
+                // R35 (P1-17): валидатор честно гейтит RequiredCultivationLevel —
+                // генерируем по ФАКТИЧЕСКОМУ уровню игрока (L1 в QA-мире).
+                _qiService != null ? (int)_qiService.CultivationLevel : 1);
             bool equipped = _equipmentService.TryEquip(EquipmentSlot.WeaponMain, weapon);
             if (equipped && _equipmentProvider != null)
             {
@@ -340,7 +343,10 @@ public partial class CombatSimDebug : Node
             GD.Print("[CombatSim] letting armed-swing pending settle before ranged phase...");
             await ToSignal(GetTree().CreateTimer(1.4), SceneTreeTimer.SignalName.Timeout);
 
-            var bow = _equipmentGenerator.GenerateWeapon(level: 3, subtype: "bow");
+            var bow = _equipmentGenerator.GenerateWeapon(
+                // R35 (P1-17): уровень игрока (гейт RequiredCultivationLevel).
+                level: _qiService != null ? (int)_qiService.CultivationLevel : 1,
+                subtype: "bow");
             bool bowEquipped = _equipmentService.TryEquip(EquipmentSlot.WeaponMain, bow);
             if (bowEquipped)
             {

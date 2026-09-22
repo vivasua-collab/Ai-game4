@@ -80,10 +80,16 @@ using CultivationGame.Core.DI;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Core.Events;
+using CultivationGame.Core.Helpers;
+using CultivationGame.Core.Messaging.Contracts;
 using CultivationGame.Adapter.Di;
 using CultivationGame.Entry;
 using CultivationGame.Entry.Phases;
 using CultivationGame.Modules.Save;
+using CultivationGame.Modules.World;
+using CultivationGame.Modules.Generator;
+using CultivationGame.Modules.Inventory;
+using CultivationGame.Modules.Player;
 
 namespace CultivationGame.Adapter.Scene;
 
@@ -245,6 +251,30 @@ public partial class Audit0922SimDebug : Node
         try { RunPureDamageTest(); }
         catch (Exception ex) { GD.Print($"[Audit0922Sim] DEFECT K-крэш: {ex.GetType().Name}: {ex.Message}"); _allPass = false; }
 
+        // === M. Time pipeline (Фаза 11: P1-13/P1-14/P1-15) ===================
+        try { RunTimePipelineTest(); }
+        catch (Exception ex) { GD.Print($"[Audit0922Sim] DEFECT M-крэш: {ex.GetType().Name}: {ex.Message}"); _allPass = false; }
+
+        // === N. Item identity (Фаза 12: P1-16 + P2-31/P2-32) =================
+        try { RunItemIdentityTest(); }
+        catch (Exception ex) { GD.Print($"[Audit0922Sim] DEFECT N-крэш: {ex.GetType().Name}: {ex.Message}"); _allPass = false; }
+
+        // === O. EquipmentValidator (Фаза 12: P1-17/P1-18) ====================
+        try { RunEquipmentGateTest(); }
+        catch (Exception ex) { GD.Print($"[Audit0922Sim] DEFECT O-крэш: {ex.GetType().Name}: {ex.Message}"); _allPass = false; }
+
+        // === P. StorageRing persistence (Фаза 12: P1-19) =====================
+        try { RunStorageRingPersistenceTest(); }
+        catch (Exception ex) { GD.Print($"[Audit0922Sim] DEFECT P-крэш: {ex.GetType().Name}: {ex.Message}"); _allPass = false; }
+
+        // === Q. Stat progression (Фаза 14: P1-20 + P2-43/P2-49) ==============
+        try { RunStatProgressionTest(); }
+        catch (Exception ex) { GD.Print($"[Audit0922Sim] DEFECT Q-крэш: {ex.GetType().Name}: {ex.Message}"); _allPass = false; }
+
+        // === R. Revive-тело + dash-границы (Фаза 14: P2-44/P2-45) ============
+        try { RunReviveAndDashTest(); }
+        catch (Exception ex) { GD.Print($"[Audit0922Sim] DEFECT R-крэш: {ex.GetType().Name}: {ex.Message}"); _allPass = false; }
+
         // === L. P2-22 (диагностика, бэклог): queued-drain re-entrancy =========
         // Запрос аудитора (Фаза 7): runtime-чек edge-case-а. Фикс — «следующий
         // слой» реестра Фазы 10, в этот эпизод НЕ входит → вердикт не гейтит.
@@ -252,8 +282,8 @@ public partial class Audit0922SimDebug : Node
         catch (Exception ex) { GD.Print($"[Audit0922Sim] diag-крэш L: {ex.GetType().Name}: {ex.Message}"); }
 
         GD.Print($"[Audit0922Sim] VERDICT: {(_allPass
-            ? "PASS — EventBus isolation/re-entrancy, path sanitisation, DI override prune, DeleteSave honesty, Trade/Corpse reset-контракты, ResolveAll registration order, startup fail-closed, cycle detection (Фаза 4: P2-12/P2-13/P2-14), world-reset fail-closed (P1-9), startup retry без дублей (P1-10), Pure без расхода Ци (P1-12)"
-            : "FAIL — см. DEFECT-строки выше (runtime-подтверждение аудита 09.22 + Фаза 4 + финальные фазы 6–10)")}");
+            ? "PASS — EventBus isolation/re-entrancy, path sanitisation, DI override prune, DeleteSave honesty, Trade/Corpse reset-контракты, ResolveAll registration order, startup fail-closed, cycle detection (Фаза 4: P2-12/P2-13/P2-14), world-reset fail-closed (P1-9), startup retry без дублей (P1-10), Pure без расхода Ци (P1-12), time catch-up/speed/markers (Фаза 11: P1-13/P1-14/P1-15), item identity/DB (Фаза 12: P1-16+P2-31/P2-32), equipment гейты (P1-17/P1-18), storage-ring persistence (P1-19), stat progression (Фаза 14: P1-20+P2-43/P2-49), revive/dash (P2-44/P2-45)"
+            : "FAIL — см. DEFECT-строки выше (runtime-подтверждение аудита 09.22 + Фаза 4 + финальные фазы 6–10 + фазы 11–14)")}");
 
         // Чистка временных каталогов теста B/D.
         await ToSignal(GetTree().CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
@@ -783,6 +813,461 @@ public partial class Audit0922SimDebug : Node
                  $"Ци {npcQiAfter}→{npcQiAfterPhys}");
         Check(physRes.AbsorbedByQi > 0 && npcQiAfterPhys < npcQiAfter,
             "K4 контроль Physical: Ци расходуется (Qi-буфер не отключён фиксом)", "P1-12");
+    }
+
+    // ── M. Фаза 11 (аудит 09.22 12:00): Time pipeline =======================
+    // P1-13 (GameBoot catch-up), P1-14 (speed-leak через ResetWorld),
+    // P1-15 (фантомные Day/Month/Year после тёплого Reset/Load).
+    private void RunTimePipelineTest()
+    {
+        GD.Print("[Audit0922Sim] === M. Time: catch-up / speed-leak / calendar markers (P1-13/P1-14/P1-15) ===");
+        var container = GameBoot.Container;
+        if (container == null)
+        {
+            GD.Print("[Audit0922Sim] DEFECT контейнер недоступен");
+            _allPass = false;
+            return;
+        }
+
+        // --- M1 (P1-13): hitch 2с на Quick — обещано 30 тиков (2с × 15 т/с).
+        // Прежде: cap 8/кадр; остаток долга 22×(1/15)с > 8×(1/15)с → СБРОШЕН молча.
+        var clock = new TickCatchUpClock();
+        int ran1 = clock.Advance(2.0f, 15, out int bulk1);
+        long accounted1 = clock.TotalTicksRun + clock.TotalBulkSkipped
+            + (long)Math.Round(clock.PendingDebtSeconds * 15);
+        GD.Print($"[Audit0922Sim] diag: 2с@Quick → смоделировано {clock.TotalTicksRun}, " +
+                 $"bulk {clock.TotalBulkSkipped}, долг {clock.PendingDebtSeconds:F3}с; учёт {accounted1}/30");
+        Check(ran1 == 30 && accounted1 == 30,
+            "M1 hitch 2с@Quick: 30/30 тиков смоделированы (не 8 + молчаливая потеря долга)", "P1-13");
+
+        // --- M2 (P1-13): гигантский hitch 60с@Quick = 900 тиков — инвариант учёта.
+        var clock2 = new TickCatchUpClock();
+        clock2.Advance(60f, 15, out int bulk2);
+        long accounted2 = clock2.TotalTicksRun + clock2.TotalBulkSkipped
+            + (long)Math.Round(clock2.PendingDebtSeconds * 15);
+        GD.Print($"[Audit0922Sim] diag: 60с@Quick → смоделировано {clock2.TotalTicksRun}, " +
+                 $"bulk-скачок {clock2.TotalBulkSkipped}, остаток долга {clock2.PendingDebtSeconds:F3}с; " +
+                 $"учёт {accounted2}/900");
+        Check(accounted2 == 900 && bulk2 > 0,
+            "M2 hitch 60с@Quick: моделирование + bulk + остаток = 900 (долг не потерян молча)", "P1-13");
+
+        // --- M3 (P1-13): BulkAdvanceTicks — календарь арифметически точен.
+        var ts = container.Resolve<TimeService>();
+        var tBefore = ts.CurrentTime;
+        ts.BulkAdvanceTicks(1500); // 25 игровых часов — пересечение суток/месяца
+        Check(ts.CurrentTime.TotalMinutes == tBefore.TotalMinutes + 1500,
+            "M3 BulkAdvanceTicks(1500): TotalMinutes растёт точно (календарь честен при скачке)", "P1-13");
+
+        // --- M4 (P1-14): скорость/пауза не протекают через ResetWorld.
+        ts.Speed = TimeSpeed.Quick;
+        ts.ResetWorld();
+        Check(ts.Speed == TimeSpeed.Normal,
+            "M4a ResetWorld: Quick → Normal (тёплая NewGame не наследует темп прошлого мира)", "P1-14");
+
+        ts.Speed = TimeSpeed.Paused;
+        ts.ResetWorld();
+        Check(ts.Speed == TimeSpeed.Normal && !ts.IsPaused,
+            "M4b ResetWorld: Paused → Normal (новая игра не стартует «замороженной»)", "P1-14");
+
+        // --- M5 (P1-15): фантомные календарные события после сброса мира.
+        var wm = container.Resolve<WorldModule>();
+        int dayEv = 0, monthEv = 0, yearEv = 0;
+        var dayTok = container.Resolve<ISubscriber<DayChangedEvent>>()
+            .Subscribe((in DayChangedEvent _) => dayEv++);
+        var monthTok = container.Resolve<ISubscriber<MonthChangedEvent>>()
+            .Subscribe((in MonthChangedEvent _) => monthEv++);
+        var yearTok = container.Resolve<ISubscriber<YearChangedEvent>>()
+            .Subscribe((in YearChangedEvent _) => yearEv++);
+
+        try
+        {
+            // Подготовка: синхронизация маркеров с текущим временем (первый
+            // тик может быть ТИХИМ — dirty от бута/NewGame в postfix).
+            ts.RestoreState(new TimeService.WorldTimeSaveState
+            {
+                Year = tBefore.Year, Month = 12, Day = 30, Hour = 6, Minute = 0,
+                TickCount = 0, TotalTime = 0f,
+            });
+            wm.Tick(1);
+            dayEv = 0; monthEv = 0; yearEv = 0;
+
+            // M5-контроль: ЛЕГИТИМНЫЙ переход суток ВНУТРИ месяца
+            // (12-05 23:59 → 12-06 — ровно один DayChanged, без Month/Year;
+            // 12-30→12-31 не существует: 12-30 — последний день года, переход
+            // даёт сразу Day+Month+Year).
+            ts.RestoreState(new TimeService.WorldTimeSaveState
+            {
+                Year = tBefore.Year, Month = 12, Day = 5, Hour = 23, Minute = 59,
+                TickCount = 1, TotalTime = 1f,
+            });
+            wm.Tick(1);
+            Check(dayEv == 1 && monthEv == 0 && yearEv == 0,
+                "M5-контроль: легитимный переход суток даёт одиночный DayChanged (харнесс)", "P1-15");
+
+            // Сценарий аудитора: мир A жил до 12-31 → NewGame/Load (время → 01-01),
+            // маркеры ДОЛЖНЫ ре-синхронизироваться ТИХО (не событиями).
+            ts.ResetWorld();
+            // WorldModule — sealed: в prefix НЕ реализует IWorldResettable (CS8121
+            // на прямом паттерне) → проверка через object-cast (runtime).
+            if ((object)wm is IWorldResettable wmReset) wmReset.ResetWorld();
+            dayEv = 0; monthEv = 0; yearEv = 0;
+            wm.Tick(2);
+            GD.Print($"[Audit0922Sim] diag: после ResetWorld+Tick: Day={dayEv}, Month={monthEv}, Year={yearEv}");
+            Check(dayEv == 0 && monthEv == 0 && yearEv == 0,
+                "M5 ResetWorld → ТИХАЯ ре-синхронизация маркеров (нет фантомных Day/Month/Year)", "P1-15");
+        }
+        finally
+        {
+            dayTok.Dispose(); monthTok.Dispose(); yearTok.Dispose();
+            // не мусорим QA-миру: канонический старт + нормальный темп
+            ts.ResetWorld();
+            ts.Speed = TimeSpeed.Normal;
+        }
+    }
+
+    // ── N. Фаза 12: коллизии ItemId + stale category-index + merge (P1-16) ──
+    private void RunItemIdentityTest()
+    {
+        GD.Print("[Audit0922Sim] === N. Items: коллизии ID / stale-индекс / merge каталога (P1-16/P2-31/P2-32) ===");
+        var container = GameBoot.Container;
+
+        // --- N1 (P1-16): сиды 5 и 1005 дают одинаковый остаток %1000 —
+        // старая схема ID {prefix}_{L}_{seed%1000:D3} коллидирует.
+        var db = new ItemDatabaseService();
+        var gen = new ItemGeneratorService(db);
+        var c1 = gen.GenerateConsumableForLevel(3, 5);
+        var c2 = gen.GenerateConsumableForLevel(3, 1005);
+        GD.Print($"[Audit0922Sim] diag: consumable(3, seed=5)={c1.ItemId}, consumable(3, seed=1005)={c2.ItemId}");
+        Check(c1.ItemId != c2.ItemId,
+            "N1 расходники: ID уникальны при коллизионных сидах (5 vs 1005 — counter-часть ID)", "P1-16");
+
+        var w1 = gen.GenerateWeaponForLevel(3, 7);
+        var w2 = gen.GenerateWeaponForLevel(3, 1007);
+        Check(w1.ItemId != w2.ItemId,
+            "N1b оружие: ID уникальны (генераторы ItemGeneratorService — counter-based)", "P1-16");
+
+        // --- N2 (P1-16): замена определения по чужому ItemId невозможна.
+        db.TryGetItem(c1.ItemId, out var def1);
+        db.TryGetItem(c2.ItemId, out var def2);
+        Check(def1 != null && def2 != null && !ReferenceEquals(def1, def2),
+            "N2 определения под разными ID — разные объекты (стак не меняет эффекты)", "P1-16");
+
+        // --- N3 (P2-31): замена категории чистит СТАРЫЙ category-index.
+        var dbx = new ItemDatabaseService();
+        dbx.Register(new ItemData { ItemId = "qa_p231_x", Category = ItemCategory.Consumable });
+        dbx.Register(new ItemData { ItemId = "qa_p231_x", Category = ItemCategory.Material });
+        bool staleInConsumable = dbx.GetItemsByCategory(ItemCategory.Consumable)
+            .Any(i => i.ItemId == "qa_p231_x");
+        Check(!staleInConsumable,
+            "N3 замена категории: из старого category-index запись удалена (нет stale-определения)", "P2-31");
+
+        // --- N4 (P2-32): RestoreState ЗАМЕНЯЕТ каталог (не merge с прошлым миром).
+        var dbSave = new ItemDatabaseService();
+        dbSave.Register(new ItemData { ItemId = "qa_p232_saved", Category = ItemCategory.Misc });
+        object snapshot = dbSave.CaptureState();
+        var dbLoad = new ItemDatabaseService();
+        dbLoad.Register(new ItemData { ItemId = "qa_p232_runtime_a", Category = ItemCategory.Misc });
+        dbLoad.Register(new ItemData { ItemId = "qa_p232_runtime_b", Category = ItemCategory.Misc });
+        dbLoad.RestoreState(snapshot);
+        Check(dbLoad.Count == 1,
+            "N4 RestoreState: каталог очищен перед восстановлением (runtime прошлого мира не переживает Load)", "P2-32");
+
+        // --- N5 (P2-32): сброс мира чистит каталог + ре-сеет канонический контент.
+        if (container == null)
+        {
+            GD.Print("[Audit0922Sim] DEFECT контейнер недоступен (N5)");
+            _allPass = false;
+            return;
+        }
+        var realDb = container.Resolve<IItemDatabaseService>();
+        Check(realDb is IWorldResettable,
+            "N5a ItemDatabaseService : IWorldResettable (сброс мира видит каталог)", "P2-32");
+
+        var dbFresh = new ItemDatabaseService();
+        // счётчики — STATIC (общие на процесс): после сбора фактов вернём,
+        // чтобы QA-мир не коллидировал новыми генерациями со старыми ID.
+        long genCounterBefore = ItemGeneratorService.GetGenerationCounter();
+        int eqCounterBefore = EquipmentGenerator.GetIdCounter();
+        dbFresh.Register(new ItemData { ItemId = "qa_reset_probe", Category = ItemCategory.Misc });
+        ((IWorldResettable)dbFresh).ResetWorld();
+        bool runtimeGone = !dbFresh.TryGetItem("qa_reset_probe", out _);
+        bool canonicalBack = dbFresh.TryGetItem("material_iron_scrap", out _);
+        ItemGeneratorService.SetGenerationCounter(genCounterBefore);
+        EquipmentGenerator.SetIdCounter(eqCounterBefore);
+        Check(runtimeGone && canonicalBack,
+            "N5b ResetWorld: runtime-предметы чистятся, канон ClassicLoot ре-сеется", "P2-32");
+    }
+
+    // ── O. Фаза 12: гейты валидатора (P1-17/P1-18) ==========================
+    private void RunEquipmentGateTest()
+    {
+        GD.Print("[Audit0922Sim] === O. EquipmentValidator: гейты требований + offhand (P1-17/P1-18) ===");
+        var container = GameBoot.Container;
+        if (container == null)
+        {
+            GD.Print("[Audit0922Sim] DEFECT контейнер недоступен");
+            _allPass = false;
+            return;
+        }
+        var stats = container.Resolve<IStatService>();
+        var empty = new Dictionary<EquipmentSlot, EquipmentData>();
+
+        // --- O1 (P1-17): L9-предмет при уровне игрока 1 — ОТКАЗ.
+        var highItem = new EquipmentData
+        {
+            ItemId = "qa_o1", NameRu = "qa", Slot = EquipmentSlot.Torso,
+            HandType = WeaponHandType.None, RequiredCultivationLevel = 9,
+        };
+        bool o1 = EquipmentValidator.ValidateEquip(highItem, EquipmentSlot.Torso, null, empty,
+            out _, playerCultivationLevel: 1, statService: stats);
+        Check(!o1, "O1 RequiredCultivationLevel=9 при уровне игрока 1 → отказ (гейт реален)", "P1-17");
+
+        // --- O2 (контроль): тот же предмет на уровне 9 — успех.
+        bool o2 = EquipmentValidator.ValidateEquip(highItem, EquipmentSlot.Torso, null, empty,
+            out _, playerCultivationLevel: 9, statService: stats);
+        Check(o2, "O2 RequiredCultivationLevel=9 при уровне 9 → успех (гейт не гиперстрогий)", "P1-17");
+
+        // --- O3 (P1-17): StatRequirements (STR≥50 при стат 10) — отказ.
+        var statItem = new EquipmentData
+        {
+            ItemId = "qa_o3", NameRu = "qa", Slot = EquipmentSlot.Torso,
+            HandType = WeaponHandType.None, RequiredCultivationLevel = 0,
+        };
+        statItem.StatRequirements.Add(new StatRequirement { StatName = "Strength", MinValue = 50 });
+        bool o3 = EquipmentValidator.ValidateEquip(statItem, EquipmentSlot.Torso, null, empty,
+            out _, playerCultivationLevel: 9, statService: stats);
+        Check(!o3, "O3 StatRequirements STR≥50 при стате игрока 10 → отказ", "P1-17");
+
+        // --- O4 (P1-18): одноручное WeaponMain-оружие → WeaponOff — разрешено.
+        var oneHand = new EquipmentData
+        {
+            ItemId = "qa_o4", NameRu = "qa", Slot = EquipmentSlot.WeaponMain,
+            Category = ItemCategory.Weapon,
+            HandType = WeaponHandType.OneHand, RequiredCultivationLevel = 0,
+        };
+        bool o4 = EquipmentValidator.ValidateEquip(oneHand, EquipmentSlot.WeaponOff, null, empty, out _);
+        Check(o4, "O4 одноручное оружие экипируется в WeaponOff (слот достижим через штатный UI)", "P1-18");
+
+        // --- O5 (регресс): двуручное → WeaponOff остаётся запретом.
+        var twoHand = new EquipmentData
+        {
+            ItemId = "qa_o5", NameRu = "qa", Slot = EquipmentSlot.WeaponMain,
+            Category = ItemCategory.Weapon,
+            HandType = WeaponHandType.TwoHand, RequiredCultivationLevel = 0,
+        };
+        bool o5 = EquipmentValidator.ValidateEquip(twoHand, EquipmentSlot.WeaponOff, null, empty, out _);
+        Check(!o5, "O5 двуручное в WeaponOff по-прежнему запрещено", "P1-18-регресс");
+
+        // --- O6 (контроль): одноручное → WeaponMain работает как раньше.
+        bool o6 = EquipmentValidator.ValidateEquip(oneHand, EquipmentSlot.WeaponMain, null, empty, out _);
+        Check(o6, "O6 одноручное → WeaponMain работает как прежде", "P1-18-регресс");
+    }
+
+    // ── P. Фаза 12: StorageRing persistence (P1-19) =========================
+    private void RunStorageRingPersistenceTest()
+    {
+        GD.Print("[Audit0922Sim] === P. StorageRingService: Save/Reset lifecycle (P1-19) ===");
+        var container = GameBoot.Container;
+        if (container == null)
+        {
+            GD.Print("[Audit0922Sim] DEFECT контейнер недоступен");
+            _allPass = false;
+            return;
+        }
+        var equipSub = container.Resolve<ISubscriber<EquipmentChangedEvent>>();
+        var itemDb = container.Resolve<IItemDatabaseService>();
+        var equipSvc = container.Resolve<IEquipmentService>();
+        var svc = new StorageRingService(equipSub, itemDb, equipSvc, null);
+
+        // --- P1/P2: контракты интерфейсов.
+        Check(svc is ISaveable,
+            "P1 StorageRingService : ISaveable (содержимое колец в сейве)", "P1-19");
+        Check(svc is IWorldResettable,
+            "P2 StorageRingService : IWorldResettable (сброс мира чистит хранилища)", "P1-19");
+        if (svc is not ISaveable saveableSvc || svc is not IWorldResettable resettableSvc)
+            return; // prefix: дальше бессмысленно — DEFECT уже зафиксирован
+
+        // Мир A: кольцо с предметом (сейв A).
+        svc.ActivateRingWithVolume("qa_ring", 2, 15f);
+        var probe = new ItemData { ItemId = "qa_p_probe", Category = ItemCategory.Consumable, Volume = 0.1f };
+        svc.TryStore("qa_ring", probe, out _);
+        object saveA = saveableSvc.CaptureState();
+
+        // Сейв B: то же кольцо ПУСТОЕ.
+        var svcB = new StorageRingService(equipSub, itemDb, equipSvc, null);
+        svcB.ActivateRingWithVolume("qa_ring", 2, 15f);
+        object saveB = ((ISaveable)svcB).CaptureState();
+
+        // --- P3: warm-load — ResetWorld → RestoreState(сейв B) → нет утечки A.
+        resettableSvc.ResetWorld();
+        saveableSvc.RestoreState(saveB);
+        int afterRestore = svc.GetRingContents("qa_ring").Count;
+        // реактивация кольца при восстановлении экипировки не воскрешает содержимое A
+        svc.ActivateRingWithVolume("qa_ring", 2, 15f);
+        Check(afterRestore == 0 && svc.GetRingContents("qa_ring").Count == 0,
+            "P3 warm-load: ResetWorld+RestoreState(пустое кольцо) — нет утечки содержимого мира A", "P1-19");
+
+        // --- P4: cold-load — содержимое сейва A восстанавливается.
+        resettableSvc.ResetWorld();
+        saveableSvc.RestoreState(saveA);
+        bool restoredRing = svc.IsRingActive("qa_ring") && svc.GetRingContents("qa_ring").Count == 1;
+        Check(restoredRing,
+            "P4 cold-load: сохранённое содержимое кольца восстанавливается (нет потери)", "P1-19");
+
+        // --- P5 (регресс): реактивация НЕ чистит (деактивация ≠ очистка).
+        svc.DeactivateRing("qa_ring");
+        svc.ActivateRingWithVolume("qa_ring", 2, 15f);
+        Check(svc.GetRingContents("qa_ring").Count == 1,
+            "P5 реактивация не очищает кольцо (снятое ≠ стёртое — прежний контракт)", "P1-19-регресс");
+    }
+
+    // ── Q. Фаза 14: конвейер развития статов (P1-20/P2-43/P2-49) ============
+    private void RunStatProgressionTest()
+    {
+        GD.Print("[Audit0922Sim] === Q. Статы: продюсеры / порог / сон (P1-20/P2-43/P2-49) ===");
+        var container = GameBoot.Container;
+        if (container == null)
+        {
+            GD.Print("[Audit0922Sim] DEFECT контейнер недоступен");
+            _allPass = false;
+            return;
+        }
+        var stats = container.Resolve<IStatService>();
+        var dmgPub = container.Resolve<IPublisher<DamageAppliedEvent>>();
+        var techPub = container.Resolve<IPublisher<TechniqueUsedEvent>>();
+        var medPub = container.Resolve<IPublisher<MeditationStateChangedEvent>>();
+
+        // --- Q1 (§5.1): удар игрока → STR +0.001.
+        float strD0 = stats.GetVirtualDelta(StatType.Strength);
+        dmgPub.Publish(new DamageAppliedEvent(PlayerIdResolver.PlayerCanonical, "qa_q_npc", 5,
+            DamageType.Physical, Element.Neutral, BodyPartType.Torso, CombatAttackResult.Hit, CombatSubtype.None));
+        Check(stats.GetVirtualDelta(StatType.Strength) > strD0 + 0.0009f,
+            "Q1 продюсер: удар игрока → STR-дельта (+0.001, §5.1)", "P1-20");
+
+        // --- Q2: уклонение игрока → AGI.
+        float agiD0 = stats.GetVirtualDelta(StatType.Agility);
+        dmgPub.Publish(new DamageAppliedEvent("qa_q_att", PlayerIdResolver.PlayerCanonical, 5,
+            DamageType.Physical, Element.Neutral, BodyPartType.Torso, CombatAttackResult.Dodge, CombatSubtype.None));
+        Check(stats.GetVirtualDelta(StatType.Agility) > agiD0 + 0.0009f,
+            "Q2 продюсер: уклонение игрока → AGI-дельта", "P1-20");
+
+        // --- Q3: получение урона → VIT.
+        float vitD0 = stats.GetVirtualDelta(StatType.Vitality);
+        dmgPub.Publish(new DamageAppliedEvent("qa_q_att", PlayerIdResolver.PlayerCanonical, 5,
+            DamageType.Physical, Element.Neutral, BodyPartType.Torso, CombatAttackResult.Hit, CombatSubtype.None));
+        Check(stats.GetVirtualDelta(StatType.Vitality) > vitD0 + 0.0009f,
+            "Q3 продюсер: получение урона игроком → VIT-дельта", "P1-20");
+
+        // --- Q4: техника → INT; медитация → INT +0.01/мин.
+        float intD0 = stats.GetVirtualDelta(StatType.Intelligence);
+        techPub.Publish(new TechniqueUsedEvent(PlayerIdResolver.PlayerCanonical, "qa_q_tech", 10));
+        Check(stats.GetVirtualDelta(StatType.Intelligence) > intD0 + 0.0009f,
+            "Q4 продюсер: использование техники → INT-дельта", "P1-20");
+
+        float intD1 = stats.GetVirtualDelta(StatType.Intelligence);
+        medPub.Publish(new MeditationStateChangedEvent(true, 1f));
+        var pm = container.Resolve<PlayerModule>();
+        pm.Tick(999001); // 1 игровой тик = 1 минута медитации
+        float medGain = stats.GetVirtualDelta(StatType.Intelligence) - intD1;
+        medPub.Publish(new MeditationStateChangedEvent(false, 0f));
+        Check(medGain > 0.009f,
+            "Q4b продюсер: медитация → INT +0.01/мин (§5.2)", "P1-20");
+
+        // --- Q5 (P2-49): инварианты AddVirtualDelta.
+        stats.AddVirtualDelta(StatType.Intelligence, 100f);
+        Check(Math.Abs(stats.GetVirtualDelta(StatType.Intelligence) - 15f) < 0.01f,
+            "Q5 кап виртуальной дельты INT = 15 (§4.2)", "P2-49");
+
+        float strD1 = stats.GetVirtualDelta(StatType.Strength);
+        stats.AddVirtualDelta(StatType.Strength, -5f);
+        Check(stats.GetVirtualDelta(StatType.Strength) == strD1,
+            "Q5b отрицательная дельта отвергается", "P2-49");
+
+        stats.AddVirtualDelta(StatType.CritChance, 5f);
+        Check(stats.GetVirtualDelta(StatType.CritChance) == 0f,
+            "Q5c вторичные статы дельту не накапливают (§2: только первичные)", "P2-49");
+
+        // --- Q6 (P1-20): порог канона max(1, floor(stat/10)).
+        float strStat = stats.GetStat(StatType.Strength);
+        float expectedThr = MathF.Max(1f, MathF.Floor(strStat / 10f));
+        Check(Math.Abs(stats.GetThreshold(StatType.Strength) - expectedThr) < 0.01f,
+            "Q6 порог = max(1, floor(stat/10)) — канон §3.1 (не константа 100)", "P1-20");
+
+        // --- Q7..Q10: изолированный StatService (детерминированная математика).
+        var s2 = new StatService();
+        s2.SetStat(StatType.Strength, 10f);
+        s2.AddVirtualDelta(StatType.Strength, 0.5f);
+        s2.ConsolidateSleep(8f); // min(0.5, 8×0.025) = 0.2 в стат; остаток 0.3
+        Check(Math.Abs(s2.GetStat(StatType.Strength) - 10.2f) < 0.0001f
+              && Math.Abs(s2.GetVirtualDelta(StatType.Strength) - 0.3f) < 0.0001f,
+            "Q7 ConsolidateSleep(8ч): min(delta, hours×0.025) в стат, остаток сохраняется (§6.2)", "P2-43");
+
+        float s2Stat = s2.GetStat(StatType.Strength);
+        float s2Delta = s2.GetVirtualDelta(StatType.Strength);
+        s2.ConsolidateSleep(2f); // < 4ч — без закрепления
+        Check(Math.Abs(s2.GetStat(StatType.Strength) - s2Stat) < 0.00001f
+              && Math.Abs(s2.GetVirtualDelta(StatType.Strength) - s2Delta) < 0.00001f,
+            "Q8 сон < 4ч: закрепления нет, дельта не сгорает (§6.1)", "P2-43");
+
+        // --- Q9 (§6.4): шаг повышения — delta ≥ threshold → стат +1.
+        s2.AddVirtualDelta(StatType.Strength, 3f);
+        s2.ConsolidateSleep(8f);
+        // ожидание: consolidate 0.2 → 10.4; затем delta(3.1) ≥ thr(1) ×3 → 13.4, остаток 0.1
+        Check(Math.Abs(s2.GetStat(StatType.Strength) - 13.4f) < 0.0001f
+              && Math.Abs(s2.GetVirtualDelta(StatType.Strength) - 0.1f) < 0.001f,
+            "Q9 шаг повышения: после закрепления delta ≥ threshold → +1 с вычитанием порога (§6.4)", "P1-20");
+
+        // --- Q10 (P1-20): полный sleep-pipeline на живом игроке.
+        var ps = container.Resolve<IPlayerService>();
+        float strBase = stats.GetStat(StatType.Strength);
+        stats.AddVirtualDelta(StatType.Strength, 0.5f);
+        ps.StartSleep(8f);
+        for (int i = 0; i < 480; i++) pm.Tick(999100 + i); // 8 игровых часов
+        bool wokeUp = ps.SleepState == PlayerSleepState.Awake;
+        bool grew = stats.GetStat(StatType.Strength) > strBase + 0.19f;
+        Check(wokeUp && grew,
+            "Q10 sleep-pipeline: StartSleep(8ч) → 480 тиков → авто-пробуждение + закрепление (§6)", "P1-20");
+
+        // чистим за собой (QA-мир живёт дальше)
+        if (!wokeUp) ps.WakeUp();
+    }
+
+    // ── R. Фаза 14: Revive-тело + dash-границы (P2-44/P2-45) ================
+    private void RunReviveAndDashTest()
+    {
+        GD.Print("[Audit0922Sim] === R. Revive-тело + dash-границы (P2-44/P2-45) ===");
+        var container = GameBoot.Container;
+        if (container == null)
+        {
+            GD.Print("[Audit0922Sim] DEFECT контейнер недоступен");
+            _allPass = false;
+            return;
+        }
+
+        // --- R1 (P2-44): смертельное повреждение → Revive() оживляет ТЕЛО.
+        var body = container.Resolve<IBodyService>();
+        var player = container.Resolve<PlayerService>();
+        body.ApplyDamage(BodyPartType.Head, 1_000_000);
+        if (player.IsAlive) body.ApplyDamage(BodyPartType.Heart, 1_000_000);
+        bool dead = !player.IsAlive;
+        GD.Print($"[Audit0922Sim] diag: после vital-урона IsAlive={player.IsAlive}");
+        if (!dead)
+        {
+            GD.Print("[Audit0922Sim] diag: игрок не умер от 1M урона — харнесс не сработал");
+        }
+        player.Revive();
+        Check(dead && player.IsAlive,
+            "R1 Revive() оживляет ТЕЛО (IsAlive через BodyService, не только флаг Health)", "P2-44");
+
+        // --- R2 (P2-45): цель рывка клэмпится в границы мира.
+        var posNE = PlayerTechniqueCaster.ComputeDashTarget(49, 49, 1, 1, 3, 49, 49);
+        var posSW = PlayerTechniqueCaster.ComputeDashTarget(0, 0, -1, -1, 3, 49, 49);
+        var posMid = PlayerTechniqueCaster.ComputeDashTarget(25, 25, 1, -1, 3, 49, 49);
+        GD.Print($"[Audit0922Sim] diag: dash(49,49,+diagonal)→({posNE.X},{posNE.Y}); " +
+                 $"dash(0,0,-diagonal)→({posSW.X},{posSW.Y}); mid→({posMid.X},{posMid.Y})");
+        Check(posNE.X >= 0 && posNE.X <= 49 && posNE.Y >= 0 && posNE.Y <= 49
+              && posSW.X >= 0 && posSW.Y >= 0 && posMid.X == 28 && posMid.Y == 22,
+            "R2 dash-цель клэмпится в границы мира (логическая позиция не покидает карту)", "P2-45");
     }
 
     // ── L. P2-22 (диагностика, бэклог): queued-drain re-entrancy guard ======

@@ -29,6 +29,8 @@ namespace CultivationGame.Modules.World;
 public sealed class TimeService : ITimeService, ISaveable, IWorldResettable
 {
     [Inject] private readonly IPublisher<TimeSpeedChangedEvent> _speedChangedPub = null!;
+    // R35 (Фаза 11 / P1-13): bulk-скачок часов при hitch (см. BulkAdvanceTicks).
+    [Inject] private readonly IPublisher<TimeHitchedEvent>? _hitchedPub;
 
     public WorldTime CurrentTime { get; private set; } =
         new WorldTime(GameConstants.START_YEAR, 1, 1, 6, 0); // 06:00 on day 1
@@ -142,11 +144,43 @@ public sealed class TimeService : ITimeService, ISaveable, IWorldResettable
     }
 
     // R17 (E-1): пересборка мира — часы на 06:00 дня 1 (канон NewGame).
+    // R35 (Фаза 11 / P1-14) ФИКС: сброс и СКОРОСТИ. Прежде ResetWorld
+    // оставлял _speed прежнего мира (Quick/…/Paused): тёплая NewGame
+    // наследовала темп, а после паузы новая игра стартовала «замороженной»
+    // при SessionState.Playing (GameBoot гейтит по IsPaused). LoadGame-путь
+    // проходит ResetWorld ДО RestoreState → скорость нормализуется на
+    // ОБОИХ дверях (сейв скорость не хранит; канон: LoadGame → Normal —
+    // что обещает и GameSession Data.IsPaused=false; WorldConfig.
+    // DefaultSpeed == Normal — единственный источник дефолта).
     public void ResetWorld()
     {
         CurrentTime = new WorldTime(GameConstants.START_YEAR, 1, 1, 6, 0);
         TickCount = 0;
         TotalTime = 0f;
+        Speed = TimeSpeed.Normal;
+    }
+
+    /// <summary>
+    /// R35 (Фаза 11 / P1-13): продвинуть мировые часы СКАЧКОМ на n минут БЕЗ
+    /// посимвольной симуляции (hitch: реальный лаг превысил потолок честного
+    /// догона — TickCatchUpClock.MaxCatchupSeconds). Календарь/счётчики
+    /// остаются честными (реальное время == смоделированное + skipped);
+    /// пертиковые эффекты (реген/баффы/NPC) пропущенных минут не получают.
+    /// Публикует TimeHitchedEvent + пишет предупреждение в лог.
+    /// Календарные Day/Month/Year события НЕ публикуются здесь — их ловит
+    /// WorldModule.Tick на первом же тике после скачка (переход даты
+    /// легитимен: маркеры отстают от CurrentTime).
+    /// Контракт закреплён в ITimeService (Core) — адаптеру не нужен cast.
+    /// </summary>
+    public void BulkAdvanceTicks(int ticks)
+    {
+        if (ticks <= 0 || IsPaused) return;
+        TickCount += ticks;
+        TotalTime += ticks;
+        CurrentTime = CurrentTime.AddMinutes(GameConstants.TICKS_PER_MINUTE * ticks);
+        _hitchedPub?.Publish(new TimeHitchedEvent(ticks));
+        Console.WriteLine($"[TimeService] HITCH: +{ticks} игровых минут скачком без симуляции " +
+                          "(долг catch-up выше потолка) — календарь честен, пертиковые эффекты пропущены");
     }
 }
 

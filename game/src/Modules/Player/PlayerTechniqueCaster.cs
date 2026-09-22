@@ -329,7 +329,16 @@ public sealed class PlayerTechniqueCaster : IDisposable
                 _attackIntentPub.Publish(new AttackIntentEvent(
                     _player.PlayerId, target ?? "", tech.TechniqueId, isRanged, potencyPermil, isCharged: true,
                     aimTileX, aimTileY));
-                PublishSuccess(tech, playerX, playerY, target);
+                // R35 (Фаза 14 / P2-46) ФИКС: успех/VFX — только если выпуск НЕ
+                // отклонён. CombatModule-мост резолвит интент СИНХРОННО в том же
+                // стеке: отказ (не участник боя/каст уже идёт) успевает прийти
+                // ДО этой строки — OnAttackRejected гасит _lastFiredTechniqueId
+                // и возвращает кулдаун/мастерство. Прежде PublishSuccess звался
+                // безусловно: игрок видел «успешный каст» и VFX при отвергнутой
+                // атаке. Асинхронные отказы (после этого кадра) компенсируются
+                // рефандом R23-1 как раньше — визуал уже честно показал ВЫПУСК.
+                if (_lastFiredTechniqueId != null)
+                    PublishSuccess(tech, playerX, playerY, target);
                 return;
             }
 
@@ -363,8 +372,11 @@ public sealed class PlayerTechniqueCaster : IDisposable
                 int dirX = Math.Sign(mouseX / 1000 - playerX * GameConstants.TILE_PIXELS);
                 int dirY = Math.Sign(mouseY / 1000 - playerY * GameConstants.TILE_PIXELS);
                 if (dirX == 0 && dirY == 0) { dirX = 1; }
-                _player.SetPosition(new Position2D(playerX + dirX * DashDistanceTiles,
-                                                   playerY + dirY * DashDistanceTiles));
+                // R35 (Фаза 14 / P2-45): цель рывка — в тестируемый helper
+                // (сим №19/R2). PREFIX-состояние: без клэмпа — дословно
+                // прежнее поведение (логическая позиция могла выйти за мир).
+                _player.SetPosition(ComputeDashTarget(playerX, playerY, dirX, dirY,
+                    DashDistanceTiles, MaxTileX, MaxTileY));
                 PublishSuccess(tech, playerX, playerY, null, visualKind: 2);
                 return;
             }
@@ -407,6 +419,27 @@ public sealed class PlayerTechniqueCaster : IDisposable
                 return;
         }
     }
+
+    /// <summary>
+    /// R35 (Фаза 14 / P2-45) ФИКС: цель рывка Movement-техники — чистый
+    /// тестируемый helper (сим №19/R2). Клэмп в границы мира [0..maxX/maxY]
+    /// (как обычное движение PlayerModule — PlayerService.SetPosition не
+    /// валидирует, логическая позиция не должна покидать карту).
+    /// </summary>
+    internal static Position2D ComputeDashTarget(int px, int py, int dirX, int dirY,
+        int distanceTiles, int maxX, int maxY)
+        => new(Math.Clamp(px + dirX * distanceTiles, 0, Math.Max(0, maxX)),
+               Math.Clamp(py + dirY * distanceTiles, 0, Math.Max(0, maxY)));
+
+    /// <summary>Границы мира по ITileService (клэмп цели рывка, P2-45).</summary>
+    private int MaxTileX => _tiles != null && _tiles.MapWidth > 0
+        ? _tiles.MapWidth - 1
+        : GameConstants.DEFAULT_MAP_WIDTH - 1;
+
+    /// <summary>Границы мира по ITileService (клэмп цели рывка, P2-45).</summary>
+    private int MaxTileY => _tiles != null && _tiles.MapHeight > 0
+        ? _tiles.MapHeight - 1
+        : GameConstants.DEFAULT_MAP_HEIGHT - 1;
 
     /// <summary>Бонус урона от активной формации Amplification, если игрок в зоне (этап 5).</summary>
     private int GetAmplificationBonusPermil()

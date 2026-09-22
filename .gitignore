@@ -57,6 +57,8 @@ game/saves/*
 
 # ── Logs and temporary files (NEVER commit) ──────────────────────────────────
 *.log
+# R35 (претензия верификатора R34): runtime prefix/postfix логи аудита —
+!checkpoints/logs/09_22_*.log
 *.tmp
 *.bak
 *.swp

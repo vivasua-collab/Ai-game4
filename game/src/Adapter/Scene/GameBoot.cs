@@ -36,7 +36,11 @@ public partial class GameBoot : Node
     private IGameSession? _session;
 
     // Tick driving state.
-    private float _tickAccumulator;
+    // R35 (Фаза 11 / P1-13): математика fixed-timestep catch-up извлечена в
+    // TickCatchUpClock (тестируемость — сим №19/M). _currentTick остаётся
+    // здесь: process-tick (каденция автосейва SaveModule), синхронно
+    // продвигается и при bulk-скачке.
+    private readonly TickCatchUpClock _catchUpClock = new();
     private int _currentTick;
 
     public override async void _Ready()
@@ -158,23 +162,26 @@ public partial class GameBoot : Node
         if (speed <= 0)
             return;
 
-        double tickInterval = 1.0 / speed;
-        _tickAccumulator += (float)delta;
-
-        // Run as many ticks as fit in the accumulated time (catch-up pattern).
-        // Hard cap of 8 ticks per physics frame to avoid spiral-of-death on hitches.
-        int ticksRun = 0;
-        while (_tickAccumulator >= tickInterval && ticksRun < 8)
+        // R35 (Фаза 11 / P1-13): catch-up — в TickCatchUpClock (сим №19/M).
+        // Инвариант учёта: смоделировано + bulk-skipped + остаток долга ==
+        // накопленное реальное время. Bulk-скачок (hitch > MaxCatchupSeconds):
+        // мировые часы продвигаются скачком (календарь честен), process-tick
+        // синхронно +n (каденция автосейва не рвётся), ВИДИМОЕ предупреждение.
+        int ranTicks = _catchUpClock.Advance((float)delta, speed, out int bulkSkipped);
+        for (int i = 0; i < ranTicks; i++)
         {
-            _tickAccumulator -= (float)tickInterval;
             _currentTick++;
             _entry.Tick(_currentTick);
-            ticksRun++;
         }
 
-        // If we still have a large backlog (lag spike), drop it to avoid runaway.
-        if (_tickAccumulator > tickInterval * 8f)
-            _tickAccumulator = 0f;
+        if (bulkSkipped > 0)
+        {
+            _currentTick += bulkSkipped;
+            // Контракт в ITimeService (Core) — без каста к Modules-типу.
+            _timeService.BulkAdvanceTicks(bulkSkipped);
+            GD.PushWarning($"[GameBoot] HITCH: {bulkSkipped} игровых минут пропущено без " +
+                           "посимвольной симуляции (долг catch-up выше потолка) — календарь продвинут честно");
+        }
     }
 
     /// <summary>

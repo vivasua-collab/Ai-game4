@@ -26,8 +26,18 @@ namespace CultivationGame.Modules.Generator
     /// Хранит словарь предметов по ID и индекс по категориям.
     /// Предустановленные предметы загружаются из Resources/Items при Initialize().
     /// Runtime-сгенерированные предметы регистрируются через Register().
+    ///
+    /// R35 (Фаза 12 / P2-31/P2-32, аудит 09.22 12:00):
+    /// • Register/RestoreState удаляют заменяемую запись из category-index
+    ///   по СТАРОЙ категории (прежде — по новой: замена Consumable→Material
+    ///   оставляла stale-запись в Consumable);
+    /// • RestoreState очищает каталог ПЕРЕД восстановлением (прежде — merge:
+    ///   runtime-предметы прошлого мира переживали Load);
+    /// • IWorldResettable: ResetWorld = полная очистка + сброс счётчиков
+    ///   генераторов + ре-сид канонического контента (ClassicLoot — как у
+    ///   свежего процесса; GeneratorModule.Start сеет его один раз при буте).
     /// </summary>
-    public class ItemDatabaseService : IItemDatabaseService, ISaveable
+    public class ItemDatabaseService : IItemDatabaseService, ISaveable, IWorldResettable
     {
         // === Основной словарь: itemId → ItemData ===
         private readonly Dictionary<string, ItemData> _itemsById = new Dictionary<string, ItemData>();
@@ -83,11 +93,13 @@ namespace CultivationGame.Modules.Generator
                 return;
             }
 
-            if (_itemsById.ContainsKey(item.ItemId))
+            if (_itemsById.TryGetValue(item.ItemId, out var oldItem))
             {
                 Console.WriteLine($"[ItemDatabase] Предмет с itemId={item.ItemId} уже зарегистрирован — замена");
-                // Удаляем старую запись из индекса категорий
-                RemoveFromCategoryIndex(item.ItemId, item.Category);
+                // R35 (P2-31): удалить старую запись из индекса категорий по
+                // СТАРОЙ категории (прежде использовалась категория нового
+                // объекта → stale-запись оставалась в старом списке).
+                RemoveFromCategoryIndex(oldItem.ItemId, oldItem.Category);
             }
 
             RegisterInternal(item);
@@ -255,6 +267,17 @@ namespace CultivationGame.Modules.Generator
         {
             if (state is not ItemDbSaveState data || data == null) return;
 
+            // R35 (P2-32): каталог ЗАМЕНЯЕТСЯ, не мержится. Прежде RestoreState
+            // добавлял/заменял поверх живого каталога: runtime-предметы прошлого
+            // мира (тёплая LoadGame/NewGame) переживали загрузку и вместе с
+            // восстановленными счётчиками создавали риск коллизий новых
+            // генераций со старыми ID (связка P1-16). Холодный Load: каталог и
+            // так пуст; тёплый: GameSession уже сбросил домены (ResetWorld ниже)
+            // — чистим и для прямых вызовов без фазы сброса.
+            _itemsById.Clear();
+            _itemsByCategory.Clear();
+            _cacheDirty = true;
+
             int restored = 0;
             int skipped = 0;
             if (data.Items != null)
@@ -274,8 +297,10 @@ namespace CultivationGame.Modules.Generator
                             && !string.IsNullOrEmpty(item.ItemId))
                         {
                             // Тихая регистрация: сотни строк лога на каталог не нужны.
-                            if (_itemsById.ContainsKey(item.ItemId))
-                                RemoveFromCategoryIndex(item.ItemId, item.Category);
+                            // R35 (P2-31): заменяемая запись удаляется по СТАРОЙ
+                            // категории (каталог только что очищен — ветка защитная).
+                            if (_itemsById.TryGetValue(item.ItemId, out var oldItem))
+                                RemoveFromCategoryIndex(oldItem.ItemId, oldItem.Category);
                             RegisterInternal(item);
                             restored++;
                         }
@@ -296,6 +321,35 @@ namespace CultivationGame.Modules.Generator
             Console.WriteLine($"[ItemDatabase] RestoreState: {restored} предметов восстановлено" +
                               (skipped > 0 ? $", {skipped} пропущено" : "") +
                               $"; счётчики ID: eq={data.EquipmentIdCounter}, gen={data.ItemGenerationCounter}");
+        }
+
+        // ── R35 (Фаза 12 / P2-32): IWorldResettable ─────────────────────
+        /// <summary>
+        /// Пересборка мира (NewGame ИЛИ LoadGame — сброс выполняет
+        /// WorldDomainResetPhase/GameSession ДО RestoreState):
+        /// • каталог полностью очищается (runtime-предметы прошлого мира
+        ///   не переживают границу миров);
+        /// • счётчики генераторов — в 0 (новый мир начинает нумерацию заново;
+        ///   коллизий со старыми ID нет — каталог пуст);
+        /// • канонический контент (ClassicLoot: материалы/камни Ци) — ре-сеится:
+        ///   GeneratorModule.Start() сеет его один раз при буте, фаза сброса
+        ///   возвращает каталог в эквивалент «свежего процесса».
+        /// LoadGame-путь: после сброса блок item_db RestoreState накладывает
+        /// сохранённый каталог поверх чистого.
+        /// </summary>
+        public void ResetWorld()
+        {
+            _itemsById.Clear();
+            _itemsByCategory.Clear();
+            _cacheDirty = true;
+            EquipmentGenerator.SetIdCounter(0);
+            ItemGeneratorService.SetGenerationCounter(0);
+            // P2-32: гвард сидера — process-scoped; сбрасываем, чтобы канон
+            // вернулся в очищенный каталог (boot сеет его один раз).
+            ClassicLootSeeder.ResetForNewWorld();
+            ClassicLootSeeder.Seed(this);
+            Console.WriteLine($"[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, " +
+                              $"канон ClassicLoot ре-сеен ({Count} предметов)");
         }
     }
 }
