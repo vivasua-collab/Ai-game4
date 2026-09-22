@@ -30,6 +30,21 @@
 //      Pure не входит в Qi-буфер вовсе — Ци не тратится ни у игрока, ни у
 //      NPC; контрольная серия — Physical Ци тратит (буфер жив).
 //
+// 2026-09-22 (R36-b, P2-бэклог Фазы 12): ДОПОЛНЕНА секцией T — Items/Trade:
+//   T1 (P2-33) CurrencyService.Add/SetBalance — saturating: переполнение
+//      int больше не делает баланс отрицательным.
+//   T2 (P2-34) TradeService: total сделки считается в long; покупка
+//      дороже int.MaxValue = честный отказ ДО списания, продажа —
+//      насыщение до int.MaxValue (прежде: wrap-отрицательный тотал →
+//      предметы изъяты, оплата молча 0).
+//   T3 (P2-35) InventoryService.RestoreState валидирует каждый слот:
+//      count>0, ≤MaxStack, Enum.IsDefined(category/rarity), ItemId есть
+//      в БД (item_db восстанавливается раньше inventory — RestoreOrder).
+//   T4 (P2-36) СТАВКИ ПЕРЕНОСКИ — ОТКЛОНЁН BY-USER: канон 50 кг / 100 ед.
+//      (прямое указание владельца, user request 2026-08-22; приоритет выше
+//      аудитора и документации — конс пект в INVENTORY_SYSTEM §3.3-примечание);
+//      T4 — страж владельческих значений (50/100 не срезаются молча).
+//
 // 2026-09-22 (R36-a, P2-бэклог Фазы 11): ДОПОЛНЕНА секцией S — время:
 //   S1 (P2-26) автосейв привязан к МИРОВОМУ тику (ITimeService.TickCount),
 //      не к процессному счётчику GameBoot._currentTick (граница NewGame/Load
@@ -105,6 +120,7 @@ using CultivationGame.Modules.World;
 using CultivationGame.Modules.Generator;
 using CultivationGame.Modules.Inventory;
 using CultivationGame.Modules.Player;
+using CultivationGame.Modules.Trade;
 
 namespace CultivationGame.Adapter.Scene;
 
@@ -263,6 +279,102 @@ public partial class Audit0922SimDebug : Node
         public IReadOnlyList<string> GetAllSaves() => Array.Empty<string>();
     }
 
+    // ── Фейковые сервисы для секции T (Фаза 12 P2: валюта/торговля/инвентарь) ──
+
+    // T2: NPC-Merchant для OpenTrade (остальные члены — заглушки).
+    private sealed class FakeTradeNpcService : INPCService
+    {
+        public NPCData GetNPC(string npcId) => null!;
+        public IReadOnlyList<string> GetNearbyNPCIds(Position2D position, float range) => Array.Empty<string>();
+        public Attitude GetAttitude(string npcId, string targetId) => default;
+        public void ModifyAttitude(string npcId, string targetId, int delta) { }
+        public bool IsAlive(string npcId) => true;
+        public NPCAIState GetAIState(string npcId) => default;
+        public IReadOnlyList<string> GetAllNPCIds() => Array.Empty<string>();
+        public void SetAIState(string npcId, NPCAIState state) { }
+        public void UpdatePosition(string npcId, Position2D position) { }
+        public NPCState GetNPCState(string npcId) => new NPCState { Role = NPCRole.Merchant, IsAlive = true };
+        [System.Obsolete] public string SpawnNPC(string presetId, Position2D position) => "npc_t2";
+        public string SpawnNPC(string speciesId, NPCRole roleId, int locationLevel, Position2D position, long seed) => "npc_t2";
+        public void DespawnNPC(string npcId) { }
+        public IReadOnlyList<string> GetSpawnedNPCIds() => Array.Empty<string>();
+    }
+
+    // T2/T3: БД с контролируемыми Value/MaxStack предметов.
+    private sealed class FakeTradeItemDb : IItemDatabaseService
+    {
+        public readonly Dictionary<string, ItemData> Items = new();
+        public bool TryGetItem(string itemId, out ItemData item)
+        {
+            item = null!;
+            return !string.IsNullOrEmpty(itemId) && Items.TryGetValue(itemId, out item!);
+        }
+        public void Register(ItemData item) { }
+        public void RegisterRange(IEnumerable<ItemData> items) { }
+        public IReadOnlyList<ItemData> GetAllItems() => Array.Empty<ItemData>();
+        public IReadOnlyList<ItemData> GetItemsByCategory(ItemCategory category) => Array.Empty<ItemData>();
+        public int Count => Items.Count;
+    }
+
+    // T2: инвентарь-заглушка (объём/вес не гейтят, sell_probe есть ×3).
+    private sealed class FakeTradeInventory : IInventoryService
+    {
+        public int HaveSellProbe = 3;
+        public bool TryAddItem(ItemData item, int count = 1) => true;
+        public bool TryAddItem(ItemData item, int count, out int addedCount) { addedCount = count; return true; }
+        public bool TryRemoveItem(string itemId, int count = 1) => true;
+        public int GetItemCount(string itemId) => itemId == "sell_probe" ? HaveSellProbe : 0;
+        public IReadOnlyList<InventorySlot> GetAllSlots() => Array.Empty<InventorySlot>();
+        public bool TrySplitSlot(int slotIndex, int moveCount) => false;
+        public bool TryRemoveFromSlot(int slotIndex, int count) => false;
+        public int FindSlotIndexBySlotId(Guid slotId) => -1;
+        public int TotalSlots => 100;
+        public int UsedSlots => 0;
+        public bool TrySplitSlot(Guid slotId, string expectedItemId, int moveCount) => false;
+        public bool TryRemoveFromSlot(Guid slotId, string expectedItemId, int count) => false;
+        public bool CanFitItem(ItemData item, int count = 1) => true;
+        public int HowManyCanFit(ItemData item) => 10_000;
+        public bool IsOverweight => false;
+        public float OverweightRatio => 0f;
+        public float GetCurrentWeight() => 0f;
+        public float GetCurrentVolume() => 0f;
+        public float GetEffectiveMaxWeight() => 100f;
+        public float GetEffectiveMaxVolume() => 100f;
+    }
+
+    // T2: валюта-рекордер (SpiritStones = int.MaxValue — любая сумма «хватает»,
+    // чтобы гейт P2-34 ловился сам по себе, а не отказом баланса).
+    private sealed class FakeTradeCurrency : ICurrencyService
+    {
+        public int AddCalls, LastAddAmount, SpendCalls, LastSpendAmount;
+        public int SpiritStones => int.MaxValue;
+        public void Add(int amount) { AddCalls++; LastAddAmount = amount; }
+        public bool Spend(int amount) { SpendCalls++; LastSpendAmount = amount; return true; }
+        public void SetBalance(int spiritStones) { }
+    }
+
+    // T2: генераторы без ассортимента (сток = только материал из TradeConfig).
+    private sealed class FakeNullEquipmentGenerator : IEquipmentGenerator
+    {
+        public EquipmentData GenerateWeapon(int level, string? subtype = null, long seed = 0) => null!;
+        public EquipmentData GenerateArmor(int level, string? subtype = null, long seed = 0) => null!;
+        public EquipmentData GenerateLegendaryWeapon(int level, string? subtype = null, long seed = 0, bool? forceOvercap = null) => null!;
+        public EquipmentData GenerateLegendaryArmor(int level, string? subtype = null, long seed = 0, bool? forceOvercap = null) => null!;
+        public EquipmentData GenerateRandom(int level, long seed = 0) => null!;
+        public bool TryApplyEnchant(EquipmentData item, string? enchantId = null, long seed = 0) => false;
+    }
+
+    private sealed class FakeNullItemGenerator : IItemGeneratorService
+    {
+        public EquipmentData GenerateWeaponForLevel(int cultivationLevel, long seed = 0) => null!;
+        public EquipmentData GenerateArmorForLevel(int cultivationLevel, long seed = 0) => null!;
+        public ItemData GenerateConsumableForLevel(int cultivationLevel, long seed = 0) => null!;
+        public EquipmentData GenerateChargerForLevel(int cultivationLevel, long seed = 0) => null!;
+        public EquipmentData GenerateRandomEquipment(int playerLevel, long seed = 0) => null!;
+        public List<EquipmentData> GenerateLoot(int playerLevel, int count, long seed = 0) => new();
+        public List<ItemData> GenerateConsumableLoot(int playerLevel, int count, long seed = 0) => new();
+    }
+
     private bool _allPass = true;
     private void Check(bool condition, string label, string defectId)
     {
@@ -352,6 +464,16 @@ public partial class Audit0922SimDebug : Node
         try { RunTimeCanonizationTest(); }
         catch (Exception ex) { GD.Print($"[Audit0922Sim] DEFECT S5-крэш: {ex.GetType().Name}: {ex.Message}"); _allPass = false; }
 
+        // === T. Фаза 12 P2-бэклог: валюта/сделка/инвентарь-restore/30-30 ===
+        try { RunCurrencyOverflowTest(); }
+        catch (Exception ex) { GD.Print($"[Audit0922Sim] DEFECT T1-крэш: {ex.GetType().Name}: {ex.Message}"); _allPass = false; }
+        try { RunTradeOverflowTest(); }
+        catch (Exception ex) { GD.Print($"[Audit0922Sim] DEFECT T2-крэш: {ex.GetType().Name}: {ex.Message}"); _allPass = false; }
+        try { RunInventoryRestoreValidationTest(); }
+        catch (Exception ex) { GD.Print($"[Audit0922Sim] DEFECT T3-крэш: {ex.GetType().Name}: {ex.Message}"); _allPass = false; }
+        try { RunCarryLimitsCanonTest(); }
+        catch (Exception ex) { GD.Print($"[Audit0922Sim] DEFECT T4-крэш: {ex.GetType().Name}: {ex.Message}"); _allPass = false; }
+
         // === L. P2-22 (диагностика, бэклог): queued-drain re-entrancy =========
         // Запрос аудитора (Фаза 7): runtime-чек edge-case-а. Фикс — «следующий
         // слой» реестра Фазы 10, в этот эпизод НЕ входит → вердикт не гейтит.
@@ -359,8 +481,8 @@ public partial class Audit0922SimDebug : Node
         catch (Exception ex) { GD.Print($"[Audit0922Sim] diag-крэш L: {ex.GetType().Name}: {ex.Message}"); }
 
         GD.Print($"[Audit0922Sim] VERDICT: {(_allPass
-            ? "PASS — EventBus isolation/re-entrancy, path sanitisation, DI override prune, DeleteSave honesty, Trade/Corpse reset-контракты, ResolveAll registration order, startup fail-closed, cycle detection (Фаза 4: P2-12/P2-13/P2-14), world-reset fail-closed (P1-9), startup retry без дублей (P1-10), Pure без расхода Ци (P1-12), time catch-up/speed/markers (Фаза 11: P1-13/P1-14/P1-15), item identity/DB (Фаза 12: P1-16+P2-31/P2-32), equipment гейты (P1-17/P1-18), storage-ring persistence (P1-19), stat progression (Фаза 14: P1-20+P2-43/P2-49), revive/dash (P2-44/P2-45), time P2-бэклог Фазы 11: автосейв по мировым тикам / pause-authority / DeltaTime / канонизация / валидация даты (P2-26…30)"
-            : "FAIL — см. DEFECT-строки выше (runtime-подтверждение аудита 09.22 + Фаза 4 + финальные фазы 6–10 + фазы 11–14 + P2-26…30)")}");
+            ? "PASS — EventBus isolation/re-entrancy, path sanitisation, DI override prune, DeleteSave honesty, Trade/Corpse reset-контракты, ResolveAll registration order, startup fail-closed, cycle detection (Фаза 4: P2-12/P2-13/P2-14), world-reset fail-closed (P1-9), startup retry без дублей (P1-10), Pure без расхода Ци (P1-12), time catch-up/speed/markers (Фаза 11: P1-13/P1-14/P1-15), item identity/DB (Фаза 12: P1-16+P2-31/P2-32), equipment гейты (P1-17/P1-18), storage-ring persistence (P1-19), stat progression (Фаза 14: P1-20+P2-43/P2-49), revive/dash (P2-44/P2-45), time P2-бэклог Фазы 11: автосейв по мировым тикам / pause-authority / DeltaTime / канонизация / валидация даты (P2-26…30), items/trade P2-бэклог Фазы 12: saturating-валюта / честный тотал сделки / валидация Restore / переноска — владельческий канон 50/100 (P2-33/34/35 + P2-36 by-user)"
+            : "FAIL — см. DEFECT-строки выше (runtime-подтверждение аудита 09.22 + Фаза 4 + финальные фазы 6–10 + фазы 11–14 + P2-26…30 + P2-33…35)")}");
 
         // Чистка временных каталогов теста B/D.
         await ToSignal(GetTree().CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
@@ -1345,6 +1467,186 @@ public partial class Audit0922SimDebug : Node
         Check(posNE.X >= 0 && posNE.X <= 49 && posNE.Y >= 0 && posNE.Y <= 49
               && posSW.X >= 0 && posSW.Y >= 0 && posMid.X == 28 && posMid.Y == 22,
             "R2 dash-цель клэмпится в границы мира (логическая позиция не покидает карту)", "P2-45");
+    }
+
+    // ── T1. Фаза 12 P2-33: CurrencyService saturating-арифметика ───────────
+    private void RunCurrencyOverflowTest()
+    {
+        GD.Print("[Audit0922Sim] === T1. CurrencyService: переполнение int (P2-33) ===");
+        var b = new ContainerBuilder();
+        b.RegisterInstance(new EventBus());
+        b.RegisterInstance(new TradeConfig { StartStones = 50 });
+        b.Register<CurrencyService>(Lifetime.Singleton);
+        var c = b.Build();
+        var cur = c.Resolve<CurrencyService>();
+
+        // T1a: 50 + (MaxValue-10) + 100 — переполнение верхнего края.
+        // Prefix: int-wrap → баланс ОТРИЦАТЕЛЬНЫЙ (аудитор: «затем это может
+        // попасть в UI/торговлю/сейв»). Postfix: насыщение в int.MaxValue.
+        cur.Add(int.MaxValue - 10);
+        cur.Add(100);
+        GD.Print($"[Audit0922Sim] diag: Add(MaxValue-10)+Add(100) → баланс {cur.SpiritStones}");
+        Check(cur.SpiritStones == int.MaxValue,
+            "T1a Add на верхнем крае int насыщается в int.MaxValue (баланс не становится отрицательным)", "P2-33");
+
+        // T1b: прямой SetBalance с минусом — минусовой баланс невозможен.
+        cur.SetBalance(-5);
+        Check(cur.SpiritStones == 0,
+            "T1b SetBalance(-5) → 0 (минусовой баланс не проходит и прямым вызовом)", "P2-33");
+    }
+
+    // ── T2. Фаза 12 P2-34: total сделки в long ===============================
+    // Мини-DI: TradeService + фейки (БД с экстремальными Value, инвентарь,
+    // валюта int.MaxValue, NPC-Merchant, генераторы без ассортимента —
+    // сток = только «material_iron_ore» ×5 из TradeConfig).
+    private void RunTradeOverflowTest()
+    {
+        GD.Print("[Audit0922Sim] === T2. TradeService: overflow стоимости сделки (P2-34) ===");
+        var db = new FakeTradeItemDb();
+        db.Items["material_iron_ore"] = new ItemData
+        {
+            ItemId = "material_iron_ore", NameRu = "Железная руда (экстрем.)",
+            Category = ItemCategory.Material, Rarity = ItemRarity.Common,
+            Stackable = true, MaxStack = 100, Weight = 1.5f, Volume = 1f,
+            Value = 1_000_000_000, // unitPrice = 1.2e9 (влезает в int)
+        };
+        db.Items["sell_probe"] = new ItemData
+        {
+            ItemId = "sell_probe", NameRu = "Проба продажи",
+            Category = ItemCategory.Material, Rarity = ItemRarity.Common,
+            Stackable = true, MaxStack = 100, Weight = 1.5f, Volume = 1f,
+            Value = 1_900_000_000, // sellPrice = 950M; ×3 = 2.85e9 > int.MaxValue
+        };
+
+        var inv = new FakeTradeInventory();
+        var currency = new FakeTradeCurrency();
+        var b = new ContainerBuilder();
+        b.RegisterInstance(new EventBus());
+        b.RegisterInstance<IInventoryService>(inv);
+        b.RegisterInstance<IItemDatabaseService>(db);
+        b.RegisterInstance<IEquipmentGenerator>(new FakeNullEquipmentGenerator());
+        b.RegisterInstance<IItemGeneratorService>(new FakeNullItemGenerator());
+        b.RegisterInstance<INPCService>(new FakeTradeNpcService());
+        b.RegisterInstance<ICurrencyService>(currency);
+        b.RegisterInstance(new TradeConfig
+        {
+            MarkupPermil = 1200, SellPermil = 500,
+            StockWeaponMin = 0, StockWeaponMax = 0,
+            StockArmorMin = 0, StockArmorMax = 0,
+            StockConsumableMin = 0, StockConsumableMax = 0,
+            StockMaterialCount = 1, MaterialStackMin = 5, MaterialStackMax = 5,
+        });
+        b.Register<ITradeService, TradeService>(Lifetime.Singleton);
+        var c = b.Build();
+        var trade = c.Resolve<ITradeService>();
+        trade.OpenTrade("npc_t2");
+
+        // T2a (покупка): 1.2e9 × 5 = 6e9 > int.MaxValue.
+        // Prefix: int-wrap → total 1_705_032_704 → «успех» с заниженной ценой
+        // (Spend вызван). Postfix: честный отказ ДО списания.
+        bool buyResult = trade.TryBuy("npc_t2", "material_iron_ore", 5);
+        GD.Print($"[Audit0922Sim] diag: TryBuy(material×5, unit 1.2e9) → {buyResult}; " +
+                 $"SpendCalls={currency.SpendCalls}, LastSpend={currency.LastSpendAmount}");
+        Check(!buyResult && currency.SpendCalls == 0,
+            "T2a TryBuy: total 6e9 > int.MaxValue → честный отказ ДО списания камней", "P2-34");
+
+        // T2b (продажа): 950M × 3 = 2.85e9 > int.MaxValue.
+        // Prefix: int-wrap → total −1_444_967_296 → предметы ИЗЪЯТЫ, оплата
+        // молча 0 (if total > 0 не срабатывает). Postfix: насыщение —
+        // Add(int.MaxValue), событие с представимым максимумом.
+        bool sellResult = trade.TrySell("npc_t2", "sell_probe", 3);
+        GD.Print($"[Audit0922Sim] diag: TrySell(sell_probe×3) → {sellResult}; " +
+                 $"AddCalls={currency.AddCalls}, LastAdd={currency.LastAddAmount}");
+        Check(sellResult && currency.AddCalls == 1 && currency.LastAddAmount == int.MaxValue,
+            "T2b TrySell: total 2.85e9 > int.MaxValue → насыщение int.MaxValue (не молча 0 и не минус)", "P2-34");
+    }
+
+    // ── T3. Фаза 12 P2-35: RestoreState инвентаря валидирует слоты =========
+    // БД «known_potion» MaxStack=10; мусорные слоты НЕ создаются и не
+    // отравляют _itemCountCache (главный вред по аудитору: count=-100).
+    private void RunInventoryRestoreValidationTest()
+    {
+        GD.Print("[Audit0922Sim] === T3. InventoryService.RestoreState: валидация (P2-35) ===");
+        var bus = new EventBus();
+        var db = new FakeTradeItemDb();
+        db.Items["known_potion"] = new ItemData
+        {
+            ItemId = "known_potion", NameRu = "Лекарство",
+            Category = ItemCategory.Consumable, Rarity = ItemRarity.Common,
+            Stackable = true, MaxStack = 10, Weight = 0.1f, Volume = 0.05f,
+            Value = 5,
+        };
+        var inv = new InventoryService(
+            new EventBusPublisher<ItemAddedEvent>(bus),
+            new EventBusPublisher<ItemRemovedEvent>(bus),
+            db, null);
+        inv.Configure(new InventoryConfig());
+
+        // T3a: полный мусорный набор аудитора: count=-100, category=999,
+        // rarity=999, фантомный ItemId, count=5000 > MaxStack=10.
+        var garbage = new InventorySaveData
+        {
+            slots = new[]
+            {
+                new InventorySlotSaveData { itemId = "known_potion", count = -100, category = 0, rarity = 0 },
+                new InventorySlotSaveData { itemId = "known_potion", count = 5, category = 999, rarity = 0 },
+                new InventorySlotSaveData { itemId = "known_potion", count = 5, category = 3, rarity = 999 },
+                new InventorySlotSaveData { itemId = "ghost_item", count = 5, category = 3, rarity = 0 },
+                new InventorySlotSaveData { itemId = "known_potion", count = 5000, category = 3, rarity = 0 },
+            },
+        };
+        inv.RestoreState(garbage);
+        GD.Print($"[Audit0922Sim] diag: мусорный Restore → слотов {inv.UsedSlots}, " +
+                 $"known_potion в кэше {inv.GetItemCount("known_potion")}");
+        Check(inv.UsedSlots == 0 && inv.GetItemCount("known_potion") == 0,
+            "T3a Restore отвергает count=-100 / category=999 / rarity=999 / фантомный ItemId / count>MaxStack (кэш не отравлен)", "P2-35");
+
+        // T3b: валидный слот по-прежнему восстанавливается.
+        var valid = new InventorySaveData
+        {
+            slots = new[] { new InventorySlotSaveData { itemId = "known_potion", count = 3, category = 3, rarity = 0 } },
+        };
+        inv.RestoreState(valid);
+        Check(inv.UsedSlots == 1 && inv.GetItemCount("known_potion") == 3,
+            "T3b валидный слот восстанавливается (count 3 ≤ MaxStack 10, категория/редкость определены)", "P2-35");
+
+        inv.ResetWorld();
+    }
+
+    // ── T4. Фаза 12 P2-36: СТАВКИ ПЕРЕНОСКИ — владельческий канон ========
+    // ⚠ ПРЯМОЕ УКАЗАНИЕ ВЛАДЕЛЬЦА (2026-09-22 вечер, конс пект): канон =
+    // 50 кг / 100 ед. (user request 2026-08-22). Прямые указания владельца
+    // имеют приоритет ВЫШЕ аудитора и ВЫШЕ документации → P2-36 (предложение
+    // аудитора «30/30 по §3.3») отклонён by-user; док-канон конс пектирован
+    // в INVENTORY_SYSTEM §3.3-примечание. Проверка — страж владельческих
+    // значений: никакой будущий «канон-док-фикс» не срежет их молча.
+    private void RunCarryLimitsCanonTest()
+    {
+        GD.Print("[Audit0922Sim] === T4. Переноска: владельческий канон 50 кг / 100 ед. (P2-36 by-user) ===");
+
+        // T4a: источник значений — InventoryConfig + GameConstants.
+        var cfg = new InventoryConfig();
+        GD.Print($"[Audit0922Sim] diag: InventoryConfig {cfg.MaxCarryWeight}/{cfg.MaxCarryVolume}; " +
+                 $"GameConstants.BASE_CARRY_WEIGHT {GameConstants.BASE_CARRY_WEIGHT}");
+        Check(Math.Abs(cfg.MaxCarryWeight - 50f) < 0.001f && Math.Abs(cfg.MaxCarryVolume - 100f) < 0.001f
+              && Math.Abs(GameConstants.BASE_CARRY_WEIGHT - 50f) < 0.001f,
+            "T4a InventoryConfig и GameConstants: 50 кг / 100 ед. (владельческий канон, user request 2026-08-22)", "P2-36-by-user");
+
+        // T4b: живой мир — эффективные лимиты 50/100 (стартовый набор рюкзак
+        // не надевает — StartingGearPhase без Back-слота, бонусов нет).
+        var container = GameBoot.Container;
+        if (container == null)
+        {
+            GD.Print("[Audit0922Sim] DEFECT контейнер недоступен");
+            _allPass = false;
+            return;
+        }
+        var liveInv = container.Resolve<IInventoryService>();
+        GD.Print($"[Audit0922Sim] diag: живой мир — вес {liveInv.GetEffectiveMaxWeight()}, " +
+                 $"объём {liveInv.GetEffectiveMaxVolume()}");
+        Check(Math.Abs(liveInv.GetEffectiveMaxWeight() - 50f) < 0.001f
+              && Math.Abs(liveInv.GetEffectiveMaxVolume() - 100f) < 0.001f,
+            "T4b живой инвентарь: эффективные лимиты 50 кг / 100 ед. (владельческий канон не срезан)", "P2-36-by-user");
     }
 
     // ── L. P2-22 (диагностика, бэклог): queued-drain re-entrancy guard ======

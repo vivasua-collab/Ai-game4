@@ -61,7 +61,14 @@ namespace CultivationGame.Core.Data
         /// </summary>
         public const float BASE_CONDUCTIVITY = 2.78f;
 
-        /// <summary>Базовый вес переносимого груза (STR=10) — 50 кг per user request 2026-08-22</summary>
+        /// <summary>
+        /// Базовый вес переносимого груза (STR=10) — 50 кг per user request 2026-08-22.
+        /// ⚠ ВЛАДЕЛЬЦЕЦ-КАНОН (конс пект прямого указания, 2026-09-22 вечер):
+        /// прямые указания владельца имеют приоритет ВЫШЕ аудитора и ВЫШЕ
+        /// документации; P2-36 (аудит 09.22 12:00, «30/30 по §3.3») отклонён
+        /// by-user — канон = 50 кг (user request 2026-08-22), зафиксировано
+        /// в INVENTORY_SYSTEM §3.3-примечание.
+        /// </summary>
         public const float BASE_CARRY_WEIGHT = 50f;
 
         #endregion

@@ -49,12 +49,21 @@ namespace CultivationGame.Modules.Trade
         }
 
         /// <summary>Добавить Духовные Камни. Публикует CurrencyChangedEvent.</summary>
+        /// <remarks>
+        /// P2-33 (аудит 09.22 12:00, Фаза 12): насыщающая арифметика —
+        /// int-переполнение больше не делает баланс отрицательным
+        /// (прежде _spiritStones += amount при MaxValue-крае заворачивало
+        /// в минус и уезжало в UI/торговлю/сейв; то же семейство, что и
+        /// Qi-арифметика Фазы 9). Копятся до представимого максимума.
+        /// </remarks>
         public void Add(int amount)
         {
             EnsureInitialized();
             if (amount <= 0) return;
 
-            _spiritStones += amount;
+            // P2-33: long-промежуток + клэмп (saturating add).
+            long candidate = (long)_spiritStones + amount;
+            _spiritStones = candidate > int.MaxValue ? int.MaxValue : (int)candidate;
             _changedPub.Publish(new CurrencyChangedEvent(_spiritStones, amount));
         }
 
@@ -74,11 +83,13 @@ namespace CultivationGame.Modules.Trade
         }
 
         /// <summary>Установить баланс напрямую (для загрузки сейва).</summary>
+        /// <remarks>P2-33: минусовой/овермаксимальный баланс невозможен и прямым вызовом.</remarks>
         public void SetBalance(int spiritStones)
         {
             _initialized = true;
-            int delta = spiritStones - _spiritStones;
-            _spiritStones = spiritStones;
+            int clamped = Math.Clamp(spiritStones, 0, int.MaxValue);
+            int delta = clamped - _spiritStones;
+            _spiritStones = clamped;
             _changedPub.Publish(new CurrencyChangedEvent(_spiritStones, delta));
         }
 

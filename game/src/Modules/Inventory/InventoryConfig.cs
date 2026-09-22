@@ -13,10 +13,17 @@ namespace CultivationGame.Modules.Inventory
     /// </summary>
     public class InventoryConfig
     {
-        /// <summary>Максимальный переносимый вес (кг)</summary>
+        /// <summary>
+        /// Максимальный переносимый вес (кг) — 50 per user request 2026-08-22
+        /// (владельческий канон; P2-36 отклонён by-user — см. §3.3-примечание
+        /// INVENTORY_SYSTEM и чекпоинт 09_22_r36b).
+        /// </summary>
         public float MaxCarryWeight = 50f;
 
-        /// <summary>Максимальный объём рюкзака (литры)</summary>
+        /// <summary>
+        /// Максимальный объём рюкзака (литры) — 100 per user request 2026-08-22
+        /// (владельческий канон; P2-36 отклонён by-user).
+        /// </summary>
         public float MaxCarryVolume = 100f;
 
         /// <summary>Вместимость духовного хранилища (слоты)</summary>

@@ -48,6 +48,9 @@ public static class InventoryModuleServices
         builder.Register<InventoryModule>(Lifetime.Singleton);
 
         // === Конфигурация по умолчанию ===
+        // 50/100 per user request 2026-08-22 — владельческий канон
+        // (P2-36 отклонён by-user: прямые указания владельца выше аудитора
+        // и документации; конс пект — INVENTORY_SYSTEM §3.3-примечание).
         var defaultConfig = new InventoryConfig
         {
             MaxCarryWeight = GameConstants.BASE_CARRY_WEIGHT,

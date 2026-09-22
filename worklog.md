@@ -3204,3 +3204,42 @@ NEXT: пачка 2 — P2-33…36 (Фаза 12: overflow валют/сделок
 инвентаря, рюкзак 50/100 → канон 30/30). Затем P2-37…42, P2-47/48/50 →
 интеграционная контрольная фаза «Time→NPC→Cultivation→Techniques→Combat→
 Save→Time resume».
+
+## R36-b — P2-бэклог Фазы 12 (Items/Trade): P2-33/34/35 + P2-36 by-user (2026-09-22 вечер)
+
+**⚠ ПРЯМОЕ УКАЗАНИЕ ВЛАДЕЛЬЦА (приоритет выше аудитора и документации):**
+переноска = 50 кг / 100 ед. (user request 2026-08-22). P2-36 (30/30 по §3.3)
+отклонён by-user; конс пект в чекпоинте 09_22_r36b §0, INVENTORY_SYSTEM
+§3.3-примечание (таблица приведена к 50/100), комментарии-конс пекты в
+Constants/InventoryConfig/InventoryModuleServices; T4-сим — страж значений.
+
+- P2-33: CurrencyService.Add — long-промежуток + клэмп int.MaxValue
+  (saturating; баланс не становится отрицательным), SetBalance — Clamp[0..Max].
+- P2-34: TradeService — тотал в long; покупка > int.MaxValue → честный
+  Fail ДО списания; продажа > int.MaxValue → насыщение int.MaxValue
+  (предметы уже изъяты — платим представимый максимум, не молча 0).
+- P2-35: InventoryService.RestoreState — валидация слотов (count>0,
+  ≤MaxStack, Enum.IsDefined category/rarity, ItemId в БД (item_db
+  восстанавливается раньше inventory по RestoreOrder), кэш не отравлен).
+- Инцидент 30/30: временный аудит-фикс ронял LOOT/SAVELOAD/QUEST/
+  TRASHDROP/CONTEXT (стартовый набор ≈29.6 ед. + мутации симов) — все
+  харнесс-«bag-free»-правки откачены вместе с 30/30; при 100 ед. симы
+  штатны.
+- Сим №19 + секция T (8 проверок): prefix VERDICT FAIL 5 T-DEFECT
+  (баланс −2147483509; TryBuy «успех» 1.7e9 за 6e9; TrySell молча 0 при
+  wrap −1.44e9; мусорный Restore 5 слотов/кэш 4910; T4 — OK, код уже на
+  владельческом каноне), postfix PASS 96 OK / 0 DEFECT; логи
+  checkpoints/logs/09_22_r36b_{prefix,postfix}_audit0922.log.
+- Build 0 err; полная QA-регрессия 19/19 PASS.
+- Доки: INVENTORY_SYSTEM §3.3 (владельческий канон), TESTING_RULES §0.1
+  (секция T).
+- Чекпоинт: checkpoints/09_22_r36b_p2_backlog_phase12_items.md.
+
+**NEXT (R37 — финальный аудит upload/audit_09_22_22_00.txt):**
+A1 P1-13-hardening (MaxCatchupSeconds = единицы: сейчас 5 тиков вместо
+5 секунд при Quick), A2 NEW-TIME-1 (TickCatchUpClock.Reset() не вызывается
+на NewGame/Load — дробный долг старого мира), A3 NEW-TIME-2 (автосейв
+сдвинут на +1 тик: WorldModule.AdvanceTick до SaveModule.Tick; интеграционный
+тест реального порядка ITickable); далее B1 P2-22 (queued-drain guard),
+затем пачки P2-37…42, P2-47/48/50; после — интеграционная контрольная
+фаза Time→Quest/Player→Combat→Inventory→Save/Load→NewGame.

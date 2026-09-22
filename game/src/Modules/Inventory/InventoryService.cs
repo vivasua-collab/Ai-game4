@@ -573,11 +573,38 @@ namespace CultivationGame.Modules.Inventory
             _slots.Clear();
             _itemCountCache.Clear();
 
+            // P2-35 (аудит 09.22 12:00, Фаза 12): валидация каждого слота ДО
+            // конструирования — повреждённый/чужой state отделяется от
+            // валидного (контракт missing-block forward compatibility).
+            // Прежде count=-100 / category=999 / rarity=999 / фантомный ItemId
+            // проходили напрямую, а отрицательный count отравлял _itemCountCache.
+            // БД доступна: блок "item_db" восстанавливается РАНЬШЕ "inventory"
+            // (RestoreOrder в SaveDataAggregator) и содержит все runtime-
+            // предметы (counter-ID из снапшота R17 G-2/G-3).
+            int skipped = 0;
             if (data.slots != null)
             {
                 foreach (var slotSave in data.slots)
                 {
-                    if (string.IsNullOrEmpty(slotSave.itemId)) continue;
+                    if (string.IsNullOrEmpty(slotSave.itemId)) { skipped++; continue; }
+                    if (slotSave.count <= 0) { skipped++; continue; }
+                    if (!Enum.IsDefined(typeof(ItemCategory), slotSave.category)) { skipped++; continue; }
+                    if (!Enum.IsDefined(typeof(ItemRarity), slotSave.rarity)) { skipped++; continue; }
+
+                    ItemData? dbItem = null;
+                    if (_itemDatabase != null)
+                    {
+                        if (!_itemDatabase.TryGetItem(slotSave.itemId, out dbItem) || dbItem == null)
+                        {
+                            // Фантом: предмета нет в восстановленном каталоге.
+                            skipped++;
+                            continue;
+                        }
+                        // MaxStack предмета — верхняя граница счёта слота
+                        // (паттерн BeltService: MaxStack ≤ 0 трактуем как 1).
+                        int maxStack = dbItem.MaxStack > 0 ? dbItem.MaxStack : 1;
+                        if (slotSave.count > maxStack) { skipped++; continue; }
+                    }
 
                     var slot = new InventorySlot(
                         slotSave.itemId,
@@ -591,6 +618,12 @@ namespace CultivationGame.Modules.Inventory
                     else
                         _itemCountCache[slotSave.itemId] = slotSave.count;
                 }
+            }
+
+            if (skipped > 0)
+            {
+                Console.WriteLine($"[Inventory] RestoreState: {skipped} слотов пропущено " +
+                                  "(невалидные count/category/rarity/ItemId/MaxStack — повреждённый блок)");
             }
         }
 

@@ -291,7 +291,19 @@ namespace CultivationGame.Modules.Trade
             buyCount = Math.Min(buyCount, canFit);
 
             int unitPrice = GetBuyPrice(itemId);
-            int total = unitPrice * buyCount;
+            // P2-34 (аудит 09.22 12:00, Фаза 12): тотал в long-промежутке —
+            // int×int wrap при повреждённых/экстремальных значениях прежде
+            // давал ОТРИЦАТЕЛЬНЫЙ/заниженный total: проверка «SpiritStones < total»
+            // обходилась, игрок платил 1.7e9 за партию в 6e9. Сделка дороже
+            // int.MaxValue непредставима валютой — честный отказ ДО движения
+            // камней/предметов.
+            long totalLong = (long)unitPrice * buyCount;
+            if (totalLong > int.MaxValue)
+            {
+                Fail("Слишком дорогая сделка (переполнение стоимости)");
+                return false;
+            }
+            int total = (int)totalLong;
 
             // Достаточно ли камней (строгая проверка на всю партию).
             if (_currency.SpiritStones < total)
@@ -353,7 +365,17 @@ namespace CultivationGame.Modules.Trade
                 return false;
             }
 
-            int total = GetSellPrice(itemId) * sellCount;
+            // P2-34: long-промежуток. Предметы УЖЕ изъяты (контракт изъятие-до-
+            // оплаты) — при total > int.MaxValue платим представимый максимум
+            // (насыщение, симметрично CurrencyService.Add), а не молча 0
+            // (прежде: wrap-отрицательный total → if (total > 0) не срабатывал).
+            long totalLong = (long)GetSellPrice(itemId) * sellCount;
+            if (totalLong > int.MaxValue)
+            {
+                Console.WriteLine($"[Trade] Sell-предупреждение: тотал {totalLong} > int.MaxValue — " +
+                                  $"насыщение до int.MaxValue (предметы уже изъяты)");
+            }
+            int total = totalLong > int.MaxValue ? int.MaxValue : (int)totalLong;
             if (total > 0)
                 _currency.Add(total);
 
