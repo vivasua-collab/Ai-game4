@@ -215,6 +215,12 @@ public sealed class GameSession : IGameSession
         if (State != SessionState.Playing) return;
         SetState(SessionState.Paused);
         Data.IsPaused = true;
+        // R36-a (Фаза 11 / P2-27): единая pause-authority — сессионная пауза
+        // ОСТАНАВЛИВАЕТ мировое время. Прежде GameSession.Pause() менял только
+        // SessionState, не касаясь TimeService: две независимые истины о паузе
+        // (SessionState.Paused vs TimeService.IsPaused) могли расходиться
+        // (текущий GameBoot гейтил симуляцию по обоим — латентно, но API врал).
+        _timeService.Pause();
         _pausedPub.Publish(new GamePausedEvent());
         Console.WriteLine("[GameSession] Paused");
     }
@@ -223,6 +229,9 @@ public sealed class GameSession : IGameSession
     public void Resume()
     {
         if (State != SessionState.Paused) return;
+        // R36-a (Фаза 11 / P2-27): время возвращается вместе с сессией
+        // (Resume восстанавливает скорость ДО паузы, Fast/Quick живы).
+        _timeService.Resume();
         SetState(SessionState.Playing);
         Data.IsPaused = false;
         _resumedPub.Publish(new GameResumedEvent());

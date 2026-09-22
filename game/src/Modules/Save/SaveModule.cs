@@ -18,7 +18,7 @@ namespace CultivationGame.Modules.Save;
 /// Save module — ticks every 60 ticks to check for autosave.
 /// Subscribes to SaveRequestedEvent / LoadRequestedEvent via the bus.
 /// </summary>
-public sealed class SaveModule : IModule
+public sealed class SaveModule : IModule, IWorldResettable
 {
     public string ModuleName => "Save";
 
@@ -36,9 +36,18 @@ public sealed class SaveModule : IModule
     // писал autosave-слоты от fallback-мира меню — мусорные сейвы).
     [Inject] private readonly SaveConfig _config = null!;
     [Inject] private readonly IGameSession _session = null!;
+    // R36-a (Фаза 11 / P2-26): мировой тик — единственный источник каденции
+    // автосейва. Прежде Tick(processTick) считал по счётчику ПРОЦЕССА
+    // (GameBoot._currentTick): после NewGame/Load (TickCount → 0 / из сейва)
+    // первый автосейв мог прийти через 1/7/18 минут — остаток процессного
+    // счётчика ломал контракт «каждые 30 ИГРОВЫХ минут».
+    [Inject] private readonly ITimeService _timeService = null!;
 
     private IDisposable? _saveSubToken;
     private IDisposable? _loadSubToken;
+
+    /// <summary>Мировой тик последнего автосейва (null — отсчёт ещё не начат).</summary>
+    private int? _lastAutosaveWorldTick;
 
     /// <summary>R17: единый слот автосейва (перезапись, не autosave_NNNN-плодовение).</summary>
     private const string AutoSaveSlotName = "autosave";
@@ -88,12 +97,41 @@ public sealed class SaveModule : IModule
         // 0/отрицательное значение — автосейв выключен.
         int interval = _config.AutoSaveIntervalMinutes;
         if (interval <= 0) return;
-        if (tickCount % interval != 0) return;
+
+        // R36-a (Фаза 11 / P2-26): каденция — МИРОВОЙ тик (ITimeService.
+        // TickCount), параметр tickCount (процессный) ИГНОРИРУЕТСЯ. Разностная
+        // схема: первый Tick после старта/сброса мира НАЧИНАЕТ отсчёт
+        // (автосейв — ровно через interval мировых минут, не мгновенно);
+        // дальше — автосейв при накоплении ≥ interval (hitch/bulk-скачок
+        // мирового тика НЕ теряет каденцию: разность честно учитывает
+        // пропущенные минуты).
+        int worldTick = _timeService.TickCount;
+        if (_lastAutosaveWorldTick is not int last)
+        {
+            _lastAutosaveWorldTick = worldTick;
+            return;
+        }
+        if (worldTick - last < interval) return;
 
         var slot = new SaveSlot(AutoSaveSlotName, SaveSlotType.AutoSave);
         // R11 P1-Save: результат автосейва не глотаем — лог при провале.
         if (!_saveService.Save(slot))
             Console.WriteLine($"[SaveModule] Autosave FAILED: {_saveService.LastError}");
+        _lastAutosaveWorldTick = worldTick;
+    }
+
+    // ── R36-a (Фаза 11 / P2-26): IWorldResettable ─────────────────────
+    /// <summary>
+    /// Пересборка мира (NewGame ИЛИ LoadGame — сброс выполняет
+    /// WorldDomainResetPhase/GameSession ДО RestoreState): отсчёт каденции
+    /// автосейва сбрасывается — новый мир начинает с чистыми 30 минутами
+    /// (TickCount нового мира = 0/восстановленный из сейва, процессный
+    /// счётчик продолжает расти и НЕ влияет).
+    /// </summary>
+    public void ResetWorld()
+    {
+        _lastAutosaveWorldTick = null;
+        Console.WriteLine("[SaveModule] ResetWorld: отсчёт автосейва сброшен (каденция — мировой тик, P2-26)");
     }
 
     private void OnSaveRequested(in SaveRequestedEvent e)
@@ -139,5 +177,8 @@ public static class SaveModuleServices
         // ISaveable-реализация SaveService оставалась мёртвым кодом.
         builder.Register<ISaveable, SaveService>(Lifetime.Singleton);
         builder.Register<SaveModule>(Lifetime.Singleton);
+        // R36-a (P2-26): WorldDomainResetPhase видит SaveModule в реестре
+        // сбрасываемых доменов (мульти-форвард того же синглтона).
+        builder.Register<IWorldResettable, SaveModule>(Lifetime.Singleton);
     }
 }

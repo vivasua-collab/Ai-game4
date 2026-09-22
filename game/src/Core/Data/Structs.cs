@@ -150,6 +150,29 @@ public readonly struct WorldTime : IEquatable<WorldTime>
 
     public WorldTime(int year, int month, int day, int hour, int minute)
     {
+        // R36-a (Фаза 11 / P2-30): компоненты даты валидируются —
+        // повреждённый/руками изменённый сейв-блок world_time больше НЕ
+        // превращается в мусорную дату через арифметику (month=13, day=0,
+        // hour=29, minute=-10, год до эпохи мира). Аудитор: «некорректная
+        // дата вместо отказа загрузки» — throw уходит в RestoreState →
+        // SaveDataAggregator ловит (LastErrors) → Load=false → честный
+        // отказ в меню. Внутренняя арифметика (ctor по TotalMinutes,
+        // AddMinutes) НЕ валидируется — это уже корректные минуты.
+        if (year < GameConstants.START_YEAR)
+            throw new ArgumentOutOfRangeException(nameof(year),
+                $"year={year} раньше эпохи мира (START_YEAR={GameConstants.START_YEAR})");
+        if (month < 1 || month > GameConstants.MONTHS_PER_YEAR)
+            throw new ArgumentOutOfRangeException(nameof(month),
+                $"month={month} вне 1..{GameConstants.MONTHS_PER_YEAR}");
+        if (day < 1 || day > GameConstants.DAYS_PER_MONTH)
+            throw new ArgumentOutOfRangeException(nameof(day),
+                $"day={day} вне 1..{GameConstants.DAYS_PER_MONTH}");
+        if (hour < 0 || hour >= GameConstants.HOURS_PER_DAY)
+            throw new ArgumentOutOfRangeException(nameof(hour),
+                $"hour={hour} вне 0..{GameConstants.HOURS_PER_DAY - 1}");
+        if (minute < 0 || minute >= 60)
+            throw new ArgumentOutOfRangeException(nameof(minute),
+                $"minute={minute} вне 0..59");
         int yearsFromStart = year - GameConstants.START_YEAR;
         int totalMinutes = yearsFromStart
             * GameConstants.MONTHS_PER_YEAR

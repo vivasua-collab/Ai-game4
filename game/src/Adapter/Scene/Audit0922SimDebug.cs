@@ -30,6 +30,21 @@
 //      Pure не входит в Qi-буфер вовсе — Ци не тратится ни у игрока, ни у
 //      NPC; контрольная серия — Physical Ци тратит (буфер жив).
 //
+// 2026-09-22 (R36-a, P2-бэклог Фазы 11): ДОПОЛНЕНА секцией S — время:
+//   S1 (P2-26) автосейв привязан к МИРОВОМУ тику (ITimeService.TickCount),
+//      не к процессному счётчику GameBoot._currentTick (граница NewGame/Load
+//      ломала абсолютную каденцию «каждые 30 игровых минут»).
+//   S2 (P2-27) единая pause-authority: GameSession.Pause/Resume синхронизируют
+//      TimeService (две истины о паузе сходятся) + Resume восстанавливает
+//      скорость ДО паузы (Fast/Quick не уничтожаются в Normal).
+//   S4 (P2-28) IsPaused ⇒ DeltaTime == 0 (латентный договор для будущих
+//      потребителей времени — культивация).
+//   S5 (P2-29) Load канонизирует три представления времени: дата первична,
+//      TickCount/TotalTime — производные (рассинхронный сейв не проходит).
+//   S6 (P2-30) WorldTime/RestoreState отвергают невалидные даты (month=13,
+//      day=0, hour=29, minute=-10, год до эпохи) → битый сейв = честный отказ.
+//   S7 (P3-11) WorldConfig без мёртвых источников времени.
+//
 // Сим написан под ПОСТФИКС-контракт (как должен вести себя исправленный код):
 //   A. EventBus (P1-5): исключение в одном подписчике НЕ прерывает fan-out
 //      (подписчики после падавшего получают событие), НЕ покидает Publish,
@@ -195,6 +210,59 @@ public partial class Audit0922SimDebug : Node
         public IReadOnlyList<string> GetAllSaves() => Array.Empty<string>();
     }
 
+    // ── Фейковые сервисы для секции S (Фаза 11 P2: автосейв/пауза/канон) ──
+    // P2-26: настраиваемый мировой тик (process-tick передаётся в Tick напрямую).
+    // TickCount-член компилируется и ДО расширения интерфейса (лишний член
+    // класса), и ПОСЛЕ (реализует ITimeService.TickCount).
+    private sealed class FakeTimeService : ITimeService
+    {
+        public int WorldTick;
+        public int TickCount => WorldTick;
+        public float DeltaTime => 1f;
+        public float TotalTime => WorldTick;
+        public int CurrentDay => 1;
+        public int CurrentMonth => 1;
+        public int CurrentYear => 1864;
+        public int CurrentHour => 6;
+        public TimeOfDay TimeOfDay => TimeOfDay.Morning;
+        public TimeSpeed Speed { get; set; } = TimeSpeed.Normal;
+        public bool IsPaused => Speed == TimeSpeed.Paused;
+        public WorldTime CurrentTime => new WorldTime(GameConstants.START_YEAR, 1, 1, 6, 0);
+        public void Pause() => Speed = TimeSpeed.Paused;
+        public void Resume() => Speed = TimeSpeed.Normal;
+        public void BulkAdvanceTicks(int ticks) => WorldTick += Math.Max(0, ticks);
+    }
+
+    private sealed class FakeSaveService : ISaveService
+    {
+        public int SaveCalls;
+        public bool Save(SaveSlot slot) { SaveCalls++; return true; }
+        public bool Load(SaveSlot slot) => false;
+        public bool HasSave(SaveSlot slot) => false;
+        public bool DeleteSave(SaveSlot slot) => true;
+        public IReadOnlyList<SaveInfo> GetAllSaves() => Array.Empty<SaveInfo>();
+        public string? LastError => null;
+    }
+
+    // P2-27: сессия в Playing — SaveModule.Tick не гейтится в главное меню.
+    private sealed class FakePlayingSession : IGameSession
+    {
+        public SessionState State => SessionState.Playing;
+        public GameSessionData Data { get; } = new();
+        public void NewGame(int startVariant) { }
+        public void NewGame(int startVariant, string locationId) { }
+        public void LoadGame(string slotName) { }
+        public void LoadGame(SaveSlot slot) { }
+        public void Pause() { }
+        public void Resume() { }
+        public void SaveAndQuit() { }
+        public void QuitWithoutSaving() { }
+        public event Action<SessionState>? OnStateChanged { add { } remove { } }
+        public bool HasSave(string slotName) => false;
+        public bool DeleteSave(string slotName) => true;
+        public IReadOnlyList<string> GetAllSaves() => Array.Empty<string>();
+    }
+
     private bool _allPass = true;
     private void Check(bool condition, string label, string defectId)
     {
@@ -275,6 +343,15 @@ public partial class Audit0922SimDebug : Node
         try { RunReviveAndDashTest(); }
         catch (Exception ex) { GD.Print($"[Audit0922Sim] DEFECT R-крэш: {ex.GetType().Name}: {ex.Message}"); _allPass = false; }
 
+        // === S. Фаза 11 P2-бэклог: автосейв-каденция / pause-authority /
+        // DeltaTime / канонизация времени / валидация даты / конфиг-дрейф ===
+        try { RunAutosaveCadenceTest(); }
+        catch (Exception ex) { GD.Print($"[Audit0922Sim] DEFECT S1-крэш: {ex.GetType().Name}: {ex.Message}"); _allPass = false; }
+        try { RunPauseAuthorityTest(); }
+        catch (Exception ex) { GD.Print($"[Audit0922Sim] DEFECT S2-крэш: {ex.GetType().Name}: {ex.Message}"); _allPass = false; }
+        try { RunTimeCanonizationTest(); }
+        catch (Exception ex) { GD.Print($"[Audit0922Sim] DEFECT S5-крэш: {ex.GetType().Name}: {ex.Message}"); _allPass = false; }
+
         // === L. P2-22 (диагностика, бэклог): queued-drain re-entrancy =========
         // Запрос аудитора (Фаза 7): runtime-чек edge-case-а. Фикс — «следующий
         // слой» реестра Фазы 10, в этот эпизод НЕ входит → вердикт не гейтит.
@@ -282,8 +359,8 @@ public partial class Audit0922SimDebug : Node
         catch (Exception ex) { GD.Print($"[Audit0922Sim] diag-крэш L: {ex.GetType().Name}: {ex.Message}"); }
 
         GD.Print($"[Audit0922Sim] VERDICT: {(_allPass
-            ? "PASS — EventBus isolation/re-entrancy, path sanitisation, DI override prune, DeleteSave honesty, Trade/Corpse reset-контракты, ResolveAll registration order, startup fail-closed, cycle detection (Фаза 4: P2-12/P2-13/P2-14), world-reset fail-closed (P1-9), startup retry без дублей (P1-10), Pure без расхода Ци (P1-12), time catch-up/speed/markers (Фаза 11: P1-13/P1-14/P1-15), item identity/DB (Фаза 12: P1-16+P2-31/P2-32), equipment гейты (P1-17/P1-18), storage-ring persistence (P1-19), stat progression (Фаза 14: P1-20+P2-43/P2-49), revive/dash (P2-44/P2-45)"
-            : "FAIL — см. DEFECT-строки выше (runtime-подтверждение аудита 09.22 + Фаза 4 + финальные фазы 6–10 + фазы 11–14)")}");
+            ? "PASS — EventBus isolation/re-entrancy, path sanitisation, DI override prune, DeleteSave honesty, Trade/Corpse reset-контракты, ResolveAll registration order, startup fail-closed, cycle detection (Фаза 4: P2-12/P2-13/P2-14), world-reset fail-closed (P1-9), startup retry без дублей (P1-10), Pure без расхода Ци (P1-12), time catch-up/speed/markers (Фаза 11: P1-13/P1-14/P1-15), item identity/DB (Фаза 12: P1-16+P2-31/P2-32), equipment гейты (P1-17/P1-18), storage-ring persistence (P1-19), stat progression (Фаза 14: P1-20+P2-43/P2-49), revive/dash (P2-44/P2-45), time P2-бэклог Фазы 11: автосейв по мировым тикам / pause-authority / DeltaTime / канонизация / валидация даты (P2-26…30)"
+            : "FAIL — см. DEFECT-строки выше (runtime-подтверждение аудита 09.22 + Фаза 4 + финальные фазы 6–10 + фазы 11–14 + P2-26…30)")}");
 
         // Чистка временных каталогов теста B/D.
         await ToSignal(GetTree().CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
@@ -1280,6 +1357,191 @@ public partial class Audit0922SimDebug : Node
     // Классификация аудитора: P2 hardening (нужен патологический
     // self-publish-цикл), НЕ P1 — фиксы «следующего слоя» (Фаза 10) —
     // поставляем runtime-доказательство, вердикт НЕ гейтим.
+    // ── S. Фаза 11 P2-бэклог (аудит 09.22 12:00): автосейв-каденция /
+    // pause-authority / DeltaTime / канонизация времени / валидация даты ──
+
+    // S1 (P2-26): автосейв привязан к МИРОВОМУ тику (ITimeService.TickCount),
+    // не к процессному счётчику. Аудитор: GameBoot._currentTick — счётчик
+    // текущего процесса; после NewGame/Load (TickCount → 0 / восстановленный)
+    // первый автосейв мог прийти через 1/7/18 минут — остаток process-счётчика.
+    private void RunAutosaveCadenceTest()
+    {
+        GD.Print("[Audit0922Sim] === S1. Автосейв по МИРОВЫМ тикам (P2-26) ===");
+        var fakeTime = new FakeTimeService { WorldTick = 29 };
+        var fakeSave = new FakeSaveService();
+        var fakeHandler = new FakeAdapterFileHandler();
+
+        // Pub/sub: Container авто-резолвит IPublisher<T>/ISubscriber<T> через
+        // зарегистрированный EventBus (спец-кейс Resolve) — отдельные фейки
+        // не нужны (и не сработали бы: generic-кейс проверяется до регистраций).
+        var b = new ContainerBuilder();
+        b.RegisterInstance(new EventBus());
+        b.RegisterInstance<ITimeService>(fakeTime);
+        b.RegisterInstance<ISaveService>(fakeSave);
+        b.RegisterInstance<IGameSession>(new FakePlayingSession());
+        b.RegisterInstance<ISaveFileHandler>(fakeHandler);
+        b.RegisterInstance(new SaveDataAggregator(fakeHandler));
+        b.RegisterInstance(new SaveConfig { AutoSaveIntervalMinutes = 30 });
+        b.Register<SaveModule>(Lifetime.Singleton);
+        var c = b.Build();
+        var sm = c.Resolve<SaveModule>();
+        sm.Start();
+
+        // Инициализация отсчёта: первый Tick в мире (мировой тик 29) —
+        // автосейва нет, начинается отсчёт «30 игровых минут».
+        sm.Tick(29);
+
+        // S1a: мировой интервал истёк (29 → 59 = 30 игровых минут), process-тик
+        // 59 не кратен 30 — в prefix автосейва НЕТ (каденция от process-счётчика).
+        fakeTime.WorldTick = 59;
+        sm.Tick(59);
+        Check(fakeSave.SaveCalls == 1,
+            "S1a автосейв по мировому тику: 29→59 = 30 минут — сейв есть (process-остаток не решает)", "P2-26");
+
+        // S1b: граница мира (аудиторский сценарий: world tick = 0 при
+        // process tick = 10029) — сброс SaveModule делает отсчёт заново,
+        // process-остаток НЕ триггерит автосейв.
+        fakeTime.WorldTick = 0;
+        if ((object)sm is IWorldResettable smr) smr.ResetWorld();
+        sm.Tick(10029);
+        Check(fakeSave.SaveCalls == 1,
+            "S1b после сброса мира (tick=0) process-остаток 10029 не триггерит автосейв", "P2-26");
+
+        // S1c: первый автосейв нового мира — ровно на 30-м МИРОВОМ тике.
+        fakeTime.WorldTick = 30;
+        sm.Tick(10030);
+        Check(fakeSave.SaveCalls == 2,
+            "S1c первый автосейв нового мира — ровно на 30-м мировом тике (контракт «каждые 30 игровых минут»)", "P2-26");
+
+        // S1d: hitch/bulk — мировой тик прыгнул на 60 (дважды интервал):
+        // автосейв ОДИН раз сразу (разность честно учтена, каденция не потеряна).
+        fakeTime.WorldTick += 60;
+        sm.Tick(10031);
+        Check(fakeSave.SaveCalls == 3,
+            "S1d bulk-скачок мирового тика: автосейв срабатывает сразу (каденция не теряется при hitch)", "P2-26");
+    }
+
+    // S2-S4 (P2-27/P2-28): единая pause-authority (Session.Pause
+    // останавливает TimeService), Resume восстанавливает скорость до паузы
+    // (Fast не превращается в Normal), IsPaused ⇒ DeltaTime == 0.
+    private void RunPauseAuthorityTest()
+    {
+        GD.Print("[Audit0922Sim] === S2-S4. Pause-authority / скорость / DeltaTime (P2-27/P2-28) ===");
+        var container = GameBoot.Container;
+        if (container == null)
+        {
+            GD.Print("[Audit0922Sim] DEFECT контейнер недоступен");
+            _allPass = false;
+            return;
+        }
+        var ts = container.Resolve<TimeService>();
+        var session = container.Resolve<IGameSession>();
+
+        try
+        {
+            // S2: сессионная пауза — единая истина с TimeService.
+            if (session.State == SessionState.Playing)
+            {
+                session.Pause();
+                Check(session.State == SessionState.Paused && ts.IsPaused,
+                    "S2a Session.Pause() останавливает мировое время (единая pause-authority, две истины сходятся)", "P2-27");
+                session.Resume();
+                Check(session.State == SessionState.Playing && !ts.IsPaused,
+                    "S2b Session.Resume() возвращает время (согласовано с TimeService)", "P2-27");
+            }
+            else
+            {
+                Check(false, "S2 харнесс: сим исполняется из Playing-сессии (GODOT_NEWGAME=1)", "P2-27");
+            }
+
+            // S3: Resume восстанавливает скорость ДО паузы.
+            var savedSpeed = ts.Speed;
+            ts.Speed = TimeSpeed.Fast;
+            ts.Pause();
+            bool pausedNow = ts.IsPaused;
+            ts.Resume();
+            Check(pausedNow && ts.Speed == TimeSpeed.Fast,
+                "S3 TimeService.Resume() возвращает скорость до паузы (Fast не уничтожается в Normal)", "P2-27");
+            ts.Speed = savedSpeed;
+
+            // S4: контракт «время стоит» — DeltaTime == 0 на паузе.
+            ts.Pause();
+            Check(ts.IsPaused && ts.DeltaTime == 0f,
+                "S4 IsPaused ⇒ DeltaTime == 0 (латентный договор: будущий код не сочтёт шаг пройденным)", "P2-28");
+        }
+        finally
+        {
+            ts.Resume();
+            if (session.State == SessionState.Paused) session.Resume();
+            ts.Speed = TimeSpeed.Normal;
+        }
+    }
+
+    // S5-S6 (P2-29/P2-30): Load канонизирует три представления времени
+    // (дата первична, TickCount/TotalTime — производные), невалидная дата
+    // бросает → агрегатор помечает сейв битым → честный отказ загрузки.
+    private void RunTimeCanonizationTest()
+    {
+        GD.Print("[Audit0922Sim] === S5-S6. Канонизация времени + валидация даты (P2-29/P2-30) ===");
+        var container = GameBoot.Container;
+        if (container == null)
+        {
+            GD.Print("[Audit0922Sim] DEFECT контейнер недоступен");
+            _allPass = false;
+            return;
+        }
+        var ts = container.Resolve<TimeService>();
+
+        try
+        {
+            // S5: рассинхронный блок world_time (дата ≠ TickCount ≠ TotalTime) —
+            // канонизация: дата первична, TickCount = минуты с 06:00 дня 1,
+            // TotalTime = TickCount.
+            ts.RestoreState(new TimeService.WorldTimeSaveState
+            {
+                Year = GameConstants.START_YEAR, Month = 2, Day = 3, Hour = 4, Minute = 5,
+                TickCount = 777, TotalTime = 42f,
+            });
+            var canonicalDate = new WorldTime(GameConstants.START_YEAR, 2, 3, 4, 5);
+            int canonicalTicks = canonicalDate.TotalMinutes - new WorldTime(GameConstants.START_YEAR, 1, 1, 6, 0).TotalMinutes;
+            Check(ts.TickCount == canonicalTicks && Math.Abs(ts.TotalTime - canonicalTicks) < 0.001f
+                  && ts.CurrentTime == canonicalDate,
+                "S5 Load канонизирует время: дата первична, TickCount/TotalTime — производные (одно представление)", "P2-29");
+
+            // S6a: WorldTime отвергает невалидные компоненты даты.
+            bool Throws(Action a) { try { a(); return false; } catch (ArgumentOutOfRangeException) { return true; } }
+            Check(Throws(() => new WorldTime(1864, 13, 1, 6, 0))
+                  && Throws(() => new WorldTime(1864, 1, 0, 6, 0))
+                  && Throws(() => new WorldTime(1864, 1, 1, 29, 0))
+                  && Throws(() => new WorldTime(1864, 1, 1, 6, -10))
+                  && Throws(() => new WorldTime(1863, 1, 1, 6, 0)),
+                "S6a WorldTime отвергает month=13 / day=0 / hour=29 / minute=-10 / год до эпохи (ArgumentOutOfRangeException)", "P2-30");
+
+            // S6b: RestoreState с мусорной датой кидает → сейв честно битый
+            // (SaveDataAggregator ловит → LastErrors → Load=false → отказ в меню).
+            bool restoreThrew = false;
+            try
+            {
+                ts.RestoreState(new TimeService.WorldTimeSaveState
+                { Year = 1864, Month = 13, Day = 1, Hour = 6, Minute = 0, TickCount = 0, TotalTime = 0f });
+            }
+            catch (ArgumentOutOfRangeException) { restoreThrew = true; }
+            Check(restoreThrew,
+                "S6b RestoreState с невалидной датой бросает (битый сейв → отказ загрузки, а не мусорная дата)", "P2-30");
+
+            // S7 (P3-11): мёртвые противоречивые конфиг-источники удалены.
+            var wct = typeof(WorldConfig);
+            Check(wct.GetField("StartHour") == null && wct.GetField("StartYear") == null
+                  && wct.GetField("StartMonth") == null && wct.GetField("StartDay") == null
+                  && wct.GetField("AutoSaveIntervalTicks") == null && wct.GetField("BaseTickRate") == null,
+                "S7 WorldConfig не содержит мёртвых источников времени (Start*/AutoSaveIntervalTicks/BaseTickRate — канон в GameConstants+SaveConfig)", "P3-11");
+        }
+        finally
+        {
+            ts.ResetWorld();
+        }
+    }
+
     private void RunQueueDrainReentrancyDiagnostic()
     {
         GD.Print("[Audit0922Sim] === L. EventBus: queued-drain re-entrancy guard (P2-22 — диагностика, бэклог) ===");

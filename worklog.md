@@ -3172,3 +3172,35 @@ queued-drain guard + P2-23/P2-18 required/optional save-блоки); план
 **NEXT**: P2-бэклог пачками (P2-26…30, P2-33…36, P2-37…42, P2-47/48/50) по
 приоритету аудитора; интеграционная контрольная фаза аудита
 (Time→NPC→Cultivation→Techniques→Combat→Save→Time resumes).
+
+---
+
+## R36-a (2026-09-22, 16:23–17:12 UTC) — P2-бэклог Фазы 11: Time (P2-26…30 + P3-11)
+
+Источник: upload/audit_09_22_12_00, Фаза 11 (строки 1031–1224). Пачка 1 из 4.
+
+- P2-26: ITimeService.TickCount (новый член) + SaveModule — разностная схема
+  по МИРОВОМУ тику (process-tick игнорируется; первый тик = старт отсчёта,
+  автосейв ровно через 30 игровых минут; SaveModule : IWorldResettable —
+  сброс мира обнуляет отсчёт; bulk-скачок каденцию не теряет).
+- P2-27: GameSession.Pause/Resume синхронизируют TimeService (единая
+  pause-authority); _speedBeforePause — Resume возвращает скорость до
+  паузы (Fast жив); ResetWorld сбрасывает и её.
+- P2-28: IsPaused ⇒ DeltaTime == 0.
+- P2-29: RestoreState канонизирует (дата первична, TickCount = минуты
+  с 06:00 дня 1, TotalTime = TickCount; рассинхрон → предупреждение).
+- P2-30: WorldTime ctor валидирует компоненты → битый сейв = честный
+  отказ загрузки (throw → агрегатор → Load=false).
+- P3-11: WorldConfig без мёртвых Start*/BaseTickRate/AutoSaveIntervalTicks.
+- Сим №19: секция S (12 проверок, мини-DI с фейками; Container-урок:
+  pub/sub резолвится только через registered EventBus). Prefix FAIL
+  (12 S-DEFECT) / postfix PASS (88 OK / 0 DEFECT); логи
+  checkpoints/logs/09_22_r36a_{prefix,postfix}_audit0922.log — в git.
+- Build 0 err; QA-регрессия 19/19 PASS. WorldDomainReset 32→33 домена
+  (+SaveModule). Доки: TIME_SYSTEM §4.4, TESTING_RULES §0.1-S.
+- Чекпоинт: checkpoints/09_22_r36a_p2_backlog_phase11_time.md.
+
+NEXT: пачка 2 — P2-33…36 (Фаза 12: overflow валют/сделок, restore-валидация
+инвентаря, рюкзак 50/100 → канон 30/30). Затем P2-37…42, P2-47/48/50 →
+интеграционная контрольная фаза «Time→NPC→Cultivation→Techniques→Combat→
+Save→Time resume».

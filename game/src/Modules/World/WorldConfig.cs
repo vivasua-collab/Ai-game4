@@ -10,30 +10,20 @@ namespace CultivationGame.Modules.World
     /// Конфигурация модуля World.
     /// Параметры для TimeService, LocationService, FactionService, EventService.
     /// BD-48: class (не struct), так как содержит словари.
+    ///
+    /// R36-a (Фаза 11 / P3-11): удалены мёртвые противоречивые источники
+    /// времени — StartYear/StartMonth/StartDay/StartHour (конфликтовали с
+    /// каноном 06:00 дня 1, зашитым в GameConstants/TimeService: StartHour=12
+    /// никогда не читался), BaseTickRate (не читался), AutoSaveIntervalTicks=60
+    /// (конфликтовал с реальным SaveConfig.AutoSaveIntervalMinutes=30).
+    /// Канонические источники: GameConstants (календарь), TimeService
+    /// (старт мира 06:00 день 1), SaveConfig (каденция автосейва).
     /// </summary>
     public class WorldConfig
     {
         // === Время ===
-        /// <summary>Начальный год (Э.С.М.)</summary>
-        public int StartYear = 1864;
-
-        /// <summary>Начальный месяц (1-12)</summary>
-        public int StartMonth = 1;
-
-        /// <summary>Начальный день (1-30)</summary>
-        public int StartDay = 1;
-
-        /// <summary>Начальный час (0-23)</summary>
-        public int StartHour = 12;
-
         /// <summary>Скорость времени по умолчанию при старте модуля.</summary>
         public TimeSpeed DefaultSpeed = TimeSpeed.Normal;
-
-        /// <summary>Базовая скорость тиков в секунду при Normal</summary>
-        public float BaseTickRate = 1f;
-
-        /// <summary>Интервал автосохранения в тиках</summary>
-        public int AutoSaveIntervalTicks = 60;
 
         // === Локации ===
         /// <summary>Начальная локация</summary>

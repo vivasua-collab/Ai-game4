@@ -37,9 +37,11 @@ public partial class GameBoot : Node
 
     // Tick driving state.
     // R35 (Фаза 11 / P1-13): математика fixed-timestep catch-up извлечена в
-    // TickCatchUpClock (тестируемость — сим №19/M). _currentTick остаётся
-    // здесь: process-tick (каденция автосейва SaveModule), синхронно
-    // продвигается и при bulk-скачке.
+    // TickCatchUpClock (тестируемость — сим №19/M).
+    // R36-a (Фаза 11 / P2-26): process-tick БОЛЬШЕ НЕ источник каденции
+    // автосейва (SaveModule считает по ITimeService.TickCount — мировые
+    // тики). _currentTick — монотонный счётчик фреймов процесса, растёт
+    // синхронно и при bulk-скачке, нужен только как аргумент Tick-лупа.
     private readonly TickCatchUpClock _catchUpClock = new();
     private int _currentTick;
 

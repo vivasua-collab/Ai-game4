@@ -54,6 +54,11 @@ public sealed class TimeService : ITimeService, ISaveable, IWorldResettable
 
     public bool IsPaused => Speed == TimeSpeed.Paused;
 
+    // R36-a (Фаза 11 / P2-27): скорость ДО паузы — Resume() восстанавливает
+    // её (а не Normal): пауза из Fast больше не уничтожает быстрый темп.
+    // ResetWorld (P1-14) сбрасывает и её: канон Load/NewGame → Normal.
+    private TimeSpeed _speedBeforePause = TimeSpeed.Normal;
+
     // ITimeService — V1 stubs (real values derived from CurrentTime when needed).
     public float DeltaTime { get; private set; }
     public float TotalTime { get; private set; }
@@ -66,15 +71,22 @@ public sealed class TimeService : ITimeService, ISaveable, IWorldResettable
     public void Pause()
     {
         if (Speed == TimeSpeed.Paused) return;
+        _speedBeforePause = Speed;
         Speed = TimeSpeed.Paused;
+        // R36-a (Фаза 11 / P2-28): контракт «время стоит» — IsPaused ⇒
+        // DeltaTime == 0 (латентный договор: будущий код вне тик-лупа не
+        // сочтёт, что временной шаг прошёл).
+        DeltaTime = 0f;
         Console.WriteLine($"[TimeService] Paused at tick {TickCount}");
     }
 
     public void Resume()
     {
         if (Speed != TimeSpeed.Paused) return;
-        Speed = TimeSpeed.Normal;
-        Console.WriteLine($"[TimeService] Resumed at tick {TickCount}");
+        // R36-a (Фаза 11 / P2-27): возвращаем скорость ДО паузы — не Normal.
+        Speed = _speedBeforePause;
+        DeltaTime = 1f;
+        Console.WriteLine($"[TimeService] Resumed at tick {TickCount} (speed {Speed})");
     }
 
     /// <summary>
@@ -136,12 +148,31 @@ public sealed class TimeService : ITimeService, ISaveable, IWorldResettable
     {
         if (state is not WorldTimeSaveState data || data == null) return;
 
-        CurrentTime = new WorldTime(data.Year, data.Month, data.Day, data.Hour, data.Minute);
-        TickCount = Math.Max(0, data.TickCount);
-        TotalTime = Math.Max(0f, data.TotalTime);
+        // R36-a (Фаза 11 / P2-29/P2-30): дата — ПЕРВИЧНЫЙ источник. Три
+        // представления (WorldTime.TotalMinutes / TickCount / TotalTime)
+        // канонизируются в ОДНО: валидация компонентов — в ctor WorldTime
+        // (невалидные → throw → агрегатор помечает сейв битым → честный
+        // отказ загрузки, а не мусорная дата в мире); TickCount
+        // ПЕРЕСЧИТЫВАЕМ из даты (минуты с 06:00 дня 1) — сейвным
+        // TickCount/TotalTime НЕ доверяем (рассинхронный блок
+        // «WorldTime=1865-03-01, TickCount=500, TotalTime=200» больше
+        // не проходит как «валидный набор»).
+        var restored = new WorldTime(data.Year, data.Month, data.Day, data.Hour, data.Minute);
+        int canonicalTicks = restored.TotalMinutes - WorldEpochStart.TotalMinutes;
+        if (data.TickCount != canonicalTicks || Math.Abs(data.TotalTime - canonicalTicks) > 0.001f)
+            Console.WriteLine($"[TimeService] RestoreState: сейвный блок world_time рассинхронизирован " +
+                              $"(tick {data.TickCount}, totalTime {data.TotalTime:0.###} vs дата {restored} = {canonicalTicks}) — " +
+                              "канонизировано: дата первична, тики пересчитаны (P2-29)");
+        CurrentTime = restored;
+        TickCount = canonicalTicks;
+        TotalTime = canonicalTicks;
         DeltaTime = 1f;
         Console.WriteLine($"[TimeService] RestoreState: {CurrentTime}, tick {TickCount}");
     }
+
+    /// <summary>Канонический старт мира: 06:00 дня 1 (TotalMinutes = 360).</summary>
+    private static readonly WorldTime WorldEpochStart =
+        new(GameConstants.START_YEAR, 1, 1, 6, 0);
 
     // R17 (E-1): пересборка мира — часы на 06:00 дня 1 (канон NewGame).
     // R35 (Фаза 11 / P1-14) ФИКС: сброс и СКОРОСТИ. Прежде ResetWorld
@@ -158,6 +189,7 @@ public sealed class TimeService : ITimeService, ISaveable, IWorldResettable
         TickCount = 0;
         TotalTime = 0f;
         Speed = TimeSpeed.Normal;
+        _speedBeforePause = TimeSpeed.Normal;
     }
 
     /// <summary>
