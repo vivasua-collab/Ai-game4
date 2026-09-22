@@ -6,6 +6,7 @@
 // Обрабатывает перемещение на основе AIState.
 // BD-42: Использует ITimeService.DeltaTime вместо UnityEngine.Time.deltaTime.
 using System;
+using System.Collections.Generic;
 using Vector2 = CultivationGame.Core.Data.Position2D;
 using CultivationGame.Core;
 using CultivationGame.Core.Messaging.Contracts;
@@ -126,14 +127,20 @@ namespace CultivationGame.Modules.NPC
         /// Обработать движение всех NPC за один кадр.
         /// Вызывается из NPCModule.Tick().
         /// BD-42: Использует ITimeService.DeltaTime.
+        /// P1-3 (аудит 09.22): zero-GC — персистентный буфер снапшота
+        /// (CopyStatesTo) вместо аллоцирующего GetAllStates().
         /// </summary>
+        private readonly List<NPCState> _moveStates = new();
+
         public void ProcessMovement()
         {
             // BD-42: deltaTime через ITimeService
             float deltaTime = _timeService.DeltaTime;
 
-            foreach (var state in _npcService.GetAllStates())
+            _npcService.CopyStatesTo(_moveStates);
+            for (int i = 0; i < _moveStates.Count; i++)
             {
+                var state = _moveStates[i];
                 if (!state.IsAlive) continue;
 
                 ProcessNPCMovement(state, deltaTime);

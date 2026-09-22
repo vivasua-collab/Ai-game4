@@ -31,8 +31,14 @@ namespace CultivationGame.Modules.NPC
 {
     /// <summary>
     /// Реализация ICorpseService (R13 FULL-LOOT).
+    /// P1-4 (аудит 09.22): world-scoped — реализует IWorldResettable.
+    /// ResetWorld() существовал с R13, но контракт не был реализован, и
+    /// сброс работал только транзитивно (NPCModule.ResetWorld → явный
+    /// вызов) — теперь единый явный контракт, ResolveAll видит сервис
+    /// напрямую (обе точки: WorldDomainResetPhase NewGame + GameSession.
+    /// LoadGame).
     /// </summary>
-    public class CorpseService : ICorpseService, ISaveable, IDisposable
+    public class CorpseService : ICorpseService, ISaveable, IDisposable, IWorldResettable
     {
         // === Зависимости ===
         private readonly NPCService _npcService;

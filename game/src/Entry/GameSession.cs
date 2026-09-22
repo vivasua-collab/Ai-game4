@@ -31,6 +31,9 @@ public sealed class GameSession : IGameSession
     [Inject] private readonly ISaveService _save = null!;
     [Inject] private readonly IPublisher<GamePausedEvent> _pausedPub = null!;
     [Inject] private readonly IPublisher<GameResumedEvent> _resumedPub = null!;
+    // P1-2 (аудит 09.22): честный результат SaveAndQuit — сбой сейва виден
+    // игроку (тост), а не тонет в логе.
+    [Inject] private readonly IPublisher<Core.Messaging.Contracts.ToastShownEvent> _toastPub = null!;
     // R17 (аудит-0911 E-1): сброс ВСЕХ world-scoped доменов при тёплой
     // загрузке (до RestoreState) — контракт IWorldResettable.
     [Inject] private readonly IResolver _resolver = null!;
@@ -240,13 +243,30 @@ public sealed class GameSession : IGameSession
 
         SetState(SessionState.Saving);
         Console.WriteLine("[GameSession] SaveAndQuit — saving...");
+        bool saved;
         try
         {
-            _save.Save(new SaveSlot(Data.Id, SaveSlotType.Manual));
+            // P1-2 (аудит 09.22): результат bool читается. Прежде — игнорировался:
+            // при отказе любого CaptureState (транзакционность агрегатора — файл
+            // НЕ пишется) или I/O-сбое сессия всё равно завершалась с логом
+            // «Quitting (saved)» — data-loss UX: игрок уверен, что прогресс
+            // сохранён. Теперь: сбой → остаёмся в игре (Playing), тост с
+            // причиной (LastError), решение за игроком (retry / quit без сейва).
+            saved = _save.Save(new SaveSlot(Data.Id, SaveSlotType.Manual));
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[GameSession] Save failed (proceeding to quit): {ex.GetType().Name}: {ex.Message}");
+            Console.WriteLine($"[GameSession] Save failed: {ex.GetType().Name}: {ex.Message}");
+            saved = false;
+        }
+
+        if (!saved)
+        {
+            Console.WriteLine($"[GameSession] Save FAILED — сессия продолжается (LastError: {_save.LastError})");
+            _toastPub?.Publish(new Core.Messaging.Contracts.ToastShownEvent(
+                $"Не удалось сохранить: {_save.LastError ?? "ошибка записи"}", 5f));
+            SetState(SessionState.Playing);
+            return;
         }
 
         SetState(SessionState.Quitting);

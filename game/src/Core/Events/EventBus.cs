@@ -39,6 +39,19 @@ public interface ISubscriber<T> where T : struct
 /// during its invocation, the re-entrant message is queued and processed after
 /// the current publish completes. This prevents StackOverflowException from
 /// cascading events (Q13: Queue re-entrant events).
+///
+/// Exception isolation (аудит 09.22, P1-5): исключение одного подписчика НЕ
+/// прерывает fan-out (последующие подписчики получают событие) и НЕ покидает
+/// <see cref="Publish{T}"/> — иначе один неисправный хендлер роняет уже и
+/// вызывающий код, а re-entrant очередь протухает ([ThreadStatic] живёт до
+/// следующего Publish) и способна исполниться позже, в чужом логическом
+/// контексте.
+///
+/// Аллокации (честный контракт, аудит 09.22 P2-9): стабильный publish-path
+/// (подписки не меняются, re-entrancy нет) — allocation-free; копия snapshot
+/// списка хендлеров аллоцируется ТОЛЬКО при первой публикации после мутации
+/// подписок (copy-on-read); re-entrant события создают closure на постановку
+/// и копию очереди на дрен — редкий путь, приемлемая цена.
 /// </summary>
 public sealed class EventBus : IDisposable
 {
@@ -57,8 +70,9 @@ public sealed class EventBus : IDisposable
 
     /// <summary>
     /// Publish a message to all subscribers of type <typeparamref name="T"/>.
-    /// Allocations: zero (no boxing, no closure capture if handler is static).
-    /// Re-entrant publishes are queued and processed after current publish completes.
+    /// Re-entrant publishes are queued and processed after current publish
+    /// completes. Исключения подписчиков изолируются (лог + продолжение
+    /// fan-out) — наружу не выходят.
     /// </summary>
     public void Publish<T>(in T message) where T : struct
     {
@@ -84,21 +98,34 @@ public sealed class EventBus : IDisposable
         finally
         {
             _publishing.Remove(typeof(T));
-        }
 
-        // If this was the outermost publish, process any queued re-entrant messages
-        if (_publishing.Count == 0 && _pendingQueue.Count > 0)
-        {
-            var queue = new List<Action>(_pendingQueue);
-            _pendingQueue.Clear();
-            foreach (var action in queue)
+            // P1-5 (аудит 09.22): дрен — в finally, на внешнем уровне.
+            // Прежний дрен ПОСЛЕ try/finally был недостижим при исключении в
+            // хендлере: очередь [ThreadStatic] протухала до следующего
+            // Publish на потоке — отложенное событие исполнялось в чужом
+            // контексте (runtime-подтверждено: стэл-дрен рушил посторонний
+            // Publish). Каждый queued-вызов тоже изолирован (InvokeHandlers
+            // ловит исключения per-handler).
+            if (_publishing.Count == 0 && _pendingQueue.Count > 0)
             {
-                action();
+                var queue = new List<Action>(_pendingQueue);
+                _pendingQueue.Clear();
+                for (int i = 0; i < queue.Count; i++)
+                {
+                    try { queue[i](); }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[EventBus] Queued re-entrant handler threw: {ex.GetType().Name}: {ex.Message}");
+                    }
+                }
             }
         }
     }
 
-    /// <summary>Invoke handlers for type T (internal, used by Publish and queue).</summary>
+    /// <summary>Invoke handlers for type T (internal, used by Publish and queue).
+    /// P1-5 (аудит 09.22): пер-хендлерная изоляция — исключение подписчика
+    /// логируется и НЕ прерывает доставку остальным и НЕ покидает шину;
+    /// вызывающий код (publisher) не должен падать от неисправного слушателя.</summary>
     private void InvokeHandlers<T>(in T message) where T : struct
     {
         List<MessageHandler<T>>? handlers;
@@ -111,7 +138,11 @@ public sealed class EventBus : IDisposable
         // Invoke outside the lock to avoid reentrancy deadlock.
         for (int i = 0; i < handlers.Count; i++)
         {
-            handlers[i](in message);
+            try { handlers[i](in message); }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[EventBus] Handler for {typeof(T).Name} threw: {ex.GetType().Name}: {ex.Message}");
+            }
         }
     }
 

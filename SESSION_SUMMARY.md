@@ -1,6 +1,6 @@
 # Сводка сессий (обновляется при завершении каждой сессии)
 
-Обновлено: 2026-09-21 19:20 UTC (main Z.ai Code, сессия R31; main = b5512bc)
+Обновлено: 2026-09-22 (main Z.ai Code, сессия R32; main = R32-коммит)
 
 ## Проект
 Cultivation World Simulator (Ai-game4), Godot 4.7.2 .NET, C#
@@ -9,6 +9,32 @@ Cultivation World Simulator (Ai-game4), Godot 4.7.2 .NET, C#
 ---
 
 ## Последние сессии (5 дней)
+
+### 2026-09-22 R32 (внешний аудит 09_22_07_30 — P1-фиксы)
+- **Верификация аудита** (5 фаз; Фаза 4 в файле ОТСУТСТВУЕТ — P1-6
+  восстановлен анализом, зафиксировано в чекпоинте): все P1 проверены по
+  коду + **runtime-верификация по запросу аудитора** (P1-5/P1-8) через
+  новый QA-сим `Audit0922SimDebug` (GODOT_AUDIT0922_DEBUG, 16 проверок,
+  префикс-прогон = FAIL с DEFECT-строками = runtime-подтверждение).
+- **P1-5 EventBus ПОДТВЕРЖДЁН runtime** (исключение подписчика покидало
+  Publish, прерывало fan-out, стэл re-entrant очередь роняла ЧУЖОЙ
+  Publish) → фикс: пер-хендлерная изоляция + дрен в finally.
+- **P1-8 traversal ПОДТВЕРЖДЁН** для Modules-layer SaveFileHandler
+  (Adapter уже санировал — уточнение аудитору) → санация паритетом.
+- **P1-6 DI override ПОДТВЕРЖДЁН** → фикс в 2 итерации: наивный prune ломал
+  мульти-форвард-паттерн (Combat→TechniqueService, Corpse→NPCService,
+  поймано регрессией 3 симов) → финал: pruning ТОЛЬКО при
+  RegisterInstance-оверрайде; ключи Register<> независимы (стражи C3-C5).
+- P1-1 TradeService : IWorldResettable (утечка стока+висячая сессия;
+  NPC-ID=GUID — «npc_0» аудитора невозможен); P1-4 CorpseService :
+  IWorldResettable (сброс работал транзитивно через NPCModule —
+  функционально ОПРОВЕРГНУТ, закрыт контрактно; явный вызов удалён);
+  P1-2 SaveAndQuit честный bool (сбой→тост+Playing); P1-7 DeleteSave
+  честный bool (+P2-15 семантика); P1-3 NPC zero-GC (CopyStatesTo+
+  персистентные буферы, вложенный обход — свой буфер).
+- **P2 → бэклог 10 пунктов** (чекпоинт §4, указание аудитора не смешивать).
+- Ответы аудитору + логи префикс/постфикс: `checkpoints/09_22_r32_external_
+  audit.md`; QA: сим №19 AUDIT0922, **регрессия 19/19 PASS**, build 0 err.
 
 ### 2026-09-21 R31 (внешний аудит 20:30, Фазы 3–4 + план аудита доков)
 - **Верификация `upload/audit_09_21_20_30.txt`** (фазы писались по
@@ -98,19 +124,25 @@ Cultivation World Simulator (Ai-game4), Godot 4.7.2 .NET, C#
   хоуминг-снаряды (центр тайла, seek только к живым R31), Tab-таргетинг,
   LOS для NPC∪звери (R31), clash, месть нейтралов; VFX-слой R29;
   K-окно с паузой + тумблер; F3-FPS
-- **Lifecycle:** IWorldResettable 28+ сервисов (R31 закрыл хвост Ф4);
-  NewGame/LoadGame чистые (QA REASSEMBLY)
-- 18 QA-симов PASS (~3 мин полный прогон)
+- **Lifecycle:** IWorldResettable 30+ сервисов (R32: +Trade, Corpse
+  контрактно); NewGame/LoadGame чистые (QA REASSEMBLY)
+- **Инфраструктура (R32):** EventBus exception-изоляция + честный
+  re-entrancy-дрен; честные Save/DeleteSave bool; санация имён слотов;
+  DI override prune (RegisterInstance-only); NPC hot path zero-GC
+- 19 QA-симов PASS (~3.5 мин полный прогон; +AUDIT0922 R32)
 
 ### Что НЕ работает / очередь
+- ❌ **P2-бэклог аудита 09.22** (чекпоинт 09_22_r32 §4, 10 пунктов:
+  RestoreState→bool, legacy AttitudeScore, ConfigureAwait-гард,
+  Trade-декомпозиция, Corpse FNV-сид, Initialize-идемпотентность,
+  GetAllSaves-мета, сейв-версии, Load-after-Reset)
 - ❌ **План аудита доков R31 — ОБРАБОТАТЬ** (checkpoints/plans/
-  2026-09-21_r31_doc_audit_plan.md: 5 проходов, обновления НЕ применены)
+  2026-09-21_r31_doc_audit_plan.md: 5 проходов, обновления НЕ применены;
+  +новые дрейф-пункты от R32-фиксов — в следующий проход плана)
 - ❌ R30+ отложено пользователем: мультибой-B, живые зоны AoE-B,
   SpareAllies-ауры (ждут party-систему)
-- ❌ Архитектурный долг: ISaveable.RestoreState→void (integrity gap,
-  28+ файлов — решение за пользователем); legacy AttitudeScore в
-  NPCSaveEntry; золотой кошелёк/проводка экономики (стабы готовы)
-- ❌ R20-№5 книга техник UI; трупы животных в сейве? (проверить);
+- ❌ Архитектурный долг: legacy AttitudeScore в NPCSaveEntry; золотой
+  кошелёк/проводка экономики (стабы готовы); R20-№5 книга техник UI;
   NPC-урон тюнинг
 
 ---
@@ -127,13 +159,11 @@ Cultivation World Simulator (Ai-game4), Godot 4.7.2 .NET, C#
 ---
 
 ## Следующие шаги
-1. Обработка плана аудита доков (Pass 1 → 5, эпизоды D1–D5 ≤45 мин,
-   каждый — коммит; grep-критерии приёмки в плане §4)
-2. Ответы на 3 открытых вопроса плана §6 (RestoreState-void, legacy
-   AttitudeScore, судьба экономики как модуля)
-3. R30+ (после снятия моратория): мультибой-B / AoE-B зоны / ауры
-4. Локальный плейтест пользователя (пустоцельный AoE, стрелы по
-   зверям, NewGame после боя)
+1. Ответ аудитора на чекпоинт 09_22_r32 (его следующая фаза — матрица
+   state→reset→save→restore→dispose→tick по всем 17 модулям)
+2. P2-бэклог аудита 09.22 — приоритизация пользователем
+3. Обработка плана аудита доков (Pass 1 → 5; + дрейф-пункты R32)
+4. R30+ (после снятия моратория): мультибой-B / AoE-B зоны / ауры
 
 ---
 
@@ -141,9 +171,9 @@ Cultivation World Simulator (Ai-game4), Godot 4.7.2 .NET, C#
 - Субагенты — ТОЛЬКО последовательно, ≤1 одновременно (START_PROMPT
   §14.2); экономить токены — flash/haiku где возможно
 - Эпизод ≤45 мин → коммит+пуш+чекпоинт; метка NEXT: в worklog
-- QA: `bash tools/qa_regression.sh` (18 симов ~3 мин); единичные —
+- QA: `bash tools/qa_regression.sh` (19 симов ~3.5 мин); единичные —
   GODOT_NEWGAME=1 GODOT_XXX=1 …/godot_bin… --headless; вердикт grep
   'VERDICT'; тяжёлые прогоны — в конце эпизода
 - Среда сбрасывается (dotnet/godot dentry-ghost): `bash cold_start.sh`
 - Токен: /home/z/my-project/.auth/github.token (не запрашивать, если есть)
-- Push работает (b5512bc на GitHub)
+- Push работает (R31 на GitHub до R32)

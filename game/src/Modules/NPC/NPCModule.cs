@@ -110,6 +110,8 @@ public class NPCModule : IModule, IWorldResettable
     /// кулдауном. CombatModule выполняет полный damage pipeline.
     /// </summary>
     private readonly Dictionary<string, float> _npcAttackTimers = new(); // R21-2: не используется (readiness) — оставлен для сейв-стабильности поля
+    // P1-3: буфер снапшота состояний для attack-loop (каждый игровой тик).
+    private readonly List<NPCState> _attackStates = new();
 
     /// <summary>
     /// R13-аудит (P2-4) + R14-аудит (P2-1): сброс NPC-домена при пересборке
@@ -117,13 +119,14 @@ public class NPCModule : IModule, IWorldResettable
     /// WorldDomainResetPhase (фаза 0, NewGame — до спавн-фаз 6/7/8) и
     /// GameSession.LoadGame (до RestoreState из сейва — фазы идут ПОСЛЕ
     /// восстановления). Чистит: реестр NPC + per-entity провайдеры + баффы +
-    /// якоря блуждания + отношения (полный путь DespawnNPC), трупы (с
-    /// CorpseRemovedEvent на каждый), группы.
+    /// якоря блуждания + отношения (полный путь DespawnNPC), группы.
+    /// Трупы: P1-4 (аудит 09.22) — CorpseService теперь сам IWorldResettable
+    /// (ResolveAll сбрасывает его напрямую), явный вызов здесь УДАЛЁН —
+    /// один владелец контракта, двойной сброс не нужен.
     /// </summary>
     public void ResetWorld()
     {
         _spawnerService.ResetWorld();
-        _corpseService?.ResetWorld();
         _groupService?.ResetWorld();
     }
 
@@ -158,8 +161,12 @@ public class NPCModule : IModule, IWorldResettable
         if (_npcServiceImpl == null || _attackIntentPub == null) return;
         float now = _timeService?.TotalTime ?? 0f;
 
-        foreach (var state in _npcServiceImpl.GetAllStates())
+        // P1-3 (аудит 09.22): zero-GC hot path — персистентный буфер
+        // снапшота вместо аллоцирующего GetAllStates() на каждом тике.
+        _npcServiceImpl.CopyStatesTo(_attackStates);
+        for (int i = 0; i < _attackStates.Count; i++)
         {
+            var state = _attackStates[i];
             if (!state.IsAlive || state.AIState != NPCAIState.Attacking) continue;
             if (string.IsNullOrEmpty(state.TargetId)) continue;
 

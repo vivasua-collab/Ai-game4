@@ -668,6 +668,16 @@ public partial class GameWorldController : Node2D
             var chargeSim = new ChargeSimDebug { Name = "ChargeSimDebug" };
             AddChild(chargeSim);
         }
+        // Аудит 09.22 (внешний, upload/audit_09_22_07_30.txt): инфраструктурные
+        // контракты — EventBus exception/re-entrancy (P1-5), санация имён слотов
+        // (P1-8), DI override prune (P1-6), честный DeleteSave (P1-7),
+        // Trade/Corpse IWorldResettable (P1-1/P1-4). До фиксов прогон = FAIL
+        // (runtime-подтверждение аудита), после — регрессионный страж.
+        if (System.Environment.GetEnvironmentVariable("GODOT_AUDIT0922_DEBUG") == "1")
+        {
+            var auditSim = new Audit0922SimDebug { Name = "Audit0922SimDebug" };
+            AddChild(auditSim);
+        }
         // R30-эпизод 2 (репорт 21.09): формации П1/П2/П3/П7 — радиус зарядки
         // (headless-вердикт GODOT_FORM_DEBUG=1) + скриншоты GODOT_FORM_SHOT.
         if (System.Environment.GetEnvironmentVariable("GODOT_FORM_DEBUG") == "1"

@@ -26,8 +26,12 @@ namespace CultivationGame.Modules.Trade
     /// в рамках сессии: генерируется при первом OpenTrade(npcId) из
     /// детерминированного сида (FNV-1a от npcId), выкупленное не
     /// восстанавливается (ресток — будущая фаза, см. MerchantStockEntry).
+    /// P1-1 (аудит 09.22): world-scoped — реализует IWorldResettable:
+    /// сток и активная сессия принадлежат миру, NewGame/LoadGame не наследуют
+    /// лавки прошлых миров (иначе _stockByMerchant течёт между сессиями, а
+    /// _activeMerchantId повисает на умершем торговце).
     /// </summary>
-    public sealed class TradeService : ITradeService
+    public sealed class TradeService : ITradeService, IWorldResettable
     {
         // === Зависимости ===
         [Inject] private readonly IInventoryService _inventory = null!;
@@ -98,6 +102,28 @@ namespace CultivationGame.Modules.Trade
 
             _activeMerchantId = null;
             _closedPub.Publish(new TradeClosedEvent());
+        }
+
+        // === IWorldResettable (P1-1, аудит 09.22) ============================
+
+        /// <summary>
+        /// Пересборка мира (NewGame/LoadGame — WorldDomainResetPhase и
+        /// GameSession.LoadGame через ResolveAll&lt;IWorldResettable&gt;):
+        /// торговая сессия и стоки принадлежат миру. Активная лавка (если
+        /// висела открытой) закрывается честно — TradeClosedEvent снимает
+        /// паузу тиков/окно UI (подписчики идемпотентны; тики в меню и так
+        /// гейтнуты E-4 по состоянию сессии). Сток прошлых миров не
+        /// наследуется: NPC-ID — GUID, коллизий нет, но словарь рос бы
+        /// неограниченно, а ресток/персистентность стока — будущая фаза
+        /// (обещание «Ассортимент персистентен в рамках сессии» сохранено
+        /// — теперь «сессия» = «мир», а не «процесс»).
+        /// </summary>
+        public void ResetWorld()
+        {
+            int staleStocks = _stockByMerchant.Count;
+            if (IsTrading) CloseTrade();
+            _stockByMerchant.Clear();
+            Console.WriteLine($"[Trade] ResetWorld — сессия закрыта, сток очищен ({staleStocks} лавок)");
         }
 
         // === Ассортимент ===

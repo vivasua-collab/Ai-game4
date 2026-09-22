@@ -84,11 +84,18 @@ public sealed class SaveService : ISaveService, ISaveable
 
     public bool HasSave(SaveSlot slot) => _aggregator.HasSave(slot.Name);
 
+    /// <summary>
+    /// Удалить слот. P1-7 (аудит 09.22): честный bool по всей цепочке
+    /// (FileHandler → Aggregator → сюда). Семантика «операция выполнена»
+    /// (P2-15): true — файл существовал и удалён; false — файла не было
+    /// или I/O-отказ. Прежний вариант безусловно возвращал true — UI
+    /// получал ложный успех при отсутствующем файле.
+    /// </summary>
     public bool DeleteSave(SaveSlot slot)
     {
-        _aggregator.DeleteSave(slot.Name);
-        Console.WriteLine($"[SaveService] DeleteSave('{slot}')");
-        return true;
+        bool ok = _aggregator.DeleteSave(slot.Name);
+        Console.WriteLine($"[SaveService] DeleteSave('{slot}') → {(ok ? "OK" : "FAILED (missing or I/O)")}");
+        return ok;
     }
 
     public IReadOnlyList<SaveInfo> GetAllSaves()

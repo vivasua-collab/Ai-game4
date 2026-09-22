@@ -37,8 +37,28 @@ public sealed class SaveFileHandler : ISaveFileHandler
         return raw;
     }
 
+    /// <summary>
+    /// Санация имени слота (P1-8, аудит 09.22): имя слота не должно
+    /// определять произвольный filesystem-путь — '../x' выталкивал запись
+    /// ЗА пределы каталога сейвов (runtime-подтверждено: файл создан в
+    /// родителе). Правила — ПАРИТЕТ с Adapter.Persistence.SaveFileHandler
+    /// .SanitizeSlotName: только буквы/цифры/дефис/подчёркивание, остальное
+    /// вырезается; пустой результат → "unnamed". Разделителей путей в
+    /// whitelist нет — traversal невозможен по построению.
+    /// </summary>
+    private static string SanitizeSlotName(string slotName)
+    {
+        var sb = new System.Text.StringBuilder(slotName.Length);
+        foreach (char c in slotName)
+        {
+            if (char.IsLetterOrDigit(c) || c == '-' || c == '_') sb.Append(c);
+        }
+        var clean = sb.ToString();
+        return string.IsNullOrEmpty(clean) ? "unnamed" : clean;
+    }
+
     private string SlotPath(string slotName) =>
-        Path.Combine(ResolveDir(), slotName + ".json");
+        Path.Combine(ResolveDir(), SanitizeSlotName(slotName) + ".json");
 
     public bool Save(string slotName, Dictionary<string, object> data)
     {

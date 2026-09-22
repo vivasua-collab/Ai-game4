@@ -14,7 +14,7 @@
 печатают вердикт `VERDICT: PASS/FAIL` (строка ищется в логе). Регрессия = полный
 прогон всех хуков + `dotnet build` с 0 errors.
 
-### 0.1. Реестр env-хуков (36)
+### 0.1. Реестр env-хуков (37)
 
 | Хук | Сцена/файл | Что проверяет |
 |---|---|---|
@@ -59,6 +59,7 @@
 | `GODOT_VFX_SHOT=<префикс>` | CombatSimDebug 3k | R29: VFX-кадры боевых эффектов — Xvfb + `--rendering-driver opengl3` (НЕ headless): `_aoe.png` (конус/форма + маркеры целей), `_homing.png` (болт в полёте, 0.25с после пуска), `_hold.png` (аура удержания) + VLM-разбор. Паттерн GODOT_SCREENSHOT_MENU |
 | `GODOT_CONTEXT_MENU_ITEM=<itemId>` | ContextMenuSimDebug | R19: предмет для скриншота ПКМ-меню (default material_stone; напр. con_pill_healing — снимок с кнопкой «Использовать») |
 | `GODOT_SCREENSHOT_SPLIT=<путь>` | ContextMenuSimDebug | Скриншот слайдера разделения стака |
+| `GODOT_AUDIT0922_DEBUG=1` | Audit0922SimDebug | Аудит 09.22 (внешний): инфраструктурные контракты — A) EventBus изоляция исключений + re-entrancy-дрен (P1-5: фан-аут не прерывается, стэл-очередь не протухает), B) санация имён слотов в Modules-layer SaveFileHandler (P1-8 path traversal), C) DI override prune: stale concrete-ключ + стражи мульти-форварда/last-wins/наследования ключа (P1-6), D) честный DeleteSave по слоям (P1-7), E) Trade/Corpse : IWorldResettable (P1-1/P1-4). Прогон до фиксов = runtime-подтверждение дефектов (чекпоинт 09_22_r32), после — регрессионный страж; сим №19 в qa_regression.sh |
 
 ### 0.2. Прогон регрессии — `tools/qa_regression.sh` (2026-09-15)
 

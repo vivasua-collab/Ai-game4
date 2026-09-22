@@ -258,20 +258,38 @@ namespace CultivationGame.Modules.NPC
         }
 
         /// <summary>
-        /// Получить все зарегистрированные NPCState (для AI-тика).
-        /// NPC-A2 FIX (аудит-4): возвращает СНАПШОТ (копию ссылок), а не живую
-        /// ValueCollection словаря. Пять мест итерируют коллекцию с публикацией
-        /// событий внутри (AI-тик NPCAIService, attack-loop и OnYearChanged →
-        /// NPCDeathEvent в NPCModule, movement-тик): при появлении RemoveNPC/
-        /// деспавна подписчики мутировали бы словарь во время итерации →
-        /// InvalidOperationException. Прецедент: threat-decay уже использует
-        /// снапшот-буфер (NPC-A07). Копируются ССЫЛКИ — мутации полей NPCState
-        /// (Age, HP, AIState) видны сразу; свежезаспавненные NPC попадут в
-        /// тик со следующего кадра.
+        /// Получить все зарегистрированные NPCState — СНАПШОТ (копию ссылок), а
+        /// не живую ValueCollection словаря. АЛЛОЦИРУЕТ (новый List на вызов) —
+        /// только холодные/отладочные пути (сборка, OnYearChanged, QA-симы).
+        /// NPC-A2 FIX (аудит-4): при появлении RemoveNPC/деспавна подписчики
+        /// мутировали бы словарь во время итерации → InvalidOperationException.
+        /// Копируются ССЫЛКИ — мутации полей NPCState (Age, HP, AIState) видны
+        /// сразу; свежезаспавненные NPC попадут в тик со следующего кадра.
+        /// Hot-path вызовы (AI-тик, движение, атаки) используют
+        /// <see cref="CopyStatesTo"/> с персистентным буфером вызывающего.
         /// </summary>
         internal List<NPCState> GetAllStates()
         {
             return new List<NPCState>(_npcStates.Values);
+        }
+
+        /// <summary>
+        /// Копировать ссылки состояний в буфер ВЫЗЫВАЮЩЕГО — zero-GC hot path
+        /// (P1-3, аудит 09.22: прежний «снапшот» аллоцировал новый List на
+        /// КАЖДЫЙ вызов — NPCAIService.Tick + вложенный обход защиты игрока =
+        /// O(N) аллокаций на тик, O(N²) при N защищающихся; «zero GC per
+        /// frame» контракт нарушался прямо в NPC hot path). Snapshot-семантика
+        /// NPC-A07 сохранена (Clear+Fill ссылками: spawn/despawn во время
+        /// итерации безопасен). Вложенные обходы в одном кадре — каждый со
+        /// СВОИМ буфером (AI-тик: Tick-буфер + Defense-буфер; EnsureCapacity
+        /// разогревается после первого кадра — ёмкость закрепляется).
+        /// </summary>
+        internal void CopyStatesTo(List<NPCState> buffer)
+        {
+            buffer.Clear();
+            buffer.EnsureCapacity(_npcStates.Count);
+            foreach (var kv in _npcStates)
+                buffer.Add(kv.Value);
         }
 
         // === Обработчики событий ===

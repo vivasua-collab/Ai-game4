@@ -40,7 +40,7 @@ public sealed class ContainerBuilder : IContainerBuilder
         where TImplementation : TInterface
     {
         var reg = new Registration(typeof(TInterface), typeof(TImplementation), lifetime, null);
-        _registrations[typeof(TInterface)] = reg;
+        SetRegistration(typeof(TInterface), reg, pruneStaleForwarding: false);
         // Forwarding: also register the concrete implementation type so that
         // constructor injection requesting TImplementation (rather than
         // TInterface) resolves to the SAME singleton. Both keys share the
@@ -48,7 +48,7 @@ public sealed class ContainerBuilder : IContainerBuilder
         // instance is ever constructed.
         if (typeof(TInterface) != typeof(TImplementation))
         {
-            _registrations[typeof(TImplementation)] = reg;
+            SetRegistration(typeof(TImplementation), reg, pruneStaleForwarding: false);
         }
         _orderedRegistrations.Add(reg);
     }
@@ -57,7 +57,7 @@ public sealed class ContainerBuilder : IContainerBuilder
         where TImplementation : class
     {
         var reg = new Registration(typeof(TImplementation), typeof(TImplementation), lifetime, null);
-        _registrations[typeof(TImplementation)] = reg;
+        SetRegistration(typeof(TImplementation), reg, pruneStaleForwarding: false);
         _orderedRegistrations.Add(reg);
     }
 
@@ -65,8 +65,46 @@ public sealed class ContainerBuilder : IContainerBuilder
     {
         if (instance is null) throw new ArgumentNullException(nameof(instance));
         var reg = new Registration(typeof(T), instance.GetType(), Lifetime.Singleton, instance);
-        _registrations[typeof(T)] = reg;
+        SetRegistration(typeof(T), reg, pruneStaleForwarding: true);
         _orderedRegistrations.Add(reg);
+    }
+
+    /// <summary>
+    /// Заменить регистрацию по ключу <paramref name="key"/>.
+    /// <para>
+    /// P1-6 (аудит 09.22): pruning хвостов — ТОЛЬКО для инстанс-оверрайда
+    /// (<see cref="RegisterInstance{T}"/> = адаптер подменяет single-provider
+    /// сервис): если прежняя регистрация теряет по этому ключу свой ПЕРВИЧНЫЙ
+    /// сервисный тип, её оставшиеся forwarding-ключи (concrete-тип) удаляются —
+    /// иначе Adapter-override <c>RegisterInstance&lt;ISaveFileHandler&gt;(godotHandler)</c>
+    /// поверх <c>Register&lt;ISaveFileHandler, Modules.SaveFileHandler&gt;</c> оставлял
+    /// живой ключ Modules.SaveFileHandler, резолвившийся в мёртвый
+    /// fallback-инстанс (и конструируемый впустую каждым ResolveAll-обходом).
+    /// </para>
+    /// <para>
+    /// Обычные <c>Register&lt;&gt;</c>-перезаписи ключей НЕ прунят (ключи НЕЗАВИСИМЫ
+    /// — префикс-семантика): мульти-интерфейсный паттерн (Register&lt;INPCService,X&gt;
+    /// + Register&lt;ISaveable,X&gt;, затем Player-модуль перерегистрирует ISaveable)
+    /// держится именно на выживании forwarding-ключей — по ним резолвятся
+    /// concrete-параметры конструкторов (CorpseService→NPCService,
+    /// CombatService→TechniqueService) и собирается ResolveAll&lt;ISaveable&gt;.
+    /// Инстанс-оверрайд маркер-мульти-провайдерского ключа (напр. ISaveable)
+    /// запрещён по построению — семантику «все провайдеры» он бы вычистил.
+    /// </para>
+    /// </summary>
+    private void SetRegistration(Type key, Registration reg, bool pruneStaleForwarding)
+    {
+        if (pruneStaleForwarding
+            && _registrations.TryGetValue(key, out var old)
+            && !ReferenceEquals(old, reg)
+            && old.ServiceType == key)
+        {
+            var doomed = new List<Type>();
+            foreach (var kv in _registrations)
+                if (ReferenceEquals(kv.Value, old) && kv.Key != key) doomed.Add(kv.Key);
+            foreach (var t in doomed) _registrations.Remove(t);
+        }
+        _registrations[key] = reg;
     }
 
     public Container Build() => new Container(_registrations, _orderedRegistrations);

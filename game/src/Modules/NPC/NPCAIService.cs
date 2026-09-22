@@ -114,6 +114,13 @@ namespace CultivationGame.Modules.NPC
             _combatStartedSubscription = _combatStartedSub.Subscribe(OnCombatStartedForRetaliation);
         }
 
+        // P1-3 (аудит 09.22): zero-GC hot path — персистентные буферы снапшота
+        // состояний. Tick-буфер — внешний обход; _defenseStates — ВЛОЖЕННЫЙ
+        // обход ProcessDisposition (Friendly-защита игрока) в том же кадре:
+        // общий буфер давал бы итерацию по списку, который сам же перезаполняется.
+        private readonly List<NPCState> _tickStates = new();
+        private readonly List<NPCState> _defenseStates = new();
+
         /// <summary>
         /// Тик AI — обработать всех живых NPC.
         /// Вызывается из NPCModule.Tick().
@@ -124,8 +131,10 @@ namespace CultivationGame.Modules.NPC
             // BD-42: deltaTime через ITimeService
             float deltaTime = _timeService.DeltaTime;
 
-            foreach (var state in _npcService.GetAllStates())
+            _npcService.CopyStatesTo(_tickStates);
+            for (int i = 0; i < _tickStates.Count; i++)
             {
+                var state = _tickStates[i];
                 if (!state.IsAlive) continue;
 
                 // Обновляем таймер состояния
@@ -177,8 +186,12 @@ namespace CultivationGame.Modules.NPC
                     float distToPlayer = Vector2.Distance(state.Position, _playerPosition);
                     if (distToPlayer > _config.AggroRadius * 2f) break;
 
-                    foreach (var other in _npcService.GetAllStates())
+                    // P1-3: вложенный обход — СВОЙ буфер (внешний _tickStates
+                    // в это же время итерируется в Tick()).
+                    _npcService.CopyStatesTo(_defenseStates);
+                    for (int i = 0; i < _defenseStates.Count; i++)
                     {
+                        var other = _defenseStates[i];
                         if (other.NpcId == state.NpcId || !other.IsAlive) continue;
                         if (other.Disposition != NPCDisposition.Hostile) continue;
                         if (other.TargetId != PlayerId && other.TargetId != "player") continue;
