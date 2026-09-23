@@ -271,6 +271,12 @@ public partial class GameWorldController : Node2D
     public UI.HotkeysWindow? HotkeysWindowForQA => _hotkeysWindow;
     public UI.TechniqueBookWindow? TechniqueBookWindowForQA => _techniqueBook;
 
+#if DEBUG
+    // R37 (баг-репорт 23.09 №1): чит-панель — геометрический дифф и скрины
+    // (GODOT_CHEATEQUIP_DEBUG / GODOT_CHEAT_SHOT).
+    public UI.CheatPanel? CheatPanelForQA => _cheatPanel;
+#endif
+
     // R37-c: окно зарядника для headless-симов (GODOT_CHARGERQA_DEBUG).
     public UI.ChargerWindow? ChargerWindowForQA => _chargerWindow;
 
@@ -614,6 +620,18 @@ public partial class GameWorldController : Node2D
             var modalStackSim = new ModalStackSimDebug { Name = "ModalStackSimDebug" };
             AddChild(modalStackSim);
         }
+#if DEBUG
+        // R37 (баг-репорт 23.09): чит-панель + экипировка сапогов —
+        // (GODOT_CHEATEQUIP_DEBUG=1) headless-вердикт: A back-end гейты
+        // экипировки (Feet L1/L5 vs Torso), B UI double-click по строке,
+        // C геометрический дифф чит-панели до/после нажатий (сползание
+        // надписей), D скриншоты (GODOT_CHEAT_SHOT=prefix, Xvfb+opengl3).
+        if (System.Environment.GetEnvironmentVariable("GODOT_CHEATEQUIP_DEBUG") == "1")
+        {
+            var cheatEquipSim = new CheatEquipSimDebug { Name = "CheatEquipSimDebug" };
+            AddChild(cheatEquipSim);
+        }
+#endif
         // R37-c (баг-репорт 23.09 «Зарядник не принимает камни Ци»):
         // (GODOT_CHARGERQA_DEBUG=1) полный путь — генерация зарядника →
         // экипировка → окно H → вставка камня (мост) → буфер/Ци →
