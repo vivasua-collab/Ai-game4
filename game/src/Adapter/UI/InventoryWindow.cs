@@ -46,6 +46,8 @@ public partial class InventoryWindow : Control
     // IQiService/IBodyService окну больше не нужны напрямую).
     [Inject] private IItemUseService ItemUseService { get; set; } = null!;
     [Inject] private CultivationGame.Core.Events.IPublisher<CultivationGame.Core.Messaging.Contracts.ToastShownEvent> ToastPub { get; set; } = null!;
+    // R37-c: мост зарядника — «Вставить в зарядник» из контекстного меню камня.
+    [Inject] private CultivationGame.Modules.Charger.ChargerItemBridge ChargerBridge { get; set; } = null!;
 
     private bool _isVisible;
     private Panel _panel = null!;
@@ -334,6 +336,26 @@ public partial class InventoryWindow : Control
     /// </summary>
     public CultivationGame.Core.Interfaces.ItemUseInfo GetUseInfo(ItemData item)
         => ItemUseService.GetUseInfo(item);
+
+    /// <summary>
+    /// R37-c (баг-репорт 23.09): вставить камень Ци из указанной кучки в
+    /// надетый зарядник (кнопка ПКМ-меню «Вставить в зарядник»). Слот-адресно
+    /// (R10 P1-SlotId); тосты причины отказа публикует мост. Обновляет список
+    /// (предмет покинул кучку).
+    /// </summary>
+    public bool TryInsertToCharger(Guid slotId, string itemId)
+    {
+        bool ok = ChargerBridge.TryInsertStone(slotId, itemId, out _);
+        if (ok)
+        {
+            RefreshExternally();
+            _dollPanel?.RefreshAll();
+        }
+        return ok;
+    }
+
+    /// <summary>R37-c: зарядник надет (гейт кнопки меню камня).</summary>
+    public bool IsChargerEquipped => ChargerBridge is { IsChargerEquipped: true };
 
     /// <summary>Опубликовать toast (показывается GameWorldController).</summary>
     private void PublishToast(string message)

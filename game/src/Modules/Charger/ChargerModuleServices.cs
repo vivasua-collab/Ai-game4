@@ -25,6 +25,10 @@ public static class ChargerModuleServices
         // === Точка входа модуля ===
         builder.Register<ChargerModule>(Lifetime.Singleton);
 
+        // R37-c (баг-репорт 23.09): мост предметы↔домен — окно H (ChargerWindow),
+        // ItemContextMenu «Вставить в зарядник», владелец режима домена.
+        builder.Register<ChargerItemBridge>(Lifetime.Singleton);
+
         // === Конфигурация по умолчанию (пояс-накопитель) ===
         // В реальной игре конфигурация загружается из JSON / SaveData
         var bufferConfig = new ChargerBufferConfig

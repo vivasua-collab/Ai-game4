@@ -148,6 +148,20 @@ namespace CultivationGame.Modules.Charger
             return _slots[slotIndex].State;
         }
 
+        /// <summary>
+        /// R37-c: immutable-снимок слота для UI/моста (ChargerItemBridge,
+        /// ChargerWindow): камень + остатки Ци без мутации домена.
+        /// </summary>
+        public ChargerSlotSnapshot GetSlotSnapshot(int slotIndex)
+        {
+            if (slotIndex < 0 || slotIndex >= _slots.Count)
+                return new ChargerSlotSnapshot(slotIndex, false, 0, 0, null);
+            var slot = _slots[slotIndex];
+            var stone = slot.InsertedStone;
+            return new ChargerSlotSnapshot(slotIndex, stone != null,
+                stone?.CurrentQi ?? 0, stone?.MaxQi ?? 0, stone);
+        }
+
         public bool TryCharge(int slotIndex, float qiAmount)
         {
             // CH-06: Камень Ци — не перезаряжаемый источник.
@@ -572,21 +586,21 @@ namespace CultivationGame.Modules.Charger
                     if (!slotSave.hasStone) continue;
                     if (slotSave.slotIndex < 0 || slotSave.slotIndex >= _slots.Count) continue;
 
-                    // Создаём камень с нужными параметрами
+                    // Создаём камень с нужными параметрами.
+                    // R37-c: maxQi — из сейва (stoneMaxQi), НЕ доменный дефолт:
+                    // камни, вставленные мостом из предметов (QiStoneData,
+                    // канон 1024×см³), имеют собственный объём — прежде
+                    // reload урезал их до BaseQi(размер)×mult с потерей Ци.
+                    long stoneMaxQiVal = long.TryParse(slotSave.stoneMaxQi, out var parsedMax) ? parsedMax : 0;
+                    long stoneCurrentQiVal = long.TryParse(slotSave.stoneCurrentQi, out var parsedStone) ? parsedStone : 0;
+
                     var stone = new QiStone(
                         (QiStoneQuality)slotSave.stoneQuality,
                         (QiStoneSize)slotSave.stoneSize,
-                        (Element)slotSave.stoneElement);
-
-                    // Извлекаем разницу, чтобы получить сохранённое текущее Ци
-                    // (конструктор создаёт камень с полным Ци)
-                    // R17 (CH-2): TryParse — кривой сейв не роняет загрузку.
-                    long stoneCurrentQiVal = long.TryParse(slotSave.stoneCurrentQi, out var parsedStone) ? parsedStone : 0;
-                    long diff = stone.MaxQi - stoneCurrentQiVal;
-                    if (diff > 0)
-                    {
-                        stone.ExtractQi(diff);
-                    }
+                        (Element)slotSave.stoneElement,
+                        stoneMaxQiVal,
+                        stoneCurrentQiVal);
+                    _ = stone.ExtractQi(Math.Max(0, stone.MaxQi - stone.CurrentQi)); // страховка клампа
 
                     // Вставляем камень в слот
                     _slots[slotSave.slotIndex].InsertStone(stone);

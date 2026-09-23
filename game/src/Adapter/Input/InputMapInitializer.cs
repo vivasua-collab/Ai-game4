@@ -77,6 +77,11 @@ public static class InputMapInitializer
         // K выбрано, чтобы не конфликтовать с C (CharacterSheet) и I (Inventory).
         AddKeyAction("cultivation_window", Key.K);
 
+        // R37-c (баг-репорт 23.09): окно зарядника Ци (H) — слоты камней/
+        // буфер/тепло/режим. H свободна в каноне (HOTKEYS §2.3); тост
+        // ItemUseService «вставьте в зарядник (H)» раньше обещал несуществующее.
+        AddKeyAction("charger_window", Key.H);
+
         // Quest log (Q)
         AddKeyAction("quest_log", Key.Q);
 

@@ -59,6 +59,7 @@ game/saves/*
 *.log
 # R35 (претензия верификатора R34): runtime prefix/postfix логи аудита —
 !checkpoints/logs/09_22_*.log
+!checkpoints/logs/09_23_*.log
 *.tmp
 *.bak
 *.swp

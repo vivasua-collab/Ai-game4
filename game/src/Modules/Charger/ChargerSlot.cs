@@ -40,6 +40,21 @@ namespace CultivationGame.Modules.Charger
         // === Конструктор ===
 
         public QiStone(QiStoneQuality quality, QiStoneSize size, Element element = Element.Neutral)
+            : this(quality, size, element,
+                  (long)(ChargerConfigs.GetStoneBaseQi(size) * ChargerConfigs.GetStoneQualityMultiplier(quality)),
+                  -1)
+        {
+        }
+
+        /// <summary>
+        /// R37-c (баг-репорт 23.09 «Зарядник не принимает камни Ци»): явные
+        /// maxQi/currentQi — мост предметов инвентаря (QiStoneData, канон
+        /// GENERATORS_SYSTEM §10: Ци = 1024×см³) переносит в домен ФАКТИЧЕСКИЙ
+        /// объём камня, а не доменный дефолт по размеру. Прецедент — RestoreState
+        /// (ChargerService), где камень с чужим maxQi существовал и раньше
+        /// (сейв хранит stoneMaxQi отдельным полем). currentQi &lt; 0 → полный.
+        /// </summary>
+        public QiStone(QiStoneQuality quality, QiStoneSize size, Element element, long maxQi, long currentQi)
         {
             _stoneId = Guid.NewGuid().ToString().Substring(0, 8);
             _quality = quality;
@@ -48,8 +63,8 @@ namespace CultivationGame.Modules.Charger
 
             // Характеристики из конфигураций
             float qualityMult = ChargerConfigs.GetStoneQualityMultiplier(quality);
-            _maxQi = (long)(ChargerConfigs.GetStoneBaseQi(size) * qualityMult);
-            _currentQi = _maxQi;
+            _maxQi = maxQi > 0 ? maxQi : (long)(ChargerConfigs.GetStoneBaseQi(size) * qualityMult);
+            _currentQi = currentQi >= 0 ? Math.Min(currentQi, _maxQi) : _maxQi;
             _releaseRate = ChargerConfigs.GetStoneBaseRate(size) * qualityMult;
             _stoneName = $"{quality} {size} {element} Камень";
         }

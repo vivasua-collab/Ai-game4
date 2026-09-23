@@ -95,6 +95,15 @@ namespace CultivationGame.Core.Interfaces
         /// </summary>
         int TechniqueSlotIndex { get; }
 
+        // === R37-c (баг-репорт 23.09): окно зарядника Ци ===
+
+        /// <summary>
+        /// R37-c: Нажата ли клавиша окна зарядника (H, однократное).
+        /// Открывает ChargerWindow (слоты камней/буфер/тепло/режим;
+        /// гейт — надетый зарядник в слоте пояса).
+        /// </summary>
+        bool IsChargerWindowPressed { get; }
+
         // === Ai-game3 compatibility: sticky flags ===
 
         /// <summary>Нажат ли pause (Esc, однократное). Ai-game3 compatibility.</summary>

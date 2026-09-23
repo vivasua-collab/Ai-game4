@@ -50,6 +50,8 @@ public partial class ItemContextMenu : Control
     public Button? UseButtonForQA { get; private set; }
     public Button? SplitButtonForQA { get; private set; }
     public Button? DropButtonForQA { get; private set; }
+    /// <summary>R37-c: кнопка «Вставить в зарядник» (только для камней Ци).</summary>
+    public Button? InsertButtonForQA { get; private set; }
     /// <summary>R10 P1-SlotId: стабильная идентичность кучки (действия меню).</summary>
     public Guid SlotIdForQA => _slot.SlotId;
     public int PropertyCountForQA { get; private set; }
@@ -227,6 +229,32 @@ public partial class ItemContextMenu : Control
             };
             vbox.AddChild(useBtn);
             UseButtonForQA = useBtn;
+        }
+
+        // 💎 Вставить в зарядник — R37-c (баг-репорт 23.09): прямой путь
+        // «добавить камень в зарядник» без drag&drop (канон A6: камень
+        // вставляется ТОЛЬКО в зарядник — окно H). Гейт — надетый зарядник;
+        // отказ виден тостом моста (причины: не надет / нет слота / кучка
+        // изменилась).
+        if (_item is QiStoneData)
+        {
+            var insertBtn = new Button
+            {
+                Text = _parent.IsChargerEquipped
+                    ? "💎 Вставить в зарядник"
+                    : "💎 Вставить в зарядник (не надет)",
+                TooltipText = _parent.IsChargerEquipped
+                    ? "Вставить камень в надетый зарядник Ци (окно H)"
+                    : "Зарядник не надет — сначала наденьте зарядник Ци в слот пояса",
+                SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            };
+            insertBtn.Pressed += () =>
+            {
+                _parent.CloseContextMenu();
+                _parent.TryInsertToCharger(_slot.SlotId, _item.ItemId);
+            };
+            vbox.AddChild(insertBtn);
+            InsertButtonForQA = insertBtn;
         }
 
         // Вторичные действия — одной строкой: разделить/выбросить.

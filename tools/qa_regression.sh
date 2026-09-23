@@ -38,6 +38,8 @@ ALL_SIMS=(
   "REASSEMBLY:GODOT_REASSEMBLY_DEBUG"
   "CHARGE:GODOT_CHARGE_SIM"
   "AUDIT0922:GODOT_AUDIT0922_DEBUG"
+  # R37-c (баг-репорт 23.09): зарядник Ци — окно H/мост/анти-дюп/пояс-гейт.
+  "CHARGERQA:GODOT_CHARGERQA_DEBUG"
 )
 
 if [ "$#" -gt 0 ]; then

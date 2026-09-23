@@ -52,6 +52,8 @@ public sealed class PlayerInputService : IPlayerInputService
     private bool _weaponMelee;
     private bool _weaponRanged;
     private int _techniqueSlotIndex;
+    // R37-c: окно зарядника (H).
+    private bool _chargerWindow;
 
     /// <summary>
     /// Internal — the raw underlying frame. Not part of the interface;
@@ -92,6 +94,9 @@ public sealed class PlayerInputService : IPlayerInputService
     public bool IsWeaponMeleePressed => _weaponMelee;
     public bool IsWeaponRangedPressed => _weaponRanged;
     public int TechniqueSlotIndex => _techniqueSlotIndex;
+
+    // R37-c (баг-репорт 23.09): окно зарядника Ци (H).
+    public bool IsChargerWindowPressed => _chargerWindow && !InputDisabled;
 
     // === Ai-game3 compatibility: sticky flags ===
     public bool IsPausePressed => _pause && !InputDisabled;
@@ -160,6 +165,8 @@ public sealed class PlayerInputService : IPlayerInputService
             if (data.IsSticky("time_speed_down")) _timeSpeedDown = true;
             // D (2026-08-26): cultivation window (K) + weapon/technique slots
             if (data.IsSticky("cultivation_window")) _cultivationWindow = true;
+            // R37-c: окно зарядника (H).
+            if (data.IsSticky("charger_window")) _chargerWindow = true;
             if (data.IsSticky("weapon_melee")) _weaponMelee = true;
             if (data.IsSticky("weapon_ranged")) _weaponRanged = true;
             for (int i = 3; i <= 9; i++)
@@ -203,5 +210,7 @@ public sealed class PlayerInputService : IPlayerInputService
         _weaponMelee = false;
         _weaponRanged = false;
         _techniqueSlotIndex = 0;
+        // R37-c: сброс флага зарядника.
+        _chargerWindow = false;
     }
 }

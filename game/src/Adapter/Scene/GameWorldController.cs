@@ -126,6 +126,9 @@ public partial class GameWorldController : Node2D
     private UI.QuestWindow _questWindow = null!;
     // C3 (2026-08-26): окно Культивации Ци (K) — 3 вкладки + панель слотов техник 3-9.
     private UI.CultivationWindow _cultivationWindow = null!;
+    // R37-c (баг-репорт 23.09): окно зарядника Ци (H) — слоты камней/буфер/
+    // тепло/режим; гейт — надетый зарядник (слот Belt, ItemType="Charger").
+    private UI.ChargerWindow _chargerWindow = null!;
 #if DEBUG
     private UI.CheatPanel? _cheatPanel; // Этап 7: чит-меню (F2, с 2026-08-28).
 #endif
@@ -268,6 +271,9 @@ public partial class GameWorldController : Node2D
     public UI.HotkeysWindow? HotkeysWindowForQA => _hotkeysWindow;
     public UI.TechniqueBookWindow? TechniqueBookWindowForQA => _techniqueBook;
 
+    // R37-c: окно зарядника для headless-симов (GODOT_CHARGERQA_DEBUG).
+    public UI.ChargerWindow? ChargerWindowForQA => _chargerWindow;
+
     /// <summary>
     /// Открыть диалог с NPC по QA-пути (пауза+окно) — те же действия,
     /// что и HandleNpcTalk, без поиска ближнего NPC (GODOT_DIALOGUE_DEBUG).
@@ -347,7 +353,10 @@ public partial class GameWorldController : Node2D
         || (_dialogueWindow is { IsOpen: true })
         // П4 (репорт 21.09): K-окно культивации — полноценное модальное
         // (прежде было только в списке клик-блокировки, паузы не ставило).
-        || (_cultivationWindow is { Visible: true });
+        || (_cultivationWindow is { Visible: true })
+        // R37-c: окно зарядника (H) — модальное с паузой (управление
+        // камнями/режимом — планирование, как инвентарь).
+        || (_chargerWindow is { Visible: true });
 
     /// <summary>
     /// Аудит-0915 A3 (INP1-2): предикат «модальное окно открыто КРОМЕ лавки».
@@ -460,6 +469,7 @@ public partial class GameWorldController : Node2D
         if (_tradeWindow is { IsOpen: true }) names.Add("лавка");
         if (_dialogueWindow is { IsOpen: true }) names.Add("диалог");
         if (_cultivationWindow is { Visible: true }) names.Add("K·культивация");
+        if (_chargerWindow is { Visible: true }) names.Add("H·зарядник");
         return names;
     }
 
@@ -604,6 +614,17 @@ public partial class GameWorldController : Node2D
             var modalStackSim = new ModalStackSimDebug { Name = "ModalStackSimDebug" };
             AddChild(modalStackSim);
         }
+        // R37-c (баг-репорт 23.09 «Зарядник не принимает камни Ци»):
+        // (GODOT_CHARGERQA_DEBUG=1) полный путь — генерация зарядника →
+        // экипировка → окно H → вставка камня (мост) → буфер/Ци →
+        // анти-дюп (полный/частичный/пустой) → сейв round-trip → пояс.
+#if DEBUG
+        if (System.Environment.GetEnvironmentVariable("GODOT_CHARGERQA_DEBUG") == "1")
+        {
+            var chargerSim = new ChargerSimDebug { Name = "ChargerSimDebug" };
+            AddChild(chargerSim);
+        }
+#endif
         // L500 (2026-09-15): мир 500×500 — интеграция генераций NPC
         // (GODOT_L500_DEBUG=1, в связке с GODOT_NEWGAME_WORLD=large_world).
         if (System.Environment.GetEnvironmentVariable("GODOT_L500_DEBUG") == "1")
@@ -1195,6 +1216,15 @@ public partial class GameWorldController : Node2D
         _cultivationWindow = new UI.CultivationWindow { Name = "CultivationWindow" };
         _hudCanvas.AddChild(_cultivationWindow);
 
+        // R37-c (баг-репорт 23.09 «Зарядник не принимает камни Ци»): окно
+        // зарядника Ци (H) — слоты камней (drag&drop из инвентаря, ПКМ —
+        // извлечь), буфер/тепло/режим. Гейт: зарядник надет в слот пояса
+        // (ChargerItemBridge.IsChargerEquipped). Closed — единая точка
+        // резюма тиков (Esc/фон/повторное H).
+        _chargerWindow = new UI.ChargerWindow { Name = "ChargerWindow" };
+        _chargerWindow.Closed += HandleModalResumeOnClose;
+        _hudCanvas.AddChild(_chargerWindow);
+
 #if DEBUG
         // Этап 7: чит-меню разработки (F2, с 2026-08-28; раньше F1).
         // Видимость переключается в HandleStickyInput по PlayerInput.IsCheatMenuPressed.
@@ -1776,6 +1806,20 @@ public partial class GameWorldController : Node2D
                 HandleModalResumeOnClose();
         }
 
+        // R37-c (баг-репорт 23.09): H — окно зарядника Ци (модальное с
+        // паузой; гейт содержимого — надетый зарядник, без него окно
+        // показывает подсказку). Гвард модальности обыска — как у Q/J.
+        if (PlayerInput.IsChargerWindowPressed && _chargerWindow != null && Time != null
+            && _lootWindow is not { IsOpen: true })
+        {
+            bool otherModalOpen = AnyModalWindowOpen();
+            _chargerWindow.Toggle();
+            if (_chargerWindow.Visible)
+                HandleModalPauseOnOpen(otherModalOpen);
+            else
+                HandleModalResumeOnClose();
+        }
+
         // 2026-08-28: Esc сначала закрывает окна новой волны (справка/книга/чит).
         if (PlayerInput.IsPausePressed && _hotkeysWindow is { Visible: true })
         {
@@ -1839,6 +1883,13 @@ public partial class GameWorldController : Node2D
         {
             _cultivationWindow.Toggle();
             HandleModalResumeOnClose();
+        }
+        // R37-c: Esc закрывает окно зарядника (H) — правило пользователя
+        // «два типа закрытия: повторная клавиша вызова И классический Esc».
+        // Resume — через Closed-событие окна (единая точка, как у инвентаря).
+        else if (PlayerInput.IsPausePressed && _chargerWindow is { Visible: true })
+        {
+            _chargerWindow.Close();
         }
         // Esc (sticky "escape") → toggle pause. INP-1: только когда НЕ открыто
         // ни одного модального окна (раньше гард проверял только инвентарь —

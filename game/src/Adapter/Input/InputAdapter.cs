@@ -141,6 +141,10 @@ public partial class InputAdapter : Node
         // D3 (2026-08-26): Окно Культивации (K) — открывает CultivationWindow.
         if (GodotInput.IsActionJustPressed("cultivation_window")) _stickyKeys.Add("cultivation_window");
 
+        // R37-c (баг-репорт 23.09): окно зарядника Ци (H) — ChargerWindow
+        // (слоты камней/буфер/тепло/режим; гейт по надетому заряднику).
+        if (GodotInput.IsActionJustPressed("charger_window")) _stickyKeys.Add("charger_window");
+
         // D3 (2026-08-26): Hotbar routing — определяется Shift state (см. комментарий выше).
         // Цикл ищет нажатую цифру 1..9 и маршрутизирует:
         //   Shift+N → belt slot (попадает в hotbarSlot для BeltService);

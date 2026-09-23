@@ -23,6 +23,11 @@ public class ChargerModule : IModule
     [Inject] private readonly ChargerBufferConfig _bufferConfig = null!;
     [Inject] private readonly List<ChargerSlotConfig> _slotConfigs = null!;
 
+    // R37-c (баг-репорт 23.09): мост — подписка на экипировку + первичная
+    // синхронизация режима. Домен НЕ активен без надетого зарядника
+    // (прежде Activate() безусловно — камни качались даже без зарядника).
+    [Inject] private readonly ChargerItemBridge _bridge = null!;
+
     public string ModuleName => "Charger";
 
         // P1-10 (аудит 09.22, Фазы 7/10): идемпотентный Start — повторный вызов
@@ -39,8 +44,12 @@ public class ChargerModule : IModule
         // Phase 17C: прямая инъекция вместо concrete-cast
         _chargerServiceImpl.Configure(_bufferConfig, _slotConfigs);
 
-        // Автоактивация при старте
-        _chargerService.Activate();
+        // R37-c: режим домена синхронизирует мост (гейт по надетому
+        // заряднику). Activate() безусловно — УБРАН. После загрузки сейва
+        // RestoreState восстановит сохранённый режим, а событие
+        // EquipmentChangedEvent (EquipmentService.RestoreState публикует)
+        // досинхронизирует мост.
+        _bridge.Initialize();
     
         _startCompleted = true;
     }

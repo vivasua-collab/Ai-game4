@@ -69,8 +69,19 @@ public sealed class BeltService : ISaveable, IWorldResettable, IDisposable
         return arr;
     }
 
-    /// <summary>Пояс надет — слоты активны (UI показывает ряд пояса).</summary>
-    public bool IsBeltEquipped => _equipment?.GetEquipped(EquipmentSlot.Belt) != null;
+    /// <summary>
+    /// Пояс надет — слоты активны (UI показывает ряд пояса).
+    /// R37-c (баг-репорт 23.09): пояс = предмет БРОНИ в слоте Belt
+    /// (armor_belt, ItemType=="Armor"). Зарядник Ци (Slot=Belt,
+    /// ItemType=="Charger") — НЕ пояс: раньше ЛЮБОЙ предмет слота Belt
+    /// включал слоты быстрого доступа — зарядник маскировался под пояс,
+    /// принимал лекарства и молча отвергал камни Ци (репорт: «не могу
+    /// добавить камни Ци, лекарство добавляется»). Камни вставляются в
+    /// зарядник через окно H (ChargerItemBridge.TryInsertStone).
+    /// </summary>
+    public bool IsBeltEquipped =>
+        _equipment?.GetEquipped(EquipmentSlot.Belt) is EquipmentData belt
+        && belt.ItemType == "Armor";
 
     public void Initialize()
     {

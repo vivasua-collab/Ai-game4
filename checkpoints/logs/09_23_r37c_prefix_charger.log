@@ -1,0 +1,33 @@
+=== PREFIX-слепок бага «Зарядник Ци не принимает камни Ци» (репорт пользователя 23.09, сессия R37-c) ===
+Дата: 2026-09-23 04:50 UTC
+
+--- ФАКТ 1: клавиша H / action charger_window НЕ зарегистрирована ---
+НИ ОДНОГО упоминания charger_window в input-цепочке — окна зарядника не существует
+
+--- ФАКТ 2: файла окна зарядника не существует ---
+ChargerWindow.cs ОТСУТСТВУЕТ — обещание тоста «вставьте в зарядник (H)» (ItemUseService.cs:62) ведёт в никуда
+
+--- ФАКТ 3: моста предметы↔домен НЕТ (QiStoneData инвентаря → QiStone домена) ---
+Модуль Charger не знает о QiStoneData: домен заряжается ТОЛЬКО из сейва (RestoreState), игрок не может вставить камень
+
+--- ФАКТ 4: BeltService.IsBeltEquipped считает ЛЮБОЙ предмет слота Belt поясом ---
+73:    public bool IsBeltEquipped => _equipment?.GetEquipped(EquipmentSlot.Belt) != null;
+108:        if (!IsBeltEquipped) return 0;
+→ зарядник (Slot=Belt, ItemGeneratorService.cs:269) надевается в слот пояса → BeltSlotRow «Пояс — слоты быстрого доступа» появляется БЕЗ пояса
+
+--- ФАКТ 5: слоты пояса принимают ТОЛЬКО Consumable — камень Ци (Category=QiStone) молча отвергается ---
+game/src/Adapter/UI/BeltSlotRow.cs:171:                && it.Category == ItemCategory.Consumable;
+
+--- ФАКТ 6: ChargerInitPhase — стаб (предмет-зарядник не связан с доменом) ---
+/// Phase 7 — charger (qi-stone slot) initialisation. Stub for v1.
+/// </summary>
+public sealed class ChargerInitPhase : AbstractSceneAssemblyPhase
+{
+    public override string PhaseName => "ChargerInit";
+
+--- СЦЕНАРИЙ ПОЛЬЗОВАТЕЛЯ (скриншот upload/pasted_image_1790136541567.png, VLM-разбор): ---
+чит «Зарядник Ци» → предмет в инвентарь → надет в слот Belt → появился ряд «Пояс — слоты быстрого доступа» ---
+→ drag камня Ци в слот: _CanDropData=false (молча) → «не могу добавить камни Ци в него»
+→ drag лекарства (Consumable): принимается → «лекарство добавляется без проблем»
+
+VERDICT: FAIL — окно зарядника H отсутствует, мост предметов в домен отсутствует, пояс-гейт ложный
