@@ -21,12 +21,30 @@
 | **I-11 PNG оружия** | `WeaponVisualCatalog.GetOrCreate` | PNG-первый по тем же ключам `class|tier` (rarity НЕ в имени — золотая обводка остаётся кодом). Нет PNG → процедурный рецепт R15. Механика крепления/офсетов/замаха не менялась. |
 | **I-5 NPC** | `NPCSpriteRenderer` | `npc_{role}_{anim}` → `npc_base_{anim}` → процедурный. Кадры — `DrawTextureRectRegion` в `_Draw`; walk-детект по дельте позиции; melee — по замахам R16; рассинхрон толпы по хэшу id. |
 | **I-7 Звери** | `AnimalSpriteRenderer` | `animal_{species}_{anim}` → процедурный. Та же региональная отрисовка. |
-| **QA-сим** | `SpriteAnimSimDebug.cs` | `GODOT_ANIMQA_DEBUG=1` — верифицирует весь контур (fallback/загрузчик/аниматор/one-shot/death-hold/оружие/NPC/звери). В регрессии №21. |
+| **QA-сим** | `SpriteAnimSimDebug.cs` | `GODOT_ANIMQA_DEBUG=1` — верифицирует весь контур (fallback/загрузчик/аниматор/one-shot/death-hold/оружие/NPC/звери). В регрессии №21. **Dual-режим (G0.2):** шаг 0 зондирует диск — сим валиден и ДО, и ПОСЛЕ доставки (файл есть → ожидаем PNG-текстуру; нет → fallback). |
+| **Приёмщик батчей** | `tools/sprites/intake_batch.py` | Пакетная доставка zip: распаковка (zip-slip защита) → инвентаризация → маппинг имён на манифест (два пространства: README file-stem + id; версии/тиры/префиксы; `--map` для ручных) → выбор лучшего варианта (геометрия>альфа>версия) → маршруты DIRECT/CONFORM/SLICE/FIT/REJECT → валидация чеками → установка (`--force` для перезаписи, `--dry-run` без касания game/). |
 | **Манифест** | `game/resources/sprites/sprites_manifest.json` | 221 позиция: файл, кадры, fps, loop, фаза G1–G5. Генератор `tools/sprites/make_manifest.py`. |
 | **Валидатор** | `tools/sprites/validate_sprites.py` | Приёмка: размеры/кадры/прозрачность/базовая линия/ширина тела. |
 | **Слайсер** | `tools/sprites/slice_sheet.py` | Исходник генерации (1344×768 и т.п.) → игровой лист: вырез фона, сетка (авто-детект разделителей), bbox-кроп, NEAREST-даунскейл, нормализация 64×64 с выравниванием низа к y=58. |
 
 ## 2. Процедура доставки (по одной позиции или пачкой)
+
+**Пачкой (рекомендуется):** положить zip в `tools/` (репо-относительные пути
+или плоские имена) и запустить приёмщик — он делает шаги 3–5 автоматически:
+
+```bash
+python3 tools/sprites/intake_batch.py tools/<batch>.zip --dry-run   # отчёт без установки
+python3 tools/sprites/intake_batch.py tools/<batch>.zip             # установка
+python3 tools/sprites/intake_batch.py tools/<batch>.zip --force     # замена итерации
+```
+
+Вариант файла `player_walk_v2.png` / `wolf_walk.png` / `weapon_dagger_1.png`
+сопоставляется с манифестом автоматически; нестандартные имена — через
+`--map имя=позиция`. Итог: маршруты DIRECT (готовая геометрия)/CONFORM
+(доводка кадров)/SLICE (сырой лист → слайсер)/FIT (иконки)/REJECT,
+дефекты валидатора — в отчёте.
+
+**По одной позиции:**
 
 1. **Генерация** — промпт из `SPRITE_PROMPTS_CHARACTERS.md` (§3 игрок /
    §4 NPC и звери / §5 экипировка), выход 1024×1024 (одиночный) или
@@ -115,6 +133,10 @@ idle/walk/run/attack/death.
 
 ## 7. QA-доступ (headless-симы)
 
+- `GODOT_ANIMQA_DEBUG=1` — сим №21 в **dual-режиме**: `step0 delivery:`
+  печатает состояние поставки (player/npc/animal/weapon PNG); ожидания всех
+  шагов вычисляются от диска — PASS и на пустом каталоге, и с доставкой
+  (G0.2: пруфы обеих сторон, лог-прогон 09-24).
 - `GWC.PlayerAnimId / PlayerAnimFrame / PlayerAnimIsPng /
   PlayerAnimFrameCount / PlayerAnimatorForQA` — аниматор игрока.
 - `NPCSpriteRenderer.ResolveNpcAnim(id, role, species, moving)` — прямой

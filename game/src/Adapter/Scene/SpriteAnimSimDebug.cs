@@ -2,10 +2,11 @@
 // Создано: 2026-09-25 — G0 «Подготовка спрайтов»: headless-верификация
 // (GODOT_ANIMQA_DEBUG=1).
 //
-// Проверяет подготовительный контур ДО доставки PNG (директива 25.09:
-// генерация/доставка — позже):
-//   1. Fallback: реальных PNG нет → все листы null, визуал не изменился
-//      (SpriteSheetCache.TryGetSheet → null, LoadAttemptCount растёт).
+// Проверяет контур спрайтов ДО и ПОСЛЕ доставки PNG (dual-режим G0.2:
+// шаг 0 зондирует диск — файл есть → ожидаем текстуру, нет → fallback):
+//   0. Состояние поставки: FileExists по player/npc/animal/weapon позициям.
+//   1. Загрузчик ↔ диск: файл есть → TryGetSheet != null, нет → null
+//      (SpriteSheetCache.LoadAttemptCount растёт в обоих случаях).
 //   2. Загрузчик: QA-плейсхолдеры из _qa/ (полоса 6×64×64 и сетка 5×6)
 //      через LoadSheetDirect → FrameCount/Rows/FrameSize корректны.
 //   3. Аниматор игрока: состояние idle → процедурная статика (IsPng=false,
@@ -66,15 +67,32 @@ public partial class SpriteAnimSimDebug : Node
 
         bool pass = true;
 
-        // === 1. Fallback: PNG в каталогах доставки НЕТ =====================
+        // === 0. Состояние поставки (сим верен ДО и ПОСЛЕ доставки PNG) ====
+        bool idleDelivered = FileAccess.FileExists(
+            $"{SpriteSheetCache.Root}/characters/player/player_idle.png");
+        bool walkDelivered = FileAccess.FileExists(
+            $"{SpriteSheetCache.Root}/characters/player/player_walk.png");
+        int expectedIconPng =
+            (FileAccess.FileExists($"{SpriteSheetCache.Root}/equipment/icons/weapon_sword_1.png") ? 1 : 0) +
+            (FileAccess.FileExists($"{SpriteSheetCache.Root}/equipment/icons/weapon_spear_1.png") ? 1 : 0);
+        int expectedHandPng =
+            (FileAccess.FileExists($"{SpriteSheetCache.Root}/equipment/equipped/weapon_hand_sword_1.png") ? 1 : 0) +
+            (FileAccess.FileExists($"{SpriteSheetCache.Root}/equipment/equipped/weapon_hand_spear_1.png") ? 1 : 0);
+        GD.Print($"[AnimQA] step0 delivery: player_idle={idleDelivered}, " +
+                 $"player_walk={walkDelivered}, weaponPng={expectedIconPng}/{expectedHandPng}");
+
+        // === 1. Загрузчик ↔ диск: файл есть → текстура; нет → null =======
         SpriteSheetCache.ResetCache();
         WeaponVisualCatalog.ResetCache();
-        var missingSheet = SpriteSheetCache.TryGetSheet("player_idle");
-        var missingWalk = SpriteSheetCache.TryGetSheet("player_walk");
+        var idleSheet = SpriteSheetCache.TryGetSheet("player_idle");
+        var walkSheet = SpriteSheetCache.TryGetSheet("player_walk");
         bool attempts = SpriteSheetCache.LoadAttemptCount >= 2;
-        GD.Print($"[AnimQA] step1 fallback: player_idle={missingSheet == null}, " +
-                 $"player_walk={missingWalk == null}, attempts={SpriteSheetCache.LoadAttemptCount}");
-        if (missingSheet != null || missingWalk != null || !attempts) pass = false;
+        bool idleOk = (idleSheet != null) == idleDelivered;
+        bool walkOk = (walkSheet != null) == walkDelivered;
+        GD.Print($"[AnimQA] step1 loader: idle={(idleSheet != null ? "png" : "fallback")}/{idleOk}, " +
+                 $"walk={(walkSheet != null ? "png" : "fallback")}/{walkOk}, " +
+                 $"attempts={SpriteSheetCache.LoadAttemptCount}");
+        if (!idleOk || !walkOk || !attempts) pass = false;
 
         // === 2. Загрузчик: QA-плейсхолдеры (полоса + сетка) ================
         var strip = SpriteSheetCache.LoadSheetDirect(QaStripPath, fps: 11, loop: true);
@@ -142,28 +160,40 @@ public partial class SpriteAnimSimDebug : Node
             bool respawnOk = _world.PlayerAnimId == "player_idle";
             GD.Print($"[AnimQA] step3c death: anim={deathAnim}, hold={deathHold}, respawn={respawnOk}");
 
-            // Сброс оверлея → процедурная статика вернулась.
+            // Сброс оверлея → режим вернулся к состоянию поставки.
             animator.DEBUG_SetSheetOverride(null);
             animator.DEBUG_Reset();
             await ToSignal(GetTree().CreateTimer(0.1), SceneTreeTimer.SignalName.Timeout);
-            bool fallbackBack = !_world.PlayerAnimIsPng && _world.PlayerAnimFrame == 0;
-            GD.Print($"[AnimQA] step3d reset: fallbackRestored={fallbackBack}, anim='{_world.PlayerAnimId}'");
+            // fallback: статика кадр 0; живой лист: кадр в границах листа.
+            bool resetOk = _world.PlayerAnimIsPng == idleDelivered
+                           && (idleDelivered
+                               ? _world.PlayerAnimFrame < _world.PlayerAnimFrameCount
+                               : _world.PlayerAnimFrame == 0);
+            GD.Print($"[AnimQA] step3d reset: modeRestored={resetOk} " +
+                     $"(png={_world.PlayerAnimIsPng}, ожидание={idleDelivered}), " +
+                     $"anim='{_world.PlayerAnimId}'");
 
-            // startPng обязана быть false (PNG не доставлены — fallback).
-            if (startPng || startFrame != 0 || !pngMode || !scrolled
+            // startPng/reset — по поставке; старт-кадр: статика 0, лист — в границах.
+            bool startOk = startPng == idleDelivered;
+            bool startFrameOk = idleDelivered
+                ? startFrame >= 0 && startFrame < _world.PlayerAnimFrameCount
+                : startFrame == 0;
+            if (!startOk || !startFrameOk || !pngMode || !scrolled
                 || !meleeAnim || !meleeDone || !deathAnim || !deathHold
-                || !respawnOk || !fallbackBack) pass = false;
+                || !respawnOk || !resetOk) pass = false;
         }
 
-        // === 4. Оружие (I-11): ключи стабильны, PNG-счётчик = 0 ===========
+        // === 4. Оружие (I-11): ключи стабильны; PNG-счётчики = поставке ===
         var swordV = WeaponVisualCatalog.GetOrCreate("sword", 1, ItemRarity.Common);
         var spearV = WeaponVisualCatalog.GetOrCreate("spear", 1, ItemRarity.Common);
         bool weaponKeys = swordV.Key == "sword|1|Common" && spearV.Key == "spear|1|Common";
         bool weaponSizes = swordV.Icon.GetSize().X == 32 && swordV.Hand.GetSize().X == 48;
-        bool weaponNoPng = WeaponVisualCatalog.PngHandCount == 0 && WeaponVisualCatalog.PngIconCount == 0;
+        bool weaponPngOk = WeaponVisualCatalog.PngIconCount == expectedIconPng
+                        && WeaponVisualCatalog.PngHandCount == expectedHandPng;
         GD.Print($"[AnimQA] step4 weapon: keys={weaponKeys}, sizes={weaponSizes}, " +
-                 $"pngCount={WeaponVisualCatalog.PngHandCount}/{WeaponVisualCatalog.PngIconCount} (expected 0/0)");
-        if (!weaponKeys || !weaponSizes || !weaponNoPng) pass = false;
+                 $"pngCount={WeaponVisualCatalog.PngHandCount}/{WeaponVisualCatalog.PngIconCount} " +
+                 $"(expected {expectedHandPng}/{expectedIconPng})");
+        if (!weaponKeys || !weaponSizes || !weaponPngOk) pass = false;
 
         // === 5. NPC (I-5): резолв fallback + кадры по клоку ===============
         if (_npcRenderer != null && _npcService != null)
@@ -183,18 +213,30 @@ public partial class SpriteAnimSimDebug : Node
                 var npc = _npcService.GetNPC(sampleId);
                 var info1 = _npcRenderer.ResolveNpcAnim(sampleId, npc.Role, null, moving: true);
                 var info2 = _npcRenderer.ResolveNpcAnim(sampleId, npc.Role, null, moving: false);
-                bool npcFallback = !info1.IsPng && info1.Procedural != null
-                                   && info2.Procedural != null;
-                bool npcKinds = info1.AnimId.EndsWith("_static") && info2.AnimId.EndsWith("_static");
-                GD.Print($"[AnimQA] step5 npc: fallback={npcFallback}, " +
+                // Ожидание по диску: ключ роли → база → процедурный (I-5).
+                string roleKey = npc.Role.ToString().ToLowerInvariant();
+                bool npcWalkPng = FileAccess.FileExists(
+                                      $"{SpriteSheetCache.Root}/characters/npc/npc_{roleKey}_walk.png")
+                                  || FileAccess.FileExists(
+                                      $"{SpriteSheetCache.Root}/characters/npc/npc_base_walk.png");
+                bool npcIdlePng = FileAccess.FileExists(
+                                      $"{SpriteSheetCache.Root}/characters/npc/npc_{roleKey}_idle.png")
+                                  || FileAccess.FileExists(
+                                      $"{SpriteSheetCache.Root}/characters/npc/npc_base_idle.png");
+                bool npcMovingOk = info1.IsPng == npcWalkPng;
+                bool npcIdleOk = info2.IsPng == npcIdlePng;
+                GD.Print($"[AnimQA] step5 npc: moving={(info1.IsPng ? "png" : "fallback")}/{npcMovingOk}, " +
+                         $"idle={(info2.IsPng ? "png" : "fallback")}/{npcIdleOk}, " +
                          $"anim(moving)='{info1.AnimId}', anim(idle)='{info2.AnimId}'");
 
-                // QA-оверлей через кэш нельзя (файлов нет) — проверяем чистоту
-                // PNG-счётчика рендерера: рисует только процедурные.
-                bool noPng = _npcRenderer.NpcPngAnimatedCount == 0;
-                GD.Print($"[AnimQA] step5b npc: noPngRenderer={noPng} " +
-                         $"(pngCount={_npcRenderer.NpcPngAnimatedCount})");
-                if (!npcFallback || !npcKinds || !noPng) pass = false;
+                // PNG-счётчик рендерера = ожиданию поставки (толпа живая).
+                bool pngCountOk = (npcWalkPng || npcIdlePng)
+                    ? _npcRenderer.NpcPngAnimatedCount > 0
+                    : _npcRenderer.NpcPngAnimatedCount == 0;
+                GD.Print($"[AnimQA] step5b npc: pngRenderer={pngCountOk} " +
+                         $"(pngCount={_npcRenderer.NpcPngAnimatedCount}, " +
+                         $"ожидание {((npcWalkPng || npcIdlePng) ? ">0" : "=0")})");
+                if (!npcMovingOk || !npcIdleOk || !pngCountOk) pass = false;
             }
         }
         else
@@ -206,24 +248,28 @@ public partial class SpriteAnimSimDebug : Node
         // === 6. Звери (I-7): резолв fallback ===============================
         if (_animalRenderer != null && _animalService != null)
         {
-            bool anyBeast = false; string beastName = "";
+            bool beastChecked = false, beastOk = true; string beastName = "";
             foreach (var animal in _animalService.GetAllAnimals())
             {
                 if (!animal.IsAlive) continue;
                 var a1 = _animalRenderer.ResolveAnimalAnim(animal.EntityId, animal.Species, animal.Size, true);
                 var a2 = _animalRenderer.ResolveAnimalAnim(animal.EntityId, animal.Species, animal.Size, false);
-                if (!a1.IsPng && a1.Procedural != null && !a2.IsPng)
-                {
-                    anyBeast = true;
-                    beastName = animal.Species;
-                    break;
-                }
+                // Ожидание по диску: animal_{species}_{walk|idle}.png (I-7).
+                string sp = animal.Species.ToLowerInvariant();
+                bool beastWalkPng = FileAccess.FileExists(
+                    $"{SpriteSheetCache.Root}/animals/animal_{sp}_walk.png");
+                bool beastIdlePng = FileAccess.FileExists(
+                    $"{SpriteSheetCache.Root}/animals/animal_{sp}_idle.png");
+                beastChecked = true; beastName = animal.Species;
+                beastOk = a1.IsPng == beastWalkPng && a2.IsPng == beastIdlePng;
+                break; // первого живого достаточно (резолв детерминирован диском)
             }
-            GD.Print($"[AnimQA] step6 animals: fallback={anyBeast}" +
-                     (anyBeast ? $" (sample='{beastName}')" : " (no animals found)"));
+            GD.Print($"[AnimQA] step6 animals: checked={beastChecked}/{beastOk}" +
+                     (beastChecked ? $" (sample='{beastName}')" : " (no animals found)"));
             // Звери могут отсутствовать в маленьком QA-мире — не FAIL,
             // но логируем (L500-мир обязателен для полной проверки).
-            if (!anyBeast) GD.Print("[AnimQA] step6 animals: WARN — beasts not spawned in this world");
+            if (!beastChecked) GD.Print("[AnimQA] step6 animals: WARN — beasts not spawned in this world");
+            else if (!beastOk) pass = false;
         }
         else
         {
