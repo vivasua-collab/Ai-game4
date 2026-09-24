@@ -437,24 +437,28 @@ NEAREST 64×64 → выравнивание базовой линии → виз
 
 ---
 
-## 11. Точки интеграции кода (будущие раунды — НЕ сегодня)
+## 11. Точки интеграции кода (фазы G; G0-подготовка ВЫПОЛНЕНА 25.09)
 
-| ID | Задача | Точка в коде |
-|---|---|---|
-| I-1 | Аниматор игрока: Hframes/Vframes/Frame по состоянию, множители скорости | блок `GWC._PhysicsProcess` :1261-1345 (все состояния под рукой); свойство `PlayerSprite` :2880 уже экспонировано; образец — `PlayerSprite._Process` демо |
-| I-2 | Лист-загрузчик PNG: `res://resources/sprites/…` + fallback на процедурный (контракт PROCEDURAL_SPRITES §5) | новый `SpriteSheetCache` по образцу `WeaponVisualCatalog.GetOrCreate` |
-| I-3 | Октантный facing (D2): вектор → ряд 0..4 | `HandleFreeMovement` GWC:1606-1730 (порог 0.15 → октант) |
-| I-4 | Визуализация дэша/сна (сейчас логика без визуала) | `PlayerTechniqueCaster` :370-382; `PlayerService.StartSleep` |
-| I-5 | Аниматор NPC: per-role листы + кадры в `_Draw` (кэш по Role уже есть) | `NPCSpriteRenderer._Draw` :245-267, `_spriteCache` :210 |
-| I-6 | Вариативность NPC по seed NPCId | там же (выбор варианта текстуры) |
-| I-7 | Аниматор зверей + интерполяция тайлового шага | `AnimalSpriteRenderer._Draw` :118-122 |
-| I-8 | Иконки брони/предметов в UI (PNG) | оживить контракт `CreateEquipmentIcon`; HotbarPanel/InventoryWindow/ItemContextMenu |
-| I-9 | Каталог визуалов экипировки: `WeaponVisualCatalog` → `EquipmentVisualCatalog` (slot-ключи) | WeaponVisualCatalog.cs (расширение) |
-| I-10 | Слои брони игрока: новые Sprite2D + z-сдвиг MainHand 5→6 + фильтр события по слотам | GWC:894-901, :2415-2423 |
-| I-11 | PNG-миграция оружия (те же ключи) | WeaponVisualCatalog.GetOrCreate: источник текстуры |
+| ID | Задача | Точка в коде | Статус |
+|---|---|---|---|
+| I-1 | Аниматор игрока: Hframes/Vframes/Frame по состоянию, множители скорости | блок `GWC._PhysicsProcess`; `PlayerAnimator.cs` | **G0 ГОТОВО** (fallback + триггеры death/melee/bow/hit/meditate/walk/run) |
+| I-2 | Лист-загрузчик PNG + fallback на процедурный | `SpriteSheetCache.cs` (реестр 24 анимации, `Image.LoadFromFile` без импорта) | **G0 ГОТОВО** |
+| I-3 | Октантный facing (D2): вектор → ряд 0..4 | `HandleFreeMovement` GWC | G5 (аниматор уже читает `Row` — D2-сетки лягут рядом side) |
+| I-4 | Визуализация дэша/сна | `PlayerTechniqueCaster`; `PlayerService.StartSleep` | G5 |
+| I-5 | Аниматор NPC: per-role листы + кадры в `_Draw` | `NPCSpriteRenderer.ResolveNpcAnim` | **G0 ГОТОВО** (idle/walk/melee; ключи npc_{role} → npc_base → процедурный) |
+| I-6 | Вариативность NPC по seed NPCId | там же | G5 |
+| I-7 | Аниматор зверей | `AnimalSpriteRenderer.ResolveAnimalAnim` | **G0 ГОТОВО** (idle/walk) |
+| I-8 | Иконки брони/предметов в UI (PNG) | HotbarPanel/InventoryWindow/ItemContextMenu | G1/G4 |
+| I-9 | Каталог визуалов экипировки (slot-ключи брони) | расширение WeaponVisualCatalog | G4 |
+| I-10 | Слои брони игрока: Sprite2D + z-сдвиг MainHand 5→6 | GWC | G4 |
+| I-11 | PNG-миграция оружия (те же ключи) | `WeaponVisualCatalog.GetOrCreate` — PNG-первый | **G0 ГОТОВО** (PngHand/PngIcon-счётчики, ключи не менялись) |
 
-Каждая задача — отдельный раунд с prefix/postfix пруфами по протоколу
-TESTING_RULES (QA-сим по образцу `WeaponVisSimDebug`).
+G0 (директива 25.09 «выполни подготовительные задачи — генерация позже»):
+инфраструктура + fallback + манифест + инструменты доставки
+(`SPRITE_DELIVERY.md`, `tools/sprites/`, `sprites_manifest.json` 221 позиция,
+QA-сим №21 ANIMQA, регрессия 21/21 PASS). Игра до доставки PNG выглядит
+идентично процедурной — нулевая регрессия. Оставшиеся раунды — каждый с
+prefix/postfix пруфами по протоколу TESTING_RULES.
 
 ---
 

@@ -89,6 +89,9 @@ public partial class AnimalSpriteRenderer : Node2D
 
     public override void _PhysicsProcess(double delta)
     {
+        // G0 (I-7): общий таймер анимационных фаз зверей.
+        _animClock += (float)delta;
+
         // Animals move once per game tick (1-15 Hz), but the renderer runs
         // every physics frame (60 Hz). QueueRedraw is cheap; Godot batches.
         QueueRedraw();
@@ -96,6 +99,25 @@ public partial class AnimalSpriteRenderer : Node2D
 
     // Cached sprites per species.
     private readonly Dictionary<string, Texture2D> _spriteCache = new();
+
+    // === G0 (I-7, 2026-09-25): анимация зверей (sprite-swap в _Draw) =====
+    // Листы animal_{species}_{anim} (idle/walk; run/attack/death — реестр
+    // готов, триггеры — фазы G3+). Нет PNG → процедурный кэш по виду (как
+    // сейчас). Кадры — DrawTextureRegion; движение — дельта позиции между
+    // кадрами (шаг зверя дискретный — 1-2 тайла за тик).
+    private float _animClock;
+    private readonly Dictionary<string, Vector2> _animalLastPos = new();
+    private readonly Dictionary<string, AnimalAnimInfo> _lastAnimInfo = new();
+
+    /// <summary>G0: резолв анимации зверя (для _Draw и headless-QA).</summary>
+    public sealed class AnimalAnimInfo
+    {
+        public string AnimId = "animal_idle";
+        public SpriteSheetCache.SpriteSheet? Sheet;
+        public Texture2D? Procedural;
+        public int Frame;
+        public bool IsPng => Sheet != null;
+    }
 
     public override void _Draw()
     {
@@ -114,17 +136,28 @@ public partial class AnimalSpriteRenderer : Node2D
             float cx = animal.Position.X * _tilePixels + halfTile;
             float cy = animal.Position.Y * _tilePixels + halfTile;
 
-            // Get or create sprite for this species.
-            if (!_spriteCache.TryGetValue(animal.Species, out var tex))
-            {
-                tex = ProceduralSpriteGenerator.CreateAnimalSprite(animal.Species, animal.Size);
-                _spriteCache[animal.Species] = tex;
-            }
+            // G0 (I-7): анимационный резолв — PNG-лист animal_{species}_{kind}
+            // → регион кадра; нет PNG → процедурный кэш по виду КАК СЕЙЧАС.
+            bool moving = IsAnimalMoving(animal.EntityId, animal.Position);
+            var anim = ResolveAnimalAnim(animal.EntityId, animal.Species, animal.Size, moving);
+            _lastAnimInfo[animal.EntityId] = anim;
 
             // Draw sprite centered on tile.
-            float spriteSize = tex.GetWidth();
+            float spriteSize = anim.Sheet?.FrameSize ?? anim.Procedural!.GetWidth();
             var pos = new Vector2(cx - spriteSize / 2f, cy - spriteSize / 2f);
-            DrawTexture(tex, pos);
+            if (anim.Sheet != null)
+            {
+                int col = anim.Frame % anim.Sheet.FrameCount;
+                int row = anim.Frame / anim.Sheet.FrameCount;
+                var src = new Rect2(col * anim.Sheet.FrameSize, row * anim.Sheet.FrameSize,
+                                    anim.Sheet.FrameSize, anim.Sheet.FrameSize);
+                DrawTextureRectRegion(anim.Sheet.Texture,
+                    new Rect2(pos, new Vector2(spriteSize, spriteSize)), src);
+            }
+            else
+            {
+                DrawTexture(anim.Procedural!, pos);
+            }
 
             // R27: рамка-подсветка ВЫБРАННОЙ цели (паттерн NPCSpriteRenderer).
             if (!string.IsNullOrEmpty(_selectedTargetId) && animal.EntityId == _selectedTargetId)
@@ -210,6 +243,83 @@ public partial class AnimalSpriteRenderer : Node2D
             SizeClass.Colossal => 40f,
             _ => 11f,
         };
+    }
+
+    // === G0 (I-7): анимационный резолв =====================================
+
+    /// <summary>
+    /// Движение зверя: дельта позиции с прошлого кадра отрисовки
+    /// (шаг зверя — телепорт 1-2 тайла за игровой тик → любая дельта > 0
+    /// означает «идёт»; между тиками кадр замирает — это канон D1).
+    /// </summary>
+    private bool IsAnimalMoving(string entityId, Position2D position)
+    {
+        var p = new Vector2(position.X, position.Y);
+        bool moving = true;
+        if (_animalLastPos.TryGetValue(entityId, out var last))
+            moving = (p - last).LengthSquared() > 0.0004f; // >0.02 тайла
+        _animalLastPos[entityId] = p;
+        return moving;
+    }
+
+    /// <summary>
+    /// Резолв анимации зверя: walk (движение) / idle. Лист
+    /// animal_{species}_{kind}; нет PNG → процедурный кэш по виду.
+    /// public: headless-QA (GODOT_ANIMQA_DEBUG) резолвит без отрисовки.
+    /// </summary>
+    public AnimalAnimInfo ResolveAnimalAnim(string entityId, string species, SizeClass size, bool moving)
+    {
+        string kind = moving ? "walk" : "idle";
+        string animId = $"animal_{species.ToLowerInvariant()}_{kind}";
+        var sheet = SpriteSheetCache.TryGetSheet(animId);
+
+        var info = new AnimalAnimInfo();
+        if (sheet != null)
+        {
+            info.AnimId = animId;
+            info.Sheet = sheet;
+            float fps = kind == "walk" ? sheet.Fps : sheet.Fps * 0.4f;
+            float phase = _animClock * fps + PhaseOffset(entityId);
+            info.Frame = (int)phase % sheet.FrameCount;
+            return info;
+        }
+
+        info.AnimId = $"animal_{species}_static";
+        info.Procedural = GetOrCreateSpeciesTexture(species, size);
+        return info;
+    }
+
+    /// <summary>Стабильный сдвиг фазы по id (стадо не марширует в ногу).</summary>
+    private static float PhaseOffset(string entityId)
+    {
+        int h = 19;
+        foreach (char c in entityId) h = h * 33 + c;
+        return (h & 0x7FFFFFFF) % 1000 / 97f;
+    }
+
+    private Texture2D GetOrCreateSpeciesTexture(string species, SizeClass size)
+    {
+        if (_spriteCache.TryGetValue(species, out var tex)) return tex;
+        tex = ProceduralSpriteGenerator.CreateAnimalSprite(species, size);
+        _spriteCache[species] = tex;
+        return tex;
+    }
+
+    // === G0: QA-доступ (GODOT_ANIMQA_DEBUG) ================================
+
+    /// <summary>QA: последний резолв анимации зверя (по id; null — не резолвился).</summary>
+    public AnimalAnimInfo? GetAnimalAnimInfo(string entityId) =>
+        _lastAnimInfo.TryGetValue(entityId, out var info) ? info : null;
+
+    /// <summary>QA: число зверей с PNG-анимацией в последнем проходе _Draw.</summary>
+    public int AnimalPngAnimatedCount
+    {
+        get
+        {
+            int n = 0;
+            foreach (var info in _lastAnimInfo.Values) if (info.IsPng) n++;
+            return n;
+        }
     }
 
     private static Color GetColourForSpecies(string species)

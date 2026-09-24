@@ -1,0 +1,2669 @@
+{
+  "version": 1,
+  "generated": "2026-09-25",
+  "frame": 64,
+  "source": "SPRITE_ANIMATION_PLAN.md §5–§9; SPRITE_PROMPTS_CHARACTERS.md §3–§5",
+  "conventions": {
+    "sheet": "полоса 1 анимация × 1 направление × N кадров (64N×64); D2-сетки 5 рядов-направлений (64N×320, ряд: front/¾/side/¾/back)",
+    "directions": "D1: лист «вправо», зеркало — FlipH кодом; D2: 5 рядов × FlipH = 8 направлений",
+    "anchors": "тело в 48×48-боксе по X; правая кисть (+6,+6) от центра; базовая линия стоп ±2px; рукоять weapon_hand G=(16,36)",
+    "filter": "NEAREST (никакого сглаживания)",
+    "runtime": "рентайм не читает манифест: кадры = W/64, fps/loop = реестр SpriteSheetCache.cs; отсутствие файла = процедурный fallback",
+    "phases": "G1 статика → G2 игрок/звери → G3 NPC → G4 экипировка → G5 полировка"
+  },
+  "total_files": 221,
+  "sheets": [
+    {
+      "id": "player_idle",
+      "file": "characters/player/player_idle.png",
+      "frames": 4,
+      "fps": 7,
+      "loop": true,
+      "phase": "G1",
+      "size": [
+        256,
+        64
+      ]
+    },
+    {
+      "id": "player_walk",
+      "file": "characters/player/player_walk.png",
+      "frames": 6,
+      "fps": 11,
+      "loop": true,
+      "phase": "G2",
+      "size": [
+        384,
+        64
+      ]
+    },
+    {
+      "id": "player_melee",
+      "file": "characters/player/player_melee.png",
+      "frames": 6,
+      "fps": 15,
+      "loop": false,
+      "phase": "G2",
+      "size": [
+        384,
+        64
+      ]
+    },
+    {
+      "id": "player_cast",
+      "file": "characters/player/player_cast.png",
+      "frames": 4,
+      "fps": 10,
+      "loop": true,
+      "phase": "G3",
+      "size": [
+        256,
+        64
+      ]
+    },
+    {
+      "id": "player_meditate",
+      "file": "characters/player/player_meditate.png",
+      "frames": 6,
+      "fps": 5,
+      "loop": true,
+      "phase": "G3",
+      "size": [
+        384,
+        64
+      ]
+    },
+    {
+      "id": "player_hit",
+      "file": "characters/player/player_hit.png",
+      "frames": 2,
+      "fps": 12,
+      "loop": false,
+      "phase": "G3",
+      "size": [
+        128,
+        64
+      ]
+    },
+    {
+      "id": "player_death",
+      "file": "characters/player/player_death.png",
+      "frames": 4,
+      "fps": 12,
+      "loop": false,
+      "phase": "G3",
+      "size": [
+        256,
+        64
+      ]
+    },
+    {
+      "id": "player_run",
+      "file": "characters/player/player_run.png",
+      "frames": 6,
+      "fps": 14,
+      "loop": true,
+      "phase": "G4",
+      "size": [
+        384,
+        64
+      ]
+    },
+    {
+      "id": "player_bow",
+      "file": "characters/player/player_bow.png",
+      "frames": 3,
+      "fps": 12,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        192,
+        64
+      ]
+    },
+    {
+      "id": "player_guard",
+      "file": "characters/player/player_guard.png",
+      "frames": 2,
+      "fps": 8,
+      "loop": true,
+      "phase": "G4",
+      "size": [
+        128,
+        64
+      ]
+    },
+    {
+      "id": "player_dash",
+      "file": "characters/player/player_dash.png",
+      "frames": 3,
+      "fps": 15,
+      "loop": false,
+      "phase": "G5",
+      "size": [
+        192,
+        64
+      ]
+    },
+    {
+      "id": "player_sleep",
+      "file": "characters/player/player_sleep.png",
+      "frames": 2,
+      "fps": 2,
+      "loop": true,
+      "phase": "G5",
+      "size": [
+        128,
+        64
+      ]
+    },
+    {
+      "id": "player_breakthrough",
+      "file": "characters/player/player_breakthrough.png",
+      "frames": 4,
+      "fps": 15,
+      "loop": false,
+      "phase": "G5",
+      "size": [
+        256,
+        64
+      ]
+    },
+    {
+      "id": "npc_base_idle",
+      "file": "characters/npc/npc_base_idle.png",
+      "frames": 4,
+      "fps": 6,
+      "loop": true,
+      "phase": "G3",
+      "size": [
+        256,
+        64
+      ]
+    },
+    {
+      "id": "npc_base_walk",
+      "file": "characters/npc/npc_base_walk.png",
+      "frames": 6,
+      "fps": 10,
+      "loop": true,
+      "phase": "G3",
+      "size": [
+        384,
+        64
+      ]
+    },
+    {
+      "id": "npc_base_melee",
+      "file": "characters/npc/npc_base_melee.png",
+      "frames": 4,
+      "fps": 15,
+      "loop": false,
+      "phase": "G3",
+      "size": [
+        256,
+        64
+      ]
+    },
+    {
+      "id": "npc_base_cast",
+      "file": "characters/npc/npc_base_cast.png",
+      "frames": 3,
+      "fps": 10,
+      "loop": true,
+      "phase": "G3",
+      "size": [
+        192,
+        64
+      ]
+    },
+    {
+      "id": "npc_base_hit",
+      "file": "characters/npc/npc_base_hit.png",
+      "frames": 2,
+      "fps": 12,
+      "loop": false,
+      "phase": "G3",
+      "size": [
+        128,
+        64
+      ]
+    },
+    {
+      "id": "npc_base_death",
+      "file": "characters/npc/npc_base_death.png",
+      "frames": 3,
+      "fps": 12,
+      "loop": false,
+      "phase": "G3",
+      "size": [
+        192,
+        64
+      ]
+    },
+    {
+      "id": "npc_guard_idle",
+      "file": "characters/npc/npc_guard_idle.png",
+      "frames": 4,
+      "fps": 6,
+      "loop": true,
+      "phase": "G3",
+      "size": [
+        256,
+        64
+      ]
+    },
+    {
+      "id": "npc_guard_walk",
+      "file": "characters/npc/npc_guard_walk.png",
+      "frames": 6,
+      "fps": 10,
+      "loop": true,
+      "phase": "G3",
+      "size": [
+        384,
+        64
+      ]
+    },
+    {
+      "id": "npc_merchant_idle",
+      "file": "characters/npc/npc_merchant_idle.png",
+      "frames": 4,
+      "fps": 6,
+      "loop": true,
+      "phase": "G3",
+      "size": [
+        256,
+        64
+      ]
+    },
+    {
+      "id": "npc_merchant_walk",
+      "file": "characters/npc/npc_merchant_walk.png",
+      "frames": 6,
+      "fps": 10,
+      "loop": true,
+      "phase": "G3",
+      "size": [
+        384,
+        64
+      ]
+    },
+    {
+      "id": "npc_elder_idle",
+      "file": "characters/npc/npc_elder_idle.png",
+      "frames": 4,
+      "fps": 6,
+      "loop": true,
+      "phase": "G3",
+      "size": [
+        256,
+        64
+      ]
+    },
+    {
+      "id": "npc_elder_walk",
+      "file": "characters/npc/npc_elder_walk.png",
+      "frames": 6,
+      "fps": 10,
+      "loop": true,
+      "phase": "G3",
+      "size": [
+        384,
+        64
+      ]
+    },
+    {
+      "id": "npc_cultivator_idle",
+      "file": "characters/npc/npc_cultivator_idle.png",
+      "frames": 4,
+      "fps": 6,
+      "loop": true,
+      "phase": "G3",
+      "size": [
+        256,
+        64
+      ]
+    },
+    {
+      "id": "npc_cultivator_walk",
+      "file": "characters/npc/npc_cultivator_walk.png",
+      "frames": 6,
+      "fps": 10,
+      "loop": true,
+      "phase": "G3",
+      "size": [
+        384,
+        64
+      ]
+    },
+    {
+      "id": "npc_enemy_idle",
+      "file": "characters/npc/npc_enemy_idle.png",
+      "frames": 4,
+      "fps": 6,
+      "loop": true,
+      "phase": "G3",
+      "size": [
+        256,
+        64
+      ]
+    },
+    {
+      "id": "npc_enemy_walk",
+      "file": "characters/npc/npc_enemy_walk.png",
+      "frames": 6,
+      "fps": 10,
+      "loop": true,
+      "phase": "G3",
+      "size": [
+        384,
+        64
+      ]
+    },
+    {
+      "id": "npc_passerby_idle",
+      "file": "characters/npc/npc_passerby_idle.png",
+      "frames": 4,
+      "fps": 6,
+      "loop": true,
+      "phase": "G3",
+      "size": [
+        256,
+        64
+      ]
+    },
+    {
+      "id": "npc_passerby_walk",
+      "file": "characters/npc/npc_passerby_walk.png",
+      "frames": 6,
+      "fps": 10,
+      "loop": true,
+      "phase": "G3",
+      "size": [
+        384,
+        64
+      ]
+    },
+    {
+      "id": "npc_disciple_idle",
+      "file": "characters/npc/npc_disciple_idle.png",
+      "frames": 4,
+      "fps": 6,
+      "loop": true,
+      "phase": "G3",
+      "size": [
+        256,
+        64
+      ]
+    },
+    {
+      "id": "npc_disciple_walk",
+      "file": "characters/npc/npc_disciple_walk.png",
+      "frames": 6,
+      "fps": 10,
+      "loop": true,
+      "phase": "G3",
+      "size": [
+        384,
+        64
+      ]
+    },
+    {
+      "id": "npc_monster_idle",
+      "file": "characters/npc/npc_monster_idle.png",
+      "frames": 4,
+      "fps": 6,
+      "loop": true,
+      "phase": "G3",
+      "size": [
+        256,
+        64
+      ]
+    },
+    {
+      "id": "npc_monster_walk",
+      "file": "characters/npc/npc_monster_walk.png",
+      "frames": 6,
+      "fps": 10,
+      "loop": true,
+      "phase": "G3",
+      "size": [
+        384,
+        64
+      ]
+    },
+    {
+      "id": "animal_wolf_idle",
+      "file": "animals/animal_wolf_idle.png",
+      "frames": 2,
+      "fps": 6,
+      "loop": true,
+      "phase": "G2",
+      "size": [
+        128,
+        64
+      ]
+    },
+    {
+      "id": "animal_wolf_walk",
+      "file": "animals/animal_wolf_walk.png",
+      "frames": 4,
+      "fps": 10,
+      "loop": true,
+      "phase": "G2",
+      "size": [
+        256,
+        64
+      ]
+    },
+    {
+      "id": "animal_wolf_run",
+      "file": "animals/animal_wolf_run.png",
+      "frames": 4,
+      "fps": 14,
+      "loop": true,
+      "phase": "G3",
+      "size": [
+        256,
+        64
+      ]
+    },
+    {
+      "id": "animal_wolf_attack",
+      "file": "animals/animal_wolf_attack.png",
+      "frames": 2,
+      "fps": 15,
+      "loop": false,
+      "phase": "G3",
+      "size": [
+        128,
+        64
+      ]
+    },
+    {
+      "id": "animal_wolf_death",
+      "file": "animals/animal_wolf_death.png",
+      "frames": 1,
+      "fps": 12,
+      "loop": false,
+      "phase": "G3",
+      "size": [
+        64,
+        64
+      ]
+    },
+    {
+      "id": "animal_deer_idle",
+      "file": "animals/animal_deer_idle.png",
+      "frames": 2,
+      "fps": 6,
+      "loop": true,
+      "phase": "G2",
+      "size": [
+        128,
+        64
+      ]
+    },
+    {
+      "id": "animal_deer_walk",
+      "file": "animals/animal_deer_walk.png",
+      "frames": 4,
+      "fps": 10,
+      "loop": true,
+      "phase": "G2",
+      "size": [
+        256,
+        64
+      ]
+    },
+    {
+      "id": "animal_deer_run",
+      "file": "animals/animal_deer_run.png",
+      "frames": 4,
+      "fps": 14,
+      "loop": true,
+      "phase": "G3",
+      "size": [
+        256,
+        64
+      ]
+    },
+    {
+      "id": "animal_deer_death",
+      "file": "animals/animal_deer_death.png",
+      "frames": 1,
+      "fps": 12,
+      "loop": false,
+      "phase": "G3",
+      "size": [
+        64,
+        64
+      ]
+    },
+    {
+      "id": "animal_rabbit_idle",
+      "file": "animals/animal_rabbit_idle.png",
+      "frames": 2,
+      "fps": 6,
+      "loop": true,
+      "phase": "G2",
+      "size": [
+        128,
+        64
+      ]
+    },
+    {
+      "id": "animal_rabbit_walk",
+      "file": "animals/animal_rabbit_walk.png",
+      "frames": 4,
+      "fps": 10,
+      "loop": true,
+      "phase": "G2",
+      "size": [
+        256,
+        64
+      ]
+    },
+    {
+      "id": "animal_rabbit_run",
+      "file": "animals/animal_rabbit_run.png",
+      "frames": 4,
+      "fps": 14,
+      "loop": true,
+      "phase": "G3",
+      "size": [
+        256,
+        64
+      ]
+    },
+    {
+      "id": "animal_rabbit_death",
+      "file": "animals/animal_rabbit_death.png",
+      "frames": 1,
+      "fps": 12,
+      "loop": false,
+      "phase": "G3",
+      "size": [
+        64,
+        64
+      ]
+    },
+    {
+      "id": "corpse_human",
+      "file": "corpses/corpse_human.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G5",
+      "size": [
+        64,
+        32
+      ]
+    },
+    {
+      "id": "corpse_beast",
+      "file": "corpses/corpse_beast.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G5",
+      "size": [
+        64,
+        32
+      ]
+    },
+    {
+      "id": "weapon_icon_dagger_t1",
+      "file": "equipment/icons/weapon_dagger_1.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G1",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_dagger_t1",
+      "file": "equipment/equipped/weapon_hand_dagger_1.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_dagger_t2",
+      "file": "equipment/icons/weapon_dagger_2.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_dagger_t2",
+      "file": "equipment/equipped/weapon_hand_dagger_2.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_dagger_t3",
+      "file": "equipment/icons/weapon_dagger_3.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_dagger_t3",
+      "file": "equipment/equipped/weapon_hand_dagger_3.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_dagger_t4",
+      "file": "equipment/icons/weapon_dagger_4.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_dagger_t4",
+      "file": "equipment/equipped/weapon_hand_dagger_4.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_dagger_t5",
+      "file": "equipment/icons/weapon_dagger_5.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_dagger_t5",
+      "file": "equipment/equipped/weapon_hand_dagger_5.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_sword_t1",
+      "file": "equipment/icons/weapon_sword_1.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G1",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_sword_t1",
+      "file": "equipment/equipped/weapon_hand_sword_1.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_sword_t2",
+      "file": "equipment/icons/weapon_sword_2.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_sword_t2",
+      "file": "equipment/equipped/weapon_hand_sword_2.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_sword_t3",
+      "file": "equipment/icons/weapon_sword_3.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_sword_t3",
+      "file": "equipment/equipped/weapon_hand_sword_3.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_sword_t4",
+      "file": "equipment/icons/weapon_sword_4.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_sword_t4",
+      "file": "equipment/equipped/weapon_hand_sword_4.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_sword_t5",
+      "file": "equipment/icons/weapon_sword_5.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_sword_t5",
+      "file": "equipment/equipped/weapon_hand_sword_5.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_axe_t1",
+      "file": "equipment/icons/weapon_axe_1.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G1",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_axe_t1",
+      "file": "equipment/equipped/weapon_hand_axe_1.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_axe_t2",
+      "file": "equipment/icons/weapon_axe_2.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_axe_t2",
+      "file": "equipment/equipped/weapon_hand_axe_2.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_axe_t3",
+      "file": "equipment/icons/weapon_axe_3.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_axe_t3",
+      "file": "equipment/equipped/weapon_hand_axe_3.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_axe_t4",
+      "file": "equipment/icons/weapon_axe_4.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_axe_t4",
+      "file": "equipment/equipped/weapon_hand_axe_4.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_axe_t5",
+      "file": "equipment/icons/weapon_axe_5.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_axe_t5",
+      "file": "equipment/equipped/weapon_hand_axe_5.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_spear_t1",
+      "file": "equipment/icons/weapon_spear_1.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G1",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_spear_t1",
+      "file": "equipment/equipped/weapon_hand_spear_1.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_spear_t2",
+      "file": "equipment/icons/weapon_spear_2.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_spear_t2",
+      "file": "equipment/equipped/weapon_hand_spear_2.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_spear_t3",
+      "file": "equipment/icons/weapon_spear_3.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_spear_t3",
+      "file": "equipment/equipped/weapon_hand_spear_3.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_spear_t4",
+      "file": "equipment/icons/weapon_spear_4.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_spear_t4",
+      "file": "equipment/equipped/weapon_hand_spear_4.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_spear_t5",
+      "file": "equipment/icons/weapon_spear_5.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_spear_t5",
+      "file": "equipment/equipped/weapon_hand_spear_5.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_greatsword_t1",
+      "file": "equipment/icons/weapon_greatsword_1.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G1",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_greatsword_t1",
+      "file": "equipment/equipped/weapon_hand_greatsword_1.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_greatsword_t2",
+      "file": "equipment/icons/weapon_greatsword_2.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_greatsword_t2",
+      "file": "equipment/equipped/weapon_hand_greatsword_2.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_greatsword_t3",
+      "file": "equipment/icons/weapon_greatsword_3.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_greatsword_t3",
+      "file": "equipment/equipped/weapon_hand_greatsword_3.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_greatsword_t4",
+      "file": "equipment/icons/weapon_greatsword_4.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_greatsword_t4",
+      "file": "equipment/equipped/weapon_hand_greatsword_4.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_greatsword_t5",
+      "file": "equipment/icons/weapon_greatsword_5.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_greatsword_t5",
+      "file": "equipment/equipped/weapon_hand_greatsword_5.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_bow_t1",
+      "file": "equipment/icons/weapon_bow_1.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G1",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_bow_t1",
+      "file": "equipment/equipped/weapon_hand_bow_1.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_bow_t2",
+      "file": "equipment/icons/weapon_bow_2.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_bow_t2",
+      "file": "equipment/equipped/weapon_hand_bow_2.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_bow_t3",
+      "file": "equipment/icons/weapon_bow_3.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_bow_t3",
+      "file": "equipment/equipped/weapon_hand_bow_3.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_bow_t4",
+      "file": "equipment/icons/weapon_bow_4.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_bow_t4",
+      "file": "equipment/equipped/weapon_hand_bow_4.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_bow_t5",
+      "file": "equipment/icons/weapon_bow_5.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_bow_t5",
+      "file": "equipment/equipped/weapon_hand_bow_5.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_staff_t1",
+      "file": "equipment/icons/weapon_staff_1.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G1",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_staff_t1",
+      "file": "equipment/equipped/weapon_hand_staff_1.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_staff_t2",
+      "file": "equipment/icons/weapon_staff_2.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_staff_t2",
+      "file": "equipment/equipped/weapon_hand_staff_2.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_staff_t3",
+      "file": "equipment/icons/weapon_staff_3.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_staff_t3",
+      "file": "equipment/equipped/weapon_hand_staff_3.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_staff_t4",
+      "file": "equipment/icons/weapon_staff_4.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_staff_t4",
+      "file": "equipment/equipped/weapon_hand_staff_4.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "weapon_icon_staff_t5",
+      "file": "equipment/icons/weapon_staff_5.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "weapon_hand_staff_t5",
+      "file": "equipment/equipped/weapon_hand_staff_5.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        48,
+        48
+      ]
+    },
+    {
+      "id": "player_idle_armor_t1",
+      "file": "characters/player/player_idle_armor_1.png",
+      "frames": 4,
+      "fps": 7,
+      "loop": true,
+      "phase": "G4",
+      "size": [
+        256,
+        64
+      ]
+    },
+    {
+      "id": "player_walk_armor_t1",
+      "file": "characters/player/player_walk_armor_1.png",
+      "frames": 6,
+      "fps": 11,
+      "loop": true,
+      "phase": "G4",
+      "size": [
+        384,
+        64
+      ]
+    },
+    {
+      "id": "player_melee_armor_t1",
+      "file": "characters/player/player_melee_armor_1.png",
+      "frames": 6,
+      "fps": 15,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        384,
+        64
+      ]
+    },
+    {
+      "id": "player_idle_armor_t2",
+      "file": "characters/player/player_idle_armor_2.png",
+      "frames": 4,
+      "fps": 7,
+      "loop": true,
+      "phase": "G4",
+      "size": [
+        256,
+        64
+      ]
+    },
+    {
+      "id": "player_walk_armor_t2",
+      "file": "characters/player/player_walk_armor_2.png",
+      "frames": 6,
+      "fps": 11,
+      "loop": true,
+      "phase": "G4",
+      "size": [
+        384,
+        64
+      ]
+    },
+    {
+      "id": "player_melee_armor_t2",
+      "file": "characters/player/player_melee_armor_2.png",
+      "frames": 6,
+      "fps": 15,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        384,
+        64
+      ]
+    },
+    {
+      "id": "player_idle_armor_t3",
+      "file": "characters/player/player_idle_armor_3.png",
+      "frames": 4,
+      "fps": 7,
+      "loop": true,
+      "phase": "G4",
+      "size": [
+        256,
+        64
+      ]
+    },
+    {
+      "id": "player_walk_armor_t3",
+      "file": "characters/player/player_walk_armor_3.png",
+      "frames": 6,
+      "fps": 11,
+      "loop": true,
+      "phase": "G4",
+      "size": [
+        384,
+        64
+      ]
+    },
+    {
+      "id": "player_melee_armor_t3",
+      "file": "characters/player/player_melee_armor_3.png",
+      "frames": 6,
+      "fps": 15,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        384,
+        64
+      ]
+    },
+    {
+      "id": "player_idle_armor_t4",
+      "file": "characters/player/player_idle_armor_4.png",
+      "frames": 4,
+      "fps": 7,
+      "loop": true,
+      "phase": "G4",
+      "size": [
+        256,
+        64
+      ]
+    },
+    {
+      "id": "player_walk_armor_t4",
+      "file": "characters/player/player_walk_armor_4.png",
+      "frames": 6,
+      "fps": 11,
+      "loop": true,
+      "phase": "G4",
+      "size": [
+        384,
+        64
+      ]
+    },
+    {
+      "id": "player_melee_armor_t4",
+      "file": "characters/player/player_melee_armor_4.png",
+      "frames": 6,
+      "fps": 15,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        384,
+        64
+      ]
+    },
+    {
+      "id": "player_idle_armor_t5",
+      "file": "characters/player/player_idle_armor_5.png",
+      "frames": 4,
+      "fps": 7,
+      "loop": true,
+      "phase": "G4",
+      "size": [
+        256,
+        64
+      ]
+    },
+    {
+      "id": "player_walk_armor_t5",
+      "file": "characters/player/player_walk_armor_5.png",
+      "frames": 6,
+      "fps": 11,
+      "loop": true,
+      "phase": "G4",
+      "size": [
+        384,
+        64
+      ]
+    },
+    {
+      "id": "player_melee_armor_t5",
+      "file": "characters/player/player_melee_armor_5.png",
+      "frames": 6,
+      "fps": 15,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        384,
+        64
+      ]
+    },
+    {
+      "id": "armor_head_helm_t1",
+      "file": "equipment/equipped/armor_head_helm_1.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        24,
+        24
+      ]
+    },
+    {
+      "id": "armor_head_hood_t1",
+      "file": "equipment/equipped/armor_head_hood_1.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        24,
+        24
+      ]
+    },
+    {
+      "id": "armor_head_circlet_t1",
+      "file": "equipment/equipped/armor_head_circlet_1.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        24,
+        24
+      ]
+    },
+    {
+      "id": "armor_feet_step_t1",
+      "file": "equipment/equipped/armor_feet_step_1.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        24,
+        16
+      ]
+    },
+    {
+      "id": "armor_feet_roll_t1",
+      "file": "equipment/equipped/armor_feet_roll_1.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        24,
+        16
+      ]
+    },
+    {
+      "id": "armor_feet_stand_t1",
+      "file": "equipment/equipped/armor_feet_stand_1.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        24,
+        16
+      ]
+    },
+    {
+      "id": "armor_belt_t1",
+      "file": "equipment/equipped/armor_belt_1.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        12
+      ]
+    },
+    {
+      "id": "armor_icon_head_t1",
+      "file": "equipment/icons/armor_head_1.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "armor_icon_torso_t1",
+      "file": "equipment/icons/armor_torso_1.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "armor_icon_arms_t1",
+      "file": "equipment/icons/armor_arms_1.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "armor_icon_legs_t1",
+      "file": "equipment/icons/armor_legs_1.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "armor_icon_feet_t1",
+      "file": "equipment/icons/armor_feet_1.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "armor_icon_belt_t1",
+      "file": "equipment/icons/armor_belt_1.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "armor_head_helm_t2",
+      "file": "equipment/equipped/armor_head_helm_2.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        24,
+        24
+      ]
+    },
+    {
+      "id": "armor_head_hood_t2",
+      "file": "equipment/equipped/armor_head_hood_2.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        24,
+        24
+      ]
+    },
+    {
+      "id": "armor_head_circlet_t2",
+      "file": "equipment/equipped/armor_head_circlet_2.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        24,
+        24
+      ]
+    },
+    {
+      "id": "armor_feet_step_t2",
+      "file": "equipment/equipped/armor_feet_step_2.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        24,
+        16
+      ]
+    },
+    {
+      "id": "armor_feet_roll_t2",
+      "file": "equipment/equipped/armor_feet_roll_2.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        24,
+        16
+      ]
+    },
+    {
+      "id": "armor_feet_stand_t2",
+      "file": "equipment/equipped/armor_feet_stand_2.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        24,
+        16
+      ]
+    },
+    {
+      "id": "armor_belt_t2",
+      "file": "equipment/equipped/armor_belt_2.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        12
+      ]
+    },
+    {
+      "id": "armor_icon_head_t2",
+      "file": "equipment/icons/armor_head_2.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "armor_icon_torso_t2",
+      "file": "equipment/icons/armor_torso_2.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "armor_icon_arms_t2",
+      "file": "equipment/icons/armor_arms_2.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "armor_icon_legs_t2",
+      "file": "equipment/icons/armor_legs_2.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "armor_icon_feet_t2",
+      "file": "equipment/icons/armor_feet_2.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "armor_icon_belt_t2",
+      "file": "equipment/icons/armor_belt_2.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "armor_head_helm_t3",
+      "file": "equipment/equipped/armor_head_helm_3.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        24,
+        24
+      ]
+    },
+    {
+      "id": "armor_head_hood_t3",
+      "file": "equipment/equipped/armor_head_hood_3.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        24,
+        24
+      ]
+    },
+    {
+      "id": "armor_head_circlet_t3",
+      "file": "equipment/equipped/armor_head_circlet_3.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        24,
+        24
+      ]
+    },
+    {
+      "id": "armor_feet_step_t3",
+      "file": "equipment/equipped/armor_feet_step_3.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        24,
+        16
+      ]
+    },
+    {
+      "id": "armor_feet_roll_t3",
+      "file": "equipment/equipped/armor_feet_roll_3.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        24,
+        16
+      ]
+    },
+    {
+      "id": "armor_feet_stand_t3",
+      "file": "equipment/equipped/armor_feet_stand_3.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        24,
+        16
+      ]
+    },
+    {
+      "id": "armor_belt_t3",
+      "file": "equipment/equipped/armor_belt_3.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        12
+      ]
+    },
+    {
+      "id": "armor_icon_head_t3",
+      "file": "equipment/icons/armor_head_3.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "armor_icon_torso_t3",
+      "file": "equipment/icons/armor_torso_3.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "armor_icon_arms_t3",
+      "file": "equipment/icons/armor_arms_3.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "armor_icon_legs_t3",
+      "file": "equipment/icons/armor_legs_3.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "armor_icon_feet_t3",
+      "file": "equipment/icons/armor_feet_3.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "armor_icon_belt_t3",
+      "file": "equipment/icons/armor_belt_3.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "armor_head_helm_t4",
+      "file": "equipment/equipped/armor_head_helm_4.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        24,
+        24
+      ]
+    },
+    {
+      "id": "armor_head_hood_t4",
+      "file": "equipment/equipped/armor_head_hood_4.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        24,
+        24
+      ]
+    },
+    {
+      "id": "armor_head_circlet_t4",
+      "file": "equipment/equipped/armor_head_circlet_4.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        24,
+        24
+      ]
+    },
+    {
+      "id": "armor_feet_step_t4",
+      "file": "equipment/equipped/armor_feet_step_4.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        24,
+        16
+      ]
+    },
+    {
+      "id": "armor_feet_roll_t4",
+      "file": "equipment/equipped/armor_feet_roll_4.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        24,
+        16
+      ]
+    },
+    {
+      "id": "armor_feet_stand_t4",
+      "file": "equipment/equipped/armor_feet_stand_4.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        24,
+        16
+      ]
+    },
+    {
+      "id": "armor_belt_t4",
+      "file": "equipment/equipped/armor_belt_4.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        12
+      ]
+    },
+    {
+      "id": "armor_icon_head_t4",
+      "file": "equipment/icons/armor_head_4.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "armor_icon_torso_t4",
+      "file": "equipment/icons/armor_torso_4.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "armor_icon_arms_t4",
+      "file": "equipment/icons/armor_arms_4.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "armor_icon_legs_t4",
+      "file": "equipment/icons/armor_legs_4.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "armor_icon_feet_t4",
+      "file": "equipment/icons/armor_feet_4.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "armor_icon_belt_t4",
+      "file": "equipment/icons/armor_belt_4.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "armor_head_helm_t5",
+      "file": "equipment/equipped/armor_head_helm_5.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        24,
+        24
+      ]
+    },
+    {
+      "id": "armor_head_hood_t5",
+      "file": "equipment/equipped/armor_head_hood_5.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        24,
+        24
+      ]
+    },
+    {
+      "id": "armor_head_circlet_t5",
+      "file": "equipment/equipped/armor_head_circlet_5.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        24,
+        24
+      ]
+    },
+    {
+      "id": "armor_feet_step_t5",
+      "file": "equipment/equipped/armor_feet_step_5.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        24,
+        16
+      ]
+    },
+    {
+      "id": "armor_feet_roll_t5",
+      "file": "equipment/equipped/armor_feet_roll_5.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        24,
+        16
+      ]
+    },
+    {
+      "id": "armor_feet_stand_t5",
+      "file": "equipment/equipped/armor_feet_stand_5.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        24,
+        16
+      ]
+    },
+    {
+      "id": "armor_belt_t5",
+      "file": "equipment/equipped/armor_belt_5.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        12
+      ]
+    },
+    {
+      "id": "armor_icon_head_t5",
+      "file": "equipment/icons/armor_head_5.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "armor_icon_torso_t5",
+      "file": "equipment/icons/armor_torso_5.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "armor_icon_arms_t5",
+      "file": "equipment/icons/armor_arms_5.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "armor_icon_legs_t5",
+      "file": "equipment/icons/armor_legs_5.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "armor_icon_feet_t5",
+      "file": "equipment/icons/armor_feet_5.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "armor_icon_belt_t5",
+      "file": "equipment/icons/armor_belt_5.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G4",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "qistone_xs",
+      "file": "items/qistone_xs.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G1",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "qistone_s",
+      "file": "items/qistone_s.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G1",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "qistone_m",
+      "file": "items/qistone_m.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G1",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "qistone_l",
+      "file": "items/qistone_l.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G1",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "qistone_xl",
+      "file": "items/qistone_xl.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G1",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "pill_heal_s",
+      "file": "items/pill_heal_s.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G1",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "pill_heal_m",
+      "file": "items/pill_heal_m.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G1",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "pill_heal_l",
+      "file": "items/pill_heal_l.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G1",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "pill_qi_s",
+      "file": "items/pill_qi_s.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G1",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "pill_qi_m",
+      "file": "items/pill_qi_m.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G1",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "pill_qi_l",
+      "file": "items/pill_qi_l.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G1",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "material_iron",
+      "file": "items/material_iron.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G1",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "material_leather",
+      "file": "items/material_leather.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G1",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "material_cloth",
+      "file": "items/material_cloth.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G1",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "material_wood",
+      "file": "items/material_wood.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G1",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "material_bone",
+      "file": "items/material_bone.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G1",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "material_steel",
+      "file": "items/material_steel.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G1",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "material_spirit_stone",
+      "file": "items/material_spirit_stone.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G1",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "material_star_metal",
+      "file": "items/material_star_metal.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G1",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "material_dragon_bone",
+      "file": "items/material_dragon_bone.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G1",
+      "size": [
+        32,
+        32
+      ]
+    },
+    {
+      "id": "material_void_matter",
+      "file": "items/material_void_matter.png",
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "phase": "G1",
+      "size": [
+        32,
+        32
+      ]
+    }
+  ]
+}

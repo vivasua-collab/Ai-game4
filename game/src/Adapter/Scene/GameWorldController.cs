@@ -105,6 +105,15 @@ public partial class GameWorldController : Node2D
     private float         _mainHandSwingAge = -1f;   // <0 = нет анимации
     private const float   MainHandSwingSec = 0.42f;  // ≈ каст базовой атаки
     private const float   MainHandSwingLungePx = 12f;
+
+    // === G0 (2026-09-25): подготовка спрайтов — аниматор игрока (I-1) ====
+    // PNG-листы отсутствуют → процедурная статика КАК СЕЙЧАС (fallback по
+    // контракту PROCEDURAL_SPRITES §5); при доставке PNG в
+    // resources/sprites/characters/player/ анимация включается без правок.
+    private PlayerAnimator? _playerAnimator;
+    private bool          _lastMoving;              // снимок движения для аниматора
+    private bool          _lastRunning;             // Shift-бег
+    private float         _lastSpeedMult = 1f;      // gameSpeed×бег×штрафы (walk fps)
     private InputAdapter  _inputAdapter  = null!;
     private SceneBuilder  _sceneBuilder  = null!;
     private TechniqueEffectRenderer _techniqueEffectRenderer = null!;
@@ -235,6 +244,23 @@ public partial class GameWorldController : Node2D
 
     /// <summary>QA: принудительный facing (headless — ввода нет).</summary>
     public void DEBUG_SetFacingLeft(bool left) => _facingLeft = left;
+
+    // === G0: QA-доступ (GODOT_ANIMQA_DEBUG) — аниматор игрока ============
+
+    /// <summary>Аниматор игрока (QA: кадры/листы/оверлеи).</summary>
+    public PlayerAnimator? PlayerAnimatorForQA => _playerAnimator;
+
+    /// <summary>Текущая анимация игрока ("player_idle"…; QA).</summary>
+    public string PlayerAnimId => _playerAnimator?.AnimId ?? "player_idle";
+
+    /// <summary>Кадр анимации игрока (QA; 0 — процедурная статика).</summary>
+    public int PlayerAnimFrame => _playerAnimator?.Frame ?? 0;
+
+    /// <summary>Анимация из PNG-листа (QA; false — процедурный fallback).</summary>
+    public bool PlayerAnimIsPng => _playerAnimator?.IsPng ?? false;
+
+    /// <summary>Кадров в активном листе игрока (QA; 0 — fallback).</summary>
+    public int PlayerAnimFrameCount => _playerAnimator?.FrameCount ?? 0;
 
     /// <summary>
     /// QA (AnimalCombatSimDebug): программный телепорт игрока — ЛОГИКА и
@@ -746,6 +772,15 @@ public partial class GameWorldController : Node2D
             var weaponVisSim = new WeaponVisSimDebug { Name = "WeaponVisSimDebug" };
             AddChild(weaponVisSim);
         }
+        // G0 (2026-09-25): headless-верификация подготовки спрайтов
+        // (GODOT_ANIMQA_DEBUG=1) — SpriteSheetCache (fallback/загрузка/сетка),
+        // PlayerAnimator (кадры/состояния/оверлей), PNG-миграция оружия,
+        // аниматоры NPC/зверей.
+        if (System.Environment.GetEnvironmentVariable("GODOT_ANIMQA_DEBUG") == "1")
+        {
+            var animQaSim = new SpriteAnimSimDebug { Name = "SpriteAnimSimDebug" };
+            AddChild(animQaSim);
+        }
         // R16 (2026-09-10): headless-верификация ИИ NPC в бою
         // (GODOT_COMBATAI_DEBUG=1) — месть на атаку игрока, урон в обе
         // стороны, селектор защит NPC, бегство HP<20%, leash, стойка
@@ -879,14 +914,18 @@ public partial class GameWorldController : Node2D
         _playerShadow = shadow;
 
         // Player sprite (procedural texture — centered on tile center).
+        var playerTex = CreatePlayerTexture();
         _playerSprite = new Sprite2D
         {
             Name = "PlayerSprite",
-            Texture = CreatePlayerTexture(),
+            Texture = playerTex,
             ZIndex = (int)RenderLayer.Player,
             TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
         };
         _worldRoot.AddChild(_playerSprite);
+
+        // G0: аниматор игрока (sprite-swap; fallback — процедурная статика).
+        _playerAnimator = new PlayerAnimator(_playerSprite, playerTex);
 
         // R15: MainHand — hand-спрайт оружия (48×48, диагональ) поверх тела.
         // Texture/Visible управляются RefreshMainHand(); позиция и FlipH —
@@ -1281,6 +1320,14 @@ public partial class GameWorldController : Node2D
                 _playerShadow.Position = new Vector2(_visualPosition.X, _visualPosition.Y + 8f);
         }
 
+        // G0: тик аниматора игрока. Пауза времени — стоп-кадр (§4.3 плана):
+        // таймеры one-shot замирают вместе с миром.
+        if (_playerAnimator != null && (Time == null || !Time.IsPaused))
+        {
+            _playerAnimator.Update(delta, new PlayerAnimator.FrameState(
+                _lastMoving, _lastRunning, _lastSpeedMult, _meditationActive));
+        }
+
         // R15: композит — оружие в руке. Позиция = тело + HandOffset
         // (зеркалирование ТОЛЬКО по X: offset → (-X, Y)); FlipH зеркалит
         // содержимое текстуры вокруг центра спрайта (SPRITE_CATALOG §16).
@@ -1608,7 +1655,11 @@ public partial class GameWorldController : Node2D
         if (Player == null) return;
 
         // Check if paused — no movement when paused.
-        if (Time != null && Time.IsPaused) return;
+        if (Time != null && Time.IsPaused)
+        {
+            _lastMoving = false; // G0: аниматор — стоп-кадр
+            return;
+        }
 
         // Get input vector (normalized -1..1 per axis).
         Vector2 moveVec = Godot.Input.GetVector("move_left", "move_right", "move_up", "move_down");
@@ -1684,6 +1735,11 @@ public partial class GameWorldController : Node2D
             if (moveVec.X > 0.15f) _facingLeft = false;
             else if (moveVec.X < -0.15f) _facingLeft = true;
 
+            // G0: снимок для аниматора (walk/run + множитель fps).
+            _lastMoving = true;
+            _lastRunning = Godot.Input.IsActionPressed("run");
+            _lastSpeedMult = speedMult;
+
             // Clamp to world bounds. Use TileService dimensions when available,
             // falling back to GameConstants.DEFAULT_MAP_* (audit issue #15).
             int mapW = Tiles != null && Tiles.MapWidth > 0 ? Tiles.MapWidth : GameConstants.DEFAULT_MAP_WIDTH;
@@ -1701,6 +1757,11 @@ public partial class GameWorldController : Node2D
             var diff = target - _visualPosition;
             float dist = diff.Length();
 
+            // G0: снимок для аниматора (мышиное движение = walk).
+            _lastMoving = dist >= 4f;
+            _lastRunning = false;
+            _lastSpeedMult = speedMult;
+
             if (dist < 4f)  // close enough — snap
             {
                 _visualPosition = target;
@@ -1713,6 +1774,14 @@ public partial class GameWorldController : Node2D
                 // R15: клик-движение — взгляд по направлению к цели.
                 if (Mathf.Abs(diff.X) > 8f) _facingLeft = diff.X < 0f;
             }
+        }
+
+        else
+        {
+            // G0: ни ввода, ни цели — покой.
+            _lastMoving = false;
+            _lastRunning = false;
+            _lastSpeedMult = 1f;
         }
 
         // Sync tile position to PlayerService (for game logic).
@@ -2153,6 +2222,8 @@ public partial class GameWorldController : Node2D
     private void OnPlayerDamaged(in Core.Messaging.Contracts.DamageAppliedEvent e)
     {
         if (e.TargetId is not ("player_0" or "player")) return;
+        // G0: поза получения урона (player_hit, one-shot 0.17с).
+        _playerAnimator?.NotifyHit();
         string attacker = e.SourceId is ("player_0" or "player")
             ? ""
             : $" — {Npcs?.GetNPCState(e.SourceId)?.DisplayName ?? "?"}";
@@ -2289,6 +2360,7 @@ public partial class GameWorldController : Node2D
     {
         ShowToast($"☠ Вы погибли ({e.Cause}) — возрождение...");
         GD.Print($"[GameWorld] Player death: {e.Cause} — respawn in 3s");
+        _playerAnimator?.NotifyDeath(); // G0: поза смерти (hold до респавна)
         CallDeferred(nameof(RespawnAfterDeath));
     }
 
@@ -2317,6 +2389,7 @@ public partial class GameWorldController : Node2D
                 }
             }
             (Player as Modules.Player.PlayerService)?.Revive();
+            _playerAnimator?.NotifyRespawn(); // G0: выход из death-hold
 
             // Телепорт в центр карты.
             int cx = (Tiles is { MapWidth: > 0 } ? Tiles.MapWidth : 50) / 2;
@@ -2458,6 +2531,13 @@ public partial class GameWorldController : Node2D
     /// </summary>
     private void OnAttackIntentForSwing(in Core.Messaging.Contracts.AttackIntentEvent e)
     {
+        // G0: поза атаки игрока — melee (0.42с, синх замаху) или bow (G4).
+        if (Core.Helpers.PlayerIdResolver.IsPlayer(e.AttackerId))
+        {
+            if (e.IsRanged) _playerAnimator?.NotifyRangedAttack();
+            else            _playerAnimator?.NotifyMeleeAttack();
+        }
+
         if (e.IsRanged) return;
         if (!Core.Helpers.PlayerIdResolver.IsPlayer(e.AttackerId)) return;
         if (_playerMainHand == null || !PlayerIdResolverProxy()) return;

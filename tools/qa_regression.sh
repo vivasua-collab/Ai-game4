@@ -40,6 +40,8 @@ ALL_SIMS=(
   "AUDIT0922:GODOT_AUDIT0922_DEBUG"
   # R37-c (баг-репорт 23.09): зарядник Ци — окно H/мост/анти-дюп/пояс-гейт.
   "CHARGERQA:GODOT_CHARGERQA_DEBUG"
+  # G0 (25.09): подготовка спрайтов — кэш/загрузчик/аниматоры/fallback.
+  "ANIMQA:GODOT_ANIMQA_DEBUG"
 )
 
 if [ "$#" -gt 0 ]; then

@@ -48,6 +48,11 @@ public static class WeaponVisualCatalog
     // Кэш: текстуры генерируются один раз на ключ.
     private static readonly Dictionary<string, WeaponVisuals> _cache = new();
 
+    // G0 (I-11, 2026-09-25): PNG-миграция — счётчик загруженных PNG
+    // (QA: GODOT_ANIMQA_DEBUG; ключи кэша НЕ меняются — PROCEDURAL_SPRITES §5).
+    private static int _pngHandCount;
+    private static int _pngIconCount;
+
     /// <summary>Ключ кэша/QA для параметров генерации.</summary>
     public static string TextureKey(string weaponClass, int materialTier, ItemRarity rarity) =>
         $"{weaponClass}|{materialTier}|{rarity}";
@@ -64,21 +69,42 @@ public static class WeaponVisualCatalog
         return GetOrCreate(classId, tier, weapon.Rarity);
     }
 
-    /// <summary>Получить (или сгенерировать) визуалы по ключу.</summary>
+    /// <summary>Получить (или сгенерировать) визуалы по ключу.
+    /// G0 (I-11): PNG-миграция — сначала PNG из resources/sprites/equipment
+    /// (по тем же ключам class|tier; редкость НЕ в имени — золотая обводка
+    /// Legendary/Mythic остаётся кодом), отсутствует → процедурный рецепт
+    /// R15 как сейчас. Механика крепления/офсетов/замаха не меняется.</summary>
     public static WeaponVisuals GetOrCreate(string weaponClass, int materialTier, ItemRarity rarity)
     {
         int tier = System.Math.Clamp(materialTier, 1, 5);
         string key = TextureKey(weaponClass, tier, rarity);
         if (_cache.TryGetValue(key, out var cached)) return cached;
 
+        // G0: PNG-первый (без editor-импорта — Image.LoadFromFile).
+        ImageTexture? iconPng = LoadEquipmentPng($"icons/weapon_{weaponClass}_{tier}.png");
+        ImageTexture? handPng = LoadEquipmentPng($"equipped/weapon_hand_{weaponClass}_{tier}.png");
+        if (iconPng != null) _pngIconCount++;
+        if (handPng != null) _pngHandCount++;
+
         var visuals = new WeaponVisuals
         {
-            Icon = ProceduralSpriteGenerator.CreateWeaponIcon(weaponClass, tier, rarity),
-            Hand = ProceduralSpriteGenerator.CreateWeaponHandSprite(weaponClass, tier, rarity),
+            Icon = iconPng ?? ProceduralSpriteGenerator.CreateWeaponIcon(weaponClass, tier, rarity),
+            Hand = handPng ?? ProceduralSpriteGenerator.CreateWeaponHandSprite(weaponClass, tier, rarity),
             Key = key,
         };
         _cache[key] = visuals;
         return visuals;
+    }
+
+    /// <summary>
+    /// G0: загрузка PNG экипировки из res://resources/sprites/equipment/
+    /// (null — файла нет; НЕ логируем — штатный fallback).
+    /// </summary>
+    private static ImageTexture? LoadEquipmentPng(string relative)
+    {
+        string path = $"{SpriteSheetCache.Root}/equipment/{relative}";
+        if (!SpriteSheetCache.TryLoadTexture(path, out var tex)) return null;
+        return tex;
     }
 
     /// <summary>
@@ -151,6 +177,17 @@ public static class WeaponVisualCatalog
     /// <summary>QA: размер кэша (генерация ленивая, по требованию).</summary>
     public static int CachedEntryCount => _cache.Count;
 
+    /// <summary>QA (GODOT_ANIMQA_DEBUG): число hand-PNG, подхваченных из каталога.</summary>
+    public static int PngHandCount => _pngHandCount;
+
+    /// <summary>QA (GODOT_ANIMQA_DEBUG): число icon-PNG, подхваченных из каталога.</summary>
+    public static int PngIconCount => _pngIconCount;
+
     /// <summary>QA/тесты: сброс кэша (сценарии ReAssembly — новые миры).</summary>
-    public static void ResetCache() => _cache.Clear();
+    public static void ResetCache()
+    {
+        _cache.Clear();
+        _pngHandCount = 0;
+        _pngIconCount = 0;
+    }
 }

@@ -123,6 +123,10 @@ public partial class NPCSpriteRenderer : Node2D
 
     public override void _PhysicsProcess(double delta)
     {
+        // G0 (I-5): общий таймер анимационных фаз NPC (реальное время —
+        // анимация не должна зависеть от троттла перерисовки).
+        _animClock += (float)delta;
+
         // R15: перескан оружия NPC (0.5с) — дёшево: GetEquipped по всем ID.
         _weaponRescanCooldown -= (float)delta;
         if (_weaponRescanCooldown <= 0f)
@@ -215,6 +219,25 @@ public partial class NPCSpriteRenderer : Node2D
     // без учёта морфологии (репорт 20.09: «молодой волк с телом человека»).
     private readonly Dictionary<string, Texture2D> _beastSpriteCache = new();
 
+    // === G0 (I-5, 2026-09-25): анимация NPC (sprite-swap в _Draw) ========
+    // Листы: npc_{role}_{anim} → npc_base_{anim} → процедурный кэш (fallback
+    // §5 PROCEDURAL_SPRITES). Звери — animal_{species}_{anim}. Кадры —
+    // DrawTextureRegion (без нарезки на текстуры). Движение — дельта позиции
+    // между кадрами; замах — тот же _npcSwings (R16).
+    private float _animClock;                            // сек — общий таймер фаз
+    private readonly Dictionary<string, Vector2> _npcLastPos = new(); // tiles
+    private readonly Dictionary<string, NpcAnimInfo> _lastAnimInfo = new(); // QA
+
+    /// <summary>G0: резолв анимации NPC на кадр (для _Draw и headless-QA).</summary>
+    public sealed class NpcAnimInfo
+    {
+        public string AnimId = "npc_idle";
+        public SpriteSheetCache.SpriteSheet? Sheet;   // null — процедурный fallback
+        public Texture2D? Procedural;                 // кэш роли/вида
+        public int Frame;                             // индекс кадра в листе
+        public bool IsPng => Sheet != null;
+    }
+
     public override void _Draw()
     {
         if (_npcService == null) return;
@@ -242,29 +265,29 @@ public partial class NPCSpriteRenderer : Node2D
             bool isQuadruped = npc.Morphology == Morphology.Quadruped;
             string? beastSpecies = isQuadruped ? st?.SpeciesId : null;
 
-            Texture2D tex;
-            if (!string.IsNullOrEmpty(beastSpecies)
-                && _beastSpriteCache.TryGetValue(beastSpecies!, out var beastTex))
-            {
-                tex = beastTex;
-            }
-            else if (!string.IsNullOrEmpty(beastSpecies))
-            {
-                tex = ProceduralSpriteGenerator.CreateAnimalSprite(
-                    beastSpecies!, BeastSizeClass(beastSpecies!));
-                _beastSpriteCache[beastSpecies!] = tex;
-            }
-            else if (!_spriteCache.TryGetValue(npc.Role, out tex))
-            {
-                // Get or create sprite for this role.
-                tex = ProceduralSpriteGenerator.CreateNPCSprite(npc.Role);
-                _spriteCache[npc.Role] = tex;
-            }
+            // G0 (I-5): анимационный резолв — PNG-лист (npc_{role}_{anim} /
+            // npc_base_{anim} / animal_{species}_{anim}) → регион кадра;
+            // нет PNG → процедурный кэш по роли/виду КАК СЕЙЧАС.
+            bool moving = IsNpcMoving(id, npc.Position);
+            var anim = ResolveNpcAnim(id, npc.Role, beastSpecies, moving);
+            _lastAnimInfo[id] = anim;
 
-            // Draw sprite centered on tile.
-            float spriteSize = tex.GetWidth();
+            float spriteSize = anim.Sheet?.FrameSize ?? anim.Procedural!.GetWidth();
             var pos = new Vector2(cx - spriteSize / 2f, cy - spriteSize / 2f);
-            DrawTexture(tex, pos);
+            if (anim.Sheet != null)
+            {
+                // Регион кадра из листа (D1-полоса; D2-сетка — ряд из Frame).
+                int col = anim.Frame % anim.Sheet.FrameCount;
+                int row = anim.Frame / anim.Sheet.FrameCount;
+                var src = new Rect2(col * anim.Sheet.FrameSize, row * anim.Sheet.FrameSize,
+                                    anim.Sheet.FrameSize, anim.Sheet.FrameSize);
+                DrawTextureRectRegion(anim.Sheet.Texture,
+                    new Rect2(pos, new Vector2(spriteSize, spriteSize)), src);
+            }
+            else
+            {
+                DrawTexture(anim.Procedural!, pos);
+            }
 
             // R27: рамка-подсветка ВЫБРАННОЙ цели (Tab-цикл TargetingService):
             // янтарная рамка вокруг спрайта — игрок видит, КГО бьют
@@ -318,6 +341,139 @@ public partial class NPCSpriteRenderer : Node2D
         "dragon" => SizeClass.Large,
         _ => SizeClass.Medium,
     };
+
+    // === G0 (I-5): анимационный резолв =====================================
+
+    /// <summary>
+    /// Движение NPC: дельта позиции (тайлы) с прошлого кадра отрисовки.
+    /// Порог 0.02 тайла — движение wander 3 т/с на 60 Гц ≈ 0.05/кадр.
+    /// </summary>
+    private bool IsNpcMoving(string npcId, Position2D position)
+    {
+        var p = new Vector2(position.X, position.Y);
+        bool moving = true;
+        if (_npcLastPos.TryGetValue(npcId, out var last))
+            moving = (p - last).LengthSquared() > 0.02f * 0.02f;
+        _npcLastPos[npcId] = p;
+        return moving;
+    }
+
+    /// <summary>
+    /// Резолв анимации NPC: melee (замах R16) > walk (движение) > idle.
+    /// Лист: npc_{role}_{kind} → npc_base_{kind} (гуманоид) /
+    /// animal_{species}_{kind} (зверь). Кадр: walk — общий клок + сдвиг по
+    /// хэшу id (рассинхрон толпы); melee — прогресс замаха; idle — медленный
+    /// цикл. Листа нет → процедурный кэш по роли/виду (нулевая регрессия).
+    /// public: headless-QA (GODOT_ANIMQA_DEBUG) резолвит без отрисовки.
+    /// </summary>
+    public NpcAnimInfo ResolveNpcAnim(string npcId, NPCRole role, string? beastSpecies, bool moving)
+    {
+        // Вид анимации: приоритет — замах (0.42с), затем движение.
+        string kind = "idle";
+        float oneShotProgress = 0f;
+        if (_npcSwings.TryGetValue(npcId, out var swing))
+        {
+            kind = "melee";
+            oneShotProgress = Mathf.Clamp(swing.Age / NpcSwingSec, 0f, 1f);
+        }
+        else if (moving) kind = "walk";
+
+        var info = new NpcAnimInfo { AnimId = "npc_idle" };
+
+        // 1) PNG-лист по ключам каталога (§6.4 SPRITE_PROMPTS_CHARACTERS).
+        SpriteSheetCache.SpriteSheet? sheet = null;
+        string animId;
+        if (!string.IsNullOrEmpty(beastSpecies))
+        {
+            animId = $"animal_{beastSpecies}_{kind}";
+            sheet = SpriteSheetCache.TryGetSheet(animId);
+        }
+        else
+        {
+            animId = $"npc_{role.ToString().ToLowerInvariant()}_{kind}";
+            sheet = SpriteSheetCache.TryGetSheet(animId);
+            if (sheet == null)
+            {
+                animId = $"npc_base_{kind}";
+                sheet = SpriteSheetCache.TryGetSheet(animId);
+            }
+        }
+
+        if (sheet != null)
+        {
+            info.AnimId = animId;
+            info.Sheet = sheet;
+            info.Frame = kind switch
+            {
+                "melee" => sheet.FrameAt(oneShotProgress),
+                "walk"  => WalkFrame(sheet, npcId),
+                _       => IdleFrame(sheet, npcId),
+            };
+            return info;
+        }
+
+        // 2) Fallback: процедурный кэш по роли/виду (как до G0).
+        info.AnimId = beastSpecies != null ? $"animal_{beastSpecies}_static" : $"npc_{role}_static";
+        info.Procedural = !string.IsNullOrEmpty(beastSpecies)
+            ? GetOrCreateBeastTexture(beastSpecies!)
+            : GetOrCreateRoleTexture(role);
+        return info;
+    }
+
+    /// <summary>Кадр walk: общий клок × fps + рассинхрон по хэшу id.</summary>
+    private int WalkFrame(SpriteSheetCache.SpriteSheet sheet, string npcId)
+    {
+        float phase = _animClock * sheet.Fps + NpcPhaseOffset(npcId);
+        return (int)phase % sheet.FrameCount;
+    }
+
+    /// <summary>Кадр idle: медленный цикл (~0.4× fps) + рассинхрон.</summary>
+    private int IdleFrame(SpriteSheetCache.SpriteSheet sheet, string npcId)
+    {
+        float phase = _animClock * (sheet.Fps * 0.4f) + NpcPhaseOffset(npcId);
+        return (int)phase % sheet.FrameCount;
+    }
+
+    /// <summary>Стабильный сдвиг фазы по id (толпа не марширует в ногу).</summary>
+    private static float NpcPhaseOffset(string npcId)
+    {
+        int h = 17;
+        foreach (char c in npcId) h = h * 31 + c;
+        return (h & 0x7FFFFFFF) % 1000 / 97f; // 0..10 сек
+    }
+
+    private Texture2D GetOrCreateRoleTexture(NPCRole role)
+    {
+        if (_spriteCache.TryGetValue(role, out var tex)) return tex;
+        tex = ProceduralSpriteGenerator.CreateNPCSprite(role);
+        _spriteCache[role] = tex;
+        return tex;
+    }
+
+    private Texture2D GetOrCreateBeastTexture(string speciesId)
+    {
+        if (_beastSpriteCache.TryGetValue(speciesId, out var tex)) return tex;
+        tex = ProceduralSpriteGenerator.CreateAnimalSprite(speciesId, BeastSizeClass(speciesId));
+        _beastSpriteCache[speciesId] = tex;
+        return tex;
+    }
+
+    // === G0: QA-доступ (GODOT_ANIMQA_DEBUG) ================================
+
+    /// <summary>QA: последний резолв анимации NPC (по id; null — не резолвился).</summary>
+    public NpcAnimInfo? GetNpcAnimInfo(string npcId) =>
+        _lastAnimInfo.TryGetValue(npcId, out var info) ? info : null;
+
+    /// <summary>QA: число NPC с PNG-анимацией в последнем проходе _Draw.</summary>
+    public int NpcPngAnimatedCount
+    {
+        get
+        {
+            int n = 0;
+            foreach (var info in _lastAnimInfo.Values) if (info.IsPng) n++;
+            return n;
+        }
+    }
 
     /// <summary>
     /// R15: overlay оружия NPC. Топ-левел hand-текстуры = топ-левел тела +
