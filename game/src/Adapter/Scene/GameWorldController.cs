@@ -79,6 +79,8 @@ public partial class GameWorldController : Node2D
     [Inject] private ISubscriber<Core.Messaging.Contracts.CorpseRemovedEvent> CorpseRemovedSub { get; set; } = null!;
     // R15 (2026-09-10): экипировка оружия → обновить спрайт в руке игрока.
     [Inject] private ISubscriber<Core.Messaging.Contracts.EquipmentChangedEvent> EquipmentChangedSub { get; set; } = null!;
+    // R37 (U2 fix): причина отказа экипировки → видимый тост игроку.
+    [Inject] private ISubscriber<Core.Messaging.Contracts.EquipmentBlockedEvent> EquipmentBlockedSub { get; set; } = null!;
     // R16 (2026-09-10): замах оружия игрока (AttackIntentEvent, melee) +
     // тост стойки защиты (DefenseIntentEvent, клавиша G).
     [Inject] private ISubscriber<Core.Messaging.Contracts.AttackIntentEvent> AttackIntentSub { get; set; } = null!;
@@ -161,6 +163,7 @@ public partial class GameWorldController : Node2D
     private System.IDisposable? _corpseRemovedToken; // R13: закрытие LootWindow по CorpseRemovedEvent
     private System.IDisposable? _attackRejectedToken; // M2: тост причины отклонения атаки
     private System.IDisposable? _equipmentChangedToken; // R15: оружие в руке
+    private System.IDisposable? _equipmentBlockedToken;  // R37 (U2): тост причины отказа
     // R16: замах оружия + тост стойки защиты.
     private System.IDisposable? _attackIntentToken;
     private System.IDisposable? _defenseIntentToken;
@@ -540,6 +543,10 @@ public partial class GameWorldController : Node2D
         // Страховка на случай экипировки ДО _Ready (фазы сборки) — поллинг 0.5с
         // в _PhysicsProcess (сравнение по ItemId, дёшево).
         _equipmentChangedToken = EquipmentChangedSub?.Subscribe(OnEquipmentChanged);
+        // R37 (U2 fix, баг-репорт 23.09 №2 «не смог одеть сапоги»): подписка на
+        // отказ экипировки — EquipmentService гейтит по уровню и публикует
+        // EquipmentBlockedEvent, но рендера не было → игрок не знал причины.
+        _equipmentBlockedToken = EquipmentBlockedSub?.Subscribe(OnEquipmentBlocked);
         // R16: замах оружия игрока + тост стойки защиты (G).
         _attackIntentToken = AttackIntentSub?.Subscribe(OnAttackIntentForSwing);
         _defenseIntentToken = DefenseIntentSub?.Subscribe(OnDefenseIntent);
@@ -2339,6 +2346,21 @@ public partial class GameWorldController : Node2D
     }
 
     /// <summary>
+    /// R37 (U2 fix, баг-репорт 23.09 №2): EquipmentService отклоняет экипировку
+    /// (гейт RequiredCultivationLevel R35 и др.) и публикует EquipmentBlockedEvent
+    /// с причиной, но рендера не было — предмет «молча не надевался», игрок не
+    /// понимал почему (сапоги L5 при игроке L1 тихо оставались в инвентаре).
+    /// Теперь причина — тост с префиксом «⛔». Фильтр: только игрок (NPC-отказы
+    /// не тостим — шум, экипировка NPC тихая). Спам-защита: ShowToast
+    /// дедуплицирует подряд идущий одинаковый текст (refresh, не новая строка).
+    /// </summary>
+    private void OnEquipmentBlocked(in Core.Messaging.Contracts.EquipmentBlockedEvent e)
+    {
+        if (CultivationGame.Core.Helpers.PlayerIdResolver.IsPlayer(e.EntityId))
+            ShowToast($"⛔ {e.Reason}");
+    }
+
+    /// <summary>
     /// M2 (2026-09-03): отклонение атаки игрока → тост причины.
     /// C-5 аудита-3: CombatService публикует AttackRejectedEvent при попытке
     /// атаковать во время каста. Раньше игрок не понимал, почему удар не прошёл
@@ -2949,6 +2971,9 @@ public partial class GameWorldController : Node2D
         // R15: экипировка → MainHand. R16: замах оружия + стойка защиты.
         _equipmentChangedToken?.Dispose();
         _equipmentChangedToken = null;
+        // R37 (U2): тост причины отказа экипировки.
+        _equipmentBlockedToken?.Dispose();
+        _equipmentBlockedToken = null;
         _attackIntentToken?.Dispose();
         _attackIntentToken = null;
         _defenseIntentToken?.Dispose();

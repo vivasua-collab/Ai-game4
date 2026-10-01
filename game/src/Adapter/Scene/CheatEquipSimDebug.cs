@@ -297,6 +297,13 @@ public partial class CheatEquipSimDebug : Node
         GD.Print($"[CheatEquipSim] U2. тост причины отказа (⛔) показан игроку: {u2} " +
                  $"({blockedToasts} строк) — {(u2 ? "OK" : "DEFECT: отказ экипировки невидим")}");
         pass &= u2;
+        // R37 (U2 postfix): визуальный пруф — скрин сразу после отклонённой
+        // попытки (тост ⛔ живёт 2.5с, успевает в кадр).
+        if (!string.IsNullOrEmpty(shotPrefix))
+        {
+            await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+            SaveScreenshot($"{shotPrefix}_u2_toast.png");
+        }
 
         cheat.Visible = false;
 
