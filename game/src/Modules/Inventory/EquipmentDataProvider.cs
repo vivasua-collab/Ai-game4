@@ -409,14 +409,18 @@ namespace CultivationGame.Modules.Inventory
                 var item = kvp.Value;
                 if (item == null) continue;
 
-                float gradeMult = GetGradeMultiplier(item.Grade);
-
+                // R38-4b: БЕЗ грейд-множителя — генератор уже вложил
+                // эффективность грейда в стат предмета (§2 «Eff = Base × Grade
+                // × (1+Material)»; GradeProfiles.EfficiencyMult ≡ EquipmentGrade
+                // Multipliers 0.5/1.0/1.3/1.6/2.0). Умножение здесь считало
+                // грейд ДВАЖДЫ (легендарка = ×4 вместо ×2). Совпало с багом
+                // 02.10 №4: «золотой сет» имел завышенные вчетверо статы.
                 if (item.Damage > 0)
-                    totalDamage += item.Damage * gradeMult;
+                    totalDamage += item.Damage;
 
                 if (item.Defense > 0)
                 {
-                    totalArmor += item.Defense * gradeMult;
+                    totalArmor += item.Defense;
                     coverageSum += item.Coverage;
                     // R21-3: предметное «Снижение урона» (%). БЕЗ грейд-
                     // множителя — грейд добавляет отдельно через bonus в
@@ -437,9 +441,8 @@ namespace CultivationGame.Modules.Inventory
                 : 0;
         }
 
-        /// <summary>Грейд-множитель предмета (EQUIPMENT_SYSTEM §2.1; 1.0 при отсутствии).</summary>
-        private static float GetGradeMultiplier(EquipmentGrade grade)
-            => GameConstants.EquipmentGradeMultipliers.TryGetValue(grade, out var mult) ? mult : 1f;
+        // R38-4b: GetGradeMultiplier удалён — грейд-эффективность уже вложена
+        // генератором в стат предмета (§2); двойное умножение давало ×4.
 
         // === Вспомогательные ===
 

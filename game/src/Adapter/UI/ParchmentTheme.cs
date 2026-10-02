@@ -23,13 +23,20 @@ public static class ParchmentTheme
     public static readonly Color AccentBlue     = new("3a5a7b");
     public static readonly Color AccentPurple   = new("5a3a7b");
 
-    // ---- Item rarity palette (§2.2) ----
-    public static readonly Color RarityCommon    = new("6b7280");
-    public static readonly Color RarityUncommon  = new("22c55e");
-    public static readonly Color RarityRare      = new("3b82f6");
-    public static readonly Color RarityEpic      = new("a855f7");
-    public static readonly Color RarityLegendary = new("fbbf24");
-    public static readonly Color RarityMythic    = new("ef4444");
+    // ---- Item rarity palette ----
+    // R38-3 (баг-репорт 02.10 №3): старая палитра §2.2 была рассчитана на ТЁМНЫЙ
+    // фон (веб-прототип) — на светлом пергаменте #E8D5A8 золото #FBBF24 имело
+    // контраст 1.15:1 («вещи почти сливаются с фоном»). Новые значения — тёмные
+    // WCAG-версии: все ≥ 4.5:1 на ParchmentBase (расчёт в чекпоинте R38):
+    //   Common #374151 7.12:1 · Uncommon #166534 4.93:1 · Rare #1E40AF 6.03:1
+    //   Epic #5B21B6 6.21:1 · Legendary #6E510B 5.10:1 · Mythic #991B1B 5.74:1
+    // Легендарки остаются узнаваемо «золотыми» — бронзово-золотой тон чернил.
+    public static readonly Color RarityCommon    = new("374151");
+    public static readonly Color RarityUncommon  = new("166534");
+    public static readonly Color RarityRare      = new("1e40af");
+    public static readonly Color RarityEpic      = new("5b21b6");
+    public static readonly Color RarityLegendary = new("6e510b");
+    public static readonly Color RarityMythic    = new("991b1b");
 
     /// <summary>
     /// Build a fully-styled <see cref="Theme"/> for the parchment look.

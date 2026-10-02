@@ -54,6 +54,14 @@ namespace CultivationGame.Modules.NPC
         /// <summary>Cooldown for combat attacks (ticks until next attack).</summary>
         public int CombatCooldownTicks { get; set; }
 
+        /// <summary>
+        /// R38-2 (баг-репорт 02.10 №2): тики ПОДРЯД вне chase-радиуса. Раньше
+        /// de-aggro был мгновенным: игрок дальше 5 тайлов — волк «замерал» на
+        /// месте, не сделав ни шага погони (дальний удар луком с 18 тайлов
+        /// включал месть и тут же гасил её). Теперь погоня живёт grace-окно.
+        /// </summary>
+        public int ChaseLostTicks { get; set; }
+
         /// <summary>ID of last attacker (for retaliation targeting).</summary>
         public string LastAttackerId { get; set; } = string.Empty;
 

@@ -12,7 +12,8 @@ namespace CultivationGame.Modules.Inventory
     /// <summary>
     /// Агрегатор статов экипировки.
     /// Подсчитывает суммарные бонусы со всех надетых предметов.
-    /// Учитывает грейд множитель и состояние прочности.
+    /// Учитывает состояние прочности. R38-4b: грейд-эффективность НЕ
+    /// применяется — генератор уже вложил её в стат предмета (§2).
     ///
     /// INV-A15/A16 FIX: Разделение flat и percentage бонусов.
     /// Формула: (base + flatSum) × (1 + percentSum)
@@ -21,7 +22,10 @@ namespace CultivationGame.Modules.Inventory
     {
         /// <summary>
         /// Подсчитать суммарную броню со всей экипировки.
-        /// Броня = Σ(equipment.Defense × gradeMultiplier × durabilityEfficiency × coverage)
+        /// Броня = Σ(equipment.Defense × durabilityEfficiency × coverage)
+        /// R38-4b: БЕЗ грейд-множителя — генератор УЖЕ вкладывает эффективность
+        /// грейда в стат предмета (§2 «Eff = Base × Grade × (1+Material)»);
+        /// умножение здесь считало грейд ДВАЖДЫ (легендарка = ×4, ×2×2).
         /// </summary>
         public static float GetTotalArmor(Dictionary<EquipmentSlot, EquipmentData> equipment)
         {
@@ -31,16 +35,16 @@ namespace CultivationGame.Modules.Inventory
                 var item = kvp.Value;
                 if (item == null || item.Defense <= 0) continue;
 
-                float gradeMult = GetGradeMultiplier(item.Grade);
                 float durabilityMult = GetDurabilityEfficiency(item);
-                total += item.Defense * gradeMult * durabilityMult * (item.Coverage / 100f);
+                total += item.Defense * durabilityMult * (item.Coverage / 100f);
             }
             return total;
         }
 
         /// <summary>
         /// Подсчитать суммарный урон со всей экипировки.
-        /// Урон = Σ(equipment.Damage × gradeMultiplier × durabilityEfficiency)
+        /// Урон = Σ(equipment.Damage × durabilityEfficiency)
+        /// R38-4b: БЕЗ грейд-множителя — см. GetTotalArmor (двойной счёт).
         /// </summary>
         public static float GetTotalDamage(Dictionary<EquipmentSlot, EquipmentData> equipment)
         {
@@ -50,9 +54,8 @@ namespace CultivationGame.Modules.Inventory
                 var item = kvp.Value;
                 if (item == null || item.Damage <= 0) continue;
 
-                float gradeMult = GetGradeMultiplier(item.Grade);
                 float durabilityMult = GetDurabilityEfficiency(item);
-                total += item.Damage * gradeMult * durabilityMult;
+                total += item.Damage * durabilityMult;
             }
             return total;
         }
@@ -73,13 +76,13 @@ namespace CultivationGame.Modules.Inventory
                 var item = kvp.Value;
                 if (item == null || item.StatBonuses == null) continue;
 
-                float gradeMult = GetGradeMultiplier(item.Grade);
+                // R38-4b: без gradeMult — генератор уже вложил §8.4 в значение.
                 float durabilityMult = GetDurabilityEfficiency(item);
 
                 foreach (var bonus in item.StatBonuses)
                 {
                     // INV-A16 FIX: Разделяем absolute и percentage бонусы
-                    float value = bonus.Value * gradeMult * durabilityMult;
+                    float value = bonus.Value * durabilityMult;
 
                     if (bonus.IsPercentage)
                     {
@@ -126,13 +129,12 @@ namespace CultivationGame.Modules.Inventory
                 var item = kvp.Value;
                 if (item == null || item.StatBonuses == null) continue;
 
-                float gradeMult = GetGradeMultiplier(item.Grade);
-                float durabilityMult = GetDurabilityEfficiency(item);
+                float durabilityMult = GetDurabilityEfficiency(item); // R38-4b: без gradeMult
 
                 foreach (var bonus in item.StatBonuses)
                 {
                     if (bonus.StatName == statName && !bonus.IsPercentage)
-                        total += bonus.Value * gradeMult * durabilityMult;
+                        total += bonus.Value * durabilityMult;
                 }
             }
             return total;
@@ -149,13 +151,12 @@ namespace CultivationGame.Modules.Inventory
                 var item = kvp.Value;
                 if (item == null || item.StatBonuses == null) continue;
 
-                float gradeMult = GetGradeMultiplier(item.Grade);
-                float durabilityMult = GetDurabilityEfficiency(item);
+                float durabilityMult = GetDurabilityEfficiency(item); // R38-4b: без gradeMult
 
                 foreach (var bonus in item.StatBonuses)
                 {
                     if (bonus.StatName == statName && bonus.IsPercentage)
-                        total += bonus.Value * gradeMult * durabilityMult;
+                        total += bonus.Value * durabilityMult;
                 }
             }
             return total;
@@ -183,16 +184,9 @@ namespace CultivationGame.Modules.Inventory
 
         // === Вспомогательные методы ===
 
-        /// <summary>
-        /// Получить множитель грейда экипировки.
-        /// Источник: EQUIPMENT_SYSTEM.md §2.1
-        /// </summary>
-        private static float GetGradeMultiplier(EquipmentGrade grade)
-        {
-            if (GameConstants.EquipmentGradeMultipliers.TryGetValue(grade, out var mult))
-                return mult;
-            return 1.0f;
-        }
+        // R38-4b: GetGradeMultiplier удалён — грейд-эффективность уже вложена
+        // генератором в стат предмета (§2/§8.4); двойное умножение давало
+        // легендаркам ×4 вместо ×2 (баг-репорт 02.10 №4, «золотой сет»).
 
         /// <summary>
         /// Получить множитель эффективности от состояния прочности.

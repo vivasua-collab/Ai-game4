@@ -4,14 +4,18 @@ using Godot;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Adapter.Di;
+using CultivationGame.Core.Data;
 
 namespace CultivationGame.Adapter.UI;
 
 /// <summary>
 /// Character Sheet window (View #12, hotkey C).
-/// Shows: body status (silhouette + HP), stats, cultivation level.
+/// R38-5 (баг-репорт 02.10 №5): перестроен на TabContainer — вкладка
+/// «Состояние» (тело + ID/позиция + культивация, как раньше) и НОВАЯ
+/// вкладка «Характеристики» (полные статы игрока из IStatService +
+/// бонусы экипировки + прогресс развития + HP тела).
 ///
-/// Layout: left = BodyStatusPanel, right = stats/cultivation.
+/// Layout: header → TabContainer («Состояние» | «Характеристики») → footer.
 /// Opens with C key, closes with C or Esc.
 /// Pauses game when open (same as inventory).
 ///
@@ -22,12 +26,16 @@ public partial class CharacterSheetWindow : Control
     [Inject] private IBodyService BodyService { get; set; } = null!;
     [Inject] private IPlayerService Player { get; set; } = null!;
     [Inject] private IQiService QiService { get; set; } = null!;
+    // R38-5: статы для вкладки «Характеристики» (тот же DI-контейнер).
+    [Inject] private IStatService? Stats { get; set; }
 
     private bool _isVisible;
     private Panel _panel = null!;
+    private TabContainer _tabs = null!;
     private BodyStatusPanel _bodyPanel = null!;
     private Label _statsLabel = null!;
     private Label _cultivationLabel = null!;
+    private Label _statsTabLabel = null!;
 
     public override void _Ready()
     {
@@ -89,14 +97,31 @@ public partial class CharacterSheetWindow : Control
         header.AddThemeColorOverride("font_color", ParchmentTheme.InkBlack);
         outer.AddChild(header);
 
-        // Content row: left = body, right = stats.
+        // Content row: left = body, right = stats. R38-5: живёт во вкладке
+        // «Состояние» TabContainer (было прямо в outer).
+        _tabs = new TabContainer
+        {
+            Name = "SheetTabs",
+            SizeFlagsVertical = SizeFlags.ExpandFill,
+        };
+        outer.AddChild(_tabs);
+
+        // ── Вкладка «Состояние» ──
+        var stateTab = new VBoxContainer
+        {
+            Name = "Состояние",
+            SizeFlagsVertical = SizeFlags.ExpandFill,
+        };
+        stateTab.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        _tabs.AddChild(stateTab);
+
         var contentRow = new HBoxContainer
         {
             Name = "ContentRow",
             SizeFlagsVertical = SizeFlags.ExpandFill,
         };
         contentRow.AddThemeConstantOverride("separation", 12);
-        outer.AddChild(contentRow);
+        stateTab.AddChild(contentRow);
 
         // ── Left: Body status panel ──
         _bodyPanel = new BodyStatusPanel
@@ -153,6 +178,49 @@ public partial class CharacterSheetWindow : Control
         _cultivationLabel.AddThemeColorOverride("font_color", ParchmentTheme.InkBlack);
         rightWrap.AddChild(_cultivationLabel);
 
+        // ── Вкладка «Характеристики» (R38-5, баг-репорт 02.10 №5) ──
+        // Контент ~30 строк > высота панели → ScrollContainer (VLM-пруф
+        // первого кадра: нижние секции «Прочие/Тело» уходили за низ панели).
+        var statsTab = new VBoxContainer
+        {
+            Name = "Характеристики",
+            SizeFlagsVertical = SizeFlags.ExpandFill,
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+        };
+        _tabs.AddChild(statsTab);
+
+        var statsScroll = new ScrollContainer
+        {
+            SizeFlagsVertical = SizeFlags.ExpandFill,
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+        };
+        statsTab.AddChild(statsScroll);
+
+        var statsInner = new VBoxContainer
+        {
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+        };
+        statsInner.AddThemeConstantOverride("separation", 4);
+        statsScroll.AddChild(statsInner);
+
+        var statsHint = new Label
+        {
+            Text = "Полные характеристики тела и духа. Бонусы (+) — от экипировки и эффектов.",
+        };
+        statsHint.AddThemeFontSizeOverride("font_size", 12);
+        statsHint.AddThemeColorOverride("font_color", ParchmentTheme.InkFaded);
+        statsInner.AddChild(statsHint);
+
+        _statsTabLabel = new Label
+        {
+            Text = "",
+            HorizontalAlignment = HorizontalAlignment.Left,
+        };
+        _statsTabLabel.AddThemeFontSizeOverride("font_size", 14);
+        _statsTabLabel.AddThemeColorOverride("font_color", ParchmentTheme.InkBlack);
+        statsInner.AddChild(_statsTabLabel);
+
         // Footer.
         // 2026-08-28: подсказки клавиш — в окне-справке (F1).
         var footer = new Label
@@ -202,6 +270,12 @@ public partial class CharacterSheetWindow : Control
         }
     }
 
+    /// <summary>
+    /// R38-5: QA-хук — переключить на вкладку «Характеристики»
+    /// (используется UIShotSimDebug для скриншота статов).
+    /// </summary>
+    public void SelectStatsTabForQA() => _tabs.CurrentTab = 1;
+
     private void RefreshAll()
     {
         _bodyPanel?.RefreshFromBody();
@@ -223,5 +297,86 @@ public partial class CharacterSheetWindow : Control
                                      $"Ёмкость ядра: {QiService.CoreCapacity}\n" +
                                      $"Проводимость: {QiService.Conductivity:F2}";
         }
+
+        // R38-5: вкладка «Характеристики».
+        RefreshStatsTab();
+    }
+
+    /// <summary>
+    /// R38-5: текст вкладки «Характеристики» — первичные (с прогрессом
+    /// развития STAT_THRESHOLD_SYSTEM: virtualDelta/threshold), боевые,
+    /// прочие и HP тела. Бонус показывается отдельно от базы.
+    /// </summary>
+    private void RefreshStatsTab()
+    {
+        if (Stats == null)
+        {
+            _statsTabLabel.Text = "— сервис статов недоступен —";
+            return;
+        }
+
+        var sb = new System.Text.StringBuilder();
+
+        sb.AppendLine("◆ Первичные характеристики");
+        AppendStat(sb, "Сила", StatType.Strength, primary: true);
+        AppendStat(sb, "Ловкость", StatType.Agility, primary: true);
+        AppendStat(sb, "Интеллект", StatType.Intelligence, primary: true);
+        AppendStat(sb, "Живучесть", StatType.Vitality, primary: true);
+        AppendStat(sb, "Проводимость", StatType.Conductivity, primary: true);
+        AppendStat(sb, "Восприятие", StatType.Perception, primary: false);
+        AppendStat(sb, "Удача", StatType.Luck, primary: false);
+
+        sb.AppendLine();
+        sb.AppendLine("◆ Боевые");
+        AppendStat(sb, "Урон", StatType.Damage);
+        AppendStat(sb, "Защита", StatType.Defense);
+        AppendStat(sb, "Броня", StatType.Armor);
+        AppendStat(sb, "Скорость", StatType.Speed);
+        AppendStat(sb, "Скорость атаки", StatType.AttackSpeed);
+        AppendStat(sb, "Шанс крита", StatType.CritChance);
+        AppendStat(sb, "Критический урон", StatType.CritDamage);
+        AppendStat(sb, "Уклонение", StatType.Evasion);
+
+        sb.AppendLine();
+        sb.AppendLine("◆ Прочие");
+        AppendStat(sb, "Переносимый вес", StatType.WeightCapacity);
+        AppendStat(sb, "Регенерация HP", StatType.HpRegen);
+        AppendStat(sb, "Получаемое исцеление", StatType.HealingReceived);
+        AppendStat(sb, "Скрытность", StatType.Stealth);
+        AppendStat(sb, "Эффективность Ци", StatType.QiEfficiency);
+
+        // HP тела — сумма RedHP живых частей (единая система тел).
+        sb.AppendLine();
+        sb.AppendLine("◆ Тело");
+        if (BodyService != null)
+        {
+            int cur = 0, max = 0;
+            foreach (var part in BodyService.GetAllParts())
+            {
+                cur += part.CurrentRedHP;
+                max += part.MaxRedHP;
+            }
+            sb.AppendLine($"  Здоровье: {cur} / {max}");
+        }
+
+        _statsTabLabel.Text = sb.ToString();
+    }
+
+    /// <summary>Строка стата: база, бонус и (для первичных) прогресс развития.</summary>
+    private void AppendStat(System.Text.StringBuilder sb, string ruName, StatType type, bool primary = false)
+    {
+        float baseVal = Stats!.GetStat(type);
+        float bonus = Stats.GetStatBonus(type);
+        string line = $"  {ruName}: {baseVal + bonus:F0}";
+        if (bonus != 0f)
+            line += $" (база {baseVal:F0}, +{bonus:F0})";
+        if (primary)
+        {
+            float delta = Stats.GetVirtualDelta(type);
+            float threshold = Stats.GetThreshold(type);
+            if (threshold > 0f)
+                line += $" · развитие {delta:F1}/{threshold:F0}";
+        }
+        sb.AppendLine(line);
     }
 }

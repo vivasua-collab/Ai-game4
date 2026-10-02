@@ -761,6 +761,14 @@ public partial class GameWorldController : Node2D
             var formShot = new FormationShotSimDebug { Name = "FormationShotSimDebug" };
             AddChild(formShot);
         }
+        // R38 (баг-репорт 02.10 №3/№5/№6): скриншоты UI-окон — инвентарь с
+        // легендарками (контраст rarity), книга техник (layout), лист
+        // персонажа (вкладка «Характеристики»).
+        if (System.Environment.GetEnvironmentVariable("GODOT_UI_SHOT") != null)
+        {
+            var uiShot = new UIShotSimDebug { Name = "UIShotSimDebug" };
+            AddChild(uiShot);
+        }
         // R13 FULL-LOOT (2026-09-10): headless-верификация спауна через
         // генерацию + трупов/обыска/full loot (GODOT_LOOT_DEBUG=1) —
         // состав населения из генератора, смерть → труп-контейнер,
@@ -2356,8 +2364,10 @@ public partial class GameWorldController : Node2D
     /// </summary>
     private void OnEquipmentBlocked(in Core.Messaging.Contracts.EquipmentBlockedEvent e)
     {
+        // R38-1: длительность 4с (дефолт 2.5с мелькал — владелец не успевал
+        // связать тост с предметом и воспринимал отказ как «сломанную экипировку»).
         if (CultivationGame.Core.Helpers.PlayerIdResolver.IsPlayer(e.EntityId))
-            ShowToast($"⛔ {e.Reason}");
+            ShowToast($"⛔ {e.Reason}", 4.0f);
     }
 
     /// <summary>

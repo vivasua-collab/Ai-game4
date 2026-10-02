@@ -407,6 +407,9 @@ public partial class TechniqueBookWindow : Control
         {
             SizeFlagsVertical = SizeFlags.ExpandFill,
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            // R38-6: без этого HFlow-чипы (250×26) тянут горизонтальный скролл
+            // вместо переноса строками; Disabled прижимает контент к ширине вкладки.
+            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
         };
         outer.AddChild(scroll);
 
@@ -434,13 +437,18 @@ public partial class TechniqueBookWindow : Control
     }
 
     /// <summary>Блок одного типа: заголовок с выделением + строки стихий.</summary>
-    private Panel BuildTypeBlock(TechniqueType type, List<LearnedTechnique> techniques)
+    // R38-6 (баг-репорт 02.10 №6): был Panel с CustomMinimumSize(0,0) — Panel НЕ
+    // контейнер, минимальная высота контента не всплывает в родительский VBox →
+    // все блоки имели высоту 0 и их заголовки/чипы рисовались ДРУГ НА ДРУГЕ
+    // («всё свалено в кучу»), а ScrollContainer не видел высоту → скролла не было.
+    // Фикс: PanelContainer (паттерн ItemContextMenu R19) — min-высота = контент,
+    // ContentMargins стайлбокса начинают работать, блоки встают друг под другом.
+    private PanelContainer BuildTypeBlock(TechniqueType type, List<LearnedTechnique> techniques)
     {
         var accent = ElementStyle.TypeAccent(type);
 
-        var block = new Panel
+        var block = new PanelContainer
         {
-            CustomMinimumSize = new Vector2(0, 0),
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
         };
         var style = new StyleBoxFlat

@@ -258,9 +258,14 @@ public partial class AnimalCombatSimDebug : Node2D
         bool secondHostile = _animalService.IsHostile(second.EntityId);
         bool combatWasActive = _combatServiceImpl.IsInCombat;
 
-        // Телепорт игрока в даль (карта 50×50 — угол противоположен).
+        // Телепорт игрока в даль: R38-2 — de-aggro теперь требует быть вне
+        // ChaseRangeTiles (20) ChaseGraceTicks (3) подряд → угол выбираем
+        // ПРОТИВОПОЛОЖНЫЙ позиции зверя (старый фикс (2,2) при звере у центра
+        // мог дать 18-19 тайлов — погоня продолжалась, сим ложно FAILил).
+        int farX = second.Position.X < 25 ? 47 : 2;
+        int farY = second.Position.Y < 25 ? 47 : 2;
         int endedBeforeTeleport = _combatEndedCount;
-        _gwc!.DEBUG_TeleportPlayer(2, 2);
+        _gwc!.DEBUG_TeleportPlayer(farX, farY);
         float waitedCalm = 0f;
         while (waitedCalm < 8f && _animalService.IsHostile(second.EntityId))
         {
@@ -276,6 +281,46 @@ public partial class AnimalCombatSimDebug : Node2D
                  $"после телепорта игрока в даль (за {waitedCalm:F1}с) hostile={_animalService.IsHostile(second.EntityId)}, " +
                  $"CombatEnded(+{_combatEndedCount - endedBeforeTeleport}) → {(deAggroOk ? "OK" : "FAIL")}");
         allOk &= deAggroOk;
+
+        // === 6a. R38-2 (баг-репорт 02.10 №2): ДАЛЬНИЙ УДАР → ПОГОНЯ =====
+        // Сценарий владельца: «напал на волка с дистанции (лук/Ци) — волк за
+        // мной не побежал». До фикса месть включалась и мгновенно гасилась
+        // (dist > 5 → de-aggro БЕЗ единого шага). Теперь: синтетический урон
+        // с 9 тайлов → волк hostile И сближается (дистанция падает).
+        {
+            // Игрок в 9 тайлах; волк спавнится на walkable-тайле second
+            // (deer там жил — блуждание работало, значит шаги доступны).
+            int dir6a = second.Position.X <= 38 ? 1 : -1;
+            _gwc!.DEBUG_TeleportPlayer(second.Position.X + 9 * dir6a, second.Position.Y);
+            var wolf6a = _animalService.SpawnAnimal("wolf", second.Position);
+            var playerPos6a = _playerService.Position;
+            _damageEventPub!.Publish(new DamageAppliedEvent(
+                PlayerBodyId, wolf6a.EntityId, 1, DamageType.Physical,
+                BodyPartType.Torso, CombatAttackResult.Hit));
+            await ToSignal(GetTree().CreateTimer(2.2), SceneTreeTimer.SignalName.Timeout);
+            bool chaseHostile = _animalService.IsHostile(wolf6a.EntityId);
+            int dx6a = wolf6a.Position.X - playerPos6a.X;
+            int dy6a = wolf6a.Position.Y - playerPos6a.Y;
+            if (dx6a < 0) dx6a = -dx6a;
+            if (dy6a < 0) dy6a = -dy6a;
+            int distNow6a = dx6a > dy6a ? dx6a : dy6a;
+            bool wolfMoved6a = distNow6a < 9;
+            bool chaseOk = chaseHostile && wolfMoved6a;
+            GD.Print($"[AnimalQA] 6a-ranged-погоня: урон с 9 тайлов → hostile={chaseHostile}, " +
+                     $"дистанция 9→{distNow6a} ({(wolfMoved6a ? "волк сближается" : "волк стоит")}) → {(chaseOk ? "OK" : "FAIL")}");
+            allOk &= chaseOk;
+            // Чистим за собой: игрок в противоположный угол → волк честно
+            // отстаёт через grace-окно (не мусорит врагом в остальных шагах).
+            int cleanX6a = playerPos6a.X < 25 ? 47 : 2;
+            int cleanY6a = playerPos6a.Y < 25 ? 47 : 2;
+            _gwc!.DEBUG_TeleportPlayer(cleanX6a, cleanY6a);
+            float waitedClean6a = 0f;
+            while (waitedClean6a < 6f && _animalService.IsHostile(wolf6a.EntityId))
+            {
+                await ToSignal(GetTree().CreateTimer(0.5), SceneTreeTimer.SignalName.Timeout);
+                waitedClean6a += 0.5f;
+            }
+        }
 
         // === 7. МИРНЫЙ ВИД — кролик не мстит (ANIMALS §5.5) ===
         if (rabbit == null || !rabbit.IsAlive)

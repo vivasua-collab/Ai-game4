@@ -314,7 +314,11 @@ public partial class CombatAISimDebug : Node2D
         await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
         bool stanceDodge = _combatServiceImpl.CurrentPlayerDefense == DefenseSubtype.Dodge;
         _defenseIntentPub.Publish(new DefenseIntentEvent(PlayerCombatId, DefenseSubtype.Parry));
-        await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+        // R38: чтение СРАЗУ — публикация синхронна (та же стопка кадров).
+        // Таймер 0.3с здесь давал окно гонки: завершение боя (NPC умер от
+        // отложенного DoT/удара) сбрасывает стойку в None (CombatService
+        // EndCombat) между интентом и чтением → ложный FAIL «Parry=False»
+        // при живой механике (флап ~50%: на прогонах 02.10 FAIL→PASS→FAIL→PASS).
         bool stanceParry = _combatServiceImpl.CurrentPlayerDefense == DefenseSubtype.Parry;
         bool stanceOk = stanceDodge && stanceParry;
         GD.Print($"[CombatAI] 6-стойка: Dodge={stanceDodge}, Parry={stanceParry} → " +

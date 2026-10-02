@@ -308,6 +308,25 @@ namespace CultivationGame.Modules.NPC
                 return;
             }
 
+            // R38-4 (баг-репорт 02.10 №4): природные звери (Quadruped) НЕ
+            // формируют ядро культивации — CoreCapacity=0, Ци=0 → RawQi-щит
+            // OFF (QiDataProvider включает буфер при Ци ≥ 10). До фикса каждый
+            // зверь — даже «молодой волк» L1 — получал ЧЕЛОВЕЧЕСКОЕ ядро
+            // BASE_CORE_CAPACITY=1000 с полным CurrentQi → автовключение
+            // RawQi → 80% физурона поглощалось Ци, остаток доедала NaturalArmor
+            // → флор 1 HP за удар («по молодому волку проходит только 1 урона»).
+            // Защита зверя теперь честная: HP тела + NaturalArmor (шкура).
+            // Будущие демон-звери с Ци — отдельный SoulType, не Quadruped-вид.
+            if (species.Morphology == Morphology.Quadruped)
+            {
+                soul.CoreCapacity = 0;
+                soul.CurrentQi = 0;
+                soul.QiDensity = 0;
+                soul.Conductivity = 0f;
+                soul.ConductivityGrowthMultiplier = 1.0f;
+                return;
+            }
+
             int level = (int)soul.CultivationLevel;
             int totalSubLevels = (level - 1) * GameConstants.MAX_SUB_LEVEL + soul.SubLevel;
 

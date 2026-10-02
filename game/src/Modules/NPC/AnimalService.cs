@@ -103,10 +103,29 @@ namespace CultivationGame.Modules.NPC
         private const int MaxSpawnAttempts = 200;
 
         /// <summary>
-        /// Радиус агро мести: игрок дальше — животное отстаёт и возвращается
-        /// к блужданию (ANIMALS.md §5.4 «прекращение retaliation»).
+        /// Радиус агро мести (истор., §5.4). R38-2: решение о погоне/отставании
+        /// теперь принимает ChaseRangeTiles + ChaseGraceTicks (ниже) — мгновенный
+        /// de-aggro «дальше 5» убивал погоню при дальней атаке. Константа
+        //  сохранена как ориентир «зоны укуса-возврата» в док-контексте.
         /// </summary>
         private const int RetaliationAgroRadius = 5;
+
+        /// <summary>
+        /// R38-2 (баг-репорт 02.10 №2): радиус ПОГОНИ за обидчиком — Чебышёв,
+        /// тайлы. Раньше de-aggro срабатывал мгновенно при dist &gt; 5: дальний
+        /// удар (лук — дальность 18, Ци-техника — до 20+) включал месть и тут же
+        /// гасил её — волк «не побежал» (жалоба владельца). Теперь 20 покрывает
+        /// дальность лука: зверь получает урон с любой дистанции → бежит к
+        /// обидчику. Симметрия с leash NPC (AggroRadius×6 = 30 тайлов).
+        /// </summary>
+        private const int ChaseRangeTiles = 20;
+
+        /// <summary>
+        /// R38-2: сколько тиков ПОДРЯД игрок может быть вне ChaseRangeTiles,
+        /// пока погоня ещё живёт (grace-окно: волк мчится за обидчиком и только
+        /// затем честно отстаёт). 3 тика ≈ 3 сек на Normal (1 Гц зверей).
+        /// </summary>
+        private const int ChaseGraceTicks = 3;
 
         /// <summary>
         /// Дистанция укуса (Чебышёв, тайлы) — мстящее животное атакует ТОЛЬКО
@@ -451,8 +470,9 @@ namespace CultivationGame.Modules.NPC
                 // 2026-09-11 (аудит D4): честная месть по ANIMALS.md §5.2/5.4 —
                 // ЧЕЙЗ игрока (раньше стоял на месте и «кусал» через всю карту:
                 // интент уходил с любой дистанции, никто его не гейтил);
-                // атака — только вплотную (Чебышёв ≤ 2); игрок дальше 5 тайлов —
-                // de-aggro, возврат к блужданию.
+                // атака — только вплотную (Чебышёв ≤ 2); R38-2: погоня живёт
+                // в радиусе ChaseRangeTiles (grace-окно вместо мгновенного
+                // de-aggro на 5 тайлах).
                 if (_hostileAnimals.Contains(a.EntityId))
                 {
                     var playerPos = _playerService.Position;
@@ -460,22 +480,39 @@ namespace CultivationGame.Modules.NPC
                         Math.Abs(a.Position.X - playerPos.X),
                         Math.Abs(a.Position.Y - playerPos.Y));
 
-                    if (dist > RetaliationAgroRadius)
+                    // R38-2: grace-окно погони. Удар с дистанции (лук/Ци) теперь
+                    // не гасит месть мгновенно: пока игрок вне ChaseRangeTiles
+                    // МЕНЬШЕ ChaseGraceTicks тиков подряд — зверь всё равно бежит
+                    // за ним (не атакуя — только сближение); счётчик сбрасывается
+                    // при возвращении игрока в радиус и при новом ударе.
+                    if (dist > ChaseRangeTiles)
                     {
-                        // §5.4: цель ушла — месть прекращается. Бой (если был)
-                        // завершаем честно — симметрия с leash NPC (R16 D3):
-                        // CombatDisengageEvent → CombatModule.OnCombatDisengage →
-                        // AbandonCombat — иначе 1v1-бой «висит» вечно (игрок
-                        // остаётся в боевой стойке/гейтах).
-                        _hostileAnimals.Remove(a.EntityId);
-                        a.Target = null;
-                        a.MoveCooldownTicks = 5; // ~5 тиков «успокаивается»
-                        _combatDisengagePub.Publish(new CombatDisengageEvent(
-                            a.EntityId, $"animal-deaggro: игрок дальше {RetaliationAgroRadius} тайлов"));
-                        Console.WriteLine($"[AnimalService] {a.Species}#{a.EntityId}: игрок ушёл ({dist} тайлов, " +
-                            $"wolf=({a.Position.X},{a.Position.Y}) player=({playerPos.X},{playerPos.Y})) → de-aggro, wander");
+                        a.ChaseLostTicks++;
+                        if (a.ChaseLostTicks >= ChaseGraceTicks)
+                        {
+                            // §5.4: цель ушла — месть прекращается. Бой (если был)
+                            // завершаем честно — симметрия с leash NPC (R16 D3):
+                            // CombatDisengageEvent → CombatModule.OnCombatDisengage →
+                            // AbandonCombat — иначе 1v1-бой «висит» вечно (игрок
+                            // остаётся в боевой стойке/гейтах).
+                            _hostileAnimals.Remove(a.EntityId);
+                            a.Target = null;
+                            a.ChaseLostTicks = 0;
+                            a.MoveCooldownTicks = 5; // ~5 тиков «успокаивается»
+                            _combatDisengagePub.Publish(new CombatDisengageEvent(
+                                a.EntityId, $"animal-deaggro: игрок вне {ChaseRangeTiles} тайлов {ChaseGraceTicks} тиков подряд"));
+                            Console.WriteLine($"[AnimalService] {a.Species}#{a.EntityId}: игрок ушёл ({dist} тайлов, " +
+                                $"wolf=({a.Position.X},{a.Position.Y}) player=({playerPos.X},{playerPos.Y})) → de-aggro, wander");
+                            continue;
+                        }
+
+                        // Grace: зверь ещё мчится за обидчиком (без атаки — далеко).
+                        a.Target = new Position2D(playerPos.X, playerPos.Y);
+                        StepTowardsTarget(a);
                         continue;
                     }
+
+                    a.ChaseLostTicks = 0; // игрок в радиусе погони — счётчик чист.
 
                     // R21-2 (attack-speed): видовой темп укуса рулит
                     // readiness-гейт CombatService (звери не в провайдере
@@ -591,8 +628,9 @@ namespace CultivationGame.Modules.NPC
             // Track attacker ID (for AttackIntentEvent target).
             animal.LastAttackerId = sourceId;
             animal.CombatCooldownTicks = 0; // attack next tick
+            animal.ChaseLostTicks = 0; // R38-2: новый удар — grace-окно погони заново
 
-            Console.WriteLine($"[AnimalService] {animal.Species}#{animal.EntityId} hit by {e.SourceId} → hostile!");
+            Console.WriteLine($"[AnimalService] {animal.Species}#{animal.EntityId} hit by {e.SourceId} → hostile, chase (range {ChaseRangeTiles} tiles, grace {ChaseGraceTicks} ticks)!");
         }
 
         // === Helpers ===

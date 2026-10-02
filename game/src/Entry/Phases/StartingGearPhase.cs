@@ -213,10 +213,14 @@ public sealed class StartingGearPhase : AbstractSceneAssemblyPhase
             if (_inventory.TryAddItem(bow, 1)) weapons++;
         }
 
-        // 4c. 2 случайных оружия L1-3 (разнообразие для экспериментов/торговли).
+        // 4c. 2 случайных оружия L1 (разнообразие классов для экспериментов/торговли).
+        // R38-1 (баг-репорт 02.10 №1): было L1-3 — оружие L2/L3 при игроке L1 не
+        // надевалось (гейт RequiredCultivationLevel R35) → стартовый набор
+        // содержал «мусор», который нельзя надеть, воспринималось как сломанная
+        // экипировка. Старт теперь выдаёт ТОЛЬКО надеваемое при L1.
         for (int i = 0; i < 2; i++)
         {
-            var weapon = _equipmentGenerator.GenerateWeapon(1 + i, null, Seed + 10 + i);
+            var weapon = _equipmentGenerator.GenerateWeapon(1, null, Seed + 10 + i);
             if (weapon != null)
             {
                 _itemDb.Register(weapon);
@@ -224,22 +228,24 @@ public sealed class StartingGearPhase : AbstractSceneAssemblyPhase
             }
         }
 
-        // 4d. 2 брони L1-2 (торс + случайная).
+        // 4d. 2 брони L1 (торс + случайная). R38-1: было GenerateArmor(2) — при
+        // выпадении armor_feet давало С4АПОГИ L2, которые игрок L1 не мог надеть
+        // (тост ⛔ 2.5с мелькал) — «снова сломалась экипировка сапогов».
         var torso = _equipmentGenerator.GenerateArmor(1, "armor_torso", Seed + 100);
         if (torso != null)
         {
             _itemDb.Register(torso);
             if (_inventory.TryAddItem(torso, 1)) armors++;
         }
-        var armor = _equipmentGenerator.GenerateArmor(2, null, Seed + 101);
+        var armor = _equipmentGenerator.GenerateArmor(1, null, Seed + 101);
         if (armor != null)
         {
             _itemDb.Register(armor);
             if (_inventory.TryAddItem(armor, 1)) armors++;
         }
 
-        // 4e. 1 случайный предмет L2.
-        if (_equipmentGenerator.GenerateRandom(2, Seed + 200) is { } eq)
+        // 4e. 1 случайный предмет L1 (R38-1: было L2 — не надевался на старте).
+        if (_equipmentGenerator.GenerateRandom(1, Seed + 200) is { } eq)
         {
             _itemDb.Register(eq);
             _inventory.TryAddItem(eq, 1);
