@@ -39,6 +39,15 @@ namespace CultivationGame.Core.Data
         public const int MAX_STAT_VALUE = 1000;
 
         /// <summary>
+        /// R39-2 (указание владельца 02.10 №2): базовый урон безоружной атаки
+        /// (кулак). Раньше хардкод «10» в CombatService.GetTechniqueDamage;
+        /// вынесен в константы для кумулятивной формулы «кулак + оружие»
+        /// (урон оружия СКЛАДЫВАЕТСЯ с кулаком: кинжал 3 + кулак 10 = 13)
+        /// и для отображения боевого итога в UI (кукла персонажа).
+        /// </summary>
+        public const int UNARMED_BASE_DAMAGE = 10;
+
+        /// <summary>
         /// Базовая ёмкость ядра (L1.0)
         /// Формула: coreCapacity = 1000 × 1.1^totalSubLevels
         /// </summary>

@@ -195,7 +195,14 @@ public partial class CharacterDollPanel : Control
         float armor = EquipmentService?.GetTotalArmor() ?? 0f;
         float damage = EquipmentService?.GetTotalDamage() ?? 0f;
         string handType = EquipmentService?.GetWeaponHandType().ToString() ?? "None";
-        _statsLabel.Text = $"Броня: {armor:F0} | Урон: {damage:F0} | Хват: {handType}";
+        // R39-2 (указание владельца 02.10 №2): показываем БОЕВОЙ итог по
+        // кумулятивной формуле «кулак + оружие» (раньше «Урон: 3» при
+        // стартовом кинжале вводил в заблуждение — в бою вклад оружия и вовсе
+        // гасился Math.Max'ом в ноль). Кулак = GameConstants.UNARMED_BASE_DAMAGE.
+        // R39-2v2: однострочный формат обрезался краем панели куклы
+        // («…OneHan…», VLM-дефект) — разбили на ДВЕ строки, урон первым.
+        int fist = GameConstants.UNARMED_BASE_DAMAGE;
+        _statsLabel.Text = $"Урон: {fist + damage:F0} (кулак {fist} + оружие {damage:F0})\nБроня: {armor:F0} · Хват: {handType}";
     }
 
     // === Drag&drop handlers (called by DollSlotRow) ===

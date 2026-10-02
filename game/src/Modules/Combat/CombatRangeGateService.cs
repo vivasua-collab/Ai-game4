@@ -93,6 +93,20 @@ public sealed class CombatRangeGateService
         => _inventory?.GetItemCount(ArrowItemId) ?? 0;
 
     /// <summary>
+    /// R39-4 (указание владельца 02.10 №4): чебышёвская дистанция между
+    /// двумя сущностями (тайлы) — для шанса промаха дальнего оружия
+    /// (DamageCalculator.DetermineAttackResult, COMBAT_SYSTEM §7.4).
+    /// −1, если любая из сторон не резолвится позиционно (не блокируем
+    /// боевой пайплайн: Miss не роллится, попадание как раньше).
+    /// </summary>
+    public int GetChebyshevDistanceTiles(string attackerId, string targetId)
+    {
+        if (!TryResolveTile(attackerId, out int ax, out int ay)) return -1;
+        if (!TryResolveTile(targetId, out int tx, out int ty)) return -1;
+        return Math.Max(Math.Abs(ax - tx), Math.Abs(ay - ty));
+    }
+
+    /// <summary>
     /// Тайловая позиция сущности: игрок (оба исторических ID), NPC или зверь
     /// (АУДИТ-0921_2030 Ф3-1: звери — боевые цели с R18, LOS обязан их видеть).
     /// </summary>

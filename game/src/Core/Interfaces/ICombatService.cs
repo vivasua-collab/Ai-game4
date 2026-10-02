@@ -171,6 +171,12 @@ namespace CultivationGame.Core.Interfaces
         // крит пробивает скрещенные клинки).
         public readonly bool ForceClashParry;
 
+        // R39-4 (указание владельца 02.10 №4): дистанция атаки и дальность
+        // оружия для шанса ПРОМАХА дальнего боя («с дальнего расстояния
+        // сложно попасть») — DamageCalculator.DetermineAttackResult §7.4.
+        public readonly int AttackDistanceTiles;  // Чебышёв-тайлы атакующий↔цель (−1 = неизвестна)
+        public readonly int RangedRangeTiles;     // Дальнобойность оружия (0 = атака не дальнобойная → Miss не роллится)
+
         /// <summary>
         /// Обратная совместимость — старый конструктор.
         /// Новые поля получают значения по умолчанию.
@@ -207,7 +213,9 @@ namespace CultivationGame.Core.Interfaces
             int defenderSTR = 10, // P2-5.2: DefenderSTR для блока
             bool isPlayerTarget = false, // P2-4.1: флаг «цель — игрок»
             CombatSubtype attackSubtype = CombatSubtype.None, // P2-7.3: подтип атаки
-            bool forceClashParry = false) // R21-2: одновременная атака → парирование
+            bool forceClashParry = false, // R21-2: одновременная атака → парирование
+            int attackDistanceTiles = -1, // R39-4: дистанция атаки (Чебышёв-тайлы; −1 = неизвестна)
+            int rangedRangeTiles = 0)     // R39-4: дальность дальнобойного оружия (0 = не дальнее)
         {
             AttackerId = attackerId;
             TargetId = targetId;
@@ -237,6 +245,8 @@ namespace CultivationGame.Core.Interfaces
             IsPlayerTarget = isPlayerTarget; // P2-4.1: флаг «цель — игрок»
             AttackSubtype = attackSubtype; // P2-7.3: подтип атаки (для кровотечения)
             ForceClashParry = forceClashParry; // R21-2: clash-парирование
+            AttackDistanceTiles = attackDistanceTiles; // R39-4: дистанция для Miss
+            RangedRangeTiles = rangedRangeTiles;       // R39-4: дальность оружия
         }
     }
 

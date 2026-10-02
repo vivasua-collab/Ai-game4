@@ -372,16 +372,25 @@
 | Blunt | Дробящий | Против хитина |
 | Elemental | Стихийный | Зависит от элемента |
 
-### 10.4. Формула урона оружия (гибридная)
+### 10.4. Формула урона оружия (куммулятивная, R39)
+
+> **R39-2 (решение владельца 02.10):** урон оружия **СКЛАДЫВАЕТСЯ** с базовым
+> уроном кулака (`GameConstants.UNARMED_BASE_DAMAGE` = 10), а не заменяет его
+> через `max(handDamage, weaponDamage × 0.5)` — прежняя формула гасила вклад
+> слабого оружия в ноль (стартовый кинжал 3 не работал: с ним били ровно как
+> кулаком 10). Пример: кинжал 3 + кулак 10 = 13.
 
 ```
-baseDamage  = max(handDamage, weaponDamage × 0.5)
-bonusDamage = weaponDamage × statScaling
-totalDamage = baseDamage + bonusDamage
+totalDamage = кулак + вклад оружия
 
-handDamage  = 3 + (STR − 10) × 0.3
-statScaling = (STR × STR_BONUS + AGI × AGI_BONUS) / 100
+кулак        = 10 (UNARMED_BASE_DAMAGE — базовая атака без техники)
+вклад оружия = weaponDamage + weaponDamage × statScaling
+statScaling  = AGI × 5% (melee, §4.1) / AGI × 2.5% + INT × 5% (лук, §4.2)
 ```
+
+`handDamage = 3 + (STR−10)×0.3` из формулы удалён (кулак учитывался бы
+дважды); STR в melee-формуле оружия больше не участвует. Кукла персонажа
+показывает боевой итог: «Урон: 13 (10+3)».
 
 ### 10.5. Влияние на техники
 

@@ -158,8 +158,15 @@ public partial class DamageNumberRenderer : Node2D
                 text = "блок";
                 colour = MissWordColour;
                 break;
+            case CombatAttackResult.Miss:
+                // R39-4 (указание владельца 02.10 №4): промах дальнего оружия
+                // от дистанции — показываем слово (до R39 Miss не производился,
+                // ветка была мёртвой). Гейт враг-индикации выше — как для Dodge.
+                text = "промах";
+                colour = MissWordColour;
+                break;
             default:
-                return; // Miss и прочее не показываем (шум)
+                return; // прочие результаты не показываем (шум)
         }
 
         // Джиттер по X, чтобы серия ударов читалась.

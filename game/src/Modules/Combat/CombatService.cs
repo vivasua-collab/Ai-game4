@@ -93,6 +93,11 @@ namespace CultivationGame.Modules.Combat
         private readonly List<Projectile> _projectiles = new();
         private readonly IPublisher<ProjectileSpawnedEvent>? _projectileSpawnedPub;
 
+        // R39-4 (указание владельца 02.10 №4): дистанция атакующий↔цель (Чебышёв,
+        // тайлы) для шанса промаха дальнего оружия. Nullable — headless-сборки
+        // без позиционных сервисов: дистанция неизвестна → Miss не роллится.
+        private readonly CombatRangeGateService? _rangeGate;
+
         // EVT-01: подписки на кросс-модульные события (вместо инъекции IQiService/IQiBufferService)
         private readonly ISubscriber<QiChangedEvent> _qiChangedSub;
         private readonly ISubscriber<QiBufferStateChangedEvent> _qiBufferStateChangedSub;
@@ -223,7 +228,8 @@ namespace CultivationGame.Modules.Combat
             IBodyDataProvider? bodyDataProvider = null, // 2026-09-11 (аудит боя): смерть защитника по правилам тел
             AoEResolver? aoeResolver = null, // R25: площадные техники
             IPublisher<AoeImpactEvent>? aoeImpactPub = null, // R25: событие залпа для VFX
-            IPublisher<ProjectileSpawnedEvent>? projectileSpawnedPub = null) // R28: хоуминг-снаряды
+            IPublisher<ProjectileSpawnedEvent>? projectileSpawnedPub = null, // R28: хоуминг-снаряды
+            CombatRangeGateService? rangeGate = null) // R39-4: дистанция атаки для Miss дальнего оружия
         {
             _damageService = damageService;
             _techniqueService = techniqueService;
@@ -247,6 +253,7 @@ namespace CultivationGame.Modules.Combat
             _aoeResolver = aoeResolver ?? new AoEResolver();
             _aoeImpactPub = aoeImpactPub;
             _projectileSpawnedPub = projectileSpawnedPub;
+            _rangeGate = rangeGate; // R39-4: дистанция для Miss (опционально — headless)
 
             // EVT-01: подписка на кэш состояния Ци
             _qiChangedSubscription = _qiChangedSub.Subscribe((in QiChangedEvent e) => {
@@ -1251,6 +1258,11 @@ namespace CultivationGame.Modules.Combat
             // экипированное оружие не влияло на урон).
             // Phase 8 ч.2 (2026-09-03): + ranged-ветка — урон дальнобойного
             // оружия (лук) по §4.2 (AGI 2.5% + INT 5%), НЕ по melee-формуле STR/AGI.
+            // R39-2 (указание владельца 02.10 №2): урон оружия СКЛАДЫВАЕТСЯ с
+            // базовым уроном кулака, а НЕ заменяет его: Math.Max(base, weapon)
+            // гасил вклад любого оружия слабее кулака в НОЛЬ — стартовый кинжал
+            // (урон 3) буквально не работал, с ним били ровно как кулаком 10.
+            // Требование владельца: кинжал 3 + кулак 10 = 13 (§4.3, R39).
             var equippedWeapon = _equipmentDataProvider.GetEquipped(attackerId, EquipmentSlot.WeaponMain);
             bool hasWeapon = equippedWeapon != null;
             // Фаза 9A: AttackRange ≤ 2 — ближнее, > 2 — дальнобойное (лук = 18)
@@ -1272,8 +1284,17 @@ namespace CultivationGame.Modules.Combat
                             weaponDamage, attackerAGI, attackerINT)
                         : WeaponDamageCalculator.CalculateMeleeWeaponDamage(
                             weaponDamage, attackerSTR, attackerAGI);
-                    // Заменить BaseDamage на урон оружия, если он больше
-                    baseDamage = Math.Max(baseDamage, weaponBonus);
+                    // R39-2: кулак (база) + ЧИСТЫЙ вклад оружия (weaponDamage +
+                    // statScaling, кулак из WeaponDamageCalculator удалён) —
+                    // кумулятивная формула §4.3: кинжал 3 + кулак 10 = 13.
+                    // ТОЛЬКО для атак ИГРОКА (указание владельца — про стартовый
+                    // кинжал): NPC сохраняют прежний Math.Max — баланс NPC-боёв
+                    // (multi R24-C «тихие» NPC-vs-NPC / толпа) не сдвигаем, там
+                    // floor кулака и раньше работал как нижняя граница.
+                    if (isPlayerAttacker)
+                        baseDamage += weaponBonus;
+                    else
+                        baseDamage = Math.Max(baseDamage, weaponBonus);
                 }
             }
 
@@ -1355,6 +1376,22 @@ namespace CultivationGame.Modules.Combat
                 ?? (isRangedWeapon ? CombatSubtype.RangedProjectile
                 : (hasWeapon ? CombatSubtype.MeleeWeapon : CombatSubtype.MeleeStrike));
 
+            // R39-4 (указание владельца 02.10 №4): дистанция атаки для шанса
+            // промаха дальнего оружия («с дальнего расстояния сложно
+            // попасть»): Чебышёв-тайлы между ПОЗИЦИЯМИ сторон на момент
+            // резолва удара (pending-каст 0.5с — цель могла сместиться,
+            // берём актуальную позицию, а не позицию на момент интента).
+            int attackDistanceTiles = _rangeGate?.GetChebyshevDistanceTiles(attackerId, defenderId) ?? -1;
+            // RangedRangeTiles > 0 ТОЛЬКО для basic_attack с дальнобойным
+            // оружием (лук: miss-шанс растёт линейно от 3 тайлов до 50% на
+            // макс. дальности, DamageCalculator §7.4). ТЕХНИКИ не попадают
+            // под Miss (tech == null — гейт): самонаводящиеся снаряды/лучи/AoE
+            // (R23/R28) — мастерство культиватора, их честность в LOS-гейте,
+            // а не в дистанции (иначе homing-снаряд с луком в руках легитимно
+            // промахивался — QA 3j ловил это сразу).
+            int rangedRangeTiles = isRangedWeapon && tech == null && equippedWeapon != null
+                ? equippedWeapon.AttackRange : 0;
+
             var request = new DamageRequest(
                 attackerId,
                 defenderId,
@@ -1371,7 +1408,9 @@ namespace CultivationGame.Modules.Combat
                 defenderSTR,                                         // P2-5.2: STR защищающегося для блока
                 isPlayerTarget,                                      // P2-4.1: флаг «цель — игрок»
                 attackSubtype,                                       // P2-7.3: подтип атаки (для кровотечения)
-                clashParry                                           // R21-2: одновременная атака → парирование
+                clashParry,                                          // R21-2: одновременная атака → парирование
+                attackDistanceTiles,                                 // R39-4: дистанция атаки (для Miss дальнего оружия)
+                rangedRangeTiles                                     // R39-4: дальность оружия (0 = атака не дальнобойная)
             );
 
             // Единый пайплайн урона
@@ -1596,8 +1635,10 @@ namespace CultivationGame.Modules.Combat
                 }
                 return baseDamage;
             }
-            // Базовый урон кулака (нет техники)
-            return 10;
+            // Базовый урон кулака (нет техники). R39-2: константа (был хардкод
+            // 10) — «кулак» теперь часть кумулятивной формулы «кулак + оружие»
+            // (кинжал 3 + кулак 10 = 13, §4.3) и отображается в кукле персонажа.
+            return GameConstants.UNARMED_BASE_DAMAGE;
         }
 
         /// <summary>

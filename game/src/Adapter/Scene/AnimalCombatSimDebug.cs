@@ -259,7 +259,7 @@ public partial class AnimalCombatSimDebug : Node2D
         bool combatWasActive = _combatServiceImpl.IsInCombat;
 
         // Телепорт игрока в даль: R38-2 — de-aggro теперь требует быть вне
-        // ChaseRangeTiles (20) ChaseGraceTicks (3) подряд → угол выбираем
+        // ChaseRangeTiles (15, R39-4) ChaseGraceTicks (3) подряд → угол выбираем
         // ПРОТИВОПОЛОЖНЫЙ позиции зверя (старый фикс (2,2) при звере у центра
         // мог дать 18-19 тайлов — погоня продолжалась, сим ложно FAILил).
         int farX = second.Position.X < 25 ? 47 : 2;

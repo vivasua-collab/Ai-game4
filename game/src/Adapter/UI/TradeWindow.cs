@@ -443,9 +443,23 @@ public partial class TradeWindow : Control
     private string ResolveItemName(string itemId)
     {
         if (ItemDb != null && ItemDb.TryGetItem(itemId, out var item))
-            return item.NameRu;
+            return FormatItemName(item);
         return itemId;
     }
+
+    /// <summary>
+    /// R39-3 (указание владельца 02.10 №3): название предмета с префиксом
+    /// уровня — «L2 Кожаный доспех», «L1 Кинжал». Уровень есть только у
+    /// экипировки (EquipmentData.ItemLevel = уровень генерации); расходники
+    /// уже несут уровень в тексте имени («Лекарство уровня N»), материалы
+    /// («Железная руда») уровня не имеют — префикс вешается только на
+    /// экипировку, чтобы не дублировать. Формат «L{x}» — конвенция проекта
+    /// (TechniqueBookWindow: вкладки/строки, CheatPanel: кнопки уровней).
+    /// Единая воронка ResolveItemName: список товаров торговца, список
+    /// продажи игроком, тултипы строк, тосты покупки/продажи.
+    /// </summary>
+    internal static string FormatItemName(ItemData item)
+        => item is EquipmentData eq ? $"L{eq.ItemLevel} {item.NameRu}" : item.NameRu;
 
     private string ResolveNpcName(string npcId)
     {

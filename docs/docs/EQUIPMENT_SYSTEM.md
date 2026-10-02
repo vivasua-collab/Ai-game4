@@ -434,17 +434,20 @@
 
 ### 7.3 Формула урона оружия
 
-**Гибридный метод:**
+**Куммулятивный метод (R39-2, решение владельца 02.10):** урон оружия
+**СКЛАДЫВАЕТСЯ** с базовым уроном кулака (10), а не заменяет его — прежний
+`max(handDamage, weaponDamage × 0.5)` гасил вклад слабого оружия в ноль
+(стартовый кинжал 3 не работал: с ним били ровно как кулаком 10).
 
 ```
-baseDamage = max(handDamage, weaponDamage × 0.5)
-bonusDamage = weaponDamage × statScaling
-totalDamage = baseDamage + bonusDamage
+totalDamage = кулак + weaponDamage + weaponDamage × statScaling
+
+кулак       = 10 (GameConstants.UNARMED_BASE_DAMAGE)
+statScaling = AGI × 5% (melee) / AGI × 2.5% + INT × 5% (лук, §4.2)
 ```
 
-**Где:**
-- handDamage = 3 + (STR-10) × 0.3
-- statScaling = (STR×STR_BONUS + AGI×AGI_BONUS) / 100
+Пример: стартовый кинжал 3 + кулак 10 = 13 (+ AGI-скейл).
+`handDamage = 3 + (STR−10)×0.3` удалён из формулы (кулак учтён в базе).
 
 ### 7.4 Влияние на техники
 

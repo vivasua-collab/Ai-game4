@@ -89,6 +89,10 @@ public partial class CombatSimDebug : Node
     private int _rangedDamageEvents;
     private int _rangedDamageTotal;
 
+    // R39-4: промахи дальнего оружия от дистанции (DamageCalculator §7.4) —
+    // пруф работы Miss-ветки в COMBAT_SIM 3c (серия выстрелов).
+    private int _missCount;
+
     private const string PlayerCombatId = "player_0"; // NPCAIService.PlayerId
 
     // R29-харденинг: GameWorldController._PhysicsProcess каждый кадр
@@ -146,6 +150,8 @@ public partial class CombatSimDebug : Node
                 _rangedDamageEvents++;
                 _rangedDamageTotal += e.Damage;
             }
+            // R39-4: промахи дальнего оружия от дистанции — считаем для 3c.
+            if (e.Result == CombatAttackResult.Miss) _missCount++;
             GD.Print($"[CombatSim] damage: {e.SourceId} → {e.TargetId}: {e.Damage} ({e.Result}, part={e.HitPart}, sub={e.AttackSubtype})");
         });
 
@@ -386,19 +392,37 @@ public partial class CombatSimDebug : Node
                 await WaitForCastClearAsync(2.0f);
                 await WaitForReadinessAsync(PlayerCombatId, 4.0f);
 
-                _attackIntentPub.Publish(new Core.Messaging.Contracts.AttackIntentEvent(
-                    PlayerCombatId, npcId, "basic_attack", isRanged: true));
-                // Каст 0.5с (натяжение лука) разрешится тиком — ждём.
-                await ToSignal(GetTree().CreateTimer(1.6), SceneTreeTimer.SignalName.Timeout);
+                // R39-4 (указание владельца 02.10 №4): СЕРИЯ из 3 выстрелов —
+                // точность лука падает с дистанции (d=8 → miss ≈ 17%,
+                // DamageCalculator.DetermineAttackResult §7.4), одиночный
+                // выстрел может ЗАКОННО промахнуться. RNG детерминирован
+                // (CombatRng seed 12345) — серия стабильна от прогона к
+                // прогону. Ассерт: хотя бы один выстрел наносит урон и
+                // RangedProjectile-подтип; промахи считаются (_missCount).
+                int missBefore = _missCount;
+                for (int shot = 1; shot <= 3; shot++)
+                {
+                    if (shot > 1)
+                    {
+                        // Между выстрелами: ждём догорания каста и готовность лука.
+                        await WaitForCastClearAsync(2.0f);
+                        await WaitForReadinessAsync(PlayerCombatId, 4.0f);
+                    }
+                    _attackIntentPub.Publish(new Core.Messaging.Contracts.AttackIntentEvent(
+                        PlayerCombatId, npcId, "basic_attack", isRanged: true));
+                    // Каст 0.5с (натяжение лука) разрешится тиком — ждём.
+                    await ToSignal(GetTree().CreateTimer(1.6), SceneTreeTimer.SignalName.Timeout);
+                }
 
                 int npcHpAfterRanged = _bodyProvider.GetCurrentHealth(npcId);
                 int rangedSwing = npcHpBeforeRanged - npcHpAfterRanged;
                 int rangedSubtyped = _rangedDamageTotal - rangedDamageBefore;
-                GD.Print($"[CombatSim] ranged shot: npc HP {npcHpBeforeRanged}→{npcHpAfterRanged} " +
-                         $"({rangedSwing} dmg, RangedProjectile-subtyped dmg={rangedSubtyped})");
+                int shotsMissed = _missCount - missBefore;
+                GD.Print($"[CombatSim] ranged volley (3 shots, distance 8): npc HP {npcHpBeforeRanged}→{npcHpAfterRanged} " +
+                         $"({rangedSwing} dmg, RangedProjectile-subtyped dmg={rangedSubtyped}, промахов={shotsMissed})");
                 rangedWiringOk = rangedSwing > 0 && rangedSubtyped > 0;
                 if (rangedSwing <= 0)
-                    GD.Print("[CombatSim] FAIL — ranged shot did no damage at distance 8 (range gate broken?)");
+                    GD.Print("[CombatSim] FAIL — 3 выстрела с дистанции 8 не нанесли урона (гейт сломан ИЛИ 3 промаха подряд?)");
                 if (rangedSubtyped <= 0)
                     GD.Print("[CombatSim] FAIL — no RangedProjectile-subtyped damage (subtype resolution broken?)");
             }
@@ -623,21 +647,41 @@ public partial class CombatSimDebug : Node
                 // Гонки с NPCModule-автоатаками (месть A→игроку может
                 // переоткрыть UI-сессию в любой паузе): «тихость» пары меряем
                 // В КАДРЕ вызова (до следующего тика), урон/месть — после паузы.
-                await WaitForOwnCastClearAsync(crowdB, 2.0f);
-                _combatServiceImpl.DebugSetReadinessPermil(crowdB, 1000);
+                // R39-4: RETRY — вероятностная защита цели (Dodge/Block/Parry)
+                // может съесть удар: RNG сидирован (seed 12345), но 3c-волей из
+                // 3 выстрелов (R39-4) сдвинул последовательность роллов —
+                // удар B→A стал выпадать в Dodge (урон 0, месть не включалась,
+                // ложно FAIL). Ретраим серией до достижения урона+мести —
+                // тот же retry-паттерн, что multi(b)/(b2).
                 int aHpBefore = _bodyProvider.GetCurrentHealth(crowdA);
-                var quietAcc = _combatServiceImpl.ExecuteAttack(crowdB, "npc_strike", crowdA, false);
-                // immediate: пара без игрока НЕ открыла UI-сессию этим ударом.
-                bool quietNoUiSession = !_combatServiceImpl.IsInCombat;
-                await ToSignal(GetTree().CreateTimer(1.6), SceneTreeTimer.SignalName.Timeout);
-                int aHpAfter = _bodyProvider.GetCurrentHealth(crowdA);
-                bool quietDamage = aHpAfter < aHpBefore;
+                bool quietDamage = false;
+                bool revenge = false;
+                bool quietNoUiSession = true;
+                var quietAcc = AttackAcceptance.Rejected;
+                for (int attempt = 0; attempt < 4 && !(quietDamage && revenge); attempt++)
+                {
+                    await WaitForOwnCastClearAsync(crowdB, 2.0f);
+                    _combatServiceImpl.DebugSetReadinessPermil(crowdB, 1000);
+                    // R39-4: «тихость» — ДИФФ в кадре удара: сессия, открытая
+                    // ЧУЖОЙ парой (месть A→игроку в паузах ретрая — гонка, о
+                    // которой предупреждал исходный комментарий), НЕ засчитывается
+                    // тихому удару B→A; нарушение — только если ЭТОТ удар открыл UI.
+                    bool wasInCombat = _combatServiceImpl.IsInCombat;
+                    quietAcc = _combatServiceImpl.ExecuteAttack(crowdB, "npc_strike", crowdA, false);
+                    // immediate: пара без игрока НЕ открыла UI-сессию этим ударом.
+                    quietNoUiSession &= !(_combatServiceImpl.IsInCombat && !wasInCombat);
+                    await ToSignal(GetTree().CreateTimer(1.2), SceneTreeTimer.SignalName.Timeout);
+                    int aHpNow = _bodyProvider.GetCurrentHealth(crowdA);
+                    quietDamage |= aHpNow < aHpBefore;
+                    var aStateNow = _npcService.GetNPCState(crowdA);
+                    // Месть: угроза A от B (Threats) — честный маркер: Threats[B].
+                    revenge |= aStateNow != null && aStateNow.Threats.ContainsKey(crowdB);
+                    GD.Print($"[CombatSim] multi(a) attempt {attempt + 1}: {crowdB}→{crowdA} acc={quietAcc}, " +
+                             $"A HP {aHpBefore}→{aHpNow}, dmg={quietDamage}, revenge={revenge}");
+                }
                 var aState = _npcService.GetNPCState(crowdA);
-                // Месть: угроза A от B (Threats) — A мог уже быть Attacking
-                // (игрок бил его в 3/3e) — честный маркер: Threats[B] > 0.
-                bool revenge = aState != null && aState.Threats.ContainsKey(crowdB);
                 GD.Print($"[CombatSim] multi(a) quiet NPC-NPC: {crowdB}→{crowdA} acc={quietAcc}, " +
-                         $"A HP {aHpBefore}→{aHpAfter}, UI-in-frame={quietNoUiSession} (ожид true), " +
+                         $"A HP {aHpBefore}→{_bodyProvider.GetCurrentHealth(crowdA)}, UI-in-frame={quietNoUiSession} (ожид true), " +
                          $"revenge(threat B)={revenge} (AIState={aState?.AIState})");
                 multiOk &= quietAcc == AttackAcceptance.Accepted
                     && quietNoUiSession && quietDamage && revenge;
@@ -1206,6 +1250,42 @@ public partial class CombatSimDebug : Node
                     if (_combatServiceImpl.IsInCombat)
                         _combatServiceImpl.AbandonCombat(PlayerCombatId);
 
+                    // R39-4: отложенный респавн-таймер (смерть могла случиться
+                    // в aoe(c): таймер 3с стреляет ПОСЛЕ входного телепорта в
+                    // clean и возвращает игрока в центр карты — конус из центра
+                    // не накрывает fx-цели, flashDelta=1, флап). Стабилизатор:
+                    // смерть-гейт + повторный телепорт ПРЯМО ПЕРЕД залпом.
+                    if (_bodyProvider.GetCurrentHealth("player") <= 0)
+                    {
+                        GD.Print("[CombatSim] vfx(a): игрок мёртв (отложенный респавн) — жду 3.5с");
+                        await ToSignal(GetTree().CreateTimer(3.5), SceneTreeTimer.SignalName.Timeout);
+                    }
+                    if (_playerService.Position.X != clean.X || _playerService.Position.Y != clean.Y)
+                    {
+                        var was = _playerService.Position;
+                        TeleportPlayer(clean.X, clean.Y);
+                        GD.Print($"[CombatSim] vfx(a) re-teleport: игрок был {was} → {clean} (респавн-гонка)");
+                    }
+
+                    // R39-4: ДЕТЕРМИНИЗМ ГЕОМЕТРИИ — за 2с ожидания Enemy-цели
+                    // успевают сместиться (агро-подход), и одна выходила из
+                    // конуса (flashDelta=1 вместо ≥2, флап). Фиксируем позиции
+                    // ОБЕИХ целей перед залпом (паттерн 3d-1: интент сразу,
+                    // NPC не успевает сдвинуться).
+                    var fx1State = _npcService.GetNPCState(fx1);
+                    var fx2State = _npcService.GetNPCState(fx2);
+                    if (fx1State != null)
+                        fx1State.Position = new Position2D(clean.X + 2, clean.Y);
+                    if (fx2State != null)
+                        fx2State.Position = new Position2D(clean.X + 4, clean.Y + 1);
+                    // Диагностика R39-4: фактические позиции NPC-объектов
+                    // (GetNPC vs NPCState — разные ли источники позиции).
+                    var fx1Npc = _npcService.GetNPC(fx1);
+                    var fx2Npc = _npcService.GetNPC(fx2);
+                    GD.Print($"[CombatSim] vfx(a) positions: fx1={fx1Npc?.Position} (state {fx1State?.Position}), " +
+                             $"fx2={fx2Npc?.Position} (state {fx2State?.Position}), player={_playerService.Position}, " +
+                             $"aim=({clean.X + 4},{clean.Y}), cone L1 radius=4 half=45°");
+
                     int volleysBefore = AoeFxRenderer.TotalVolleys;
                     int flashesBefore = AoeFxRenderer.TotalTargetFlashes;
                     var vfxAcc = _combatServiceImpl.ExecuteAttack(
@@ -1215,7 +1295,7 @@ public partial class CombatSimDebug : Node
                     int volleyDelta = AoeFxRenderer.TotalVolleys - volleysBefore;
                     int flashDelta = AoeFxRenderer.TotalTargetFlashes - flashesBefore;
                     GD.Print($"[CombatSim] vfx(a) aoe: acc={vfxAcc} (ожид Accepted), " +
-                             $"volleys +{volleyDelta} (ожид +1), target-flashes +{flashDelta} (ожид ≥2), " +
+                             $"volleys +{volleyDelta} (ожид +1), target-flashes +{flashDelta} (ожид ≥2, AoeImpact.targets={_aoeImpactCount}), " +
                              $"draws={AoeFxRenderer.TotalDrawCalls} (рендер-пайплайн жив; headless тоже тикает)");
                     vfxOk &= vfxAcc == AttackAcceptance.Accepted && volleyDelta == 1 && flashDelta >= 2;
 

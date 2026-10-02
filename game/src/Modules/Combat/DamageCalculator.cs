@@ -155,6 +155,9 @@ namespace CultivationGame.Modules.Combat
         /// Спринт 5 C3: Блок из STR — blockChance = shieldBlock + (STR-10)×2 промилле.
         /// Спринт 5 C3: Парирование из AGI — parryChance = weaponParryBonus + (AGI-10)×3 промилле.
         /// P2-5.2 FIX: blockChance использует defenderSTR (сила ЗАЩИЩАЮЩЕГОСЯ), не атакующего.
+        /// R39-4 (указание владельца 02.10 №4): ПРОМАХ дальнего оружия от дистанции —
+        /// miss = (dist−3) × 500‰ / (range−3), кап 500‰ (§7.4). Роллится ПЕРВЫМ:
+        /// дистанция — свойство АТАКУЮЩЕГО (прицеливание), защита цели — поверх.
         /// ЗАПРЕТ 3.9: Все расчёты в промилле (integer math), ролл через Random.Range(0, 1000).
         /// IMPL-6 (Q5): RNG передаётся через <paramref name="rng"/> (детерминированный бой).
         /// </summary>
@@ -167,9 +170,28 @@ namespace CultivationGame.Modules.Combat
             int weaponParryBonus = 0,
             int shieldBlock = 0,
             int attackerLuck = 0,
-            int techniqueCritBonus = 0)
+            int techniqueCritBonus = 0,
+            int attackDistanceTiles = -1, // R39-4: дистанция атаки (Чебышёв-тайлы; −1 = неизвестна)
+            int rangedRangeTiles = 0)     // R39-4: дальность дальнобойного оружия (0 = не дальнее)
         {
             if (rng is null) throw new ArgumentNullException(nameof(rng));
+
+            // R39-4: ПРОМАХ ДАЛЬНЕГО ОРУЖИЯ от дистанции — «с дальнего
+            // расстояния сложно попасть» (указание владельца 02.10 №4).
+            // В ближней зоне (≤ 3 тайлов) прицеливание точное — miss = 0;
+            // далее линейный штраф до 50% (кап 500‰) на максимальной дальности
+            // оружия. Пример (лук, range 18): d=4 → 33‰, d=9 → 200‰, d=18 → 500‰.
+            // CombatAttackResult.Miss до R39 был мёртвой веткой (Enum есть,
+            // тексты «промах» в логе/цифрах есть — не производился никем).
+            if (rangedRangeTiles > 3 && attackDistanceTiles > 3)
+            {
+                int span = rangedRangeTiles - 3;
+                int missChancePermil = (attackDistanceTiles - 3) * 500 / span;
+                if (missChancePermil > 500) missChancePermil = 500; // кап 50%
+                int missRoll = rng.Next(0, 1000);
+                if (missRoll < missChancePermil)
+                    return CombatAttackResult.Miss;
+            }
 
             // C1: Уклонение из AGI — ALGORITHMS.md §4
             // dodgeChance = 5% + (AGI-10) × 0.5% - armorDodgePenalty

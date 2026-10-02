@@ -195,8 +195,27 @@ namespace CultivationGame.Modules.Combat
                 request.WeaponParryBonus,  // C3: бонус парирования
                 request.ShieldBlock,       // C3: блок щита
                 request.AttackerLuck,      // C2: шанс крита
-                request.TechniqueCritBonus // C2: бонус крита техники
+                request.TechniqueCritBonus, // C2: бонус крита техники
+                request.AttackDistanceTiles, // R39-4: дистанция для промаха дальнего оружия
+                request.RangedRangeTiles     // R39-4: дальность оружия (0 = Miss не роллится)
             );
+
+            // R39-4 (указание владельца 02.10 №4): ПРОМАХ дальнего оружия
+            // (дистанция) — по образцу Dodge (AUDIT-0911 CMB-3): честное
+            // событие с Damage=0 и Result=Miss — лог событий покажет «промах»
+            // (EventLogWindow), цифры над целью «промах» (DamageNumberRenderer),
+            // BodyService применит 0 безопасно, месть цели включится (стрела
+            // просвистела — зверь заметил атаку). Miss ДО R39 не производился.
+            if (attackResult == CombatAttackResult.Miss)
+            {
+                var missSubtype = GetCombatSubtypeFromRequest(request);
+                _damageAppliedPub.Publish(new DamageAppliedEvent(
+                    request.AttackerId, request.TargetId,
+                    0, request.Type, request.Element,
+                    hitPart, CombatAttackResult.Miss, missSubtype));
+
+                return new DamageResult(0, 0, 0, hitPart, CombatAttackResult.Miss, false);
+            }
 
             // Уклонение — полный промах
             if (attackResult == CombatAttackResult.Dodge)

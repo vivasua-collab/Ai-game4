@@ -10,36 +10,38 @@ namespace CultivationGame.Modules.Combat
 {
     /// <summary>
     /// Калькулятор урона оружия для подтипа melee_weapon.
-    /// Источник: COMBAT_SYSTEM.md §1b, EQUIPMENT_SYSTEM.md §7.3-7.4
+    /// Источник: COMBAT_SYSTEM.md §1b/§4.3, EQUIPMENT_SYSTEM.md §7.3-7.4
     ///
-    /// Формулы (integer math, промилле):
-    /// - handDamage = 3 + (STR-10) × 3 / 10
-    /// - baseDamage = max(handDamage, weaponDamage / 2)
-    /// - bonusDamage = weaponDamage × AGI × 50 / 1000 (stat scaling)
+    /// Формула R39-2 (кумулятивная, integer math, промилле):
+    /// - вклад оружия = weaponDamage + weaponDamage × AGI × 50 / 1000
+    /// - итог атаки   = кулак (GameConstants.UNARMED_BASE_DAMAGE) + вклад оружия
     ///
     /// ЗАПРЕТ 3.9: Все расчёты в integer math.
     /// </summary>
     public static class WeaponDamageCalculator
     {
         /// <summary>
-        /// Рассчитать урон оружия для melee_weapon атаки.
-        /// handDamage = 3 + (STR-10) × 0.3
-        /// baseDamage = max(handDamage, weaponDamage × 0.5)
-        /// bonusDamage = weaponDamage × AGI × 0.05 (stat scaling)
+        /// Рассчитать ЧИСТЫЙ вклад оружия для melee_weapon атаки (R39-2).
+        /// CombatService СКЛАДЫВАЕТ его с базовым уроном кулака:
+        /// итог = кулак (UNARMED_BASE_DAMAGE) + weaponDamage + AGI-скейл.
+        /// Пример (стартовый кинжал L1, STR/AGI 10): 10 + 3 + 1 = 14.
         ///
         /// В integer math:
-        /// handDamage = 3 + (STR-10) × 3 / 10
-        /// baseDmg = max(handDamage, weaponDamage / 2)
+        /// baseDmg  = weaponDamage
         /// bonusDmg = weaponDamage × attackerAGI × 50 / 1000
         /// </summary>
         public static int CalculateMeleeWeaponDamage(
             int weaponDamage, int attackerSTR, int attackerAGI)
         {
-            // Урон голыми руками
-            int handDamage = 3 + (attackerSTR - 10) * 3 / 10;
-
-            // Базовый урон: max(кулак, половина оружия)
-            int baseDmg = Math.Max(handDamage, weaponDamage / 2);
+            // R39-2 (указание владельца 02.10 №2): метод возвращает ЧИСТЫЙ вклад
+            // оружия. «Кулак» (handDamage = 3 + (STR-10)×0.3) УДАЛЁН из формулы:
+            // база кулака (UNARMED_BASE_DAMAGE = 10) складывается в CombatService —
+            // иначе кулак учитывался ДВАЖДЫ. Раньше max(handDamage, weaponDamage/2)
+            // + Math.Max в CombatService гасили вклад слабого оружия в ноль
+            // (стартовый кинжал 3: с ним били ровно как кулаком 10).
+            // attackerSTR оставлен в сигнатуре для совместимости вызовов —
+            // в melee-формуле больше не участвует (база кулака не здесь).
+            int baseDmg = weaponDamage;
 
             // Бонус от AGI (stat scaling): weaponDamage × AGI × 5%
             // В integer math: weaponDamage × attackerAGI × 50 / 1000
