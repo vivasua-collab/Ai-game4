@@ -42,7 +42,10 @@ namespace CultivationGame.Modules.NPC
         public int AttitudeDecayStartDays = 7;
 
         /// <summary>Максимальное количество активных NPC</summary>
-        public int MaxActiveNPCs = 100;
+        // R41-4 (репорт 18.10 №3): 100 → 150 — население больших карт
+        // подросло (scale 6 + банды R41-5 + группы): 500×500 ≈ 60-90 NPC
+        // суммарно; потолок оставляет запас под ивент-спаун.
+        public int MaxActiveNPCs = 150;
 
         /// <summary>Скорость движения NPC по умолчанию (тайлов/тик).
         /// R20 (баг №2): 2 → 3 — блуждание/патруль живее (игрок 180px/с ÷ 64px = 2.8 тайла/с — NPC были медленнее игрока вдвое при блуждании).</summary>

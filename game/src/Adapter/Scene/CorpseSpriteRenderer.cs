@@ -27,6 +27,9 @@ public partial class CorpseSpriteRenderer : Node2D
     [Inject] private ICorpseService? _corpses;
 
     private int _tilePixels;
+    // R41-2: троттл редрава (трупы статичны)
+    private const float EntityRedrawIntervalSec = 1f / 15f;
+    private float _redrawAccum;
 
     private static readonly Color ShroudColour = new(0.16f, 0.13f, 0.10f, 0.92f);
     private static readonly Color ShroudEmpty = new(0.30f, 0.28f, 0.25f, 0.55f);
@@ -49,12 +52,21 @@ public partial class CorpseSpriteRenderer : Node2D
 
     public override void _PhysicsProcess(double delta)
     {
-        QueueRedraw();
+        // R41-2: трупы статичны — редрав 15 Гц достаточно (маркеры/названия
+        // не анимируются; добавление/удаление трупа видно в следующий тик).
+        _redrawAccum += (float)delta;
+        if (_redrawAccum >= EntityRedrawIntervalSec)
+        {
+            _redrawAccum = 0f;
+            QueueRedraw();
+        }
     }
 
     public override void _Draw()
     {
         if (_corpses == null) return;
+
+        RenderDiagnostics.CorpseDraws++; // R41-2: счётчик для PerfOverlay
 
         var all = _corpses.GetAllCorpses();
         LastDrawnMarkerCount = all.Count;

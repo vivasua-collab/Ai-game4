@@ -27,6 +27,32 @@ namespace CultivationGame.Core.Data
 
         #endregion
 
+        #region R41-6: Terrain speed factor
+
+        /// <summary>
+        /// R41-6 (репорт владельца 18.10 №5 «проверить влияние биомов на
+        /// скорость; культиваторам L5+ логично игнорировать тип биома»):
+        /// множитель скорости игрока от стоимости движения тайла.
+        /// Оживает мёртвые данные TILE_SYSTEM §4.4 (EffectiveMoveCost не имел
+        /// потребителей): Sand 1.2 → ×0.83, Snow/Ice 1.5 → ×0.67,
+        /// Water_Shallow 2.0 → ×0.5, Road 0.7 → ×1.43 (дорога ускоряет
+        /// любой уровень). Штрафы (cost &gt; 1) применяются ТОЛЬКО к L1-L4;
+        /// L5+ «далеко продвинулись в познании мира» — игнорируют.
+        /// Непроходимый тайл (cost 0) — без множителя (движение не должно
+        /// туда попасть, гейт IsWalkable elsewhere).
+        /// Pure-функция для QA (L500Sim): фактор при L1 vs L5.
+        /// </summary>
+        public static float GetTerrainSpeedFactor(in GameTile tile, int cultivationLevel)
+        {
+            float cost = tile.EffectiveMoveCost;
+            if (cost <= 0f) return 1f;   // непроходимо/неизвестно — не трогаем
+            if (cost <= 0.999f) return 1f / cost; // Road 0.7 → ускорение (все уровни)
+            if (cultivationLevel >= 5) return 1f; // познание мира: штрафы не действуют
+            return 1f / cost;                       // Sand/Snow/Water замедляют L1-L4
+        }
+
+        #endregion
+
         #region Character Base Stats
 
         /// <summary>Базовое значение характеристик</summary>

@@ -293,20 +293,24 @@ namespace CultivationGame.Modules.NPC
             var rng = new SeededRandom(seed + AnimalSeedOffset);
 
             // L500 (2026-09-15): звери масштабируются от площади на больших
-            // картах (500×500 → 24; волки для теста боевки гарантированно
-            // есть), малые карты — прежний 3-5 rng (QA-детерминизм: стрим
+            // картах, малые карты — прежний 3-5 rng (QA-детерминизм: стрим
             // и число вызовов идентичны до-L500).
+            // R41-4 (репорт 18.10 №3 «слишком мало NPC — не на ком тренировать
+            // техники»): плотность больших карт ×3-4 — хард-кап 24 заменён
+            // масштабом от площади с потолком 120: 500×500 → 100 зверей
+            // (прежде 24). Пояс жизни сгущён у старта: 75% в ±60 тайлов
+            // (было 60% в ±80) — тренировочные цели рядом с игроком.
             bool large = width * height >= 100_000;
             int targetCount = large
-                ? Math.Min(24, (width * height) / 10_000)
+                ? Math.Clamp((width * height) / 2_500, 24, 120)
                 : rng.Next(3, 6);  // 3-5 animals
             string[] speciesPool = { "wolf", "deer", "rabbit" };
 
             int playerX = width / 2;
             int playerY = height / 2;
-            // L500: 60% зверей — «пояс жизни» ±80 тайлов от центра (игрок
-            // встречает волков, не ищет их по пустыне), 40% — вся карта.
-            int nearRadius = Math.Min(80, Math.Min(width, height) / 2 - 2);
+            // L500/R41-4: «пояс жизни» — 75% зверей в ±60 тайлов от центра
+            // (игрок встречает цели рядом, не ищет по пустыре), 25% — вся карта.
+            int nearRadius = Math.Min(60, Math.Min(width, height) / 2 - 2);
             bool clusterNearCentre = large && nearRadius > MinDistanceFromPlayer + 5;
 
             int spawned = 0;
@@ -317,7 +321,7 @@ namespace CultivationGame.Modules.NPC
 
                 // Random position within the map, leaving a 1-tile margin.
                 int x, y;
-                if (clusterNearCentre && rng.NextDouble() < 0.6)
+                if (clusterNearCentre && rng.NextDouble() < 0.75)
                 {
                     x = Math.Clamp(playerX + rng.Next(-nearRadius, nearRadius + 1), 1, width - 2);
                     y = Math.Clamp(playerY + rng.Next(-nearRadius, nearRadius + 1), 1, height - 2);

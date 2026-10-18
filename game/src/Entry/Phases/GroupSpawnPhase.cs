@@ -84,6 +84,17 @@ public sealed class GroupSpawnPhase : AbstractSceneAssemblyPhase
             groupsCreated += SpawnGuardPatrol(rng, loc, mapW, mapH);
             groupsCreated += SpawnTradeCaravan(rng, loc, mapW, mapH);
             groupsCreated += SpawnDeerHerd(rng, loc, mapW, mapH);
+            // R41-5 (репорт 18.10 №4 «не встретил ни одной группы врагов —
+            // нужны группы для теста массовых техник на 500×500»): все 4
+            // группы выше — МИРНЫЕ/нейтральные (волки neutral-by-design,
+            // стражи/караван friendly, стадо peaceful), враждебные бандиты
+            // спавнились только поодиночками. Добавляем банды: 3-5 Enemy
+            // (Hostile, проактивное агро в 5 тайлах) с маршрутом — толпа
+            // на игрока, мультибой R24-C уже работает. 500×500 → 4 банды
+            // (итого групп 8); бюджет NPC — см. MaxActiveNPCs (150).
+            int bands = Math.Clamp((mapW * mapH) / 62_500, 2, 6);
+            for (int i = 0; i < bands; i++)
+                groupsCreated += SpawnBanditBand(rng, loc, mapW, mapH);
         }
         else
         {
@@ -166,6 +177,47 @@ public sealed class GroupSpawnPhase : AbstractSceneAssemblyPhase
         }
         Console.WriteLine($"[GroupSpawn] Guard patrol '{groupId}' — {n} guards at {center.Value}");
         return 1;
+    }
+
+    /// <summary>
+    /// R41-5 (репорт 18.10 №4): банда бандитов — 3-5 NPC Enemy (Hostile,
+    /// проактивное агро в AggroRadius=5 тайлов), HuntingPack task,
+    /// faction="bandits". Группа ВРАЖДЕБНА игроку (в отличие от волков,
+    /// которые нейтральны до первого удара) — то, чего не хватало для
+    /// теста массовых техник на большой карте. Паттерн — SpawnGuardPatrol.
+    /// Уровень 1-2: честная цель для техник, не ваншот-губка.
+    /// </summary>
+    private int SpawnBanditBand(SeededRandom rng, LocationData loc, int mapW, int mapH)
+    {
+        int n = rng.Next(3, 6);  // 3-5 бандитов
+        var center = FindGroupCenter(rng, mapW, mapH, minSpacing: 20);
+        if (center is null)
+        {
+            Console.WriteLine("[GroupSpawn] Bandit band — no walkable centre found, skipped");
+            return 0;
+        }
+
+        var groupId = _groupService.CreateGroup(GroupTaskType.HuntingPack, faction: "bandits");
+        var route = BuildPatrolRoute(center.Value, radius: 9, points: 4, rng, mapW, mapH);
+        _groupService.SetPatrolRoute(groupId, route);
+
+        int spawned = 0;
+        for (int i = 0; i < n; i++)
+        {
+            var pos = FindWalkableNear(center.Value, rng, mapW, mapH, maxOffset: 2) ?? center.Value;
+            // +500 — семена не пересекаются с патрулём стражи/караваном.
+            long seed = loc.Seed + GroupSeedOffset + (long)NPCRole.Enemy + 500 + i;
+            int level = 1 + (i % 2); // 1-2: честные цели для тренировки техник
+            string npcId = _spawner.SpawnNPC("human", NPCRole.Enemy, level, pos, seed);
+            if (!string.IsNullOrEmpty(npcId))
+            {
+                _groupService.AddMember(groupId, npcId,
+                    i == 0 ? GroupRole.Leader : GroupRole.Follower);
+                spawned++;
+            }
+        }
+        Console.WriteLine($"[GroupSpawn] Bandit band '{groupId}' — {spawned}/{n} бандитов at {center.Value} (Hostile, агро 5т)");
+        return spawned > 0 ? 1 : 0;
     }
 
     /// <summary>

@@ -284,6 +284,7 @@ public partial class SceneBuilder : Node
         // Each renderer is a child Node2D; QueueRedraw propagates.
         // BiomeTileRenderer and SurfaceTransitionRenderer are added to _worldRoot,
         // not to SceneBuilder directly, so we call QueueRedraw on each.
+        RenderDiagnostics.QueueRedrawAllCalls++; // R41-2: счётчик для PerfOverlay
         foreach (var child in _worldRoot.GetChildren())
         {
             if (child is CanvasItem ci)
@@ -346,8 +347,12 @@ public partial class BiomeTileRenderer : Node2D
             }
         }
 
-        if (drawn + missing > 0)
-            GD.Print($"[BiomeTiles] Drew {drawn} textures, {missing} missing (culled to {xMax-xMin+1}×{yMax-yMin+1})");
+        // R40-5a: счётчик редравов для PerfOverlay + лог-штамп не чаще 1/5с
+        RenderDiagnostics.BiomeDraws++;
+        RenderDiagnostics.LastBiomeTilesDrawn = drawn;
+
+        if (drawn + missing > 0 && RenderDiagnostics.ShouldPrint("biome"))
+            GD.Print($"[BiomeTiles] Drew {drawn} textures, {missing} missing (culled to {xMax - xMin + 1}×{yMax - yMin + 1})");
     }
 
     /// <summary>

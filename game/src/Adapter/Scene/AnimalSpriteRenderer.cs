@@ -92,9 +92,16 @@ public partial class AnimalSpriteRenderer : Node2D
         // G0 (I-7): общий таймер анимационных фаз зверей.
         _animClock += (float)delta;
 
-        // Animals move once per game tick (1-15 Hz), but the renderer runs
-        // every physics frame (60 Hz). QueueRedraw is cheap; Godot batches.
-        QueueRedraw();
+        // R41-2 (репорт «просадки до 40+ FPS»): редрав 60 → 15 Гц — звери
+        // ходят дискретно 1-2 тайла за игровой тик, листы 10-12 fps;
+        // события (выбор цели) дергают QueueRedraw немедленно. Было:
+        // безусловный каждый физ-кадр.
+        _redrawAccum += (float)delta;
+        if (_redrawAccum >= EntityRedrawIntervalSec)
+        {
+            _redrawAccum = 0f;
+            QueueRedraw();
+        }
     }
 
     // Cached sprites per species.
@@ -108,20 +115,30 @@ public partial class AnimalSpriteRenderer : Node2D
     private float _animClock;
     private readonly Dictionary<string, Vector2> _animalLastPos = new();
     private readonly Dictionary<string, AnimalAnimInfo> _lastAnimInfo = new();
+    // R41-2: троттл редрава + кэши фаз/строк (GC-churn на стаде).
+    private const float EntityRedrawIntervalSec = 1f / 15f;
+    private float _redrawAccum;
+    private readonly Dictionary<string, float> _phaseOffsetCache = new();
+    private static readonly Dictionary<(string s, string k), string> _animIdCache = new();
+    private static readonly Dictionary<string, string> _speciesLowerCache = new();
 
-    /// <summary>G0: резолв анимации зверя (для _Draw и headless-QA).</summary>
-    public sealed class AnimalAnimInfo
+    /// <summary>G0: резолв анимации зверя (для _Draw и headless-QA).
+    /// R41-2: STRUCT + кэши строк (было: class-аллокация и 1-2 интерполяции
+    /// на зверя × кадр — Gen0-пауги на большом стаде после R41-4).</summary>
+    public struct AnimalAnimInfo
     {
-        public string AnimId = "animal_idle";
+        public string AnimId;
         public SpriteSheetCache.SpriteSheet? Sheet;
         public Texture2D? Procedural;
         public int Frame;
-        public bool IsPng => Sheet != null;
+        public readonly bool IsPng => Sheet != null;
     }
 
     public override void _Draw()
     {
         if (_animalService == null) return;
+
+        RenderDiagnostics.AnimalDraws++; // R41-2: счётчик для PerfOverlay
 
         _snapshot.Clear();
         foreach (var a in _animalService.GetAllAnimals())
@@ -270,7 +287,8 @@ public partial class AnimalSpriteRenderer : Node2D
     public AnimalAnimInfo ResolveAnimalAnim(string entityId, string species, SizeClass size, bool moving)
     {
         string kind = moving ? "walk" : "idle";
-        string animId = $"animal_{species.ToLowerInvariant()}_{kind}";
+        // R41-2: кэшированные строки (интерполяция+ToLower на зверя × кадр).
+        string animId = CachedAnimalAnimId(SpeciesLower(species), kind);
         var sheet = SpriteSheetCache.TryGetSheet(animId);
 
         var info = new AnimalAnimInfo();
@@ -284,17 +302,38 @@ public partial class AnimalSpriteRenderer : Node2D
             return info;
         }
 
-        info.AnimId = $"animal_{species}_static";
+        info.AnimId = CachedAnimalAnimId(species, "static");
         info.Procedural = GetOrCreateSpeciesTexture(species, size);
         return info;
     }
 
-    /// <summary>Стабильный сдвиг фазы по id (стадо не марширует в ногу).</summary>
-    private static float PhaseOffset(string entityId)
+    private static string CachedAnimalAnimId(string mid, string kind)
     {
+        var key = (mid, kind);
+        if (_animIdCache.TryGetValue(key, out string? s)) return s;
+        s = $"animal_{mid}_{kind}";
+        _animIdCache[key] = s;
+        return s;
+    }
+
+    private static string SpeciesLower(string species)
+    {
+        if (_speciesLowerCache.TryGetValue(species, out string? s)) return s;
+        s = species.ToLowerInvariant();
+        _speciesLowerCache[species] = s;
+        return s;
+    }
+
+    /// <summary>Стабильный сдвиг фазы по id (стадо не марширует в ногу).
+    /// R41-2: кэш — хэш строки на зверя × кадр больше не считается.</summary>
+    private float PhaseOffset(string entityId)
+    {
+        if (_phaseOffsetCache.TryGetValue(entityId, out float off)) return off;
         int h = 19;
         foreach (char c in entityId) h = h * 33 + c;
-        return (h & 0x7FFFFFFF) % 1000 / 97f;
+        off = (h & 0x7FFFFFFF) % 1000 / 97f;
+        _phaseOffsetCache[entityId] = off;
+        return off;
     }
 
     private Texture2D GetOrCreateSpeciesTexture(string species, SizeClass size)

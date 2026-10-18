@@ -65,7 +65,10 @@ public partial class SurfaceTransitionRenderer : Node2D
             }
         }
 
-        GD.Print($"[SurfaceTransitions] Drew {drawn} transition sprites (culled to {xMax-xMin+1}×{yMax-yMin+1})");
+        // R40-5a: счётчик редравов для PerfOverlay + лог-штамп не чаще 1/5с
+        RenderDiagnostics.TransitionDraws++;
+        if (RenderDiagnostics.ShouldPrint("transitions"))
+            GD.Print($"[SurfaceTransitions] Drew {drawn} transition sprites (culled to {xMax - xMin + 1}×{yMax - yMin + 1})");
     }
 
     /// <summary>

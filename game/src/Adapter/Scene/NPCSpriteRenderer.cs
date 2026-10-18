@@ -149,7 +149,17 @@ public partial class NPCSpriteRenderer : Node2D
             foreach (var id in expired) _npcSwings.Remove(id);
         }
 
-        QueueRedraw();
+        // R41-2 (репорт «просадки до 40+ FPS»): редрав 60 → 15 Гц —
+        // PNG-листы анимируются на 10-12 fps, замах длится 0.42с (достаточно
+        // 6 кадров), события (выбор цели Tab) дергают QueueRedraw немедленно.
+        // Было: безусловный QueueRedraw каждый физ-кадр — при ~70+ сущностях
+        // это и draw-команды, и GC-churn (см. struct-кэши ниже).
+        _redrawAccum += (float)delta;
+        if (_redrawAccum >= EntityRedrawIntervalSec)
+        {
+            _redrawAccum = 0f;
+            QueueRedraw();
+        }
     }
 
     /// <summary>
@@ -227,20 +237,30 @@ public partial class NPCSpriteRenderer : Node2D
     private float _animClock;                            // сек — общий таймер фаз
     private readonly Dictionary<string, Vector2> _npcLastPos = new(); // tiles
     private readonly Dictionary<string, NpcAnimInfo> _lastAnimInfo = new(); // QA
+    // R41-2: троттл редрава (15 Гц достаточно для листов/замахов/баров)
+    // + кэш сдвигов фаз (хэш строки id на NPC × кадр — лишние вычисления/аллоки).
+    private const float EntityRedrawIntervalSec = 1f / 15f;
+    private float _redrawAccum;
+    private readonly Dictionary<string, float> _phaseOffsetCache = new();
 
-    /// <summary>G0: резолв анимации NPC на кадр (для _Draw и headless-QA).</summary>
-    public sealed class NpcAnimInfo
+    /// <summary>G0: резолв анимации NPC на кадр (для _Draw и headless-QA).
+    /// R41-2: STRUCT (был class — аллокация на NPC × кадр, ~8-12 тыс./с
+    //  Gen0-паузы на толпе) + кэши строк animId (интерполяции 1-3 на NPC
+    //  × кадр) и нижнего регистра ролей.</summary>
+    public struct NpcAnimInfo
     {
-        public string AnimId = "npc_idle";
+        public string AnimId;
         public SpriteSheetCache.SpriteSheet? Sheet;   // null — процедурный fallback
         public Texture2D? Procedural;                 // кэш роли/вида
         public int Frame;                             // индекс кадра в листе
-        public bool IsPng => Sheet != null;
+        public readonly bool IsPng => Sheet != null;
     }
 
     public override void _Draw()
     {
         if (_npcService == null) return;
+
+        RenderDiagnostics.NpcDraws++; // R41-2: счётчик для PerfOverlay
 
         _idSnapshot.Clear();
         foreach (var id in _npcService.GetAllNPCIds())
@@ -381,20 +401,21 @@ public partial class NPCSpriteRenderer : Node2D
         var info = new NpcAnimInfo { AnimId = "npc_idle" };
 
         // 1) PNG-лист по ключам каталога (§6.4 SPRITE_PROMPTS_CHARACTERS).
+        // R41-2: строки кэшируются (раньше 1-3 интерполяции на NPC × кадр).
         SpriteSheetCache.SpriteSheet? sheet = null;
         string animId;
         if (!string.IsNullOrEmpty(beastSpecies))
         {
-            animId = $"animal_{beastSpecies}_{kind}";
+            animId = CachedAnimId("animal", beastSpecies!, kind);
             sheet = SpriteSheetCache.TryGetSheet(animId);
         }
         else
         {
-            animId = $"npc_{role.ToString().ToLowerInvariant()}_{kind}";
+            animId = CachedAnimId("npc", RoleLower(role), kind);
             sheet = SpriteSheetCache.TryGetSheet(animId);
             if (sheet == null)
             {
-                animId = $"npc_base_{kind}";
+                animId = CachedAnimId("npc", "base", kind);
                 sheet = SpriteSheetCache.TryGetSheet(animId);
             }
         }
@@ -413,7 +434,9 @@ public partial class NPCSpriteRenderer : Node2D
         }
 
         // 2) Fallback: процедурный кэш по роли/виду (как до G0).
-        info.AnimId = beastSpecies != null ? $"animal_{beastSpecies}_static" : $"npc_{role}_static";
+        info.AnimId = beastSpecies != null
+            ? CachedAnimId("animal", beastSpecies, "static")
+            : CachedAnimId("npc", role.ToString(), "static");
         info.Procedural = !string.IsNullOrEmpty(beastSpecies)
             ? GetOrCreateBeastTexture(beastSpecies!)
             : GetOrCreateRoleTexture(role);
@@ -434,12 +457,37 @@ public partial class NPCSpriteRenderer : Node2D
         return (int)phase % sheet.FrameCount;
     }
 
-    /// <summary>Стабильный сдвиг фазы по id (толпа не марширует в ногу).</summary>
-    private static float NpcPhaseOffset(string npcId)
+    /// <summary>Стабильный сдвиг фазы по id (толпа не марширует в ногу).
+    /// R41-2: кэш по id — раньше строка хэшировалась на NPC каждый кадр.</summary>
+    private float NpcPhaseOffset(string npcId)
     {
+        if (_phaseOffsetCache.TryGetValue(npcId, out float off)) return off;
         int h = 17;
         foreach (char c in npcId) h = h * 31 + c;
-        return (h & 0x7FFFFFFF) % 1000 / 97f; // 0..10 сек
+        off = (h & 0x7FFFFFFF) % 1000 / 97f; // 0..10 сек
+        _phaseOffsetCache[npcId] = off;
+        return off;
+    }
+
+    // R41-2: кэши строк анимаций — интерполяции на NPC × кадр давали
+    // тысяч строк-аллокаций/с (Gen0-паузы = «периодические просадки FPS»).
+    private static readonly Dictionary<(string p, string m, string k), string> _animIdCache = new();
+    private static string CachedAnimId(string prefix, string mid, string kind)
+    {
+        var key = (prefix, mid, kind);
+        if (_animIdCache.TryGetValue(key, out string? s)) return s;
+        s = $"{prefix}_{mid}_{kind}";
+        _animIdCache[key] = s;
+        return s;
+    }
+
+    private static readonly Dictionary<NPCRole, string> _roleLowerCache = new();
+    private static string RoleLower(NPCRole role)
+    {
+        if (_roleLowerCache.TryGetValue(role, out string? s)) return s;
+        s = role.ToString().ToLowerInvariant();
+        _roleLowerCache[role] = s;
+        return s;
     }
 
     private Texture2D GetOrCreateRoleTexture(NPCRole role)

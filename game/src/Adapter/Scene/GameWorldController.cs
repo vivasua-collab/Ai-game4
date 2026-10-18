@@ -348,7 +348,45 @@ public partial class GameWorldController : Node2D
     // Redraw throttle for viewport-culled renderers (~10 Hz).
     private const float RedrawIntervalSec = 0.1f;
     private float _redrawCooldown = 0f;
+    // R41-2: camera-dirty-гейт редрава терраина + фолбэк-интервал.
+    private float _redrawFallbackSec = 0.5f;
+    private float _redrawFallbackCooldown;
+    private int _lastVisMinX = int.MinValue, _lastVisMinY = int.MinValue;
+    private int _lastVisMaxX, _lastVisMaxY;
+    private float _lastVisZoom = -1f;
     private const float RunSpeedMultiplier = 1.8f;
+
+    // R41-6: кэш терраин-фактора — пересчёт только при смене тайла/уровня.
+    private int _terrainTileX = int.MinValue, _terrainTileY = int.MinValue;
+    private int _terrainLevel = -1;
+    private float _terrainSpeedFactor = 1f;
+
+    /// <summary>
+    /// R41-2: изменился ли видимый тайл-диапазон (camera-dirty для редрава
+    /// терраина): камера перешла на новый тайл или сменился зум. Проверка
+    /// дешёвая (одна позиция камеры + размер вьюпорта); точный куллинг
+    /// считается в _Draw рендереров, гейт лишь отсекает холостые редравы.
+    /// </summary>
+    private bool VisibleRangeChanged()
+    {
+        if (_camera == null) return true;
+        float zoom = _camera.Zoom.X;
+        var vp = GetViewport().GetVisibleRect().Size;
+        float halfW = vp.X / (2f * zoom);
+        float halfH = vp.Y / (2f * zoom);
+        var c = _camera.Position;
+        int minX = (int)((c.X - halfW) / GameConstants.TILE_PIXELS);
+        int minY = (int)((c.Y - halfH) / GameConstants.TILE_PIXELS);
+        int maxX = (int)((c.X + halfW) / GameConstants.TILE_PIXELS);
+        int maxY = (int)((c.Y + halfH) / GameConstants.TILE_PIXELS);
+        bool changed = minX != _lastVisMinX || minY != _lastVisMinY
+                       || maxX != _lastVisMaxX || maxY != _lastVisMaxY
+                       || zoom != _lastVisZoom;
+        _lastVisMinX = minX; _lastVisMinY = minY;
+        _lastVisMaxX = maxX; _lastVisMaxY = maxY;
+        _lastVisZoom = zoom;
+        return changed;
+    }
 
     /// <summary>Max Chebyshev distance (tiles) for E-key NPC talk. Phase 2.</summary>
     private const float TalkRangeTiles = 2.5f;
@@ -1223,6 +1261,15 @@ public partial class GameWorldController : Node2D
         _fpsLabel.AddThemeConstantOverride("outline_size", 2);
         _hudCanvas.AddChild(_fpsLabel);
 
+        // R41-2 (репорт 18.10 №6 «просадки до 40+ FPS — нужен анализ
+        // быстродействия»): перф-оверлей — расширенный технический HUD
+        // (мс/кадр + персентили, draw calls, сущности, фактические
+        // редравы/с по рендерерам, лог медленных кадров). Тумбл F6 либо
+        // env GODOT_PERF_OVERLAY=1; сам оверлей проводит свою DI-инъекцию
+        // и свой ввод (не-модальный, MouseFilter=Ignore — INP-1 не задет).
+        var perfOverlay = new PerfOverlay { Name = "PerfOverlay" };
+        _hudCanvas.AddChild(perfOverlay);
+
         // 2026-09-04 S5: стрелки направления атакующих вне экрана — игрок
         // видит, ОТКУДА прилетает урон, даже когда источник за кадром.
         _dmgDirIndicator = new UI.DamageDirectionIndicator { Name = "DamageDirIndicator" };
@@ -1404,13 +1451,23 @@ public partial class GameWorldController : Node2D
             _camera.Position = _playerSprite.Position;
         }
 
-        // Redraw tile renderers every few frames so viewport culling updates
-        // as camera/player moves. Throttle to ~10 Hz to avoid per-frame redraw cost.
+        // Redraw tile renderers so viewport culling updates as camera/player
+        // moves. R41-2 (репорт «просадки до 40+ FPS»): ЧАСТОТА РЕДАВА УМНОЖЕНА
+        // на camera-dirty-гейт — перерисовка ТОЛЬКО при смене видимого
+        // тайл-диапазона (камера перешла на новый тайл / изменился зум) либо
+        // фолбэком раз в 0.5с (страховка динамики объектного слоя — урожай/
+        // события без подписки). Было: безусловно каждые 0.1с — 10 полных
+        // перерисовок терраина в сек даже у стоячей камеры.
         _redrawCooldown -= (float)delta;
         if (_redrawCooldown <= 0 && _sceneBuilder != null)
         {
-            _sceneBuilder.QueueRedrawAll();
-            _redrawCooldown = RedrawIntervalSec;
+            _redrawCooldown = RedrawIntervalSec; // интервал ПРОВЕРКИ
+            _redrawFallbackCooldown -= RedrawIntervalSec;
+            if (VisibleRangeChanged() || _redrawFallbackCooldown <= 0f)
+            {
+                _sceneBuilder.QueueRedrawAll();
+                _redrawFallbackCooldown = _redrawFallbackSec;
+            }
         }
 
         // Update time HUD label.
@@ -1709,6 +1766,28 @@ public partial class GameWorldController : Node2D
         };
         float speedMult = gameSpeedMult;
         if (Godot.Input.IsActionPressed("run")) speedMult *= RunSpeedMultiplier;
+
+        // === R41-6 (репорт 18.10 №5): терраин/поверхность и скорость ===
+        // Стоимость движения тайла (TILE_SYSTEM §4.4) оживает: снег/песок/
+        // мелководье замедляют, дорога ускоряет. L5+ игнорируют штрафы
+        // («далеко продвинулись в познании мира» — указание владельца).
+        // Пересчёт только при смене тайла ИЛИ уровня (кэш; чтение уровня
+        // дёшево — HUD и так читает каждый кадр).
+        if (Tiles != null)
+        {
+            int terrX = (int)(_visualPosition.X / GameConstants.TILE_PIXELS);
+            int terrY = (int)(_visualPosition.Y / GameConstants.TILE_PIXELS);
+            int terrLevel = QiService != null ? (int)QiService.CultivationLevel : 1;
+            if (terrX != _terrainTileX || terrY != _terrainTileY || terrLevel != _terrainLevel)
+            {
+                _terrainTileX = terrX;
+                _terrainTileY = terrY;
+                _terrainLevel = terrLevel;
+                var tile = Tiles.GetTile(terrX, terrY);
+                _terrainSpeedFactor = GameConstants.GetTerrainSpeedFactor(tile, terrLevel);
+            }
+            speedMult *= _terrainSpeedFactor;
+        }
 
         // Camera must keep up with the faster player — scale smoothing too.
         if (_camera != null)

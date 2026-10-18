@@ -60,8 +60,10 @@ public partial class ObjectLayerRenderer : Node2D
             }
         }
 
-        if (drawn > 0)
-            GD.Print($"[ObjectLayer] Drew {drawn} object sprites (culled to {xMax-xMin+1}×{yMax-yMin+1})");
+        // R40-5a: счётчик редравов для PerfOverlay + лог-штамп не чаще 1/5с
+        RenderDiagnostics.ObjectDraws++;
+        if (drawn > 0 && RenderDiagnostics.ShouldPrint("objects"))
+            GD.Print($"[ObjectLayer] Drew {drawn} object sprites (culled to {xMax - xMin + 1}×{yMax - yMin + 1})");
     }
 
     /// <summary>

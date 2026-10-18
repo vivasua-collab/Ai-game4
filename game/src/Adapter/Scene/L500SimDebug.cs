@@ -28,6 +28,8 @@ public partial class L500SimDebug : Node
     [Inject] private IAnimalService? _animals;
     [Inject] private INPCGroupService? _groups;
     [Inject] private IWorldService? _world;
+    // R41-6: терраин-фактор — проверка гейта L5 через SetCultivationLevel
+    [Inject] private IQiService? _qi;
 
     // R20 (баг №3): лог смертей для проверки «NPC не умирают сами».
     private readonly System.Collections.Generic.List<string> _deathLog = new();
@@ -111,9 +113,30 @@ public partial class L500SimDebug : Node
         pass &= ringOk;
 
         // === 4. Кап спавнера ============================================
-        bool capOk = npcCount <= 100;
-        GD.Print($"[L500Sim] 4. MaxActiveNPCs: {npcCount}/100 ({(capOk ? "ок" : "ПРЕВЫШЕН")})");
+        // R41-4: кап поднят 100 → 150 (население больших карт ×1.5 + банды
+        // R41-5) — синхронизировано с NPCConfig.MaxActiveNPCs.
+        bool capOk = npcCount <= 150;
+        GD.Print($"[L500Sim] 4. MaxActiveNPCs: {npcCount}/150 ({(capOk ? "ок" : "ПРЕВЫШЕН")})");
         pass &= capOk;
+
+        // === 4a. R41-5: ВРАЖДЕБНЫЕ ГРУППЫ (банды бандитов) =============
+        // Репорт 18.10 №4: «не встретил ни одной группы врагов». Все группы
+        // были мирными/нейтральными. Гард: (а) групп ≥ 6 (4 базовых + банды);
+        // (б) есть ХОТЯ БЫ ОДНА враждебная группа из 3+ Enemy-членов.
+        {
+            int hostileGroups = 0, maxHostileMembers = 0;
+            foreach (var g in _groups.GetAllGroups())
+            {
+                if (g.Faction != "bandits") continue;
+                hostileGroups++;
+                if (g.MemberIds.Count > maxHostileMembers) maxHostileMembers = g.MemberIds.Count;
+            }
+            bool bandsOk = groupCount >= 6 && hostileGroups >= 1 && maxHostileMembers >= 3;
+            GD.Print($"[L500Sim] 4a. банды бандитов(R41-5): групп всего={groupCount} (≥6), " +
+                      $"банд={hostileGroups} (≥1), бойцов в крупнейшей={maxHostileMembers} (≥3) " +
+                      $"→ {(bandsOk ? "ок" : "FAIL")}");
+            pass &= bandsOk;
+        }
 
         // === 5. R20 (баг №1): уникальность имён гуманоидов =============
         // Репорт: «у всех гуманоидов имя Наталья». Генератор существует
@@ -218,6 +241,69 @@ public partial class L500SimDebug : Node
             // не меняется ни в одном сэмпле) — отдельное расследование NEXT.
             string stuckHist = string.Join(", ", stuckStates);
             GD.Print($"[L500Sim] 7. движение (диагностика): {moved}/{tracked} гуманоидов сместились за 15с ({moveShare}%) — {string.Join(", ", SampleTop(movers, 6))}; застряли: [{stuckHist}]");
+        }
+
+        // === 8. R41-6: терраин-фактор скорости (L5+ игнорирует) =========
+        // Репорт 18.10 №5: «проверить влияние биомов на скорость; L5+ игнорят
+        // тип биома». Pure-функция GameConstants.GetTerrainSpeedFactor:
+        // штрафные поверхности (Snow/Sand/Water — cost>1) замедляют L1-L4,
+        // L5+ — нет; Road (0.7) ускоряет всех. Гард по живому тайлу карты.
+        {
+            Core.Data.GameTile slowTile = default;
+            string slowDesc = "";
+            bool foundSlow = false;
+            // Одноразовый скан сетки (500×500 = 250k чтений O(1) — доли сек):
+            // ищем первый проходимый тайл со штрафной поверхностью.
+            for (int y = 0; y < _tiles.MapHeight && !foundSlow; y += 3)
+            {
+                for (int x = 0; x < _tiles.MapWidth && !foundSlow; x += 3)
+                {
+                    var t = _tiles.GetTile(x, y);
+                    if (t.EffectiveMoveCost > 1f && t.IsWalkable)
+                    {
+                        slowTile = t;
+                        slowDesc = $"{t.Terrain}({t.EffectiveMoveCost:F1}) @({x},{y})";
+                        foundSlow = true;
+                    }
+                }
+            }
+            bool l1Slowed = foundSlow
+                && GameConstants.GetTerrainSpeedFactor(slowTile, 1) < 0.999f;
+            bool l5Immune = foundSlow
+                && Math.Abs(GameConstants.GetTerrainSpeedFactor(slowTile, 5) - 1f) < 0.001f;
+            // Дорога — бонус всем: проверяем наличие хоть одной (может не
+            // быть на карте — тогда просто пропускаем эту полупроверку).
+            bool roadBonusChecked = false, roadBonusOk = true;
+            for (int y = 0; y < _tiles.MapHeight && !roadBonusChecked; y += 3)
+            {
+                for (int x = 0; x < _tiles.MapWidth && !roadBonusChecked; x += 3)
+                {
+                    var t = _tiles.GetTile(x, y);
+                    if (t.Terrain == Core.Data.TerrainType.Road)
+                    {
+                        roadBonusChecked = true;
+                        roadBonusOk = GameConstants.GetTerrainSpeedFactor(t, 5) > 1f;
+                    }
+                }
+            }
+            bool terrainOk = l1Slowed && l5Immune && roadBonusOk;
+            GD.Print($"[L500Sim] 8. терраин-фактор(R41-6): штрафный тайл={slowDesc} (найден={foundSlow}), " +
+                      $"L1 замедлен={l1Slowed} ({(foundSlow ? GameConstants.GetTerrainSpeedFactor(slowTile, 1).ToString("F2") : "—")}), " +
+                      $"L5 имунен={l5Immune}, дорога ускоряет L5={(!roadBonusChecked ? "нет дорог на карте (пропуск)" : roadBonusOk.ToString())} " +
+                      $"→ {(terrainOk ? "ок" : "FAIL")}");
+            pass &= terrainOk;
+
+            // Полупроверка ЖИВОГО интегр-пути: уровень через реальный сервис —
+            // фактор пересчитывается кэшем GWC (см. HandleFreeMovement).
+            if (_qi != null && foundSlow)
+            {
+                int savedLvl = (int)_qi.CultivationLevel;
+                _qi.SetCultivationLevel(5, 0);
+                bool liveImmune = Math.Abs(GameConstants.GetTerrainSpeedFactor(slowTile, (int)_qi.CultivationLevel) - 1f) < 0.001f;
+                _qi.SetCultivationLevel(Math.Max(1, savedLvl), 0);
+                GD.Print($"[L500Sim] 8a. живой уровень: SetCultivationLevel(5) → CultivationLevel={_qi.CultivationLevel}, фактор на штрафном тайле = 1.0 → {(liveImmune ? "ок" : "FAIL")}");
+                pass &= liveImmune;
+            }
         }
 
         GD.Print($"[L500Sim] VERDICT: {(pass
