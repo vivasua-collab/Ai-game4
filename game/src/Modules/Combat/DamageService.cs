@@ -61,6 +61,10 @@ namespace CultivationGame.Modules.Combat
     {
         // === Зависимости (DI через конструктор) ===
         private readonly IPublisher<DamageAppliedEvent> _damageAppliedPub;
+        // R40-5b/R41-1: трейс урона (полный брейкдаун слоёв) — для GODOT_DAMAGE_TRACE
+        private readonly IPublisher<DamageTraceEvent> _damageTracePub;
+        // R41-1: HP цели до/после для трейса (алиас-безопасно: BodyService)
+        private readonly IBodyDataProvider _bodyDataProvider;
 
         // Спринт 2 B2: IBuffService для модификаторов урона/защиты
         private readonly IBuffService _buffService;
@@ -107,9 +111,13 @@ namespace CultivationGame.Modules.Combat
             IBuffService buffService, // Спринт 2 B2
             IFormationService formationService, // Спринт 2 B2/C9
             IQiDataProvider qiDataProvider, // Спринт 4 B8: per-entity QiBuffer
-            ICombatRng combatRng) // IMPL-6 (Q5): deterministic RNG
+            ICombatRng combatRng, // IMPL-6 (Q5): deterministic RNG
+            IPublisher<DamageTraceEvent> damageTracePub, // R40-5b/R41-1
+            IBodyDataProvider bodyDataProvider) // R41-1: HP до/после в трейсе
         {
             _damageAppliedPub = damageAppliedPub;
+            _damageTracePub = damageTracePub;
+            _bodyDataProvider = bodyDataProvider;
             _qiBufferStateChangedSub = qiBufferStateChangedSub;
             _qiChangedSub = qiChangedSub;
             _qiConsumeRequestPub = qiConsumeRequestPub;
@@ -209,10 +217,21 @@ namespace CultivationGame.Modules.Combat
             if (attackResult == CombatAttackResult.Miss)
             {
                 var missSubtype = GetCombatSubtypeFromRequest(request);
+                int missHp = _bodyDataProvider.GetCurrentHealth(request.TargetId);
                 _damageAppliedPub.Publish(new DamageAppliedEvent(
                     request.AttackerId, request.TargetId,
                     0, request.Type, request.Element,
                     hitPart, CombatAttackResult.Miss, missSubtype));
+                // R40-5b: трейс и для промаха — виден весь расчёт до ролла
+                _damageTracePub.Publish(new DamageTraceEvent(
+                    request.AttackerId, request.TargetId, request.Type, request.Element,
+                    missSubtype, request.AttackerLevel, request.DefenderLevel,
+                    request.BaseDamage, rawDamage, suppressionPermil, elementPermil,
+                    atkBuffPermil, formationDmgPermil, preDefenseDamage,
+                    CombatAttackResult.Miss, hitPart, 0, 0,
+                    false, 0, 0,
+                    0, 0, false, 0, 0,
+                    0, false, missHp, missHp));
 
                 return new DamageResult(0, 0, 0, hitPart, CombatAttackResult.Miss, false);
             }
@@ -226,10 +245,20 @@ namespace CultivationGame.Modules.Combat
                 // Result=Dodge: BodyService применит 0 (безопасно), цифры-рендер
                 // покажет «уклонение», StrikeFxRenderer фильтрует Dodge by-design.
                 var dodgeSubtype = GetCombatSubtypeFromRequest(request);
+                int dodgeHp = _bodyDataProvider.GetCurrentHealth(request.TargetId);
                 _damageAppliedPub.Publish(new DamageAppliedEvent(
                     request.AttackerId, request.TargetId,
                     0, request.Type, request.Element,
                     hitPart, CombatAttackResult.Dodge, dodgeSubtype));
+                _damageTracePub.Publish(new DamageTraceEvent(
+                    request.AttackerId, request.TargetId, request.Type, request.Element,
+                    dodgeSubtype, request.AttackerLevel, request.DefenderLevel,
+                    request.BaseDamage, rawDamage, suppressionPermil, elementPermil,
+                    atkBuffPermil, formationDmgPermil, preDefenseDamage,
+                    CombatAttackResult.Dodge, hitPart, 0, 0,
+                    false, 0, 0,
+                    0, 0, false, 0, 0,
+                    0, false, dodgeHp, dodgeHp));
 
                 return new DamageResult(0, 0, 0, hitPart, CombatAttackResult.Dodge, false);
             }
@@ -361,6 +390,8 @@ namespace CultivationGame.Modules.Combat
 
             int postArmorDamage;
             int absorbedByArmor;
+            // R40-5b: предметный DR нужен трейсу и вне ветки покрытия
+            int equipDrPermil = 0;
 
             if (armorCoversHit)
             {
@@ -368,7 +399,7 @@ namespace CultivationGame.Modules.Combat
                 // R21-3: + предметное «Снижение урона» (ALGORITHMS §5.2:
                 // damageReduction = armor.damageReduction + бонусы) в
                 // DefenseContext.DamageReductionPermil (поверх бафф/формаций).
-                int equipDrPermil = _equipmentDataProvider.GetDamageReductionPermil(request.TargetId);
+                equipDrPermil = _equipmentDataProvider.GetDamageReductionPermil(request.TargetId);
                 var defenseContext = new DefenseContext(
                     request.TargetId, armorValue, request.DefenderMaterial,
                     buffReductionPermil + equipDrPermil, request.Penetration); // C6: penetration
@@ -400,10 +431,28 @@ namespace CultivationGame.Modules.Combat
             // Спринт 7 C8: передаём Element для стихийных эффектов
             // P2-7.3 FIX: передаём AttackSubtype для различения slashing/piercing от blunt
             var attackSubtype = GetCombatSubtypeFromRequest(request);
+            // R41-1: HP до удара (EventBus синхронный — BodyService применит
+            // урон прямо внутри Publish ниже, включая овекилл-перенос)
+            int hpBefore = _bodyDataProvider.GetCurrentHealth(request.TargetId);
             _damageAppliedPub.Publish(new DamageAppliedEvent(
                 request.AttackerId, request.TargetId,
                 finalDamage, request.Type, request.Element,
                 hitPart, attackResult, attackSubtype));
+
+            // R40-5b/R41-1: полный трейс удара — одна строка в консоль
+            // (Adapter-подписчик, env GODOT_DAMAGE_TRACE=1). Все числа уже
+            // посчитаны выше; HP после — пост-фактум синхронного применения.
+            int hpAfter = _bodyDataProvider.GetCurrentHealth(request.TargetId);
+            bool aliveAfter = _bodyDataProvider.IsEntityAlive(request.TargetId);
+            _damageTracePub.Publish(new DamageTraceEvent(
+                request.AttackerId, request.TargetId, request.Type, request.Element,
+                attackSubtype, request.AttackerLevel, request.DefenderLevel,
+                request.BaseDamage, rawDamage, suppressionPermil, elementPermil,
+                atkBuffPermil, formationDmgPermil, preDefenseDamage,
+                attackResult, hitPart, defensePermil, postDefenseActionDamage,
+                bufferActive, targetCurrentQi, absorbedByQi,
+                armorValue, armorCoverage, armorCoversHit, buffReductionPermil + (armorCoversHit ? equipDrPermil : 0), absorbedByArmor,
+                finalDamage, !aliveAfter, hpBefore, hpAfter));
 
             return damageResult;
         }

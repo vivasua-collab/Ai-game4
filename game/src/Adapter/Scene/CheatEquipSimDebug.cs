@@ -17,6 +17,7 @@
 using Godot;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.Events;
@@ -305,9 +306,59 @@ public partial class CheatEquipSimDebug : Node
             SaveScreenshot($"{shotPrefix}_u2_toast.png");
         }
 
+        // === D. R40-2 (2026-10-18): генерация чит-панелью следует уровню игрока + селектор ===
+        // Репорт владельца: «повышаю до L3, генерирую оружие — выпадает L1».
+        // Цепочка: SetCultivationLevel(3) → UI-кнопка «Оружие cycle» (селектор «авто»)
+        // → генератор → инвентарь; затем ручной селектор L9 → ItemLevel==9.
+        var btnWeaponCycle = FindButtonByText(cheat, "Оружие cycle");
+        var btnGenL9 = FindButtonInNamed(cheat, "GenLevelRow", "L9");
+        var btnGenAuto = FindButtonInNamed(cheat, "GenLevelRow", "авто");
+        if (btnWeaponCycle == null || btnGenL9 == null || btnGenAuto == null)
+        {
+            GD.Print($"[CheatEquipSim] VERDICT: FAIL — кнопки R40-2 не найдены " +
+                     $"(Оружие cycle={btnWeaponCycle != null}, GenL9={btnGenL9 != null}, GenAuto={btnGenAuto != null})");
+            return;
+        }
+
+        // D1: авто = уровень игрока (поднимаем до 3 через сервис — как L-кнопка панели).
+        _qi.SetCultivationLevel(3, 0);
+        await ToSignal(GetTree().CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
+        var idsBefore = new HashSet<string>(_inventory.GetAllSlots().Select(s => s.ItemId));
+        PressButton(btnWeaponCycle);
+        await ToSignal(GetTree().CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
+        var d1Item = FirstNewWeapon(idsBefore);
+        bool d1 = d1Item != null && d1Item.ItemLevel == 3;
+        GD.Print($"[CheatEquipSim] D1. авто-генерация при игроке L3: {DescribeItem(d1Item)} — " +
+                 $"{(d1 ? "OK (ItemLevel==3)" : "DEFECT: уровень предмета ≠ уровень игрока")}");
+        pass &= d1;
+
+        // D2: ручной селектор L9 → генерация ровно L9 (даже при игроке L3).
+        PressButton(btnGenL9);
+        await ToSignal(GetTree().CreateTimer(0.1), SceneTreeTimer.SignalName.Timeout);
+        idsBefore = new HashSet<string>(_inventory.GetAllSlots().Select(s => s.ItemId));
+        PressButton(btnWeaponCycle);
+        await ToSignal(GetTree().CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
+        var d2Item = FirstNewWeapon(idsBefore);
+        bool d2 = d2Item != null && d2Item.ItemLevel == 9;
+        GD.Print($"[CheatEquipSim] D2. селектор L9 (игрок L3): {DescribeItem(d2Item)} — " +
+                 $"{(d2 ? "OK (ItemLevel==9)" : "DEFECT: селектор не применился")}");
+        pass &= d2;
+
+        // D3: возврат в «авто» — уровень снова следует игроку (L3).
+        PressButton(btnGenAuto);
+        await ToSignal(GetTree().CreateTimer(0.1), SceneTreeTimer.SignalName.Timeout);
+        idsBefore = new HashSet<string>(_inventory.GetAllSlots().Select(s => s.ItemId));
+        PressButton(btnWeaponCycle);
+        await ToSignal(GetTree().CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
+        var d3Item = FirstNewWeapon(idsBefore);
+        bool d3 = d3Item != null && d3Item.ItemLevel == 3;
+        GD.Print($"[CheatEquipSim] D3. возврат «авто» (игрок L3): {DescribeItem(d3Item)} — " +
+                 $"{(d3 ? "OK (ItemLevel==3)" : "DEFECT: авто не вернулся к уровню игрока")}");
+        pass &= d3;
+
         cheat.Visible = false;
 
-        GD.Print($"[CheatEquipSim] VERDICT: {(pass ? "PASS — сапоги/броня экипируются по уровню игрока, гейты честные, причина отказа видима, геометрия чит-панели стабильна" : "FAIL")} ");
+        GD.Print($"[CheatEquipSim] VERDICT: {(pass ? "PASS — сапоги/броня экипируются по уровню игрока, гейты честные, причина отказа видима, геометрия чит-панели стабильна, генерация следует уровню/селектору (R40-2)" : "FAIL")} ");
     }
 
     private void OnEquipmentBlocked(in EquipmentBlockedEvent e)
@@ -384,6 +435,41 @@ public partial class CheatEquipSimDebug : Node
         }
         return null;
     }
+
+    /// <summary>R40-2: кнопка по тексту ВНУТРИ именованного контейнера
+    /// (различает «L9» селектора генерации от «L9» уровня культивации).</summary>
+    private static Button? FindButtonInNamed(Node root, string containerName, string text)
+    {
+        var container = FindNamedNode(root, containerName);
+        return container == null ? null : FindButtonByText(container, text);
+    }
+
+    private static Node? FindNamedNode(Node node, string name)
+    {
+        if (node.Name == name) return node;
+        foreach (var child in node.GetChildren())
+        {
+            var found = FindNamedNode(child, name);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    /// <summary>R40-2: первый НОВЫЙ Weapon-предмет в инвентаре после нажатия.</summary>
+    private EquipmentData? FirstNewWeapon(HashSet<string> idsBefore)
+    {
+        foreach (var slot in _inventory.GetAllSlots())
+        {
+            if (idsBefore.Contains(slot.ItemId)) continue;
+            if (_itemDb.TryGetItem(slot.ItemId, out var it) && it is EquipmentData eq
+                && eq.Category == ItemCategory.Weapon)
+                return eq;
+        }
+        return null;
+    }
+
+    private static string DescribeItem(EquipmentData? eq) =>
+        eq == null ? "оружие НЕ найдено" : $"{eq.NameRu} L{eq.ItemLevel} ({eq.Grade}, T{eq.MaterialTier})";
 
     private void SaveScreenshot(string path)
     {

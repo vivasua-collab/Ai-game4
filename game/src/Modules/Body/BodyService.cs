@@ -239,6 +239,9 @@ namespace CultivationGame.Modules.Body
             // Запоминаем предыдущее состояние
             BodyPartState previousState = part.State;
 
+            // R41-1: HP части до удара — для расчёта овекилл-остатка
+            int redBefore = part.CurrentRedHP;
+
             // Наносим урон (DISC-01: одновременный split, без overflow)
             bool applied = part.TakeDamage(finalRedDmg, finalBlackDmg);
             if (!applied) return; // Часть отрублена (не должно быть после ResolveTarget)
@@ -275,6 +278,18 @@ namespace CultivationGame.Modules.Body
                         _entityId, part.Type, newState,
                         part.MaxRedHP > 0 ? (float)part.CurrentRedHP / part.MaxRedHP : 0f));
                 }
+            }
+
+            // R41-1 (репорт 18.10 №2: «олень L1 переживает 80к урона техникой»):
+            // овекилл-перенос — избыток red-урона после разрушения части (её
+            // RedHP → 0) ранее ДИСКАРДИЛСЯ (кламп в TakeDamage); гигантский
+            // удар «исчезал» в одной части (торс 90 HP), не достигая vitals,
+            // и смерть (Head|Heart) была 4%-лотереей ролла независимо от
+            // величины урона. Теперь избыток переносится на следующие части.
+            int redLeftover = finalRedDmg - (redBefore - part.CurrentRedHP);
+            if (redLeftover > 0)
+            {
+                CascadeOverkill(_entityId, _parts.Values, part, redLeftover, isPlayer: true);
             }
         }
 
@@ -511,6 +526,8 @@ namespace CultivationGame.Modules.Body
             var (finalRedDmg, finalBlackDmg) = BodyDamageCalculator.SplitDamage(totalDamage);
 
             BodyPartState previousState = part.State;
+            // R41-1: HP части до удара — для расчёта овекилл-остатка
+            int redBefore = part.CurrentRedHP;
             bool applied = part.TakeDamage(finalRedDmg, finalBlackDmg);
             if (!applied) return;
 
@@ -538,6 +555,15 @@ namespace CultivationGame.Modules.Body
                         part.MaxRedHP > 0 ? (float)part.CurrentRedHP / part.MaxRedHP : 0f));
                 }
             }
+
+            // R41-1: овекилл-перенос (см. комментарий в ApplyDamage) —
+            // тот же фикс для NPC/зверей: 80к-удар L9-игрока обязан
+            // убивать оленя L1, а не «исчезать» в торсе на 90 HP.
+            int redLeftover = finalRedDmg - (redBefore - part.CurrentRedHP);
+            if (redLeftover > 0)
+            {
+                CascadeOverkill(entityId, parts, part, redLeftover, isPlayer: false);
+            }
         }
 
         /// <summary>
@@ -563,6 +589,101 @@ namespace CultivationGame.Modules.Body
                         return part;
 
             return null;
+        }
+
+        /// <summary>
+        /// R41-1 (репорт 18.10 №2 «олень L1 выживает 80к»): перенос овекилла.
+        /// Избыток red-урона, не поместившийся в разбитую часть (RedHP → 0),
+        /// переносится на следующие части, пока не иссякнет или организм
+        /// не погибнет. Порядок приёмников: Торс (центр массы) → витальные
+        /// (Head, Heart) → остальные живые. Black-урон не переносится
+        /// (структурный — остаётся на исходной части). На каждую затронутую
+        /// часть публикуются стандартные события (как в основном пути).
+        /// </summary>
+        private void CascadeOverkill(string entityId, IEnumerable<BodyPart> parts, BodyPart origin, int redLeftover, bool isPlayer)
+        {
+            var allParts = new List<BodyPart>(parts);
+            while (redLeftover > 0)
+            {
+                // Смерть уже наступила — дальше не рубим
+                if (!BodyDamageCalculator.IsAlive(allParts))
+                    break;
+
+                var next = NextOverkillTarget(allParts, origin);
+                if (next == null)
+                    break; // поглощать больше некуда
+
+                int redBefore = next.CurrentRedHP;
+                BodyPartState previousState = next.State;
+                int transferred = redLeftover;
+                bool applied = next.TakeDamage(redLeftover, 0);
+                if (!applied)
+                {
+                    origin = next; // защита от зацикливания (не должно случаться)
+                    continue;
+                }
+                redLeftover -= redBefore - next.CurrentRedHP;
+
+                var newState = next.State;
+                bool stateChanged = newState != previousState;
+                _damagedPublisher.Publish(new BodyPartDamagedEvent(
+                    entityId, next.Type, transferred, newState, stateChanged,
+                    next.CurrentRedHP, next.MaxRedHP));
+
+                if (newState == BodyPartState.Severed && previousState != BodyPartState.Severed)
+                {
+                    if (isPlayer) _severedParts.Add(next.Type);
+                    var blockedSlots = BodySlotMapping.GetBlockedSlots(next.Type);
+                    _severedPublisher.Publish(new BodyPartSeveredEvent(
+                        entityId, next.Type, blockedSlots, next.IsVital));
+                }
+
+                if (next.IsVital)
+                {
+                    if ((newState == BodyPartState.Disabled && previousState != BodyPartState.Disabled) ||
+                        (newState == BodyPartState.Severed && previousState != BodyPartState.Severed))
+                    {
+                        _criticalPublisher.Publish(new BodyCriticalEvent(
+                            entityId, next.Type, newState,
+                            next.MaxRedHP > 0 ? (float)next.CurrentRedHP / next.MaxRedHP : 0f));
+                    }
+                }
+
+                if (isPlayer)
+                {
+                    _listDirty = true;
+                    _cacheDirty = true;
+                }
+                origin = next;
+            }
+        }
+
+        /// <summary>
+        /// R41-1: следующая цель овекилл-переноса — Торс (центр массы) →
+        /// витальные (VitalPriority: Head, Heart) → остальные живые части.
+        /// Пропускаются: origin, Severed и функционально разрушенные (RedHP ≤ 0).
+        /// </summary>
+        private static BodyPart? NextOverkillTarget(List<BodyPart> parts, BodyPart origin)
+        {
+            foreach (var part in parts)
+                if (part.Type == BodyPartType.Torso && CanAbsorb(part, origin))
+                    return part;
+
+            foreach (var vitalType in VitalPriority)
+                foreach (var part in parts)
+                    if (part.Type == vitalType && CanAbsorb(part, origin))
+                        return part;
+
+            foreach (var part in parts)
+                if (CanAbsorb(part, origin))
+                    return part;
+
+            return null;
+
+            static bool CanAbsorb(BodyPart p, BodyPart origin) =>
+                !ReferenceEquals(p, origin)
+                && p.State != BodyPartState.Severed
+                && p.CurrentRedHP > 0;
         }
 
         /// <summary>

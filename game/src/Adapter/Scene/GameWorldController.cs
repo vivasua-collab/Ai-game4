@@ -81,6 +81,8 @@ public partial class GameWorldController : Node2D
     [Inject] private ISubscriber<Core.Messaging.Contracts.EquipmentChangedEvent> EquipmentChangedSub { get; set; } = null!;
     // R37 (U2 fix): причина отказа экипировки → видимый тост игроку.
     [Inject] private ISubscriber<Core.Messaging.Contracts.EquipmentBlockedEvent> EquipmentBlockedSub { get; set; } = null!;
+    // R40-5b/R41-1: боевой трейс урона (печать под env GODOT_DAMAGE_TRACE=1)
+    [Inject] private ISubscriber<Core.Messaging.Contracts.DamageTraceEvent> DamageTraceSub { get; set; } = null!;
     // R16 (2026-09-10): замах оружия игрока (AttackIntentEvent, melee) +
     // тост стойки защиты (DefenseIntentEvent, клавиша G).
     [Inject] private ISubscriber<Core.Messaging.Contracts.AttackIntentEvent> AttackIntentSub { get; set; } = null!;
@@ -164,6 +166,8 @@ public partial class GameWorldController : Node2D
     private System.IDisposable? _attackRejectedToken; // M2: тост причины отклонения атаки
     private System.IDisposable? _equipmentChangedToken; // R15: оружие в руке
     private System.IDisposable? _equipmentBlockedToken;  // R37 (U2): тост причины отказа
+    // R40-5b/R41-1: боевой трейс урона — печать полного брейкдауна в консоль
+    private System.IDisposable? _damageTraceToken;
     // R16: замах оружия + тост стойки защиты.
     private System.IDisposable? _attackIntentToken;
     private System.IDisposable? _defenseIntentToken;
@@ -547,6 +551,12 @@ public partial class GameWorldController : Node2D
         // отказ экипировки — EquipmentService гейтит по уровню и публикует
         // EquipmentBlockedEvent, но рендера не было → игрок не знал причины.
         _equipmentBlockedToken = EquipmentBlockedSub?.Subscribe(OnEquipmentBlocked);
+        // R40-5b/R41-1 (репорт 18.10 №5): боевой трейс урона в консоль —
+        // полный брейкдаун цифр удара (откуда берётся каждая). Гейт env —
+        // по умолчанию ВЫКЛ (не спамить прод/QA): включать запуском с
+        // GODOT_DAMAGE_TRACE=1 (владельцу — для отладки боёвки).
+        if (System.Environment.GetEnvironmentVariable("GODOT_DAMAGE_TRACE") == "1")
+            _damageTraceToken = DamageTraceSub?.Subscribe(OnDamageTrace);
         // R16: замах оружия игрока + тост стойки защиты (G).
         _attackIntentToken = AttackIntentSub?.Subscribe(OnAttackIntentForSwing);
         _defenseIntentToken = DefenseIntentSub?.Subscribe(OnDefenseIntent);
@@ -2354,6 +2364,28 @@ public partial class GameWorldController : Node2D
     }
 
     /// <summary>
+    /// R40-5b/R41-1: полный трейс удара — одна строка в консоль (godot.log —
+    /// ротация в user://logs). Отвечает на вопрос владельца «откуда берутся
+    /// конкретные цифры урона»: base → raw(грейд×потенция×стат) → подавление
+    /// уровнем → стихия → баффы/формации → ролл (miss/dodge/parry/block/crit)
+    /// → Ци-щит → броня → финал → HP цели до/после (овекилл-перенос R41-1
+    /// виден как скачок HP больше «−финального числа по одной части»).
+    /// Печать через GD.Print (Console.WriteLine в godot.log не попадает).
+    /// </summary>
+    private void OnDamageTrace(in Core.Messaging.Contracts.DamageTraceEvent e)
+    {
+        string qi = e.QiBufferActive
+            ? $"ON(qi={e.DefenderQi}) absorb={e.AbsorbedByQi}"
+            : "OFF";
+        GD.Print($"[DMG] {e.AttackerId}(L{e.AttackerLevel}) → {e.DefenderId}(L{e.DefenderLevel}) " +
+                 $"| {e.AttackSubtype}/{e.Type}/{e.Element} base={e.BaseDamage} raw={e.RawDamage} " +
+                 $"| suppr={e.SuppressionPermil}‰ elem={e.ElementPermil}‰ atkBuff={e.AtkBuffPermil}‰ form={e.FormationDmgPermil}‰ → preDef={e.PreDefenseDamage} " +
+                 $"| roll={e.Result}({e.HitPart}) defP={e.DefensePermil}‰ → {e.PostActionDamage} " +
+                 $"| Qi:{qi} | armor={e.ArmorValue} cov={e.ArmorCoverage}% covered={e.ArmorCoversHit} defBuff={e.DefenseBuffPermil}‰ absorb={e.AbsorbedByArmor} " +
+                 $"| FINAL={e.FinalDamage}{(e.Fatal ? " FATAL" : "")} | HP {e.DefenderHpBefore}→{e.DefenderHpAfter}");
+    }
+
+    /// <summary>
     /// R37 (U2 fix, баг-репорт 23.09 №2): EquipmentService отклоняет экипировку
     /// (гейт RequiredCultivationLevel R35 и др.) и публикует EquipmentBlockedEvent
     /// с причиной, но рендера не было — предмет «молча не надевался», игрок не
@@ -2984,6 +3016,8 @@ public partial class GameWorldController : Node2D
         // R37 (U2): тост причины отказа экипировки.
         _equipmentBlockedToken?.Dispose();
         _equipmentBlockedToken = null;
+        _damageTraceToken?.Dispose();
+        _damageTraceToken = null;
         _attackIntentToken?.Dispose();
         _attackIntentToken = null;
         _defenseIntentToken?.Dispose();

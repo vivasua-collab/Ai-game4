@@ -82,6 +82,101 @@ public readonly struct TechniqueUsedEvent
         { UserId = userId; TechniqueId = techniqueId; QiCost = qiCost; }
 }
 
+/// <summary>
+/// R40-5b/R41-1 (репорт владельца 18.10 №5): ПОЛНЫЙ боевой трейс урона.
+/// Одна публикация на каждый резолв удара (включая Miss/Dodge) со всеми
+/// промежуточными числами пайплайна: base → raw(грейд×потенция×стат) →
+/// подавление уровнем → стихия → баффы/формации → ролл (miss/dodge/parry/
+/// block/crit) → Ци-щит (поглощение/пробитие) → броня (покрытие/редукция)
+/// → финал → HP цели до/после (овекилл-перенос R41-1 виден как скачок HP).
+/// Публикуется DamageService.CalculateDamage рядом с DamageAppliedEvent.
+/// Консольный вывод — Adapter-подписчик под env GODOT_DAMAGE_TRACE=1
+/// (QA-парсеры нейтральны к префиксу [DMG]).
+/// </summary>
+public readonly struct DamageTraceEvent
+{
+    public readonly string AttackerId;
+    public readonly string DefenderId;
+    public readonly DamageType Type;              // Qi / Physical / Pure
+    public readonly Element Element;
+    public readonly CombatSubtype AttackSubtype;  // MeleeWeapon / RangedProjectile / AoE / …
+    public readonly int AttackerLevel;
+    public readonly int DefenderLevel;
+
+    // Слои расчёта
+    public readonly int BaseDamage;          // request.BaseDamage (кулак+оружие или BaseDamage техники)
+    public readonly int RawDamage;           // после грейд × потенция × стат-скейлинга
+    public readonly int SuppressionPermil;   // подавление уровнем (1000 = ×1.0)
+    public readonly int ElementPermil;       // стихийный множитель
+    public readonly int AtkBuffPermil;       // бафф урона атакующего
+    public readonly int FormationDmgPermil;  // бонус формаций на урон
+    public readonly int PreDefenseDamage;   // итог ДО роллов/защиты
+    public readonly CombatAttackResult Result; // Hit / Miss / Dodge / Parry / Block / CriticalHit
+    public readonly BodyPartType HitPart;
+    public readonly int DefensePermil;       // ролл-множитель (Parry/Block 500, Crit 1500, Hit 1000)
+    public readonly int PostActionDamage;   // после ролла
+
+    // Ци-щит (слой 5b)
+    public readonly bool QiBufferActive;
+    public readonly long DefenderQi;         // Ци цели на момент удара
+    public readonly int AbsorbedByQi;
+
+    // Броня (слои 6-8)
+    public readonly int ArmorValue;
+    public readonly int ArmorCoverage;       // % покрытия
+    public readonly bool ArmorCoversHit;     // результат coverage-ролла
+    public readonly int DefenseBuffPermil;   // бафф защиты + формации + DR предмета
+    public readonly int AbsorbedByArmor;
+
+    // Финал
+    public readonly int FinalDamage;
+    public readonly bool Fatal;
+    public readonly int DefenderHpBefore;    // сумма RedHP живых частей до удара
+    public readonly int DefenderHpAfter;     // … после (синхронное применение через EventBus)
+
+    public DamageTraceEvent(
+        string attackerId, string defenderId, DamageType type, Element element,
+        CombatSubtype attackSubtype, int attackerLevel, int defenderLevel,
+        int baseDamage, int rawDamage, int suppressionPermil, int elementPermil,
+        int atkBuffPermil, int formationDmgPermil, int preDefenseDamage,
+        CombatAttackResult result, BodyPartType hitPart, int defensePermil, int postActionDamage,
+        bool qiBufferActive, long defenderQi, int absorbedByQi,
+        int armorValue, int armorCoverage, bool armorCoversHit, int defenseBuffPermil, int absorbedByArmor,
+        int finalDamage, bool fatal, int defenderHpBefore, int defenderHpAfter)
+    {
+        AttackerId = attackerId;
+        DefenderId = defenderId;
+        Type = type;
+        Element = element;
+        AttackSubtype = attackSubtype;
+        AttackerLevel = attackerLevel;
+        DefenderLevel = defenderLevel;
+        BaseDamage = baseDamage;
+        RawDamage = rawDamage;
+        SuppressionPermil = suppressionPermil;
+        ElementPermil = elementPermil;
+        AtkBuffPermil = atkBuffPermil;
+        FormationDmgPermil = formationDmgPermil;
+        PreDefenseDamage = preDefenseDamage;
+        Result = result;
+        HitPart = hitPart;
+        DefensePermil = defensePermil;
+        PostActionDamage = postActionDamage;
+        QiBufferActive = qiBufferActive;
+        DefenderQi = defenderQi;
+        AbsorbedByQi = absorbedByQi;
+        ArmorValue = armorValue;
+        ArmorCoverage = armorCoverage;
+        ArmorCoversHit = armorCoversHit;
+        DefenseBuffPermil = defenseBuffPermil;
+        AbsorbedByArmor = absorbedByArmor;
+        FinalDamage = finalDamage;
+        Fatal = fatal;
+        DefenderHpBefore = defenderHpBefore;
+        DefenderHpAfter = defenderHpAfter;
+    }
+}
+
 // === Этап 2 внедрения ЦИ (2026-08-23): слоты техник игрока (TECHNIQUE_SYSTEM.md §12) ===
 
 /// <summary>

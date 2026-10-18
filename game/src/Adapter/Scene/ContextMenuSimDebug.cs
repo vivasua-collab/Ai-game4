@@ -23,6 +23,9 @@
 //   14. Материал (ItemCategory.Material): кнопки «Использовать» НЕТ.
 //   15. Читаемость подокна: панель имеет высоту (регресс: фон не
 //       рисовался при высоте 0), фон непрозрачен, контраст ≥ 4.5:1.
+// R40-3 (2026-10-18) «Окно характеристик» — шаг 16:
+//   16. Легендарка L9: потолок высоты (контент выше вьюпорта → скролл),
+//       drag-перенос с клампом в границы экрана, ZIndex=40 (поверх хотбара).
 // Запуск: GODOT_NEWGAME=1 GODOT_CONTEXT_DEBUG=1 godot --headless --path . scenes/MainMenu.tscn
 using Godot;
 using System;
@@ -43,6 +46,7 @@ public partial class ContextMenuSimDebug : Node
     [Inject] private IBodyService? _body;      // R19: лечение/урон в тесте
     [Inject] private IQiService? _qi;          // R19: поглощение Ци камня
     [Inject] private IItemUseService? _itemUse; // A6: сервисный гейт камней
+    [Inject] private IEquipmentGenerator? _equipGen; // R40-3: легендарка для шага 16
 
     private const string StoneId = "material_stone";
     private const string QiDustId = "qistone_dust_calm";
@@ -628,6 +632,70 @@ public partial class ContextMenuSimDebug : Node
                 GD.Print("[ContextSim] 15. FAIL — пилюля для проверки читаемости не найдена");
             }
             pass &= readabilityOk;
+        }
+
+        // === 16. R40-3: окно характеристик — потолок/drag/ZIndex =========
+        // Репорт владельца: окно статов не перемещается, влезает не полностью,
+        // закрывается хотбаром на легендарках. Гард трёх фиксов:
+        //   (а) контент выше потолка → скролл взял излишек, панель ≤ потолка
+        //       (естественный контент в headless компактнее — потолок
+        //       принижается QA-оверрайдом 240px, механика та же);
+        //   (б) DragPanelByForQA(±10к) → кламп: панель целиком внутри вьюпорта;
+        //   (в) ZIndex == 40 — меню рисуется поверх хотбара.
+        {
+            bool capOk = false, dragOk = false, zOk = false;
+            if (_equipGen != null)
+            {
+                var legend = _equipGen.GenerateLegendaryWeapon(9, "sword", 92001);
+                if (legend != null && _inventory.TryAddItem(legend, 1))
+                {
+                    int legSlot = FindSlotIndex(_inventory, legend.ItemId);
+                    if (legSlot >= 0)
+                    {
+                        win.CloseContextMenu();
+                        win.OpenContextMenu(legSlot);
+                        var legMenu = win.ContextMenuForQA;
+                        if (legMenu != null)
+                        {
+                            await ToSignal(GetTree().CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
+                            var vp = GetViewport().GetVisibleRect().Size;
+                            zOk = legMenu.MenuZIndexForQA == 40;
+                            // Естественное состояние: панель целиком в вьюпорте.
+                            bool fitsNaturally = legMenu.PanelPositionForQA.Y + legMenu.PanelSizeForQA.Y <= vp.Y + 1f;
+                            // Принудительный потолок → скролл включается.
+                            legMenu.SetHeightCapOverrideForQA(240f);
+                            await ToSignal(GetTree().CreateTimer(0.1), SceneTreeTimer.SignalName.Timeout);
+                            float capped = legMenu.AppliedHeightCapForQA;
+                            float panelH = legMenu.PanelSizeForQA.Y;
+                            capOk = fitsNaturally && capped > 0f && panelH <= capped + 80f;
+                            // Экстремальные переносы в обе стороны — кламп.
+                            legMenu.DragPanelByForQA(new Vector2(10000f, 10000f));
+                            var posBR = legMenu.PanelPositionForQA;
+                            var sizeBR = legMenu.PanelSizeForQA;
+                            bool brOk = posBR.X + sizeBR.X <= vp.X + 1f && posBR.Y + sizeBR.Y <= vp.Y + 1f;
+                            legMenu.DragPanelByForQA(new Vector2(-100000f, -100000f));
+                            var posTL = legMenu.PanelPositionForQA;
+                            bool tlOk = posTL.X >= -1f && posTL.Y >= -1f;
+                            dragOk = brOk && tlOk;
+                            GD.Print($"[ContextSim] 16. R40-3 легендарка L9: в вьюпорте={fitsNaturally}, потолок(оверрайд 240)={capped:F0}px (скролл {capped > 0}), высота панели={panelH:F0}px, ZIndex={legMenu.MenuZIndexForQA}, drag-кламп BR={brOk}/TL={tlOk}");
+                        }
+                    }
+                    else
+                    {
+                        GD.Print("[ContextSim] 16. FAIL — слот легендарки не найден");
+                    }
+                }
+                else
+                {
+                    GD.Print("[ContextSim] 16. FAIL — легендарка L9 не сгенерирована/не добавлена");
+                }
+                win.CloseContextMenu();
+            }
+            else
+            {
+                GD.Print("[ContextSim] 16. FAIL — IEquipmentGenerator не инжектирован");
+            }
+            pass &= capOk && dragOk && zOk;
         }
 
         // === HOLD для VLM-скриншота (GODOT_CONTEXT_HOLD=1) ==========

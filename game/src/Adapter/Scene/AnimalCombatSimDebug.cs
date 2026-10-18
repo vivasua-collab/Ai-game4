@@ -22,6 +22,7 @@
 using Godot;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Data;
+using System;
 using CultivationGame.Core.Events;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Core.Messaging.Contracts;
@@ -446,6 +447,53 @@ public partial class AnimalCombatSimDebug : Node2D
             allOk &= barsOk;
         }
 
+        // === 9. R41-1 (репорт 18.10 №2): ОВЕКИЛЛ-ПЕРЕНОС =============
+        // «Игрок L9 наносит оленю L1 80к урона техникой — олень жив; второй
+        // удар 83к — жив; мечом 150 — умер». Корень: весь удар клампился в
+        // ОДНУ часть (торс 90 HP), избыток дискардился, смерть = только
+        // Head|Heart (4% ролла). Фикс: избыток red-урона переносится
+        // (Торс → витальные → остальные). Гард: (а) гигантский удар убивает,
+        // (б) средний удар переносится ровно на min(red, торс+голова).
+        {
+            var ppOvk = _playerService.Position;
+            var deerOvk = _animalService.SpawnAnimal("deer", new Position2D(ppOvk.X + 2, ppOvk.Y));
+            var deerMid = _animalService.SpawnAnimal("deer", new Position2D(ppOvk.X, ppOvk.Y + 2));
+            int hpBefore = _bodyProvider.GetCurrentHealth(deerOvk.EntityId);
+            int torsoRed = 0, headRed = 0;
+            foreach (var p in _bodyProvider.GetBodyParts(deerOvk.EntityId))
+            {
+                if (p.Type == BodyPartType.Torso) torsoRed = p.CurrentRedHP;
+                if (p.Type == BodyPartType.Head) headRed = p.CurrentRedHP;
+            }
+
+            // (а) 80 000 урона (как в репорте) — олень ОБЯЗАН умереть:
+            // торс разрублен, избыток доходит до головы → смерть.
+            _damageEventPub!.Publish(new DamageAppliedEvent(
+                PlayerBodyId, deerOvk.EntityId, 80000, DamageType.Qi,
+                BodyPartType.Torso, CombatAttackResult.Hit));
+            await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+            bool giantKills = !_bodyProvider.IsEntityAlive(deerOvk.EntityId);
+            int hpAfterGiant = _bodyProvider.GetCurrentHealth(deerOvk.EntityId);
+
+            // (б) 150 урона мечом: red-часть 105 → торс 90 + перенос 15 в
+            // голову — выживший олень теряет РОВНО min(105, torso+head) red.
+            int midBefore = _bodyProvider.GetCurrentHealth(deerMid.EntityId);
+            _damageEventPub!.Publish(new DamageAppliedEvent(
+                PlayerBodyId, deerMid.EntityId, 150, DamageType.Physical,
+                BodyPartType.Torso, CombatAttackResult.Hit));
+            await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+            int midDrop = midBefore - _bodyProvider.GetCurrentHealth(deerMid.EntityId);
+            int expectedMid = Math.Min(105, torsoRed + headRed);
+            bool midAlive = _bodyProvider.IsEntityAlive(deerMid.EntityId);
+            bool midOk = midAlive && midDrop == expectedMid;
+
+            bool overkillOk = giantKills && midOk;
+            GD.Print($"[AnimalQA] 9-овекилл(R41-1): 80к-удар убивает оленя (HP {hpBefore}→{hpAfterGiant}, убит={giantKills}); " +
+                     $"150-удар: HP {midBefore}→{midBefore - midDrop} (−{midDrop}, ожид. {expectedMid} = торс {Math.Min(torsoRed, 105)} + перенос {Math.Max(0, Math.Min(105 - torsoRed, headRed))}), жив={midAlive} " +
+                     $"→ {(overkillOk ? "OK" : "FAIL")}");
+            allOk &= overkillOk;
+        }
+
         PrintVerdict(allOk);
     }
 
@@ -461,6 +509,6 @@ public partial class AnimalCombatSimDebug : Node2D
     }
 
     private static void PrintVerdict(bool pass) => GD.Print(pass
-        ? "[AnimalQA] VERDICT: PASS — таргетинг/урон/месть/смерть→труп/killfeed-имя/de-aggro/мирный вид/HP-бары+тумблер: бой с животными зарегистрирован полностью"
+        ? "[AnimalQA] VERDICT: PASS — таргетинг/урон/месть/смерть→труп/killfeed-имя/de-aggro/мирный вид/HP-бары+тумблер/овекилл-перенос: бой с животными зарегистрирован полностью"
         : "[AnimalQA] VERDICT: FAIL — см. шаги выше (какой контур не прошёл)");
 }

@@ -74,6 +74,14 @@ namespace CultivationGame.Adapter.UI
         private int _formationSizeIdx = (int)FormationSize.Small;
         private int _formationLevel = 1;
 
+        // R40-2 (2026-10-18): селектор уровня генерации предметов.
+        // 0 = «авто» = текущий major-уровень культивации игрока; 1..9 = ручной выбор.
+        // Репорт владельца: генерация «выпадает L1» — при чтом уровне панели,
+        // причина восприятия: «Прорыв» растит ПОД-уровень (L1.3 читается как L3),
+        // major остаётся 1; плюс нулевая обратная связь (уровень предмета не выводился).
+        private int _genLevel;
+        private readonly Button?[] _genLevelButtons = new Button[10]; // [0]=авто, [1..9]=L1..L9
+
         // Cycle-массивы.
         private static readonly string[] WeaponIds =
             { "dagger", "sword", "axe", "spear", "greatsword", "bow", "staff" };
@@ -223,6 +231,20 @@ namespace CultivationGame.Adapter.UI
             // === Phase F: Экипировка (оружие/броня/рандом) ===
             vbox.AddChild(MakeSeparator());
             vbox.AddChild(MakeLabel("▸ Экипировка:", 12, new Color(0.94f, 0.83f, 0.66f)));
+            // R40-2: селектор уровня генерации — «авто» (уровень игрока) или L1..L9.
+            vbox.AddChild(MakeLabel("Уровень генерации:", 12, new Color(0.94f, 0.83f, 0.66f)));
+            var genLevelRow = new HBoxContainer { Name = "GenLevelRow" };
+            genLevelRow.AddThemeConstantOverride("separation", 2);
+            _genLevelButtons[0] = MakeButton("авто", 34, () => OnSetGenLevel(0));
+            genLevelRow.AddChild(_genLevelButtons[0]!);
+            for (int lvl = 1; lvl <= 9; lvl++)
+            {
+                int captured = lvl;
+                _genLevelButtons[lvl] = MakeButton($"L{lvl}", 24, () => OnSetGenLevel(captured));
+                genLevelRow.AddChild(_genLevelButtons[lvl]!);
+            }
+            vbox.AddChild(genLevelRow);
+            RefreshGenLevelButtons();
             var equipRow = new HBoxContainer();
             equipRow.AddThemeConstantOverride("separation", 4);
             equipRow.AddChild(MakeButton("Оружие cycle", 88, OnGenerateWeapon));
@@ -337,7 +359,7 @@ namespace CultivationGame.Adapter.UI
         private void OnGrantTechniques()
         {
             if (TechniqueGenerator == null || Techniques == null) return;
-            int level = Qi == null ? 1 : Math.Max(1, (int)Qi.CultivationLevel);
+            int level = GetGenerationLevel();
             int granted = 0;
             // Цикл по пулу активных типов (как TechniqueGrantPhase).
             var types = new[]
@@ -387,7 +409,7 @@ namespace CultivationGame.Adapter.UI
         private void OnCreateFormation()
         {
             if (FormationGenerator == null || Formations == null || Player == null) return;
-            int level = Qi == null ? 1 : Math.Max(1, (int)Qi.CultivationLevel);
+            int level = GetGenerationLevel();
             // Gathering-формация (сбор Ци — полезна для теста медитации).
             var formData = FormationGenerator.GenerateSpecified(
                 FormationType.Gathering, FormationSize.Small, level, _seedCounter++);
@@ -424,46 +446,46 @@ namespace CultivationGame.Adapter.UI
         private void OnGenerateWeapon()
         {
             if (EquipmentGenerator == null || Inventory == null) return;
-            int level = Qi == null ? 1 : Math.Max(1, (int)Qi.CultivationLevel);
+            int level = GetGenerationLevel();
             string subtype = WeaponIds[_weaponCycleIdx % WeaponIds.Length];
             _weaponCycleIdx++;
             var weapon = EquipmentGenerator.GenerateWeapon(level, subtype, _seedCounter++);
             if (weapon == null) { SetStatus("Оружие не сгенерировано"); return; }
             bool added = Inventory.TryAddItem(weapon, 1);
-            SetStatus($"Оружие: {weapon.NameRu} ({weapon.Grade}, T{weapon.MaterialTier}, dmg={weapon.Damage}) — в инвентарь: {added}");
+            SetStatus($"Оружие: {weapon.NameRu} (L{weapon.ItemLevel}, {weapon.Grade}, T{weapon.MaterialTier}, dmg={weapon.Damage}) — генерация L{level} — в инвентарь: {added}");
         }
 
         private void OnGenerateArmor()
         {
             if (EquipmentGenerator == null || Inventory == null) return;
-            int level = Qi == null ? 1 : Math.Max(1, (int)Qi.CultivationLevel);
+            int level = GetGenerationLevel();
             string subtype = ArmorIds[_armorCycleIdx % ArmorIds.Length];
             _armorCycleIdx++;
             var armor = EquipmentGenerator.GenerateArmor(level, subtype, _seedCounter++);
             if (armor == null) { SetStatus("Броня не сгенерирована"); return; }
             bool added = Inventory.TryAddItem(armor, 1);
-            SetStatus($"Броня: {armor.NameRu} ({armor.Grade}, def={armor.Defense}, cov={armor.Coverage:F0}%) — в инвентарь: {added}");
+            SetStatus($"Броня: {armor.NameRu} (L{armor.ItemLevel}, {armor.Grade}, def={armor.Defense}, cov={armor.Coverage:F0}%) — генерация L{level} — в инвентарь: {added}");
         }
 
         private void OnGenerateRandomEquip()
         {
             if (EquipmentGenerator == null || Inventory == null) return;
-            int level = Qi == null ? 1 : Math.Max(1, (int)Qi.CultivationLevel);
+            int level = GetGenerationLevel();
             var item = EquipmentGenerator.GenerateRandom(level, _seedCounter++);
             if (item == null) { SetStatus("Рандом не сгенерирован"); return; }
             bool added = Inventory.TryAddItem(item, 1);
-            SetStatus($"Рандом: {item.NameRu} ({item.Grade}, slot={item.Slot}) — в инвентарь: {added}");
+            SetStatus($"Рандом: {item.NameRu} (L{item.ItemLevel}, {item.Grade}, slot={item.Slot}) — генерация L{level} — в инвентарь: {added}");
         }
 
         private void OnGenerateEnchantedWeapon()
         {
             if (EquipmentGenerator == null || Inventory == null) return;
-            int level = Qi == null ? 1 : Math.Max(1, (int)Qi.CultivationLevel);
+            int level = GetGenerationLevel();
             var weapon = EquipmentGenerator.GenerateWeapon(level, "sword", _seedCounter++);
             if (weapon == null) { SetStatus("Оружие не сгенерировано"); return; }
             bool enchanted = EquipmentGenerator.TryApplyEnchant(weapon, null, _seedCounter++);
             bool added = Inventory.TryAddItem(weapon, 1);
-            SetStatus($"Оружие+зачар: {weapon.NameRu} | enchant={enchanted} | effects={weapon.SpecialEffects.Count} | в инвентарь: {added}");
+            SetStatus($"Оружие+зачар: {weapon.NameRu} (L{weapon.ItemLevel}) | enchant={enchanted} | effects={weapon.SpecialEffects.Count} | генерация L{level} | в инвентарь: {added}");
         }
 
         // === 2026-08-26: Легендарки (Epic→Legendary + оверкап) ===
@@ -471,27 +493,27 @@ namespace CultivationGame.Adapter.UI
         private void OnGenerateLegendaryWeapon()
         {
             if (EquipmentGenerator == null || Inventory == null) return;
-            int level = Qi == null ? 1 : Math.Max(1, (int)Qi.CultivationLevel);
+            int level = GetGenerationLevel();
             string subtype = WeaponIds[_weaponCycleIdx % WeaponIds.Length];
             _weaponCycleIdx++;
             var weapon = EquipmentGenerator.GenerateLegendaryWeapon(level, subtype, _seedCounter++);
             if (weapon == null) { SetStatus("Легендарка не сгенерирована"); return; }
             bool added = Inventory.TryAddItem(weapon, 1);
             bool overcap = weapon.Description.Contains("ОВЕРКАП");
-            SetStatus($"Легендарка: {weapon.NameRu} | dmg={weapon.Damage} dur={weapon.MaxDurability} | оверкап={overcap} | бонусы={weapon.StatBonuses.Count} | в инвентарь: {added}");
+            SetStatus($"Легендарка: {weapon.NameRu} (L{weapon.ItemLevel}) | dmg={weapon.Damage} dur={weapon.MaxDurability} | оверкап={overcap} | бонусы={weapon.StatBonuses.Count} | генерация L{level} | в инвентарь: {added}");
         }
 
         private void OnGenerateLegendaryArmor()
         {
             if (EquipmentGenerator == null || Inventory == null) return;
-            int level = Qi == null ? 1 : Math.Max(1, (int)Qi.CultivationLevel);
+            int level = GetGenerationLevel();
             string subtype = ArmorIds[_armorCycleIdx % ArmorIds.Length];
             _armorCycleIdx++;
             var armor = EquipmentGenerator.GenerateLegendaryArmor(level, subtype, _seedCounter++);
             if (armor == null) { SetStatus("Легендарка не сгенерирована"); return; }
             bool added = Inventory.TryAddItem(armor, 1);
             bool overcap = armor.Description.Contains("ОВЕРКАП");
-            SetStatus($"Легендарка: {armor.NameRu} | def={armor.Defense} dur={armor.MaxDurability} | оверкап={overcap} | бонусы={armor.StatBonuses.Count} | в инвентарь: {added}");
+            SetStatus($"Легендарка: {armor.NameRu} (L{armor.ItemLevel}) | def={armor.Defense} dur={armor.MaxDurability} | оверкап={overcap} | бонусы={armor.StatBonuses.Count} | генерация L{level} | в инвентарь: {added}");
         }
 
         /// <summary>
@@ -501,7 +523,7 @@ namespace CultivationGame.Adapter.UI
         private void OnLegendaryStats()
         {
             if (EquipmentGenerator == null || Verifier == null) return;
-            int level = Qi == null ? 9 : Math.Max(1, (int)Qi.CultivationLevel);
+            int level = Qi == null ? 9 : GetGenerationLevel(); // fallback 9 — исторический смысл «статистика на высоком уровне»
             const int n = 20;
             int overcapped = 0, valid = 0, weapons = 0, armors = 0;
             var sb = new System.Text.StringBuilder();
@@ -527,21 +549,21 @@ namespace CultivationGame.Adapter.UI
         private void OnGenerateConsumable()
         {
             if (ItemGenerator == null || Inventory == null) return;
-            int level = Qi == null ? 1 : Math.Max(1, (int)Qi.CultivationLevel);
+            int level = GetGenerationLevel();
             var item = ItemGenerator.GenerateConsumableForLevel(level, _seedCounter++);
             if (item == null) { SetStatus("Расходник не сгенерирован"); return; }
             bool added = Inventory.TryAddItem(item, 1);
-            SetStatus($"Расходник: {item.NameRu} (stack={item.MaxStack}, wt={item.Weight:F1}) — в инвентарь: {added}");
+            SetStatus($"Расходник: {item.NameRu} (stack={item.MaxStack}, wt={item.Weight:F1}) — генерация L{level} — в инвентарь: {added}");
         }
 
         private void OnGenerateCharger()
         {
             if (ItemGenerator == null || Inventory == null) return;
-            int level = Qi == null ? 1 : Math.Max(1, (int)Qi.CultivationLevel);
+            int level = GetGenerationLevel();
             var charger = ItemGenerator.GenerateChargerForLevel(level, _seedCounter++);
             if (charger == null) { SetStatus("Зарядник не сгенерирован"); return; }
             bool added = Inventory.TryAddItem(charger, 1);
-            SetStatus($"Зарядник: {charger.NameRu} (slot={charger.Slot}) — в инвентарь: {added}");
+            SetStatus($"Зарядник: {charger.NameRu} (slot={charger.Slot}) — генерация L{level} — в инвентарь: {added}");
         }
 
         // === Phase F: Техника с привязкой формации ===
@@ -550,7 +572,7 @@ namespace CultivationGame.Adapter.UI
         {
             if (TechniqueGenerator == null || Techniques == null || FormationGenerator == null
                 || Formations == null || Player == null) return;
-            int level = Qi == null ? 1 : Math.Max(1, (int)Qi.CultivationLevel);
+            int level = GetGenerationLevel();
             // 1. Сгенерировать Formation-технику.
             var tech = TechniqueGenerator.GenerateSpecified(
                 TechniqueType.Formation, level, level, _seedCounter++);
@@ -596,7 +618,7 @@ namespace CultivationGame.Adapter.UI
 
         private void OnDumpBoundaries()
         {
-            int level = Qi == null ? 1 : Math.Max(1, (int)Qi.CultivationLevel);
+            int level = GetGenerationLevel();
             var sb = new System.Text.StringBuilder();
             sb.AppendLine($"L{level} границы для Combat-Common:");
             var b = CultivationGame.Core.Data.LevelBoundaries.TechniqueBoundsFor(level, TechniqueType.Combat, TechniqueGrade.Common);
@@ -615,6 +637,48 @@ namespace CultivationGame.Adapter.UI
                 TechniqueRegistry.GetAll(),
                 t => Modules.Generator.DeduplicationService.Fingerprint(t));
             SetStatus($"Дублей в TechniqueRegistry: {dups} (total={TechniqueRegistry.Count})");
+        }
+
+        // === R40-2: уровень генерации (селектор «авто»/L1..L9) ===
+
+        private void OnSetGenLevel(int level)
+        {
+            _genLevel = Math.Clamp(level, 0, 9);
+            RefreshGenLevelButtons();
+            int effective = GetGenerationLevel();
+            SetStatus(_genLevel == 0
+                ? $"Генерация: авто → L{effective} (уровень игрока)"
+                : $"Генерация: фиксированный L{_genLevel}");
+        }
+
+        /// <summary>
+        /// R40-2: уровень для генераторов чит-панели.
+        /// _genLevel=0 («авто») → major-уровень культивации игрока;
+        /// иначе — ручной выбор. Qi-сервис единый на процесс (singleton DI),
+        /// «Прорыв» и L-кнопки апдейтят то же поле, что читается здесь.
+        /// </summary>
+        private int GetGenerationLevel()
+        {
+            if (_genLevel > 0) return _genLevel;
+            if (Qi == null)
+            {
+                GD.PushWarning("[CheatPanel] IQiService не инжектирован — уровень генерации L1");
+                return 1;
+            }
+            return Math.Max(1, (int)Qi.CultivationLevel);
+        }
+
+        private void RefreshGenLevelButtons()
+        {
+            for (int i = 0; i < _genLevelButtons.Length; i++)
+            {
+                var btn = _genLevelButtons[i];
+                if (btn == null) continue;
+                // Активная кнопка — оранжевая (стиль заголовка панели), остальные — белые.
+                btn.Modulate = _genLevel == i
+                    ? new Color(0.98f, 0.7f, 0.25f)
+                    : new Color(1f, 1f, 1f);
+            }
         }
 
         // === Helpers ===
@@ -681,12 +745,12 @@ namespace CultivationGame.Adapter.UI
         {
             if (EquipmentGenerator == null || Equipment == null || CombatAdapter == null)
             { SetStatus("EquipmentGenerator/EquipmentService не инжектированы"); return; }
-            int level = Qi == null ? 1 : Math.Clamp((int)Qi.CultivationLevel, 1, 9);
+            int level = Math.Clamp(GetGenerationLevel(), 1, 9);
             var bow = EquipmentGenerator.GenerateWeapon(level, "bow");
             if (!Equipment.TryEquip(EquipmentSlot.WeaponMain, bow))
             { SetStatus($"Не удалось надеть '{bow.NameRu}' (слот занят?)"); return; }
             CombatAdapter.SwitchToRangedMode();
-            SetStatus($"🏹 {bow.NameRu} (урон {bow.Damage}, дальность {bow.AttackRange} м) — " +
+            SetStatus($"🏹 {bow.NameRu} (L{bow.ItemLevel}, урон {bow.Damage}, дальность {bow.AttackRange} м) — " +
                       $"режим дальнего боя. Space — выстрел, 1 — назад в melee");
         }
 

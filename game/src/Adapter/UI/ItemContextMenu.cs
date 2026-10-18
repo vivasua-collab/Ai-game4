@@ -45,6 +45,15 @@ public partial class ItemContextMenu : Control
     private readonly ItemData _item;
 
     private PanelContainer _panel = null!;
+    // R40-3: скролл-контейнер (потолок высоты для длинных списков легендарок)
+    // и drag-состояние заголовка (окно перемещаемое по репорту владельца).
+    private ScrollContainer _menuScroll = null!;
+    private bool _dragging;
+    private Vector2 _dragOffset;
+    private bool _userMovedPanel;
+    private const float MenuMaxHeightPx = 640f;
+    private const float MenuBottomReservePx = 140f; // зона хотбара + запас
+    private float _heightCapOverrideForQA; // R40-3 QA: принудительный потолок для теста скролла
 
     // === QA-акцессоры (GODOT_CONTEXT_DEBUG, №26) ===
     public Button? UseButtonForQA { get; private set; }
@@ -63,6 +72,29 @@ public partial class ItemContextMenu : Control
     public float MenuPanelBgAlphaForQA { get; private set; }
     /// <summary>Контраст (WCAG, отношение) фон↔текст описания (цель ≥ 4.5).</summary>
     public float DescriptionContrastForQA { get; private set; }
+    // === R40-3 QA: перемещаемость/ограниченность окна ===
+    public Vector2 PanelPositionForQA => _panel?.Position ?? Vector2.Zero;
+    public Vector2 PanelSizeForQA => _panel?.Size ?? Vector2.Zero;
+    public int MenuZIndexForQA => ZIndex;
+    /// <summary>Потолок высоты, применённый к панели (px; 0 = контент влез).</summary>
+    public float AppliedHeightCapForQA { get; private set; }
+    /// <summary>Симуляция drag для QA: сдвиг панели с тем же клампом, что и у мыши.</summary>
+    public void DragPanelByForQA(Vector2 delta)
+    {
+        _panel.Position = ClampPanelPosition(_panel.Position + delta);
+        _userMovedPanel = true;
+    }
+
+    /// <summary>
+    /// R40-3 QA: принудительный потолок высоты — гарантирует включение скролла
+    /// в тесте независимо от фактической высоты контента (headless-рендер
+    /// компактнее десктопа). 0 = вернуть естественный потолок.
+    /// </summary>
+    public void SetHeightCapOverrideForQA(float cap)
+    {
+        _heightCapOverrideForQA = MathF.Max(0f, cap);
+        ApplyHeightCap();
+    }
 
     public ItemContextMenu(InventoryWindow parent, InventorySlot slot, ItemData item)
     {
@@ -77,6 +109,11 @@ public partial class ItemContextMenu : Control
         Theme = ParchmentTheme.Create();
         SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         MouseFilter = MouseFilterEnum.Stop;
+        // R40-3: меню поверх хотбара — InventoryWindow добавляется в HUD-канвас
+        // РАНЬШЕ HotbarPanel (дерево-порядок рисует хотбар сверху), из-за чего
+        // нижние ~100px меню перекрывались кнопками быстрых действий. ZIndex
+        // поднимает поддерево меню выше хотбара (прецедент CheatPanel ZIndex=50).
+        ZIndex = 40;
 
         // Затемнение — клик мимо панели закрывает меню. R19: 0.25 → 0.45:
         // выраженное отделение светлой панели от инвентаря позади.
@@ -131,9 +168,32 @@ public partial class ItemContextMenu : Control
 
         // Контент — естественная вертикальная раскладка (без FullRect-якорей:
         // панель сама растёт по высоте контента — в этом и был фикс).
+        // R40-3: контент ограничен потолком высоты (легендарки = 20+ строк —
+        // без потолка панель выше вьюпорта, низ уходит под хотбар); излишек
+        // скроллится. Точная высота назначается в ApplyHeightCap() в конце
+        // _Ready по факту контента (GetCombinedMinimumSize — синхронный расчёт).
+        _menuScroll = new ScrollContainer
+        {
+            Name = "MenuScroll",
+            CustomMinimumSize = new Vector2(420, 0), // уточняется в ApplyHeightCap()
+            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+        };
+        _panel.AddChild(_menuScroll);
         var vbox = new VBoxContainer();
         vbox.AddThemeConstantOverride("separation", 4);
-        _panel.AddChild(vbox);
+        _menuScroll.AddChild(vbox);
+
+        // R40-3: заголовок-«ручка» — зона перетаскивания окна (клик по
+        // бекдропу по-прежнему закрывает меню; ручка — часть панели).
+        var header = new VBoxContainer
+        {
+            Name = "MenuHeader",
+            MouseFilter = MouseFilterEnum.Stop,
+            TooltipText = "Перетащите заголовок, чтобы переместить окно",
+        };
+        header.MouseDefaultCursorShape = Control.CursorShape.Move;
+        header.GuiInput += OnHeaderGuiInput;
+        vbox.AddChild(header);
 
         // Заголовок: имя предмета.
         var title = new Label
@@ -143,7 +203,7 @@ public partial class ItemContextMenu : Control
         };
         title.AddThemeFontSizeOverride("font_size", 18);
         title.AddThemeColorOverride("font_color", rarityColor);
-        vbox.AddChild(title);
+        header.AddChild(title);
 
         // Подзаголовок: редкость · категория · стак.
         var sub = new Label
@@ -154,7 +214,7 @@ public partial class ItemContextMenu : Control
         };
         sub.AddThemeFontSizeOverride("font_size", 12);
         sub.AddThemeColorOverride("font_color", ParchmentTheme.InkFaded);
-        vbox.AddChild(sub);
+        header.AddChild(sub);
 
         vbox.AddChild(new HSeparator());
 
@@ -304,18 +364,73 @@ public partial class ItemContextMenu : Control
         // Позиционирование: возле переданной точки (локальные координаты окна),
         // с клампом в границы. Отложим на один кадр — к моменту _Ready
         // у панели уже есть рассчитанный размер.
+        // R40-3: сначала потолок высоты (итоговый размер панели зависит от него).
+        ApplyHeightCap();
         CallDeferred(nameof(PositionPanel));
+    }
+
+    /// <summary>
+    /// R40-3: потолок высоты контента. Синхронный расчёт минимальной высоты
+    /// vbox → скроллу назначается min(контент, потолок): контент влез — панель
+    /// точного размера (вид как до R40-3); не влез — фиксированная высота,
+    /// излишек скроллится. Потолок: min(640, вьюпорт−140) — нижняя резервная
+    /// зона хотбара + запас.
+    /// </summary>
+    private void ApplyHeightCap()
+    {
+        float contentH = 0f;
+        foreach (var child in _menuScroll.GetChildren())
+            if (child is VBoxContainer v)
+                contentH = MathF.Max(contentH, v.GetCombinedMinimumSize().Y);
+        float cap = _heightCapOverrideForQA > 0f
+            ? _heightCapOverrideForQA
+            : Mathf.Min(MenuMaxHeightPx, Mathf.Max(240f, Size.Y - MenuBottomReservePx));
+        _menuScroll.CustomMinimumSize = new Vector2(420, Mathf.Clamp(contentH, 0f, cap));
+        AppliedHeightCapForQA = contentH > cap ? cap : 0f;
+        // Панель может остаться выше нового минимума (родитель панели —
+        // обычный Control, не контейнер: авто-сжатия нет) — сжимаем явно,
+        // иначе «скролл внутри» не виден и панель торчит за потолком.
+        var minSize = _panel.GetCombinedMinimumSize();
+        if (_panel.Size.Y > minSize.Y + 0.5f)
+            _panel.Size = new Vector2(_panel.Size.X, minSize.Y);
     }
 
     /// <summary>Позиционировать панель возле курсора с клампом в границы окна.</summary>
     private void PositionPanel()
     {
+        if (_userMovedPanel) return; // после ручного переноса позицию не сбрасываем
         Vector2 anchor = _parent.LastContextMenuPosition;
         Vector2 size = _panel.Size;
         Vector2 windowSize = Size;
         float x = Mathf.Clamp(anchor.X + 12, 4, Mathf.Max(4, windowSize.X - size.X - 4));
         float y = Mathf.Clamp(anchor.Y - size.Y / 2, 4, Mathf.Max(4, windowSize.Y - size.Y - 4));
         _panel.Position = new Vector2(x, y);
+    }
+
+    /// <summary>R40-3: кламп позиции панели в границы вьюпорта (окно не уходит за экран).</summary>
+    private Vector2 ClampPanelPosition(Vector2 pos)
+    {
+        Vector2 vp = Size;
+        Vector2 sz = _panel.Size;
+        pos.X = Mathf.Clamp(pos.X, 0, MathF.Max(0, vp.X - sz.X));
+        pos.Y = Mathf.Clamp(pos.Y, 0, MathF.Max(0, vp.Y - sz.Y));
+        return pos;
+    }
+
+    /// <summary>R40-3: перетаскивание окна за заголовок (ЛКМ зажать + движение).</summary>
+    private void OnHeaderGuiInput(InputEvent @event)
+    {
+        if (@event is InputEventMouseButton mb && mb.ButtonIndex == MouseButton.Left)
+        {
+            _dragging = mb.Pressed;
+            if (_dragging)
+                _dragOffset = _panel.Position - mb.GlobalPosition;
+        }
+        else if (@event is InputEventMouseMotion motion && _dragging)
+        {
+            _panel.Position = ClampPanelPosition(motion.GlobalPosition + _dragOffset);
+            _userMovedPanel = true;
+        }
     }
 
     /// <summary>
