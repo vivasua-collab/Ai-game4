@@ -73,7 +73,8 @@ public static class InputMapInitializer
         AddKeyAction("character_sheet", Key.C);
 
         // D2 (2026-08-26): Окно Культивации Ци (K). Открывает CultivationWindow:
-        // вкладки Техники / Меридианы / Ядро + панель слотов техник 3-9.
+        // вкладки Меридианы / Ядро + панель слотов техник 3-9 (R41-7: вкладка
+        // «Техники» удалена — браузер техник живёт в Книге, T).
         // K выбрано, чтобы не конфликтовать с C (CharacterSheet) и I (Inventory).
         AddKeyAction("cultivation_window", Key.K);
 

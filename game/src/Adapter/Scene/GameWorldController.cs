@@ -1270,6 +1270,12 @@ public partial class GameWorldController : Node2D
         var perfOverlay = new PerfOverlay { Name = "PerfOverlay" };
         _hudCanvas.AddChild(perfOverlay);
 
+        // R41-10 (репорт 18.10 №7 «кнопка просмотра тайла под курсором —
+        // послойное описание»): тайл-инспектор — F4, не-модальный, drag за
+        // заголовок; собственная DI-инъекция и ввод (паттерн PerfOverlay).
+        var tileInspector = new TileInspectorOverlay { Name = "TileInspectorOverlay" };
+        _hudCanvas.AddChild(tileInspector);
+
         // 2026-09-04 S5: стрелки направления атакующих вне экрана — игрок
         // видит, ОТКУДА прилетает урон, даже когда источник за кадром.
         _dmgDirIndicator = new UI.DamageDirectionIndicator { Name = "DamageDirIndicator" };
@@ -2192,7 +2198,7 @@ public partial class GameWorldController : Node2D
             if (string.IsNullOrEmpty(techId))
             {
                 ToastPub?.Publish(new Core.Messaging.Contracts.ToastShownEvent(
-                    $"Слот {slotIdx}: пусто — назначьте технику в окне Культивации (K)", 2.0f));
+                    $"Слот {slotIdx}: пусто — назначьте технику в Книге Техник (T)", 2.0f));
             }
             else
             {

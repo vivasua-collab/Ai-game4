@@ -1,20 +1,21 @@
 #nullable enable
 // Создано: 2026-08-26 — C3-C7 (окно Культивации Ци, этап C).
+// R41-7 (репорт владельца 18.10 №4 «убрать из K-окна раздел Техники»):
+// вкладка «Техники» УДАЛЕНА — список/детали/назначение техник живёт в
+// Книге Техник (T, в т.ч. drag&drop в слоты — R41-8); K-окно осталось
+// окном СОСТОЯНИЯ практика (меридианы/ядро) + нижний бар слотов техник
+// (обзор назначений + снятие ЛКМ). Слот-бар живёт в root окна и от
+// вкладки не зависел (аудит r40-a) — удаление вкладки его не задело.
 //
 // CultivationWindow — отдельное окно (как инвентарь), открывается клавишей K.
-// Содержит 3 вкладки + нижнюю панель слотов техник:
+// Содержит 2 вкладки + нижнюю панель слотов техник:
 //
-//   ┌─ CultivationWindow (Control, скрыт по умолчанию) ───────────┐
-//   │  [Вкладки: Техники | Меридианы | Ядро]      [× Закрыть]      │
+//   ┌─ CultivationWindow (Panel, скрыт по умолчанию) ──────────┐
+//   │  [Вкладки: Меридианы | Ядро]              [× Закрыть]    │
 //   ├──────────────────────────────────────────────────────────────┤
-//   │ ┌─ Левая (40%) ───────┐  ┌─ Правая (60%) ──────────────┐  │
-//   │ │ Список изученных    │  │ Характеристики выбранной    │  │
-//   │ │ техник (scroll)     │  │ техники: тип, грейд, ур-нь, │  │
-//   │ │  • Меч Ветра L1      │  │ стихия, qiCost, кулдаун,   │  │
-//   │ │  • Щит Земли L1      │  │ мощность, мастерство        │  │
-//   │ │  • ...               │  │                              │  │
-//   │ │                      │  │ [Установить в слот ▼] → 3-9  │  │
-//   │ └──────────────────────┘  └──────────────────────────────┘  │
+//   │ ┌─ Меридианы / Ядро (FullRect, вкладки TabContainer) ───┐  │
+//   │ │  (проводимость каналов / даньтянь, заполнение Ци)     │  │
+//   │ └──────────────────────────────────────────────────────┘  │
 //   ├──────────────────────────────────────────────────────────────┤
 //   │ Панель слотов техник (3..9, горизонтальная, 7 ячеек)        │
 //   │  [3] [4] [5] [6] [7] [8] [9]                                │
@@ -25,7 +26,6 @@
 // TechniqueSlotService (слоты). Паузит игру при открытии (как InventoryWindow).
 using Godot;
 using System;
-using System.Collections.Generic;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Events;
@@ -41,7 +41,8 @@ namespace CultivationGame.Adapter.UI;
 /// <summary>
 /// Окно Культивации Ци (C3-C7, 2026-08-26).
 /// Открывается клавишей K (CultivationWindowToggleRequestedEvent).
-/// 3 вкладки: Техники / Меридианы / Ядро + панель слотов техник (3-9).
+/// R41-7 (18.10): 2 вкладки — Меридианы / Ядро + панель слотов техник
+/// (3-9); вкладка «Техники» удалена (браузер техник — Книга T).
 /// П4 (репорт 21.09): базовый класс Panel — прежде Control, и override
 /// «panel» НИЧЕГО не рисовал (только Panel/Window используют этот
 /// стильбокс): текст читался сквозь полупрозрачную пустоту. Теперь
@@ -58,18 +59,18 @@ public partial class CultivationWindow : Panel
     [Inject] private IPublisher<TechniqueSlotClearedEvent> SlotClearedPub = null!;
     [Inject] private IPublisher<ToastShownEvent> ToastPub = null!;
     [Inject] private ISubscriber<CultivationWindowToggleRequestedEvent> ToggleSub = null!;
-    [Inject] private ISubscriber<TechniqueLearnedEvent> LearnedSub = null!;
-    [Inject] private ISubscriber<TechniqueForgottenEvent> ForgottenSub = null!;
+    // R41-7: подписки TechniqueLearned/ForgottenEvent удалены вместе со
+    // вкладкой «Техники» (их обработчики обновляли только список/детали
+    // вкладки; слот-бар обновляется собственными TechniqueSlot*-событиями).
     [Inject] private ISubscriber<QiChangedEvent> QiSub = null!;
     [Inject] private ISubscriber<TechniqueSlotAssignedEvent> SlotAssignedSub = null!;
     [Inject] private ISubscriber<TechniqueSlotClearedEvent> SlotClearedSub = null!;
 
     // === UI nodes ===
+    // R41-7: поля вкладки «Техники» (_techniqueList/_techniqueDetails/
+    // _slotSelector/_assignButton/_selectedTechId) удалены как мёртвые —
+    // обращений извне нет (все прежние потребители null-гардились).
     private TabContainer _tabs = null!;
-    private ItemList _techniqueList = null!;
-    private Label _techniqueDetails = null!;
-    private OptionButton _slotSelector = null!;
-    private Button _assignButton = null!;
     private Label _meridiansLabel = null!;
     private Label _coreLabel = null!;
     private HBoxContainer _slotBar = null!;
@@ -78,14 +79,11 @@ public partial class CultivationWindow : Panel
 
     // === Подписки ===
     private IDisposable? _toggleToken;
-    private IDisposable? _learnedToken;
-    private IDisposable? _forgottenToken;
     private IDisposable? _qiToken;
     private IDisposable? _slotAssignedToken;
     private IDisposable? _slotClearedToken;
 
     // === Состояние ===
-    private string? _selectedTechId;
     private long _cachedCurrentQi;
     private long _cachedMaxQi;
     private float _cachedConductivity;
@@ -100,14 +98,11 @@ public partial class CultivationWindow : Panel
         BuildUI();
 
         _toggleToken = ToggleSub?.Subscribe(OnToggle);
-        _learnedToken = LearnedSub?.Subscribe(OnLearned);
-        _forgottenToken = ForgottenSub?.Subscribe(OnForgotten);
         _qiToken = QiSub?.Subscribe(OnQiChanged);
         _slotAssignedToken = SlotAssignedSub?.Subscribe(OnSlotAssigned);
         _slotClearedToken = SlotClearedSub?.Subscribe(OnSlotCleared);
 
         Visible = false;
-        RebuildTechniqueList();
         RefreshSlots();
         RefreshMeridiansAndCore();
         GD.Print("[CultivationWindow] Ready");
@@ -116,19 +111,13 @@ public partial class CultivationWindow : Panel
     public override void _ExitTree()
     {
         _toggleToken?.Dispose();
-        _learnedToken?.Dispose();
-        _forgottenToken?.Dispose();
         _qiToken?.Dispose();
         _slotAssignedToken?.Dispose();
         _slotClearedToken?.Dispose();
     }
 
-    public override void _Process(double delta)
-    {
-        if (!Visible) return;
-        // Обновляем кулдауны на лету (как Книга Техник).
-        RefreshSelectedTechniqueDetails();
-    }
+    // R41-7: override _Process удалён — живой кулдаун обновлял детали
+    // выбранной техники вкладки «Техники»; вкладки больше нет.
 
     // === UI Construction ===
 
@@ -175,12 +164,15 @@ public partial class CultivationWindow : Panel
         header.AddChild(closeBtn);
         root.AddChild(header);
 
-        // Tabs: Техники / Меридианы / Ядро
+        // Tabs: Меридианы / Ядро
+        // R41-7: вкладка «Техники» (список/детали/OptionButton «В слот» +
+        // «Установить») удалена — назначение техник живёт в Книге Техник
+        // (T): кнопки-цифры + drag&drop R41-8. Слот-бар ниже — root-уровень,
+        // от вкладки не зависит, остался без изменений.
         _tabs = new TabContainer();
         _tabs.SizeFlagsVertical = SizeFlags.ExpandFill;
         root.AddChild(_tabs);
 
-        BuildTechniquesTab();
         BuildMeridiansTab();
         BuildCoreTab();
 
@@ -241,6 +233,9 @@ public partial class CultivationWindow : Panel
             vbox.AddChild(techNameLabel);
 
             // ЛКМ по слоту → снять технику (если занят)
+            // R41-7: слот-бар — единственная точка работы с техниками в K-окне
+            // (вкладка удалена); НАЗНАЧЕНИЕ техник — в Книге Техник (T):
+            // кнопки-цифры + drag&drop (R41-8).
             int captured = slotIndex;
             panel.GuiInput += @event =>
             {
@@ -261,65 +256,9 @@ public partial class CultivationWindow : Panel
         }
     }
 
-    private void BuildTechniquesTab()
-    {
-        var tab = new VBoxContainer { Name = "Техники" };
-        _tabs.AddChild(tab);
-
-        var split = new HSplitContainer();
-        split.SizeFlagsVertical = SizeFlags.ExpandFill;
-        split.SplitOffset = 320;
-        tab.AddChild(split);
-
-        // Left: list
-        _techniqueList = new ItemList
-        {
-            SizeFlagsHorizontal = SizeFlags.ExpandFill,
-            SizeFlagsVertical = SizeFlags.ExpandFill,
-        };
-        _techniqueList.ItemSelected += idx =>
-        {
-            if (idx >= 0 && idx < _techniqueList.ItemCount)
-            {
-                _selectedTechId = (string?)_techniqueList.GetItemMetadata((int)idx);
-                RefreshSelectedTechniqueDetails();
-            }
-        };
-        split.AddChild(_techniqueList);
-
-        // Right: details + assign
-        var right = new VBoxContainer
-        {
-            SizeFlagsHorizontal = SizeFlags.ExpandFill,
-            SizeFlagsVertical = SizeFlags.ExpandFill,
-        };
-        split.AddChild(right);
-
-        _techniqueDetails = new Label
-        {
-            SizeFlagsVertical = SizeFlags.ExpandFill,
-            SizeFlagsHorizontal = SizeFlags.ExpandFill,
-            AutowrapMode = TextServer.AutowrapMode.WordSmart,
-        };
-        _techniqueDetails.AddThemeFontSizeOverride("font_size", 13);
-        right.AddChild(_techniqueDetails);
-
-        var assignRow = new HBoxContainer();
-        assignRow.AddThemeConstantOverride("separation", 6);
-        var assignLabel = new Label { Text = "В слот:" };
-        assignLabel.AddThemeFontSizeOverride("font_size", 13);
-        assignRow.AddChild(assignLabel);
-
-        _slotSelector = new OptionButton();
-        for (int i = TechniqueSlotService.MinSlot; i <= TechniqueSlotService.MaxSlot; i++)
-            _slotSelector.AddItem(i.ToString());
-        assignRow.AddChild(_slotSelector);
-
-        _assignButton = new Button { Text = "Установить" };
-        _assignButton.Pressed += OnAssignPressed;
-        assignRow.AddChild(_assignButton);
-        right.AddChild(assignRow);
-    }
+    // R41-7: BuildTechniquesTab() удалён вместе с вызовом — вкладка
+    // «Техники» (ItemList + детали + OptionButton «В слот» + «Установить»)
+    // больше не строится; браузером техник является Книга Техник (T).
 
     private void BuildMeridiansTab()
     {
@@ -364,7 +303,7 @@ public partial class CultivationWindow : Panel
     {
         if (Visible) return;
         Visible = true;
-        RebuildTechniqueList();
+        // R41-7: RebuildTechniqueList() удалён вместе со вкладкой «Техники».
         RefreshSlots();
         RefreshMeridiansAndCore();
         ToastPub?.Publish(new ToastShownEvent("Окно Культивации открыто", 1.0f));
@@ -383,20 +322,9 @@ public partial class CultivationWindow : Panel
         else Open();
     }
 
-    private void OnLearned(in TechniqueLearnedEvent e)
-    {
-        if (!Visible) return;
-        RebuildTechniqueList();
-    }
-
-    private void OnForgotten(in TechniqueForgottenEvent e)
-    {
-        if (!Visible) return;
-        RebuildTechniqueList();
-        if (_selectedTechId == e.TechniqueId) _selectedTechId = null;
-        RefreshSelectedTechniqueDetails();
-        RefreshSlots();
-    }
+    // R41-7: OnLearned/OnForgotten удалены — их обработчики обновляли
+    // только список/детали вкладки «Техники»; слот-бар обновляется
+    // событиями TechniqueSlotAssigned/Cleared сервиса слотов.
 
     private void OnQiChanged(in QiChangedEvent e)
     {
@@ -422,79 +350,14 @@ public partial class CultivationWindow : Panel
         RefreshSlots();
     }
 
-    private void OnAssignPressed()
-    {
-        if (string.IsNullOrEmpty(_selectedTechId))
-        {
-            ToastPub?.Publish(new ToastShownEvent("Сначала выберите технику", 1.5f));
-            return;
-        }
-        // П5 (репорт 21.09): пассивная техника медитации не занимает номерный
-        // слот — вежливый отказ ДО вызова сервиса (сервис тоже гейтит).
-        if (Techniques.GetTechnique(_selectedTechId) is { Type: Core.Data.TechniqueType.Cultivation })
-        {
-            ToastPub?.Publish(new ToastShownEvent(
-                "☯ Пассивная техника — номерный слот не нужен: медитация включается клавишей V (спец-слот в хотбаре)", 3.0f));
-            return;
-        }
-        int slotIndex = TechniqueSlotService.MinSlot + _slotSelector.Selected;
-        bool ok = Slots?.AssignSlot(slotIndex, _selectedTechId) ?? false;
-        if (!ok)
-        {
-            ToastPub?.Publish(new ToastShownEvent($"Не удалось установить в слот {slotIndex}", 1.5f));
-        }
-    }
+    // R41-7: OnAssignPressed (OptionButton «В слот» + «Установить») удалён
+    // вместе со вкладкой «Техники» — назначение техник живёт в Книге (T).
 
     // === Refresh helpers ===
 
-    private void RebuildTechniqueList()
-    {
-        if (_techniqueList == null) return;
-        _techniqueList.Clear();
-        var ordered = Techniques?.GetOrderedIds();
-        if (ordered == null) return;
-        foreach (var id in ordered)
-        {
-            var tech = Techniques.GetTechnique(id);
-            if (tech == null) continue;
-            string label = $"{TechName(tech)}  L{tech.Level}";
-            _techniqueList.AddItem(label);
-            _techniqueList.SetItemMetadata(_techniqueList.ItemCount - 1, id);
-            if (id == _selectedTechId)
-                _techniqueList.Select(_techniqueList.ItemCount - 1);
-        }
-        RefreshSelectedTechniqueDetails();
-    }
-
-    private void RefreshSelectedTechniqueDetails()
-    {
-        if (_techniqueDetails == null) return;
-        if (string.IsNullOrEmpty(_selectedTechId))
-        {
-            _techniqueDetails.Text = "Выберите технику слева.";
-            return;
-        }
-        var tech = Techniques?.GetTechnique(_selectedTechId);
-        if (tech == null)
-        {
-            _techniqueDetails.Text = "Техника удалена.";
-            return;
-        }
-        int currentSlot = Slots?.FindSlotForTechnique(_selectedTechId) ?? -1;
-        string slotInfo = currentSlot >= 0 ? $"Слот {currentSlot}" : "не назначен";
-        float cd = Techniques?.GetCooldown(_selectedTechId) ?? 0f;
-        string cdInfo = cd > 0f ? $"  ⏳{cd:F0}с" : "";
-
-        _techniqueDetails.Text =
-            $"{TechName(tech)}\n" +
-            $"Тип: {TechTypeLabel(tech.Type)}   Грейд: {tech.Grade}\n" +
-            $"Уровень: {tech.Level}   Стихия: {ElementLabel(tech.Element)}\n" +
-            $"Стоимость Ци: {tech.QiCost}   Ёмкость: {tech.CapacityCost}\n" +
-            $"Базовый урон: {tech.BaseDamage}   Пробитие: {tech.ArmorPenetration}\n" +
-            $"Кулдаун: {tech.Cooldown:F1}с{cdInfo}   Дальность: {tech.Range:F1}м\n" +
-            $"Мастерство: {tech.Mastery:F2}/100   Ultimate: {(tech.IsUltimate ? "да" : "нет")}\n" +
-            $"Слот быстрого доступа: {slotInfo}";
-    }
+    // R41-7: RebuildTechniqueList()/RefreshSelectedTechniqueDetails()
+    // удалены вместе со вкладкой «Техники» (null-гарды :452/:471 из аудита
+    // r40-a больше не нужны — контролов вкладки просто нет).
 
     private void RefreshSlots()
     {
@@ -559,39 +422,11 @@ public partial class CultivationWindow : Panel
 
     // === Helpers ===
 
-    private static string TechName(LearnedTechnique tech) =>
-        string.IsNullOrEmpty(tech.Name) ? tech.TechniqueId : tech.Name;
+    // R41-7: TechName()/TechTypeLabel()/ElementLabel() удалены вместе со
+    // вкладкой «Техники» (их единственные потребители — удалённые методы).
 
     private static string ShortName(string name) =>
         name.Length <= 12 ? name : name.Substring(0, 12) + "…";
-
-    private static string TechTypeLabel(TechniqueType t) => t switch
-    {
-        TechniqueType.Combat => "Боевая",
-        TechniqueType.Defense => "Защитная",
-        TechniqueType.Healing => "Лечебная",
-        TechniqueType.Movement => "Перемещение",
-        TechniqueType.Sensory => "Сенсорная",
-        TechniqueType.Support => "Поддержка",
-        TechniqueType.Curse => "Проклятие",
-        TechniqueType.Cultivation => "Культивация",
-        TechniqueType.Formation => "Формация",
-        _ => t.ToString()
-    };
-
-    private static string ElementLabel(Element e) => e switch
-    {
-        Element.Fire => "Огонь",
-        Element.Water => "Вода",
-        Element.Earth => "Земля",
-        Element.Air => "Воздух",
-        Element.Lightning => "Молния",
-        Element.Void => "Пустота",
-        Element.Light => "Свет",
-        Element.Poison => "Яд",
-        Element.Neutral => "Нейтрально",
-        _ => e.ToString()
-    };
 
     private static int GetCurrentBreakthroughStage(int level)
     {

@@ -660,23 +660,31 @@ namespace CultivationGame.Modules.Body
 
         /// <summary>
         /// R41-1: следующая цель овекилл-переноса — Торс (центр массы) →
-        /// витальные (VitalPriority: Head, Heart) → остальные живые части.
+        /// НЕ-витальные части (конечности гасят избыток: R20-правило
+        /// «разрушение торса ≠ смерть» — смягчение v2: удар по функционально
+        /// мёртвому торсу не должен делать цель «хрупкой головой», иначе
+        //  затяжные бои становятся ваншот-лотереей) → витальные (Head, Heart).
         /// Пропускаются: origin, Severed и функционально разрушенные (RedHP ≤ 0).
+        /// Гигантский избыток (80к) всё равно доходит до витальных —
+        /// «бессмертный олень» невозможен (репорт 18.10 №2).
         /// </summary>
         private static BodyPart? NextOverkillTarget(List<BodyPart> parts, BodyPart origin)
         {
+            // 1) Торс — центр массы (если ещё жив).
             foreach (var part in parts)
                 if (part.Type == BodyPartType.Torso && CanAbsorb(part, origin))
                     return part;
 
+            // 2) НЕ-витальные — конечности гасят избыток ДО витальных.
+            foreach (var part in parts)
+                if (!IsVitalPart(part) && CanAbsorb(part, origin))
+                    return part;
+
+            // 3) Витальные — смерть (гигантский избыток доходит сюда).
             foreach (var vitalType in VitalPriority)
                 foreach (var part in parts)
                     if (part.Type == vitalType && CanAbsorb(part, origin))
                         return part;
-
-            foreach (var part in parts)
-                if (CanAbsorb(part, origin))
-                    return part;
 
             return null;
 
@@ -684,6 +692,9 @@ namespace CultivationGame.Modules.Body
                 !ReferenceEquals(p, origin)
                 && p.State != BodyPartState.Severed
                 && p.CurrentRedHP > 0;
+
+            static bool IsVitalPart(BodyPart p) =>
+                p.Type == BodyPartType.Head || p.Type == BodyPartType.Heart;
         }
 
         /// <summary>

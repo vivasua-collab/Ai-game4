@@ -476,20 +476,26 @@ public partial class AnimalCombatSimDebug : Node2D
             int hpAfterGiant = _bodyProvider.GetCurrentHealth(deerOvk.EntityId);
 
             // (б) 150 урона мечом: red-часть 105 → торс 90 + перенос 15 в
-            // голову — выживший олень теряет РОВНО min(105, torso+head) red.
+            // следующую не-витальную часть (конечности гасят избыток ДО
+            // витальных — смягчение v2 каскада). Выживший олень теряет РОВНО
+            // red-часть удара (все части считаются: черная 45 < 180 — торс не
+            // ампутирован).
             int midBefore = _bodyProvider.GetCurrentHealth(deerMid.EntityId);
+            int midTotalRed = 0;
+            foreach (var p in _bodyProvider.GetBodyParts(deerMid.EntityId))
+                if (p.State != BodyPartState.Severed) midTotalRed += p.CurrentRedHP;
             _damageEventPub!.Publish(new DamageAppliedEvent(
                 PlayerBodyId, deerMid.EntityId, 150, DamageType.Physical,
                 BodyPartType.Torso, CombatAttackResult.Hit));
             await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
             int midDrop = midBefore - _bodyProvider.GetCurrentHealth(deerMid.EntityId);
-            int expectedMid = Math.Min(105, torsoRed + headRed);
+            int expectedMid = Math.Min(105, midTotalRed);
             bool midAlive = _bodyProvider.IsEntityAlive(deerMid.EntityId);
             bool midOk = midAlive && midDrop == expectedMid;
 
             bool overkillOk = giantKills && midOk;
             GD.Print($"[AnimalQA] 9-овекилл(R41-1): 80к-удар убивает оленя (HP {hpBefore}→{hpAfterGiant}, убит={giantKills}); " +
-                     $"150-удар: HP {midBefore}→{midBefore - midDrop} (−{midDrop}, ожид. {expectedMid} = торс {Math.Min(torsoRed, 105)} + перенос {Math.Max(0, Math.Min(105 - torsoRed, headRed))}), жив={midAlive} " +
+                     $"150-удар: HP {midBefore}→{midBefore - midDrop} (−{midDrop}, ожид. {expectedMid} = red-часть удара, торс {Math.Min(torsoRed, 105)} + каскад {Math.Max(0, 105 - torsoRed)} в не-витальные), жив={midAlive} " +
                      $"→ {(overkillOk ? "OK" : "FAIL")}");
             allOk &= overkillOk;
         }

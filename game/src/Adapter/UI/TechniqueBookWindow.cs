@@ -20,13 +20,22 @@
 //   └───────────────────────────────────────────────────────────┘
 //
 // Правила:
-//   • Техники Культивации НЕ показываются (их дом — CultivationWindow, вкладка
-//     «Техники»): решение пользователя 2026-08-28.
+//   • Техники Культивации НЕ показываются (медитация ☯ — спец-слот хотбара,
+//     клавиша V): решение пользователя 2026-08-28; R41-7: вкладка «Техники»
+//     K-окна удалена — Книга остаётся единственным браузером техник.
 //   • Архив — техники ниже окна резонанса (L−4): хранить можно, изучить заново
 //     нельзя — только со свитка.
 //   • Свитки — записанные базовые формы техник (Mastery=0), изучение со свитка
 //     обходит окно резонанса, свиток расходуется.
 //   • Паузит игру при открытии (как инвентарь — планирование, Old School).
+//
+// R41-8 (репорт владельца 18.10 №8 «перетаскивание техник в слот быстрого
+// доступа; только нажатие на кнопки слота — не интуитивно»): чипы техник —
+// drag-source (payload {technique_id, source:"technique_book"}), слот-панели
+// нижнего бара — приёмники (валидация зеркальна TechniqueSlotService.
+// AssignSlot, отказ — тост с причиной). Хотбар геометрически перекрыт
+// FullRect-оверлеем Книги → дроп-цель — слот-бар САМОЙ Книги. Кнопки-цифры
+// в панели деталей остаются fallback.
 using Godot;
 using System;
 using System.Collections.Generic;
@@ -46,7 +55,8 @@ namespace CultivationGame.Adapter.UI;
 /// <summary>
 /// Книга Техник (T) — матричный браузер библиотеки техник игрока.
 /// Вкладки = уровни, блоки = типы, строки = стихии. Управление слотами
-/// быстрого доступа (3–9), свитками и забвением с эхом мастерства.
+/// быстрого доступа (3–9: кнопки-цифры + drag&drop R41-8), свитками
+/// и забвением с эхом мастерства.
 /// </summary>
 public partial class TechniqueBookWindow : Control
 {
@@ -72,11 +82,12 @@ public partial class TechniqueBookWindow : Control
     private ConfirmationDialog _forgetDialog = null!;
     private readonly Button[] _slotButtons = new Button[TechniqueSlotService.SlotCount];
     private readonly Label[] _slotLabels = new Label[TechniqueSlotService.SlotCount];
-    private readonly Panel[] _slotPanels = new Panel[TechniqueSlotService.SlotCount];
+    // R41-8: слот-панели — приёмники drag&drop (прежде — пассивные Panel).
+    private readonly TechniqueSlotDropPanel[] _slotPanels = new TechniqueSlotDropPanel[TechniqueSlotService.SlotCount];
     private readonly StyleBoxFlat[] _slotStyles = new StyleBoxFlat[TechniqueSlotService.SlotCount];
 
-    /// <summary>Чипы техник по ID (подсветка выбранной).</summary>
-    private readonly Dictionary<string, Button> _chipById = new();
+    /// <summary>Чипы техник по ID (подсветка выбранной; R41-8: drag-source).</summary>
+    private readonly Dictionary<string, TechniqueChipButton> _chipById = new();
 
     // === Подписки ===
     private IDisposable? _learnedToken;
@@ -233,7 +244,7 @@ public partial class TechniqueBookWindow : Control
         BuildDetailsRow(root);
 
         // ── Нижний бар слотов 3–9 ──
-        var slotCaption = new Label { Text = "Слоты быстрого доступа техник:" };
+        var slotCaption = new Label { Text = "Слоты быстрого доступа техник (перетащи чип или ЛКМ — снять):" };
         slotCaption.AddThemeFontSizeOverride("font_size", 14);
         slotCaption.AddThemeColorOverride("font_color", new Color(0.85f, 0.75f, 0.55f));
         root.AddChild(slotCaption);
@@ -248,7 +259,10 @@ public partial class TechniqueBookWindow : Control
         for (int i = 0; i < TechniqueSlotService.SlotCount; i++)
         {
             int slotIndex = TechniqueSlotService.MinSlot + i;
-            var slotPanel = new Panel
+            // R41-8: слот-панель — ПРИЁМНИК drag&drop техник из матрицы Книги
+            // (прежде — обычная Panel только с ЛКМ-снятием). Валидация и
+            // тосты причин — в TechniqueSlotDropPanel._CanDropData/_DropData.
+            var slotPanel = new TechniqueSlotDropPanel(slotIndex, this)
             {
                 CustomMinimumSize = new Vector2(108, 52),
                 MouseFilter = MouseFilterEnum.Stop,
@@ -291,20 +305,8 @@ public partial class TechniqueBookWindow : Control
             techNameLabel.CustomMinimumSize = new Vector2(96, 26);
             vbox.AddChild(techNameLabel);
 
-            // ЛКМ по занятому слоту → снять технику.
-            int captured = slotIndex;
-            slotPanel.GuiInput += @event =>
-            {
-                if (@event is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == Godot.MouseButton.Left)
-                {
-                    var techId = Slots?.GetTechniqueAtSlot(captured);
-                    if (!string.IsNullOrEmpty(techId) && Slots != null)
-                    {
-                        Slots.ClearSlot(captured);
-                        ToastPub?.Publish(new ToastShownEvent($"Слот {captured}: очищен", 1.5f));
-                    }
-                }
-            };
+            // (R41-8: ЛКМ-снятие переехало в TechniqueSlotDropPanel._GuiInput —
+            // вместе с панелью, чтобы не конкурировать с drop-логикой.)
 
             _slotLabels[i] = techNameLabel;
             _slotPanels[i] = slotPanel;
@@ -343,7 +345,8 @@ public partial class TechniqueBookWindow : Control
         var all = Techniques?.GetAllTechniques();
         if (all == null) return;
 
-        // Техники Культивации не показываем в Книге (их дом — CultivationWindow).
+        // Техники Культивации не показываем в Книге (медитация ☯ — хотбар V;
+        // R41-7: K-окно больше не содержит вкладку «Техники»).
         IEnumerable<LearnedTechnique> bookTechniques = all.Values
             .Where(t => t.Type != TechniqueType.Cultivation);
 
@@ -532,7 +535,9 @@ public partial class TechniqueBookWindow : Control
         foreach (var tech in row)
         {
             string id = tech.TechniqueId;
-            var chip = new Button
+            // R41-8: чип — ИСТОЧНИК drag&drop (payload technique_id/source);
+            // ЛКМ-клик сохраняет прежнюю семантику — выбор активной (Z-каст).
+            var chip = new TechniqueChipButton(tech)
             {
                 Text = ChipTitle(tech),
                 Alignment = HorizontalAlignment.Left,
@@ -643,6 +648,8 @@ public partial class TechniqueBookWindow : Control
         row.AddChild(actions);
 
         // Слоты 3–9: клик — назначить выбранную технику / снять, если та же.
+        // R41-8: кнопки остаются FALLBACK — основной путь назначения теперь
+        // drag&drop чипа в слот-панель нижнего бара (репорт «не интуитивно»).
         var slotRow = new HBoxContainer();
         slotRow.AddThemeConstantOverride("separation", 3);
         for (int i = 0; i < TechniqueSlotService.SlotCount; i++)
@@ -811,7 +818,8 @@ public partial class TechniqueBookWindow : Control
         {
             _detailsLabel.Text = "Выберите технику в матрице.\n\n" +
                 "ЛКМ по чипу — выбрать активной (каст: Z).\n" +
-                "Кнопки слотов назначают технику в слоты быстрого доступа.";
+                "Перетащите чип в слот 3–9 ниже — назначение (R41-8);\n" +
+                "кнопки слотов — то же без перетаскивания.";
             if (_inscribeButton != null) _inscribeButton.Disabled = true;
             if (_forgetButton != null) _forgetButton.Disabled = true;
             return;
@@ -958,4 +966,169 @@ public partial class TechniqueBookWindow : Control
 
     private static string ShortName(string name) =>
         name.Length <= 14 ? name : name.Substring(0, 14) + "…";
+
+    // === R41-8: drag&drop техник в слоты быстрого доступа =====================
+
+    /// <summary>
+    /// Дискриминатор источника drag-data Книги Техник (R41-8). Ключ payload
+    /// «technique_id» НЕ пересекается с инвентарным «item_id» — чужие
+    /// приёмники (кукла/корзина/зарядник/пояс) payload не разберут и
+    /// отвергнут по source; слоты Книги зеркально отвергают item_id.
+    /// </summary>
+    internal const string DragSource = "technique_book";
+
+    /// <summary>
+    /// R41-8: payload перетаскиваемой техники (паттерн
+    /// CharacterDollPanel.CreateDragData, словарь Godot Variant).
+    /// </summary>
+    internal static Godot.Collections.Dictionary CreateTechniqueDragData(string techniqueId) =>
+        new()
+        {
+            { "technique_id", techniqueId },
+            { "source", DragSource },
+        };
+
+    /// <summary>
+    /// R41-8: разбор payload — только наш source и непустой technique_id
+    /// (паттерн CharacterDollPanel.TryParseDragData).
+    /// </summary>
+    internal static bool TryParseTechniqueDragData(Variant data, out string techniqueId)
+    {
+        techniqueId = string.Empty;
+        if (data.VariantType != Variant.Type.Dictionary) return false;
+        var dict = data.As<Godot.Collections.Dictionary>();
+        if (!dict.ContainsKey("technique_id")) return false;
+        if (!dict.ContainsKey("source") || dict["source"].AsString() != DragSource) return false;
+        techniqueId = dict["technique_id"].AsString();
+        return !string.IsNullOrEmpty(techniqueId);
+    }
+
+    /// <summary>
+    /// R41-8: чип техники в матрице — ИСТОЧНИК drag&drop: перетащить технику
+    /// в слот быстрого доступа 3–9. Прежде назначение было только мелкими
+    /// кнопками-цифрами в панели деталей — «не интуитивно» (репорт владельца
+    /// 18.10 №8). ЛКМ-клик сохраняет прежнюю семантику: выбор активной
+    /// техники для Z-каста (OnChipClicked). Паттерн: InventoryItemRow._GetDragData.
+    /// </summary>
+    private sealed partial class TechniqueChipButton : Button
+    {
+        private readonly string _techniqueId;
+        private readonly string _techName;
+        private readonly Color _elementColor;
+
+        public TechniqueChipButton(LearnedTechnique tech)
+        {
+            _techniqueId = tech.TechniqueId;
+            _techName = tech.Name;
+            _elementColor = ElementStyle.ElementColor(tech.Element);
+        }
+
+        public override Variant _GetDragData(Vector2 atPosition)
+        {
+            var dragData = CreateTechniqueDragData(_techniqueId);
+            // Превью у курсора — имя техники цветом её стихии
+            // (паттерн CharacterDollPanel.BuildDragPreview).
+            var preview = new Label { Text = $"⚔ {_techName}" };
+            preview.AddThemeFontSizeOverride("font_size", 13);
+            preview.AddThemeColorOverride("font_color", _elementColor.Lightened(0.2f));
+            SetDragPreview(preview);
+            return dragData;
+        }
+    }
+
+    /// <summary>
+    /// R41-8: слот-панель 3–9 — ПРИЁМНИК drop техники из матрицы Книги
+    /// (хотбар геометрически перекрыт FullRect-оверлеем — дроп-цель видна
+    /// в самом окне). Валидация зеркальна TechniqueSlotService.AssignSlot
+    /// (изучена / не-Cultivation), отказ — тост с ПРИЧИНОЙ (прежде — тихий
+    /// no-op кнопок). ЛКМ по занятому слоту — прежнее снятие. Паттерн:
+    /// ChargerStoneSlot (_CanDropData/_DropData/_GuiInput).
+    /// </summary>
+    private sealed partial class TechniqueSlotDropPanel : Panel
+    {
+        private readonly int _slotIndex;
+        private readonly TechniqueBookWindow _owner;
+
+        public TechniqueSlotDropPanel(int slotIndex, TechniqueBookWindow owner)
+        {
+            _slotIndex = slotIndex;
+            _owner = owner;
+        }
+
+        public override bool _CanDropData(Vector2 atPosition, Variant data)
+        {
+            if (!TryParseTechniqueDragData(data, out var techId)) return false;
+            var tech = _owner.Techniques?.GetTechnique(techId);
+            if (tech == null) return false;                      // не изучена
+            return tech.Type != TechniqueType.Cultivation;       // ☯ не назначается (П5)
+        }
+
+        public override void _DropData(Vector2 atPosition, Variant data)
+        {
+            if (!TryParseTechniqueDragData(data, out var techId)) return;
+            var tech = _owner.Techniques?.GetTechnique(techId);
+            if (tech == null)
+            {
+                _owner.ToastPub?.Publish(new ToastShownEvent(
+                    $"«{techId}» не изучена — назначить в слот нельзя", 2.0f));
+                return;
+            }
+            if (tech.Type == TechniqueType.Cultivation)
+            {
+                // П5-причина: пассивная медитация — спец-слот хотбара (V),
+                // номерные слоты 3–9 для неё не тратятся.
+                _owner.ToastPub?.Publish(new ToastShownEvent(
+                    "☯ Техника Культивации не назначается в слот: медитация — клавиша V (спец-слот хотбара)", 3.0f));
+                return;
+            }
+            if (_owner.Slots?.AssignSlot(_slotIndex, techId) == true)
+                _owner.ToastPub?.Publish(new ToastShownEvent(
+                    $"Слот {_slotIndex}: «{tech.Name}»", 1.5f));
+            // UI-обновление слот-бара — по TechniqueSlotAssignedEvent
+            // (OnSlotAssigned → RefreshSlots), как у кнопок-цифр.
+        }
+
+        public override void _GuiInput(InputEvent @event)
+        {
+            // Прежний UX (аудит r40-a :248-312): ЛКМ по занятому слоту →
+            // снять технику. Drop-путь не конкурирует: нажатие при drag
+            // уходит источнику (чипом), в панель приходит только drop.
+            if (@event is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == Godot.MouseButton.Left)
+            {
+                var techId = _owner.Slots?.GetTechniqueAtSlot(_slotIndex);
+                if (!string.IsNullOrEmpty(techId) && _owner.Slots != null)
+                {
+                    _owner.Slots.ClearSlot(_slotIndex);
+                    _owner.ToastPub?.Publish(new ToastShownEvent($"Слот {_slotIndex}: очищен", 1.5f));
+                }
+            }
+        }
+    }
+
+    // === R41-8: QA-акцессоры (headless-форс-дроп, паттерн TrashDropSim) ======
+
+    /// <summary>Есть ли чип-источник drag&drop для техники (после Open).</summary>
+    public bool HasChipForQA(string techniqueId) => _chipById.ContainsKey(techniqueId);
+
+    /// <summary>
+    /// R41-8 QA: прямой вызов _CanDropData приёмника (форс-дроп без GUI-drag,
+    /// паттерн TrashDropSimDebug — SetDragPreview вне drag НЕ вызывается).
+    /// </summary>
+    public bool CanDropTechniqueForQA(int slotIndex, Variant data)
+    {
+        var panel = FindSlotPanelForQA(slotIndex);
+        return panel?._CanDropData(Vector2.Zero, data) ?? false;
+    }
+
+    /// <summary>R41-8 QA: прямой вызов _DropData приёмника (форс-дроп).</summary>
+    public void DropTechniqueForQA(int slotIndex, Variant data)
+    {
+        FindSlotPanelForQA(slotIndex)?._DropData(Vector2.Zero, data);
+    }
+
+    private TechniqueSlotDropPanel? FindSlotPanelForQA(int slotIndex)
+    {
+        int idx = slotIndex - TechniqueSlotService.MinSlot;
+        return idx >= 0 && idx < _slotPanels.Length ? _slotPanels[idx] : null;
+    }
 }

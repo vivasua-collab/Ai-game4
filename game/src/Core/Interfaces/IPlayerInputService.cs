@@ -79,7 +79,8 @@ namespace CultivationGame.Core.Interfaces
 
         /// <summary>
         /// D: Нажата ли клавиша окна Культивации (K, однократное).
-        /// Открывает CultivationWindow (вкладки Техники/Меридианы/Ядро + слоты 3-9).
+        /// Открывает CultivationWindow (вкладки Меридианы/Ядро + слоты 3-9;
+        /// R41-7: вкладка «Техники» удалена — браузер техник в Книге, T).
         /// </summary>
         bool IsCultivationWindowPressed { get; }
 

@@ -926,7 +926,10 @@ public partial class HotbarPanel : Panel
             _nameCache[i] = null;
             _slotLabels[i].Text = "—";
             _slotStyles[i].SetBorderColor(new Color(0.42f, 0.38f, 0.32f));
-            _slotPanels[i].TooltipText = $"Слот {slotIndex}: пусто — назначьте технику в окне Культивации (K)";
+            // R41-7: подсказка перенаправлена в Книгу Техник (T) — вкладки
+            // «Техники» в K-окне больше нет, назначение живёт в Книге
+            // (кнопки-цифры + drag&drop R41-8).
+            _slotPanels[i].TooltipText = $"Слот {slotIndex}: пусто — назначьте технику в Книге Техник (T)";
             if (_qiLabels[i] != null) _qiLabels[i].Text = "";
         }
     }

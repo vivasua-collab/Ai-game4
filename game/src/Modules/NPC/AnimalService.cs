@@ -514,8 +514,9 @@ namespace CultivationGame.Modules.NPC
                         }
 
                         // Grace: зверь ещё мчится за обидчиком (без атаки — далеко).
+                        // R41-9: чейз-скорость 3 тайла/тик — паритет с NPC.
                         a.Target = new Position2D(playerPos.X, playerPos.Y);
-                        StepTowardsTarget(a);
+                        StepTowardsTarget(a, ChaseSpeedTilesPerTick);
                         continue;
                     }
 
@@ -531,7 +532,8 @@ namespace CultivationGame.Modules.NPC
                     {
                         a.CombatCooldownTicks--;
                         a.Target = new Position2D(playerPos.X, playerPos.Y);
-                        StepTowardsTarget(a);
+                        // R41-9: во время кулдауна укуса — ЧЕЙЗ на полной скорости.
+                        StepTowardsTarget(a, ChaseSpeedTilesPerTick);
                         continue;
                     }
 
@@ -549,9 +551,9 @@ namespace CultivationGame.Modules.NPC
                     }
                     else
                     {
-                        // Не дотянулся — сближаемся.
+                        // Не дотянулся — сближаемся (R41-9: чейз-скорость).
                         a.Target = new Position2D(playerPos.X, playerPos.Y);
-                        StepTowardsTarget(a);
+                        StepTowardsTarget(a, ChaseSpeedTilesPerTick);
                     }
                     continue; // Не блуждаем, пока мстим
                 }
@@ -671,16 +673,25 @@ namespace CultivationGame.Modules.NPC
         }
 
         /// <summary>
-        /// Move the animal up to MoveSpeedTilesPerTick tiles towards Target.
-        /// Greedy: each sub-step tries diagonal first, then horizontal,
-        /// then vertical. If all three are blocked, aborts the target.
+        /// Move the animal up to MoveSpeedTilesPerTick (или forcedSteps)
+        /// tiles towards Target. Greedy: each sub-step tries diagonal first,
+        /// then horizontal, then vertical. If all three are blocked, aborts.
         /// </summary>
-        private void StepTowardsTarget(AnimalEntity a)
+        /// <remarks>
+        /// R41-9 (репорт R40-6 «волк почти не преследует»): скорость ПОГОНИ
+        /// (тайлов/тик) для мстящих зверей. Раньше 1 тайл/тик против ходьбы
+        /// игрока 2.8 (бег 5.1) тайла/с — зверь физически не догонял,
+        /// de-aggro срабатывал через ~3с. 3 = паритет с NPC
+        /// DefaultMoveSpeed (R20); на Fast/Quick масштабируется с тиками.
+        /// </remarks>
+        private const int ChaseSpeedTilesPerTick = 3;
+
+        private void StepTowardsTarget(AnimalEntity a, int forcedSteps = 0)
         {
             if (a.Target is null) return;
             var target = a.Target.Value;
 
-            int stepsRemaining = a.MoveSpeedTilesPerTick;
+            int stepsRemaining = forcedSteps > 0 ? forcedSteps : a.MoveSpeedTilesPerTick;
             while (stepsRemaining > 0 && a.Position != target)
             {
                 int dx = Math.Sign(target.X - a.Position.X);

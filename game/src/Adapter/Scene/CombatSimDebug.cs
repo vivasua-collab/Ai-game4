@@ -36,6 +36,10 @@ public partial class CombatSimDebug : Node
     [Inject] private IEquipmentService? _equipmentService;
     [Inject] private Modules.Generator.EquipmentGenerator? _equipmentGenerator;
     [Inject] private IPlayerService? _playerService;
+    // R41-1: полное лечение игрока перед толпой — каскадный перенос сделал
+    // затяжные бои летальными (торс red=0 больше не «пожирает» удары),
+    // игрок-сим умирал от разрушения головы → сессия закрывалась → ложно FAIL.
+    [Inject] private IBodyService? _bodyService;
 
     // Phase 8 ч.3: гейты дальнего боя — LOS/стрелы (верификация 3d).
     [Inject] private ITileService? _tileService;
@@ -690,6 +694,12 @@ public partial class CombatSimDebug : Node
                 // Сессию может открыть и автоатака A (месть — честно), и наш
                 // прямой удар: retry-цикл до открытия (гонка с NPCModule-кастами
                 // A — Reject «Каст уже идёт» ретраится).
+                // R41-1: перед толпой — полное лечение игрока: шаг мерит
+                // UI-сессию, а не выживание (дизайн-следствие фикса овекилла:
+                // ранее урон «исчезал» в разрушенном торсе — игрок был
+                // фактически бессмертен после торс-0, сим на этом молча
+                // держался).
+                HealPlayerFully();
                 int playerHpCrowd0 = _bodyProvider.GetCurrentHealth("player");
                 for (int attempt = 0; attempt < 5 && (attempt == 0 || !_combatServiceImpl.IsInCombat); attempt++)
                 // R29-харденинг: гонка «UI-пара уже открыта NPC-AI до входа»
@@ -1632,6 +1642,26 @@ public partial class CombatSimDebug : Node
             waited += 0.1f;
         }
         GD.Print($"[CombatSim] WARN — stage {stage} not reached after {timeoutSec}s (now: {_combatServiceImpl.CurrentStage})");
+    }
+
+    /// <summary>
+    /// R41-1: полное лечение всех частей игрока (red+black). Каскадный
+    /// овекилл-перенос сделал затяжные бои честно летальными (торс red=0
+    /// больше не «пожирает» удары бесследно — раньше игрок-сим был
+    /// фактически бессмертен после разрушения торса, и шаги толпы молча
+    /// на этом держались). Лечение — не ослабление ассерта, а изоляция
+    /// шага: multi(b) мерит ОТКРЫТИЕ UI-сессии, а не выживание.
+    /// HealPart сплитит 70/30 → даём с запасом, Heal клампит по MaxHP.
+    /// </summary>
+    private void HealPlayerFully()
+    {
+        if (_bodyService == null) return;
+        foreach (var p in _bodyService.GetAllParts())
+        {
+            // 10000: red 7000 / black 3000 — оба слагаемых выше любого MaxHP.
+            _bodyService.HealPart(p.Type, 10000);
+        }
+        GD.Print($"[CombatSim] player heal (R41-1): HP={_bodyProvider.GetCurrentHealth("player")}");
     }
 
     private string? FindHostileNpc()

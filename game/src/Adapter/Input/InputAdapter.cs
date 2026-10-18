@@ -139,6 +139,8 @@ public partial class InputAdapter : Node
         if (GodotInput.IsActionJustPressed("help_hotkeys"))    _stickyKeys.Add("help_hotkeys");
 
         // D3 (2026-08-26): Окно Культивации (K) — открывает CultivationWindow.
+        // R41-7: вкладка «Техники» из окна удалена — браузер техник живёт
+        // в Книге Техник (T); K-окно — только состояние практика + слот-бар.
         if (GodotInput.IsActionJustPressed("cultivation_window")) _stickyKeys.Add("cultivation_window");
 
         // R37-c (баг-репорт 23.09): окно зарядника Ци (H) — ChargerWindow
