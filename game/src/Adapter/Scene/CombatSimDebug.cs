@@ -64,6 +64,13 @@ public partial class CombatSimDebug : Node
     [Inject] private ISubscriber<Core.Messaging.Contracts.ProjectileSpawnedEvent>? _projectileSpawnedSub;
     // R29: аура удержания (визуал кольца стихии вокруг игрока — Hold/Release).
     [Inject] private Modules.Player.AuraHoldService? _auraHold;
+    // BUG-001 (аудит 10-19, волна 1): каст-эффекты техник Sensory/Curse/
+    // Poison/Support — полный игрок-путь (запрос → зарядка → аура → выпуск)
+    // + ассерты эффекта в состоянии (бафф/дебафф/DoT-тики/лечение).
+    [Inject] private IPublisher<Core.Messaging.Contracts.TechniqueCastRequestedEvent>? _castRequestPub;
+    [Inject] private ISubscriber<Core.Messaging.Contracts.TechniqueCastResultEvent>? _castResultSub;
+    [Inject] private IPublisher<Core.Messaging.Contracts.DamageAppliedEvent>? _damageAppliedPub;
+    [Inject] private IBuffService? _buffService;
 
     private System.IDisposable? _damageToken;
     private System.IDisposable? _intentEchoToken;
@@ -71,6 +78,7 @@ public partial class CombatSimDebug : Node
     private System.IDisposable? _aoeImpactToken;
     private System.IDisposable? _targetChangedToken;
     private System.IDisposable? _projectileSpawnedToken;
+    private System.IDisposable? _castResultToken;
 
     // R25: количество целей последнего AoE-залпа (AoeImpactEvent.TargetIds).
     private int _aoeImpactCount = -1;
@@ -96,6 +104,14 @@ public partial class CombatSimDebug : Node
     // R39-4: промахи дальнего оружия от дистанции (DamageCalculator §7.4) —
     // пруф работы Miss-ветки в COMBAT_SIM 3c (серия выстрелов).
     private int _missCount;
+
+    // BUG-001: DoT-тики техники-яда (BodyModule публикует источник
+    // "dot:technique_poison") — ассерт шага 3m(c).
+    private int _poisonDotDamageEvents;
+    private int _poisonDotDamageTotal;
+
+    // BUG-001: последний отказ каста игрока (диагностика зарядки/выпуска).
+    private string _lastCastFail = "";
 
     private const string PlayerCombatId = "player_0"; // NPCAIService.PlayerId
 
@@ -156,6 +172,13 @@ public partial class CombatSimDebug : Node
             }
             // R39-4: промахи дальнего оружия от дистанции — считаем для 3c.
             if (e.Result == CombatAttackResult.Miss) _missCount++;
+            // BUG-001: DoT-тики техники-яда (единый пайплайн: BuffTicked →
+            // BodyModule → DamageAppliedEvent("dot:technique_poison")).
+            if (e.SourceId != null && e.SourceId.StartsWith("dot:technique_poison"))
+            {
+                _poisonDotDamageEvents++;
+                _poisonDotDamageTotal += e.Damage;
+            }
             GD.Print($"[CombatSim] damage: {e.SourceId} → {e.TargetId}: {e.Damage} ({e.Result}, part={e.HitPart}, sub={e.AttackSubtype})");
         });
 
@@ -182,6 +205,17 @@ public partial class CombatSimDebug : Node
                      $"from ({e.FromX},{e.FromY}) speed={e.SpeedTilesPerSec} t/s ({e.Element})");
         });
 
+        // BUG-001: отказы каста игрока (PlayerTechniqueCaster.PublishFail) —
+        // диагностика шага 3m (почему зарядка/выпуск не дошли до эффекта).
+        _castResultToken = _castResultSub?.Subscribe((in Core.Messaging.Contracts.TechniqueCastResultEvent e) =>
+        {
+            if (!e.Success)
+            {
+                _lastCastFail = $"'{e.TechniqueId}': {e.Reason}";
+                GD.Print($"[CombatSim] cast fail: {_lastCastFail}");
+            }
+        });
+
         GD.Print("[CombatSim] Ready — scripted combat verification starts in 2s");
         _ = RunSequenceAsync();
     }
@@ -200,6 +234,8 @@ public partial class CombatSimDebug : Node
         _targetChangedToken = null;
         _projectileSpawnedToken?.Dispose();
         _projectileSpawnedToken = null;
+        _castResultToken?.Dispose();
+        _castResultToken = null;
     }
 
     private async System.Threading.Tasks.Task RunSequenceAsync()
@@ -1532,6 +1568,177 @@ public partial class CombatSimDebug : Node
             }
         }
 
+        // 3m. BUG-001 (аудит 10-19, волна 1): каст-эффекты техник Sensory /
+        // Curse / Poison / Support — прежде 4 типа «ничего не делали»
+        // (Sensory/Support/Curse — пустой успех после зарядки, Poison —
+        // «тип не поддерживается» после траты Ци/кулдауна). Полный игрок-путь:
+        // генерация → изучение → TechniqueCastRequestedEvent → зарядка по
+        // проводимости → парк в ауру → второе нажатие → FireTechnique →
+        // ассерты эффекта в состоянии мира (бафф себе / дебафф на цели /
+        // DoT-тики через единый пайплайн / самолечение).
+        bool bug001Ok = true;
+        if (_castRequestPub != null && _techniqueGenerator != null && _techniqueService != null
+            && _buffService != null && _auraHold != null && _playerService != null
+            && _npcSpawner != null && _bodyProvider != null && _damageAppliedPub != null)
+        {
+            // Стабилизация (паттерн 3k): мёртвый игрок → респавн 3с + телепорт
+            // в центр; ждём и лечим — шагу нужен живой FULL-HP игрок.
+            if (_bodyProvider.GetCurrentHealth("player") <= 0)
+            {
+                GD.Print("[CombatSim] bug001: игрок мёртв — жду респавн 3.5с");
+                await ToSignal(GetTree().CreateTimer(3.5), SceneTreeTimer.SignalName.Timeout);
+            }
+            HealPlayerFully();
+
+            // Чистая зона в границах карты (паттерн 3k: QA-мир 50×50, кламп).
+            var bpos = _playerService.Position;
+            int mapW3 = _tileService != null && _tileService.MapWidth > 0
+                ? _tileService.MapWidth : 50;
+            int mapH3 = _tileService != null && _tileService.MapHeight > 0
+                ? _tileService.MapHeight : 50;
+            var bzone = new Position2D(
+                Mathf.Min(bpos.X + 40, mapW3 - 6), Mathf.Min(bpos.Y + 40, mapH3 - 6));
+            TeleportPlayer(bzone.X, bzone.Y);
+            await ToSignal(GetTree().CreateTimer(0.8), SceneTreeTimer.SignalName.Timeout);
+            TeleportPlayer(bzone.X, bzone.Y); // повторный телепорт — логика «прилипает»
+
+            // Цель Poison/Curse: мирный прохожий вплотную — не атакует игрока
+            // (изоляция шага), позиция пинится перед каждым нажатием
+            // (паттерн 3d-1: цель не успевает сдвинуться/уйти из радиуса).
+            string? bugTarget = _npcSpawner.SpawnNPC("human", NPCRole.Passerby, 1,
+                new Position2D(bzone.X + 1, bzone.Y), 99051);
+            if (bugTarget == null)
+            {
+                GD.Print("[CombatSim] WARN — bug001: цель не заспавнена (шаг (b)/(c) падает)");
+                bug001Ok = false;
+            }
+            else
+            {
+                var bugTargetState = _npcService.GetNPCState(bugTarget);
+                System.Action pinTarget = () =>
+                {
+                    if (bugTargetState != null)
+                        bugTargetState.Position = new Position2D(bzone.X + 1, bzone.Y);
+                };
+                pinTarget();
+
+                int blevel = _qiService != null ? (int)_qiService.CultivationLevel : 1;
+                if (blevel < 1) blevel = 1;
+                _techniqueService.ExtraLibraryCapacity += 4;
+
+                // Curse-слот персональный (§12, ×1): TechniqueGrantPhase уже
+                // выдал проклятие — забываем грант, изучаем свой (seed
+                // детерминирован). Sensory/Support/Poison — Combat-пул, мест
+                // достаточно (ExtraLibraryCapacity выше).
+                foreach (var id in _techniqueService.GetOrderedIds())
+                {
+                    var granted = _techniqueService.GetTechnique(id);
+                    if (granted != null && granted.Type == TechniqueType.Curse)
+                    {
+                        _techniqueService.ForgetTechnique(id);
+                        GD.Print($"[CombatSim] bug001: грант-проклятие '{id}' забыто (слот ×1)");
+                        break;
+                    }
+                }
+
+                var sensoryTech = _techniqueGenerator.GenerateSpecified(
+                    TechniqueType.Sensory, blevel, blevel, 99052);
+                var curseTech = _techniqueGenerator.GenerateSpecified(
+                    TechniqueType.Curse, blevel, blevel, 99053);
+                var poisonTech = _techniqueGenerator.GenerateSpecified(
+                    TechniqueType.Poison, blevel, blevel, 99054);
+                var supportTech = _techniqueGenerator.GenerateSpecified(
+                    TechniqueType.Support, blevel, blevel, 99055);
+                bool lSensory = _techniqueService.LearnTechnique(sensoryTech);
+                bool lCurse = _techniqueService.LearnTechnique(curseTech);
+                bool lPoison = _techniqueService.LearnTechnique(poisonTech);
+                bool lSupport = _techniqueService.LearnTechnique(supportTech);
+                bool learnedAll = lSensory && lCurse && lPoison && lSupport;
+                GD.Print($"[CombatSim] bug001: техники L{blevel} изучены " +
+                         $"{lSensory}/{lCurse}/{lPoison}/{lSupport} (qiCost " +
+                         $"{sensoryTech.QiCost}/{curseTech.QiCost}/{poisonTech.QiCost}/{supportTech.QiCost}, " +
+                         $"dmg {sensoryTech.BaseDamage}/{curseTech.BaseDamage}/{poisonTech.BaseDamage}/{supportTech.BaseDamage})");
+                if (!learnedAll) bug001Ok = false;
+
+                int MouseMs(int tile) => tile * GameConstants.TILE_PIXELS * 1000;
+                string playerId = _playerService.PlayerId;
+
+                // === (a) Sensory: бафф себе (+урон, StatType.Damage — слой 3a) ===
+                int sensoryModBefore = _buffService.GetStatModifierPermil(playerId, StatType.Damage);
+                bool sensoryCharged = await ChargeToAuraAsync(sensoryTech.TechniqueId,
+                    MouseMs(bzone.X), MouseMs(bzone.Y));
+                bool sensoryFired = sensoryCharged && ReleaseFromAura(sensoryTech.TechniqueId,
+                    MouseMs(bzone.X), MouseMs(bzone.Y));
+                bool sensoryHas = _buffService.HasBuff(playerId, "sensory_attack_boost");
+                int sensoryModAfter = _buffService.GetStatModifierPermil(playerId, StatType.Damage);
+                GD.Print($"[CombatSim] bug001(a) sensory: зарядка+выпуск={sensoryFired}, бафф={sensoryHas}, " +
+                         $"модификатор урона {sensoryModBefore}‰→{sensoryModAfter}‰ (ожид: бафф true, рост)");
+                bug001Ok &= learnedAll && sensoryFired && sensoryHas && sensoryModAfter > sensoryModBefore;
+
+                // === (b) Curse: дебафф цели (−% атаки, маппинг «shock») ===
+                pinTarget();
+                int curseModBefore = _buffService.GetStatModifierPermil(bugTarget, StatType.Damage);
+                bool curseCharged = await ChargeToAuraAsync(curseTech.TechniqueId,
+                    MouseMs(bzone.X + 1), MouseMs(bzone.Y));
+                pinTarget(); // цель могла уйти за время зарядки — пин перед выпуском
+                bool curseFired = curseCharged && ReleaseFromAura(curseTech.TechniqueId,
+                    MouseMs(bzone.X + 1), MouseMs(bzone.Y));
+                bool curseHas = _buffService.HasBuff(bugTarget, "curse_shock");
+                int curseModAfter = _buffService.GetStatModifierPermil(bugTarget, StatType.Damage);
+                GD.Print($"[CombatSim] bug001(b) curse: зарядка+выпуск={curseFired}, дебафф={curseHas}, " +
+                         $"модификатор атаки цели {curseModBefore}‰→{curseModAfter}‰ (ожид: дебафф true, падение)");
+                bug001Ok &= curseFired && curseHas && curseModAfter < curseModBefore;
+
+                // === (c) Poison: DoT на цель — тики через единый пайплайн ===
+                pinTarget();
+                int poisonHpBefore = _bodyProvider.GetCurrentHealth(bugTarget);
+                _poisonDotDamageEvents = 0;
+                _poisonDotDamageTotal = 0;
+                bool poisonCharged = await ChargeToAuraAsync(poisonTech.TechniqueId,
+                    MouseMs(bzone.X + 1), MouseMs(bzone.Y));
+                pinTarget();
+                bool poisonFired = poisonCharged && ReleaseFromAura(poisonTech.TechniqueId,
+                    MouseMs(bzone.X + 1), MouseMs(bzone.Y));
+                bool poisonHas = _buffService.HasBuff(bugTarget, "technique_poison");
+                // Тик 1с (BuffService-маппинг poison): 3.2с ≈ ≥3 тиков;
+                // урон идёт BuffTicked → BodyModule → DamageAppliedEvent.
+                await ToSignal(GetTree().CreateTimer(3.2), SceneTreeTimer.SignalName.Timeout);
+                int poisonHpAfter = _bodyProvider.GetCurrentHealth(bugTarget);
+                GD.Print($"[CombatSim] bug001(c) poison: зарядка+выпуск={poisonFired}, бафф={poisonHas}, " +
+                         $"DoT-тиков={_poisonDotDamageEvents} (суммарно {_poisonDotDamageTotal} урона), " +
+                         $"цель HP {poisonHpBefore}→{poisonHpAfter} (ожид: тики ≥2, HP падает)");
+                bug001Ok &= poisonFired && poisonHas && _poisonDotDamageEvents >= 2
+                            && poisonHpAfter < poisonHpBefore;
+
+                // === (d) Support: самолечение (вдвое слабее Healing-типа) ===
+                // Синтетический урон торсу (паттерн DoT-сима: DamageAppliedEvent
+                // → BodyService): гейт «тело не ранено» честно проходит;
+                // 50×0.7=35 red-HP > heal ≤28 → итоговый HP игрока ниже
+                // старта сима (инвариант summary playerTookDamage).
+                _damageAppliedPub.Publish(new Core.Messaging.Contracts.DamageAppliedEvent(
+                    "qa_bug001_selfhit", "player", 50, DamageType.Physical, Element.Neutral,
+                    BodyPartType.Torso, CombatAttackResult.Hit, CombatSubtype.None));
+                int supportHpBefore = _bodyProvider.GetCurrentHealth("player");
+                bool supportCharged = await ChargeToAuraAsync(supportTech.TechniqueId,
+                    MouseMs(bzone.X), MouseMs(bzone.Y));
+                int supportHpAfter = _bodyProvider.GetCurrentHealth("player");
+                bool supportFired = supportCharged && ReleaseFromAura(supportTech.TechniqueId,
+                    MouseMs(bzone.X), MouseMs(bzone.Y));
+                int supportHpAfterCast = _bodyProvider.GetCurrentHealth("player");
+                GD.Print($"[CombatSim] bug001(d) support: зарядка+выпуск={supportFired}, " +
+                         $"HP после синтет-урона={supportHpBefore}, до выпуска={supportHpAfter}, " +
+                         $"после каста={supportHpAfterCast} (ожид: лечение > 0)");
+                bug001Ok &= supportFired && supportHpAfterCast > supportHpAfter;
+
+                _npcSpawner.DespawnNPC(bugTarget);
+            }
+        }
+        else
+        {
+            GD.Print("[CombatSim] WARN — bug001 skipped (no cast/buff/aura services)");
+            bug001Ok = false;
+        }
+
         // 4. Итоги.
         int playerHpAfter = _bodyProvider.GetCurrentHealth("player");
         int npcHpAfter = _bodyProvider.GetCurrentHealth(npcId);
@@ -1544,7 +1751,7 @@ public partial class CombatSimDebug : Node
                  $"npc {npcHpBefore}→{npcHpAfter}, arrows now={_inventory?.GetItemCount(CombatRangeGateService.ArrowItemId) ?? -1}");
 
         bool pass = playerTookDamage && npcTookDamage && weaponWiringOk && rangedWiringOk && gatesOk && turnGateOk
-                    && r21ArmorOk && r21QiOk && multiOk && aoeOk && targetingOk && homingOk && vfxOk;
+                    && r21ArmorOk && r21QiOk && multiOk && aoeOk && targetingOk && homingOk && vfxOk && bug001Ok;
         if (!playerTookDamage)
             GD.Print("[CombatSim] FAIL — NPC→player damage did NOT apply (BodyService player-id mismatch?)");
         if (!npcTookDamage)
@@ -1571,8 +1778,56 @@ public partial class CombatSimDebug : Node
             GD.Print("[CombatSim] FAIL — homing (R28): наведение/полёт/контакт сломаны (план R23 §3.2-A?)");
         if (!vfxOk)
             GD.Print("[CombatSim] FAIL — vfx (R29): проводка событий→рендереры сломана (план R23 §6.7?)");
+        if (!bug001Ok)
+            GD.Print("[CombatSim] FAIL — bug001 (аудит 10-19): каст-эффекты Sensory/Curse/Poison/Support не применяются (посл. отказ: " + $"{_lastCastFail})");
 
         PrintVerdict(pass);
+    }
+
+    /// <summary>
+    /// BUG-001 (шаг 3m): ПЕРВОЕ нажатие — публика TechniqueCastRequestedEvent →
+    /// PlayerTechniqueCaster запускает зарядку (drain Ци по проводимости) →
+    /// по завершении парк техники в ауру (AuraHoldService). Ждём парка
+    /// опросом (декей ауры 1%/тик — выпускать надо быстро).
+    /// Ци топим до 500 (кламп по MaxQi) — гарантия зарядки L1-техник.
+    /// </summary>
+    private async System.Threading.Tasks.Task<bool> ChargeToAuraAsync(
+        string techniqueId, int mouseX, int mouseY, float timeoutSec = 12f)
+    {
+        if (_auraHold == null || _castRequestPub == null) return false;
+        if (!_auraHold.IsEmpty)
+        {
+            _auraHold.Release();
+            GD.Print("[CombatSim] bug001: аура занята — очищена перед зарядкой");
+        }
+        if (_qiService != null && _qiService.CurrentQi < 500)
+            _qiService.AddQi(500 - _qiService.CurrentQi);
+
+        _castRequestPub.Publish(new Core.Messaging.Contracts.TechniqueCastRequestedEvent(
+            techniqueId, mouseX, mouseY));
+        float waited = 0f;
+        while (waited < timeoutSec)
+        {
+            var parked = _auraHold.Current;
+            if (parked != null && parked.TechniqueId == techniqueId) return true;
+            await ToSignal(GetTree().CreateTimer(0.1), SceneTreeTimer.SignalName.Timeout);
+            waited += 0.1f;
+        }
+        GD.Print($"[CombatSim] bug001 FAIL — '{techniqueId}' не припаркована в ауре за {timeoutSec}s " +
+                 $"(посл. отказ каста: {_lastCastFail}; Qi={_qiService?.CurrentQi})");
+        return false;
+    }
+
+    /// <summary>
+    /// BUG-001 (шаг 3m): ВТОРОЕ нажатие — выпуск удержанной техники
+    /// (OnCastRequested → FireTechnique; эффект применяется СИНХРОННО в
+    /// обработчике события). Аура после выпуска пуста.
+    /// </summary>
+    private bool ReleaseFromAura(string techniqueId, int mouseX, int mouseY)
+    {
+        _castRequestPub!.Publish(new Core.Messaging.Contracts.TechniqueCastRequestedEvent(
+            techniqueId, mouseX, mouseY));
+        return _auraHold == null || _auraHold.IsEmpty;
     }
 
     /// <summary>
@@ -1698,6 +1953,6 @@ public partial class CombatSimDebug : Node
 
     private static void PrintVerdict(bool pass)
     {
-        GD.Print($"[CombatSim] VERDICT: {(pass ? "PASS — обе стороны боя получают урон (melee + ranged + LOS/ammo gates + readiness-gate + multi R24-C + vfx R29)" : "FAIL")}");
+        GD.Print($"[CombatSim] VERDICT: {(pass ? "PASS — обе стороны боя получают урон (melee + ranged + LOS/ammo gates + readiness-gate + multi R24-C + vfx R29 + bug001 каст-эффекты 4 типов)" : "FAIL")}");
     }
 }

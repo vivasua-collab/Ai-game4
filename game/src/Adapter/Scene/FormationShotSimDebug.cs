@@ -127,6 +127,61 @@ public partial class FormationShotSimDebug : Node
         pass &= active;
         if (shot != null) Snap(shot + "_active.png");
 
+        // === VER-001 (аудит form-s7, 10-19-fix-b): точечная верификация
+        // эффект-логики формаций по типам. Пайплайн урона тянет бонусы
+        // через IFormationService.GetFormationBonusPermil (DamageService
+        // слои 3b/MED-2) — здесь проверяем ПРОИЗВОДИТЕЛЬНУЮ сторону.
+        // 4a. Barrier (Shield/Defense): после активации Defense-промилле > 0
+        //     (фикс VER-001: агрегация Shield в FormationEffects).
+        int barrierDef = Formations.GetFormationBonusPermil(StatType.Defense);
+        bool barrierOk = barrierDef > 0;
+        GD.Print($"[FormShot] VER-001 4a Barrier: Defense permil={barrierDef} (ожидали > 0)");
+        pass &= barrierOk;
+
+        // 4b. Деактивация снимает бонус (FormationEffects.Deactivate → 0).
+        Formations.DeactivateFormation();
+        await Frames(2);
+        int defAfter = Formations.GetFormationBonusPermil(StatType.Defense);
+        bool barrierCleared = defAfter == 0;
+        GD.Print($"[FormShot] VER-001 4b деактивация: Defense permil={defAfter} (ожидали 0)");
+        pass &= barrierCleared;
+
+        // 4c. Amplification (Buff/Damage): генерация → мгновенное заполнение
+        //     → активация → Damage-промилле > 0.
+        Qi.AddQi(Qi.MaxQi); // топ-ап Ци (контур+ёмкость L1 Small ~880)
+        var amp = Gen.GenerateSpecified(FormationType.Amplification, FormationSize.Small, 1, 777001);
+        bool ampStarted = Formations.StartDrawing(amp.Id, Player.PlayerId, p0.X, p0.Y);
+        Formations.ContributeQi(Player.PlayerId, Formations.QiPoolMax);
+        await Frames(2);
+        int ampDmg = Formations.GetFormationBonusPermil(StatType.Damage);
+        bool ampOk = ampStarted
+            && Formations.CurrentStage == FormationStage.Active
+            && ampDmg > 0;
+        GD.Print($"[FormShot] VER-001 4c Amplification: started={ampStarted}, стадия={Formations.CurrentStage}, Damage permil={ampDmg} (ожидали > 0)");
+        pass &= ampOk;
+        Formations.DeactivateFormation();
+
+        // 4d. Trap (Control/Slow|Freeze): ЧЕСТНЫЙ вердикт аудита — формация
+        //     ставится/заполняется/активируется, Control-эффект присутствует в
+        //     ДАННЫХ, но механизма наложения контроля на врагов нет (0
+        //     потребителей ControlType; StatType.Speed не потребляется
+        //     движением NPC/игрока) → задокументированный крупный разрыв,
+        //     VERDICT не фейлим (механизм — отдельная задача реестра).
+        Qi.AddQi(Qi.MaxQi);
+        var trap = Gen.GenerateSpecified(FormationType.Trap, FormationSize.Small, 1, 777002);
+        bool trapStarted = Formations.StartDrawing(trap.Id, Player.PlayerId, p0.X, p0.Y);
+        Formations.ContributeQi(Player.PlayerId, Formations.QiPoolMax);
+        await Frames(2);
+        var trapEffects = Formations.GetActiveEffects();
+        bool trapHasControl = trapEffects.Count > 0
+            && trapEffects[0].EffectType == FormationEffectType.Control;
+        int trapSpeed = Formations.GetFormationBonusPermil(StatType.Speed);
+        GD.Print($"[FormShot] VER-001 4d Trap: started={trapStarted}, стадия={Formations.CurrentStage}, " +
+                 $"Control-эффект в данных={trapHasControl} ({trapEffects.Count}), агрегированный Speed permil={trapSpeed} — " +
+                 "механизм наложения контроля отсутствует (крупный разрыв, вердикт в реестре bugs.json)");
+        pass &= trapStarted; // жизненный цикл ловушки обязан работать
+        Formations.DeactivateFormation();
+
         // Пауза тиков скриншотам не мешает (рендер в _Process).
         GD.Print($"[FormShot] VERDICT: {(pass ? "PASS" : "FAIL")}");
         if (shot == null && pass == false)

@@ -47,11 +47,20 @@ namespace CultivationGame.Modules.Formation
 
                 _activeEffects.Add(effectData);
 
-                // Агрегируем бонусы по статам (только для Buff/Debuff)
+                // Агрегируем бонусы по статам (только для Buff/Debuff).
+                // VER-001 (10-19-fix-b, аудит form-s7): + Shield — барьерные
+                // формации (Barrier-тип, FormationGeneratorService.BuildEffects)
+                // пишут эффект как Shield/Defense, но агрегировались только
+                // Buff/Debuff → GetFormationBonusPermil(Defense) всегда 0, а
+                // потребитель пайплайна урона СУЩЕСТВУЕТ (DamageService MED-2
+                // тянет GetFormationBonusPermil(StatType.Defense)) — эффект
+                // барьера был «мёртв». Shield агрегируется со знаком «+» по
+                // своему TargetStat (генератор: Defense 0.2..0.6 → 200..600‰).
                 if (entry.EffectType == FormationEffectType.Buff ||
-                    entry.EffectType == FormationEffectType.Debuff)
+                    entry.EffectType == FormationEffectType.Debuff ||
+                    entry.EffectType == FormationEffectType.Shield)
                 {
-                    float sign = entry.EffectType == FormationEffectType.Buff ? 1f : -1f;
+                    float sign = entry.EffectType == FormationEffectType.Debuff ? -1f : 1f;
                     if (_statBonuses.ContainsKey(entry.TargetStat))
                         _statBonuses[entry.TargetStat] += sign * entry.Value;
                     else

@@ -142,6 +142,10 @@ public partial class GameWorldController : Node2D
     // R37-c (баг-репорт 23.09): окно зарядника Ци (H) — слоты камней/буфер/
     // тепло/режим; гейт — надетый зарядник (слот Belt, ItemType="Charger").
     private UI.ChargerWindow _chargerWindow = null!;
+    // GAP-001 (10-19-fix-b): экран смерти игрока — вуаль+причина+кнопка
+    // «Возродиться»; показ по PlayerDeathEvent, респавн — ТОЛЬКО по кнопке
+    // (прежний 3с-автореспавн отключён: смерть → оверлей сразу).
+    private UI.DeathScreenOverlay _deathOverlay = null!;
 #if DEBUG
     private UI.CheatPanel? _cheatPanel; // Этап 7: чит-меню (F2, с 2026-08-28).
 #endif
@@ -1275,6 +1279,13 @@ public partial class GameWorldController : Node2D
         // заголовок; собственная DI-инъекция и ввод (паттерн PerfOverlay).
         var tileInspector = new TileInspectorOverlay { Name = "TileInspectorOverlay" };
         _hudCanvas.AddChild(tileInspector);
+
+        // GAP-001 (10-19-fix-b): экран смерти — показ по PlayerDeathEvent
+        // (OnPlayerDeath), кнопка «Возродиться» → RequestPlayerRespawn
+        // (СУЩЕСТВУЮЩИЙ респавн-флоу, логика не дублируется в UI).
+        _deathOverlay = new UI.DeathScreenOverlay { Name = "DeathScreenOverlay" };
+        _deathOverlay.BindRespawnAction(RequestPlayerRespawn);
+        _hudCanvas.AddChild(_deathOverlay);
 
         // 2026-09-04 S5: стрелки направления атакующих вне экрана — игрок
         // видит, ОТКУДА прилетает урон, даже когда источник за кадром.
@@ -2502,28 +2513,31 @@ public partial class GameWorldController : Node2D
     }
 
     /// <summary>
-    /// Этап 4: смерть игрока → респавн через 3 секунды: полное лечение
-    /// частей тела, Revive, телепорт в центр карты.
+    /// Этап 4 + GAP-001: смерть игрока → ЭКРАН СМЕРТИ (сразу, без таймера):
+    /// тёмная вуаль + причина гибели + кнопка «Возродиться». Респавн —
+    /// ТОЛЬКО по кнопке (RequestPlayerRespawn); прежний 3с-автореспавн
+    /// отключён — игрок не понимал, что произошло (аудит player-s5).
     /// </summary>
     private void OnPlayerDeath(in Core.Messaging.Contracts.PlayerDeathEvent e)
     {
-        ShowToast($"☠ Вы погибли ({e.Cause}) — возрождение...");
-        GD.Print($"[GameWorld] Player death: {e.Cause} — respawn in 3s");
+        ShowToast($"☠ Вы пали ({e.Cause})");
+        GD.Print($"[GameWorld] Player death: {e.Cause} — экран смерти (респавн по кнопке)");
         _playerAnimator?.NotifyDeath(); // G0: поза смерти (hold до респавна)
-        CallDeferred(nameof(RespawnAfterDeath));
+        _deathOverlay?.Show(e.Cause);   // GAP-001: вуаль+причина+«Возродиться»
     }
 
     /// <summary>
-    /// Аудит 2026-09-06 (P0): async void обёрнут в try/catch — исключение
-    /// внутри респавна больше не роняет процесс без лога (async void —
-    /// исключение уходит в unhandled-обработчик рантайма).
+    /// GAP-001: СУЩЕСТВУЮЩИЙ респавн-флоу (бывш. RespawnAfterDeath): полное
+    /// лечение всех частей тела, Revive, телепорт в центр карты. 3с-таймер
+    /// удалён — вызов из DeathScreenOverlay по кнопке «Возродиться» (и
+    /// защитный PlayerReviveEvent-путь остаётся рабочим).
+    /// Аудит 2026-09-06 (P0): тело обёрнуто в try/catch — исключение внутри
+    /// респавна не роняет процесс без лога.
     /// </summary>
-    private async void RespawnAfterDeath()
+    public void RequestPlayerRespawn()
     {
         try
         {
-            await ToSignal(GetTree().CreateTimer(3.0), SceneTreeTimer.SignalName.Timeout);
-
             // Полное лечение всех частей (Q4: HP = Σ RedHP).
             if (BodyService != null)
             {
@@ -2553,7 +2567,7 @@ public partial class GameWorldController : Node2D
         catch (Exception ex)
         {
             // P0-фикс аудита: респавн не должен ронять игру молча.
-            GD.PrintErr($"[GameWorld] RespawnAfterDeath FAILED: {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
+            GD.PrintErr($"[GameWorld] RequestPlayerRespawn FAILED: {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
             ShowToast("⚠ Ошибка возрождения — см. лог");
         }
     }

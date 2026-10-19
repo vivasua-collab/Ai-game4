@@ -6,6 +6,10 @@
 //   2. P1-2: TryTravel возвращает false БЕЗ смены CurrentLocationId
 //      (физический переход мира не реализован — честный контракт).
 //   3. P2-4: TimeChangedEvent.Delta == ITimeService.DeltaTime (1.0, не 1/60).
+//   4. GAP-001 (10-19-fix-b): смерть игрока → DeathScreenOverlay в дереве
+//      и показан (причина из PlayerDeathEvent.Cause), авто-респавн 3с ОТМЕНЁН
+//      (игрок мёртв и оверлей виден спустя 3.6с), нажатие «Возродиться» →
+//      существующий респавн-флоу (IsAlive + телепорт в центр) + оверлей скрыт.
 // Запуск: GODOT_NEWGAME=1 GODOT_RESPAWN_DEBUG=1 godot --headless --path . scenes/MainMenu.tscn
 using Godot;
 using CultivationGame.Core.DI;
@@ -26,6 +30,9 @@ public partial class RespawnSimDebug : Node
     [Inject] private ISubscriber<TimeChangedEvent>? _timeChangedSub;
     [Inject] private ISubscriber<TileChangedEvent>? _tileChangedSub;
     [Inject] private ResourceService? _resourceServiceImpl;
+    // GAP-001 (шаг 4): честная смерть игрока через тело + респавн-проверки.
+    [Inject] private IPlayerService? _player;
+    [Inject] private IBodyService? _body;
 
     private System.IDisposable? _timeChangedToken;
     private System.IDisposable? _tileChangedToken;
@@ -69,6 +76,12 @@ public partial class RespawnSimDebug : Node
         if (_tiles == null || _time == null || _world == null || _resourceServiceImpl == null)
         {
             GD.Print("[RespawnSim] FAIL — DI not wired");
+            PrintVerdict(false);
+            return;
+        }
+        if (_player == null || _body == null)
+        {
+            GD.Print("[RespawnSim] FAIL — DI not wired (player/body для шага 4)");
             PrintVerdict(false);
             return;
         }
@@ -155,11 +168,65 @@ public partial class RespawnSimDebug : Node
             pass &= respawnOk;
         }
 
+        // === 4. GAP-001 (10-19-fix-b): экран смерти ========================
+        // Честная смерть через тело (каскад R41): ApplyDamage(Head) →
+        // BodyCriticalEvent → PlayerService.Die → PlayerDeathEvent →
+        // GameWorldController показывает DeathScreenOverlay.
+        var player = _player;   // локали — nullable-flow без предупреждений
+        var body = _body;
+        var gwc = GetParent() as GameWorldController;
+        var overlay = gwc?.GetNodeOrNull<UI.DeathScreenOverlay>("HUDCanvas/DeathScreenOverlay");
+        bool overlayInTree = overlay != null;
+        GD.Print($"[RespawnSim] 4. DeathScreenOverlay в дереве = {overlayInTree} (HUDCanvas/DeathScreenOverlay)");
+        pass &= overlayInTree;
+
+        if (overlay != null && player != null && body != null)
+        {
+            // 4a. Живой игрок → разрушаем голову → оверлей показан, причина
+            //     из события, ввод заблокирован (MouseFilter=Stop).
+            bool wasAlive = player.IsAlive;
+            body.ApplyDamage(BodyPartType.Head, 10_000_000);
+            bool playerDead = !player.IsAlive;
+            bool overlayShown = overlay.Visible && overlay.BlocksInput;
+            bool causeOk = overlay.DebugCauseText.Contains("Голова");
+            GD.Print($"[RespawnSim] 4a. смерть: был жив={wasAlive}, IsAlive={player.IsAlive} (ожидали false), " +
+                     $"оверлей виден={overlay.Visible}, ввод блокирован={overlay.BlocksInput}, " +
+                     $"причина='{overlay.DebugCauseText}' (ожидали 'Голова…')");
+            pass &= wasAlive && playerDead && overlayShown && causeOk;
+
+            // 4b. Авто-респавн ОТМЕНЁН: 3.6с > прежних 3с — игрок всё ещё
+            //     мёртв, оверлей всё ещё показан (респавн только по кнопке).
+            await ToSignal(GetTree().CreateTimer(3.6), SceneTreeTimer.SignalName.Timeout);
+            bool stillDead = !player.IsAlive;
+            bool stillShown = overlay.Visible;
+            GD.Print($"[RespawnSim] 4b. авто-респавн отменён: через 3.6с IsAlive={player.IsAlive} " +
+                     $"(ожидали false — мёртв), оверлей виден={stillShown} (ожидали true)");
+            pass &= stillDead && stillShown;
+
+            // 4c. Симуляция нажатия «Возродиться» → СУЩЕСТВУЮЩИЙ респавн-флоу:
+            //     полное лечение + Revive + телепорт в центр карты, оверлей скрыт.
+            int cx = _tiles.MapWidth / 2, cy = _tiles.MapHeight / 2;
+            overlay.SimulateRespawnPressForQa();
+            await ToSignal(GetTree().CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
+            bool respawnedNow = player.IsAlive;
+            bool overlayHidden = !overlay.Visible;
+            bool atCenter = player.Position.X == cx && player.Position.Y == cy;
+            GD.Print($"[RespawnSim] 4c. после «Возродиться»: IsAlive={player.IsAlive} (ожидали true), " +
+                     $"оверлей скрыт={overlayHidden}, позиция=({player.Position.X},{player.Position.Y}) " +
+                     $"(ожидали центр {cx},{cy})");
+            pass &= respawnedNow && overlayHidden && atCenter;
+        }
+        else if (overlay != null)
+        {
+            GD.Print("[RespawnSim] FAIL — player/body пустые при живом оверлее (шаг 4)");
+            pass = false;
+        }
+
         PrintVerdict(pass);
     }
 
     private static void PrintVerdict(bool pass)
     {
-        GD.Print($"[RespawnSim] VERDICT: {(pass ? "PASS — resource respawn + honest travel + time delta" : "FAIL")}");
+        GD.Print($"[RespawnSim] VERDICT: {(pass ? "PASS — resource respawn + honest travel + time delta + death screen (GAP-001)" : "FAIL")}");
     }
 }

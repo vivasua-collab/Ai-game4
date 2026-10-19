@@ -12,7 +12,9 @@
 //      - аура свободна → AuraHoldService.Hold (park, ждёт второго нажатия)
 //      - аура занята → FireTechnique немедленно (вариант В: «остальные срабатывают сразу»)
 //   4. FireTechnique: TechniqueService.CompleteUse (кулдаун+мастерство) + эффект по типу
-//      (Combat → AttackIntentEvent с potency; Healing → лечение; Defense → щит; Movement → рывок; ...).
+//      (Combat → AttackIntentEvent с potency; Healing → лечение; Defense → щит; Movement → рывок;
+//       BUG-001 (аудит 10-19): Poison → DoT на цель; Curse → дебафф −% атаки цели;
+//       Sensory → бафф себе; Support → малое самолечение).
 //
 // Источник: checkpoints/08_25_technique_hold_analysis.md (план, подтверждён 2026-08-25).
 using System;
@@ -59,9 +61,44 @@ public sealed class PlayerTechniqueCaster : IDisposable
     // R23-1 (аудит CMB-1): рефанд кулдауна/мастерства при отклонении выпуска
     // гейтами CombatService (PublishRejection → только для игрока).
     [Inject] private readonly ISubscriber<AttackRejectedEvent> _attackRejectedSub = null!;
+    // BUG-001 (аудит 10-19, волна 1): DoT/баффы техник — через существующий
+    // IBuffService (тот же механизм, что у стихийных эффектов ElementalEffectService:
+    // ApplyBuff → BuffTickProcessor → BodyModule.DoT-пайплайн).
+    [Inject] private readonly IBuffService _buffs = null!;
 
     private const int DashDistanceTiles = 3;
     private const float MinAttackRangeTiles = 2f;
+
+    // === BUG-001: параметры эффектов Sensory/Curse/Poison/Support (баланс L1) ===
+    // Идентификаторы баффов подобраны под существующий маппинг BuffService
+    // .MapBuffIdToType (движок-агностичный прототип без BuffData-JSON):
+    //   "...poison..."       → BuffType.Poison DoT, тик 1с, potency = HP/тик;
+    //   "...shock..."        → AttackReduction, potency = промилле (200 = −20%);
+    //   "...attack_boost..." → AttackBoost +20% урона (Value=0.2 из маппинга).
+    // Величины согласованы с существующими продюсерами: combat_shock −20%
+    // (CombatConsequencesService), elemental_poison 3% maxHP/тик, attack_boost +20%.
+
+    /// <summary>Poison: DoT на цель (ид по маппингу BuffService → BuffType.Poison, тик 1с).</summary>
+    private const string PoisonBuffId = "technique_poison";
+    /// <summary>Poison: длительность = количество тиков (TickInterval=1с).</summary>
+    private const float PoisonDurationSec = 6f;
+    /// <summary>Poison: тиков за длительность (суммарный урон ≈ BaseDamage).</summary>
+    private const int PoisonDotTicks = 6;
+
+    /// <summary>Curse: дебафф цели −% атаки (маппинг «shock» → AttackReduction, промилле).</summary>
+    private const string CurseBuffId = "curse_shock";
+    /// <summary>Curse: длительность = кулдауну типа (BaseCooldownByType 8с).</summary>
+    private const float CurseDurationSec = 8f;
+    /// <summary>Curse: −15% атаки цели на L1 (слабее травматического шока −20%).</summary>
+    private const int CurseWeakenPermil = 150;
+
+    /// <summary>Sensory: бафф себе +урон («ясное видение слабых мест»; маппинг «attack_boost»).</summary>
+    private const string SensoryBuffId = "sensory_attack_boost";
+    /// <summary>Sensory: длительность 10с (2 кулдауна типа — короткий боевой импульс).</summary>
+    private const float SensoryDurationSec = 10f;
+
+    /// <summary>Support: доля BaseDamage самолечения (вдвое слабее Healing-типа).</summary>
+    private const int SupportHealDivisor = 2;
 
     private static readonly FormationType[] FormationTypePool =
     {
@@ -175,6 +212,16 @@ public sealed class PlayerTechniqueCaster : IDisposable
                 }
             }
         }
+        // BUG-001: Poison/Curse — целевые техники: ранний отказ ДО зарядки
+        // (Stage 0-принцип «не тратить Ци впустую», паттерн Combat выше).
+        else if (tech.Type == TechniqueType.Poison || tech.Type == TechniqueType.Curse)
+        {
+            if (FindTargetInRange(tech) == null)
+            {
+                PublishFail(e.TechniqueId, "Нет цели в радиусе");
+                return;
+            }
+        }
 
         // Запускаем зарядку (валидация кулдауна/Ци внутри StartCharge)
         bool started = _chargeService.StartCharge(_player.PlayerId, e.TechniqueId, mouseX, mouseY);
@@ -257,9 +304,21 @@ public sealed class PlayerTechniqueCaster : IDisposable
                 }
                 break;
             case TechniqueType.Healing:
+            // BUG-001: Support — самолечение, тот же гейт «нечего лечить».
+            case TechniqueType.Support:
                 if (!_hasDamagedParts())
                 {
                     PublishFail(tech.TechniqueId, "Тело не ранено");
+                    return;
+                }
+                break;
+            // BUG-001: Poison/Curse — цель обязана быть жива в момент выпуска
+            // (зарядка шла секунды — цель могла умереть/уйти).
+            case TechniqueType.Poison:
+            case TechniqueType.Curse:
+                if (FindTargetInRange(tech) == null)
+                {
+                    PublishFail(tech.TechniqueId, "Цель исчезла");
                     return;
                 }
                 break;
@@ -381,12 +440,81 @@ public sealed class PlayerTechniqueCaster : IDisposable
                 return;
             }
 
-            case TechniqueType.Sensory:
-            case TechniqueType.Support:
+            // BUG-001 (аудит 10-19, волна 1): 4 типа получили честные эффекты.
+            // Прежнее поведение: Sensory/Support/Curse — пустой успех (тост+
+            // визуал без эффекта); Poison — default «Тип техники не
+            // поддерживается» (Ци и кулдаун сгорали впустую).
+
+            case TechniqueType.Poison:
+            {
+                // DoT на цель — механизм стихийного яда (ElementalEffectService
+                // .ApplyPoison): бафф «poison» с тик-уроном; тикает BuffTickProcessor
+                // → BodyModule → DamageAppliedEvent("dot:...") — единый DoT-пайплайн.
+                string? dotTarget = FindTargetInRange(tech);
+                if (dotTarget == null)
+                {
+                    _techniques.RefundUse(tech.TechniqueId);
+                    PublishFail(tech.TechniqueId, "Цель исчезла");
+                    return;
+                }
+                // Тик-урон: BaseDamage делится на число тиков (суммарно ≈ удар
+                // техники, разнесённый во времени и игнорирующий броню).
+                int tickDamage = Math.Max(1, tech.BaseDamage * potencyPermil / 1000 / PoisonDotTicks);
+                if (!_buffs.ApplyBuff(dotTarget, PoisonBuffId, PoisonDurationSec, tickDamage))
+                {
+                    _techniques.RefundUse(tech.TechniqueId);
+                    PublishFail(tech.TechniqueId, "Цель не принимает яд");
+                    return;
+                }
+                PublishSuccess(tech, playerX, playerY, dotTarget);
+                return;
+            }
+
             case TechniqueType.Curse:
             {
-                // Схематично: расход Ци (в зарядке) + тост + визуал ауры
+                // Дебафф цели: −% атаки через существующий бафф-механизм
+                // (маппинг «shock» → AttackReduction, промилле-потенция).
+                string? curseTarget = FindTargetInRange(tech);
+                if (curseTarget == null)
+                {
+                    _techniques.RefundUse(tech.TechniqueId);
+                    PublishFail(tech.TechniqueId, "Цель исчезла");
+                    return;
+                }
+                int weakenPermil = Math.Max(50, CurseWeakenPermil * potencyPermil / 1000);
+                if (!_buffs.ApplyBuff(curseTarget, CurseBuffId, CurseDurationSec, weakenPermil))
+                {
+                    _techniques.RefundUse(tech.TechniqueId);
+                    PublishFail(tech.TechniqueId, "Проклятие не ложится");
+                    return;
+                }
+                PublishSuccess(tech, playerX, playerY, curseTarget);
+                return;
+            }
+
+            case TechniqueType.Sensory:
+            {
+                // Бафф себе: «восприятие течения боя» → удары точнее → +урон.
+                // Ближайшая потребляемая характеристика пайплайна — StatType.Damage
+                // (DamageService слой 3a; Perception/Evasion пайплайном не
+                // потребляются). Величина +20% — канон маппинга attack_boost.
+                if (!_buffs.ApplyBuff(_player.PlayerId, SensoryBuffId, SensoryDurationSec, 0))
+                {
+                    _techniques.RefundUse(tech.TechniqueId);
+                    PublishFail(tech.TechniqueId, "Применение невозможно");
+                    return;
+                }
                 PublishSuccess(tech, playerX, playerY, null, visualKind: 2);
+                return;
+            }
+
+            case TechniqueType.Support:
+            {
+                // Самолечение: вдвое слабее Healing-техники (Healing = полный
+                // BaseDamage мгновенно; Support — малое подлечивание).
+                int supportHeal = Math.Max(1, tech.BaseDamage * potencyPermil / 1000 / SupportHealDivisor);
+                HealDamagedParts(supportHeal);
+                PublishSuccess(tech, playerX, playerY, null, visualKind: 3);
                 return;
             }
 
