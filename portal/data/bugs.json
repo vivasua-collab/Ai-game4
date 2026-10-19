@@ -1,0 +1,385 @@
+{
+  "version": "1.0",
+  "updated": "2026-10-19T13:00:00Z",
+  "format": {
+    "purpose": "Реестр находок аудита и волн их исправления. Запуск процесса: директива владельца от 19.10.2026 — «по важным находкам аудита запустить анализ и исправление». Источник находок: аудит-вердикты итерации 2 карты проекта (коммит dfb98d0) + открытые верификации PROJECT_MAP.md §5. Ведёт main-агент Z.ai Code; веб-портал читает файл напрямую (runtime, no-store).",
+    "type": {
+      "bug": "поведение сломано или не соответствует заявленному",
+      "gap": "заявленная фича отсутствует (этап трека карты)",
+      "verify": "требует точечной верификации по коду"
+    },
+    "severity": {
+      "P1": "игрок сталкивается напрямую / блокирует опыт",
+      "P2": "заметно, но обходится",
+      "P3": "полировка, горизонт, контент-план"
+    },
+    "item_status": {
+      "new": "найдено, анализ не начат",
+      "analyzing": "идёт анализ корня по коду",
+      "planned": "план назначен (fix_wave)",
+      "in_progress": "исправляется (волна N)",
+      "fixed": "код исправлен, ждёт регрессии/плейтеста",
+      "verified": "исправление подтверждено (сим/QA/плейтест)",
+      "deferred": "осознанно отложено (причина в analysis)"
+    },
+    "fix_wave": {
+      "1": "текущая сессия 19.10.2026 — параллельные субагенты 10-19-fix-a / 10-19-fix-b",
+      "2": "ближайшие сессии — малые фичи (крафт-UI, зарядники, NPC-категории)",
+      "3": "дизайн-этап / контент-план M6+ — требует решения владельца"
+    }
+  },
+  "items": [
+    {
+      "id": "BUG-001",
+      "type": "bug",
+      "severity": "P1",
+      "title": "Каст-эффекты техник: 4 типа генерируются без эффектов",
+      "module": "Бой и техники (Combat / Generator)",
+      "track_ref": "tech-s7",
+      "status": "verified",
+      "fix_wave": 1,
+      "assignee": "10-19-fix-a",
+      "found": "2026-10-19",
+      "summary": "Техники типов Sensory / Curse / Poison / Support генерируются генератором, но их каст не производит никакого эффекта (в отличие от Combat / Defense / Healing / Movement). Игрок может получить технику, которая «ничего не делает».",
+      "analysis": "Корень (10-19-fix-a): PlayerTechniqueCaster.FireTechnique — Sensory/Support/Curse делали пустой успех (тост+визуал ауры без эффекта), Poison падал в default «тип не поддерживается» ПОСЛЕ списания Ци/кулдауна/мастерства. Генератор невиновен (корректно создаёт все 4 типа).",
+      "fix_plan": "Реализовано (10-19-fix-a) через существующий IBuffService без новых модулей/контрактов: Poison → DoT на цель (6с × 6 тиков, тик BaseDamage/6 × potency — суммарно ≈ удар техники); Curse → дебафф −15% атаки 8с (масштаб от potency, пол 50‰); Sensory → +20% урона себе 10с; Support → самолечение BaseDamage/2 с гейтом «Тело не ранено». Гейты цели Poison/Curse до траты Ци + RefundUse при отказе.",
+      "progress_pct": 100,
+      "refs": [
+        "checkpoints/10_19_project_map.md",
+        "docs/docs_v2/00_overview/PROJECT_MAP.md §5"
+      ],
+      "history": [
+        {
+          "date": "2026-10-19",
+          "event": "Найдено аудитом итерации 2 карты проекта (dfb98d0)"
+        },
+        {
+          "date": "2026-10-19",
+          "event": "Волна 1 запущена: субагент 10-19-fix-a — анализ корня + реализация каст-эффектов"
+        },
+        {
+          "date": "2026-10-19",
+          "event": "Волна 1 закрыта: 4 эффекта реализованы, COMBAT_SIM шаг 3m PASS (бафф/дебафф/DoT 3 тика 27 урона/лечение +27), смежные CHARGE/DOT/HOTBAR PASS; полная регрессия при интеграции"
+        }
+      ]
+    },
+    {
+      "id": "VER-001",
+      "type": "verify",
+      "severity": "P2",
+      "title": "Формации: эффекты барьера (щит союзникам) и ловушки (замедление) не верифицированы",
+      "module": "Формации (Formation)",
+      "track_ref": "form-s7",
+      "status": "verified",
+      "fix_wave": 1,
+      "assignee": "10-19-fix-b",
+      "found": "2026-10-19",
+      "summary": "Типы формаций Barrier / Trap / Amplification генерируются и заявлены в документации; точечная проверка эффект-логики (щит союзникам от Barrier, замедление врагов от Trap) не проводилась.",
+      "analysis": "Вердикт верификации (10-19-fix-b, FormationShotSimDebug шаги 4a-4d): Amplification — работает: Buff(Damage) → FormationEffects._statBonuses → DamageService слой 3b (GetFormationBonusPermil(Damage)=220‰ на L1). Barrier — работал ЧАСТИЧНО: щит Ци кастеру-игроку через PlayerTechniqueCaster.OnFormationActivated (QiBufferActivateRequestEvent 200..2000); НО Shield-эффекты не агрегировались в _statBonuses → Defense-пулл DamageService MED-2 всегда 0 — МЕЛКИЙ разрыв починен (FormationEffects.Initialize: агрегация Shield по TargetStat; после фикса 250‰ на L1, деактивация честно снимает). Trap — КРУПНЫЙ разрыв: Control(Freeze/Slow) генерируется, но 0 потребителей ControlType в рунтайме; zone-entry-триггера нет; даже применённый Slow ничего не даёт — StatType.Speed не потребляется движением NPC (NPCMovementService — конфиг-константы) и игрока (GWC speedMult: терраин+экипировка+вес), StatModifierChangedEvent без подписчиков → оформлен как GAP-009.",
+      "fix_plan": "Прочитать FormationEffects / FormationService; сверить с критериями доков FormationSystem; мелкие разрывы починить на месте, крупные — задокументировать как новые gap-записи реестра.",
+      "progress_pct": 100,
+      "refs": [
+        "checkpoints/10_19_project_map.md",
+        "docs/docs_v2/00_overview/PROJECT_MAP.md §5"
+      ],
+      "history": [
+        {
+          "date": "2026-10-19",
+          "event": "Найдено аудитом итерации 2 карты проекта (dfb98d0)"
+        },
+        {
+          "date": "2026-10-19",
+          "event": "Волна 1 запущена: субагент 10-19-fix-b — верификация + точечные фиксы"
+        },
+        {
+          "date": "2026-10-19",
+          "event": "Вердикт: Amplification работает (Damage 220‰); Barrier — фикс агрегации Shield (Defense 250‰, был 0); Trap — крупный разрыв → GAP-009. FormationShotSimDebug шаги 4a-4d PASS"
+        }
+      ]
+    },
+    {
+      "id": "GAP-001",
+      "type": "gap",
+      "severity": "P1",
+      "title": "Экран смерти игрока (UX смерти)",
+      "module": "Игрок / UI (Player, Adapter/UI)",
+      "track_ref": "player-s5",
+      "status": "verified",
+      "fix_wave": 1,
+      "assignee": "10-19-fix-b",
+      "found": "2026-10-19",
+      "summary": "Смерть игрока — технический респавн через 3 секунды (GameWorldController); экрана смерти нет — игрок не понимает, что произошло, и где возродился.",
+      "analysis": "Реализовано (10-19-fix-b): новый Adapter/UI/DeathScreenOverlay (вуаль MouseFilter=Stop, ZIndex=50 — над HUD/окнами, ниже QA-панелей; пергаментная панель: заголовок «☠ Вы пали…», причина из PlayerDeathEvent.Cause, источник последнего удара из кэша DamageAppliedEvent, уровень культивации, кнопка «Возродиться»). GWC.OnPlayerDeath показывает оверлей сразу; прежний 3с-автореспавн ОТКЛЮЧЁН (респавн только по кнопке → RequestPlayerRespawn — прежнее тело флоу: полное лечение + Revive + телепорт в центр). Лимитации: оверлей не в INP-1 модальном стеке (мир тикает, Esc не закрывает); горячие клавиши окон (B/C) не гейтятся — окна открываются под вуалью.",
+      "fix_plan": "Оверлей смерти: тёмная вуаль, причина гибели, кнопка «Возродиться» (вызывает существующий респавн-флоу), блокировка боевого ввода; QA-шаг в существующем RespawnSimDebug.",
+      "progress_pct": 100,
+      "refs": [
+        "checkpoints/10_19_project_map.md",
+        "docs/docs_v2/00_overview/PROJECT_MAP.md §5"
+      ],
+      "history": [
+        {
+          "date": "2026-10-19",
+          "event": "Найдено аудитом итерации 2 карты проекта (dfb98d0)"
+        },
+        {
+          "date": "2026-10-19",
+          "event": "Волна 1 запущена: субагент 10-19-fix-b — реализация экрана смерти"
+        },
+        {
+          "date": "2026-10-19",
+          "event": "Реализовано: DeathScreenOverlay + GWC (Show/RequestPlayerRespawn, 3с-таймер отключён); RespawnSimDebug шаг 4 (оверлей→отмена авто-респавна→кнопка→респавн в центр) PASS, build 0 err"
+        }
+      ]
+    },
+    {
+      "id": "GAP-002",
+      "type": "gap",
+      "severity": "P2",
+      "title": "Крафт: UI окна и контент рецептов",
+      "module": "Инвентарь (Inventory)",
+      "track_ref": "inv-s8",
+      "status": "planned",
+      "fix_wave": 2,
+      "found": "2026-10-19",
+      "summary": "CraftingService + RegisterRecipe(s) API готовы; UI крафта и рецепты — 0 вхождений в коде. Игрок не может крафтить.",
+      "analysis": "Сервисный слой готов (аудит dfb98d0); отсутствуют окно (Adapter/UI) и стартовый набор рецептов.",
+      "fix_plan": "Волна 2: CraftingWindow по паттернам существующих окон (LootWindow/TradeWindow), 5–10 стартовых рецептов (пилюли, материалы), хоткей, QA-шаг в существующем симе.",
+      "progress_pct": 0,
+      "refs": [
+        "checkpoints/10_19_project_map.md"
+      ],
+      "history": [
+        {
+          "date": "2026-10-19",
+          "event": "Найдено аудитом итерации 2 карты проекта (dfb98d0)"
+        },
+        {
+          "date": "2026-10-19",
+          "event": "Запланировано в волну 2"
+        }
+      ]
+    },
+    {
+      "id": "GAP-003",
+      "type": "gap",
+      "severity": "P2",
+      "title": "Зарядники: генерация и UI только для Belt (1 из 5 форм-факторов)",
+      "module": "Зарядники Ци (Charger)",
+      "track_ref": "charger-s4",
+      "status": "planned",
+      "fix_wave": 2,
+      "found": "2026-10-19",
+      "summary": "Домен ChargerData готов для 5 форм-факторов (аудит dfb98d0); генерация предметов и окно ChargerWindow покрывают только Belt.",
+      "analysis": "Модельная часть форм-факторов завершена, презентационная и генеративная — за Belt не выходили.",
+      "fix_plan": "Волна 2: включить остальные форм-факторы в генерацию предметов (Generator), адаптировать строки/слоты ChargerWindow, QA-шаг.",
+      "progress_pct": 0,
+      "refs": [
+        "checkpoints/10_19_project_map.md"
+      ],
+      "history": [
+        {
+          "date": "2026-10-19",
+          "event": "Найдено аудитом итерации 2 карты проекта (dfb98d0)"
+        },
+        {
+          "date": "2026-10-19",
+          "event": "Запланировано в волну 2"
+        }
+      ]
+    },
+    {
+      "id": "GAP-004",
+      "type": "gap",
+      "severity": "P3",
+      "title": "NPC-категории Temp/Plot/Unique: частичная семантика",
+      "module": "NPC",
+      "track_ref": "npc-s7",
+      "status": "planned",
+      "fix_wave": 2,
+      "found": "2026-10-19",
+      "summary": "Enum NPCCategory и сохранение есть; реальные различия спавна/поведения/историй между Temp / Plot / Unique частичны.",
+      "analysis": "Аудит dfb98d0: семантика категорий реализована не полностью — категории есть в данных, но не всегда различаются поведением.",
+      "fix_plan": "Волна 2: закрепить семантику (ограничение жизни Temp, сюжетная защита Plot, единственность Unique + сейв), QA-шаг.",
+      "progress_pct": 0,
+      "refs": [
+        "checkpoints/10_19_project_map.md"
+      ],
+      "history": [
+        {
+          "date": "2026-10-19",
+          "event": "Найдено аудитом итерации 2 карты проекта (dfb98d0)"
+        },
+        {
+          "date": "2026-10-19",
+          "event": "Запланировано в волну 2"
+        }
+      ]
+    },
+    {
+      "id": "GAP-005",
+      "type": "gap",
+      "severity": "P3",
+      "title": "Формации: NPC-помощники (до 50 участников)",
+      "module": "Формации (Formation)",
+      "track_ref": "form-s5",
+      "status": "planned",
+      "fix_wave": 3,
+      "found": "2026-10-19",
+      "summary": "Зарядник→формация работает; NPC-помощники в формациях отсутствуют — формации не набирают участников-персонажей.",
+      "analysis": "Аудит dfb98d0: механизм NPC-помощников (до 50) не реализован.",
+      "fix_plan": "Волна 3: механика набора участников и их вклада Ци — дизайн-этап, связан с party-механикой.",
+      "progress_pct": 0,
+      "refs": [
+        "checkpoints/10_19_project_map.md"
+      ],
+      "history": [
+        {
+          "date": "2026-10-19",
+          "event": "Найдено аудитом итерации 2 карты проекта (dfb98d0)"
+        },
+        {
+          "date": "2026-10-19",
+          "event": "Запланировано в волну 3 (дизайн-этап)"
+        }
+      ]
+    },
+    {
+      "id": "GAP-006",
+      "type": "gap",
+      "severity": "P3",
+      "title": "Формации: предметы-носители Disk/Altar",
+      "module": "Формации (Formation)",
+      "track_ref": "form-s6",
+      "status": "planned",
+      "fix_wave": 3,
+      "found": "2026-10-19",
+      "summary": "Enum FormationCarrier (Disk/Altar) есть; предметов-носителей формаций в контенте нет.",
+      "analysis": "Аудит dfb98d0: enum определён, предметы-носители не генерируются.",
+      "fix_plan": "Волна 3: генерация предметов-носителей + размещение формации без зарядника.",
+      "progress_pct": 0,
+      "refs": [
+        "checkpoints/10_19_project_map.md"
+      ],
+      "history": [
+        {
+          "date": "2026-10-19",
+          "event": "Найдено аудитом итерации 2 карты проекта (dfb98d0)"
+        },
+        {
+          "date": "2026-10-19",
+          "event": "Запланировано в волну 3"
+        }
+      ]
+    },
+    {
+      "id": "GAP-007",
+      "type": "gap",
+      "severity": "P2",
+      "title": "События мира: событийная система (караваны, нападения, находки)",
+      "module": "Мир (World)",
+      "track_ref": "world-s8",
+      "status": "planned",
+      "fix_wave": 3,
+      "found": "2026-10-19",
+      "summary": "IEventService — интерфейс без реализации; караваны спавнятся разово (TrySpawnEventNpc); событийного генератора мира нет.",
+      "analysis": "Архитектурное место зарезервировано (интерфейс в Core), событийной системы нет — мир статичен между спавнами.",
+      "fix_plan": "Волна 3: дизайн-спека событий мира (типы, триггеры, награды, частоты) → реализация WorldEventService. Масштаб M6 — требует решения владельца.",
+      "progress_pct": 0,
+      "refs": [
+        "checkpoints/10_19_project_map.md"
+      ],
+      "history": [
+        {
+          "date": "2026-10-19",
+          "event": "Найдено аудитом итерации 2 карты проекта (dfb98d0)"
+        },
+        {
+          "date": "2026-10-19",
+          "event": "Запланировано в волну 3 (дизайн-этап, M6)"
+        }
+      ]
+    },
+    {
+      "id": "GAP-008",
+      "type": "gap",
+      "severity": "P2",
+      "title": "NPC AI: слои Behavior Tree / Neural Router / Brain Controller",
+      "module": "NPC AI",
+      "track_ref": "ai-s6",
+      "status": "planned",
+      "fix_wave": 3,
+      "found": "2026-10-19",
+      "summary": "Spinal / BehaviorTree / NeuralRouter / BrainController — 0 вхождений в коде; фактически работают событийные реакции (месть, селектор защит, бегство, leash) без слоистой архитектуры спеки §3.7.",
+      "analysis": "Аудит dfb98d0: заявленная в спеке слоистая AI-архитектура не начиналась; текущие реакции работают и покрыты QA.",
+      "fix_plan": "Волна 3: большой дизайн-этап ai-s6..s8 (BT → Router → Brain) по спеке §3.7; до старта — решение владельца о необходимости слоёв vs текущих событийных реакций.",
+      "progress_pct": 0,
+      "refs": [
+        "checkpoints/10_19_project_map.md"
+      ],
+      "history": [
+        {
+          "date": "2026-10-19",
+          "event": "Найдено аудитом итерации 2 карты проекта (dfb98d0)"
+        },
+        {
+          "date": "2026-10-19",
+          "event": "Запланировано в волну 3 (большой дизайн-этап)"
+        }
+      ]
+    },
+    {
+      "id": "BUG-002",
+      "type": "bug",
+      "severity": "P2",
+      "title": "Mastery техник не растёт от использования",
+      "module": "Бой и техники (Combat)",
+      "track_ref": "tech-s6",
+      "status": "planned",
+      "fix_wave": 3,
+      "found": "2026-10-19",
+      "summary": "Mastery фиксируется rng при генерации техники и никогда не растёт от применения, хотя механика подразумевает прокачку мастерством.",
+      "analysis": "Корень: генератор назначает mastery однократно (rng); в каст-пайплайне нет накопления опыта. Чувствительные формулы урона зависят от mastery — рост требует баланс-прохода.",
+      "fix_plan": "Карта проекта относит механику роста mastery к контент-плану M6: анализ баланса → правило роста (успешный каст → малый прирост, кэпы по рангам) → интеграция в формулы.",
+      "progress_pct": 10,
+      "refs": [
+        "checkpoints/10_19_project_map.md"
+      ],
+      "history": [
+        {
+          "date": "2026-10-19",
+          "event": "Найдено аудитом итерации 2 карты проекта (dfb98d0)"
+        },
+        {
+          "date": "2026-10-19",
+          "event": "Запланировано в волну 3 (контент-план M6)"
+        }
+      ]
+    },
+    {
+      "id": "GAP-009",
+      "type": "gap",
+      "severity": "P3",
+      "title": "Формации: механизм наложения Control-эффектов (Trap — замедление/заморозка врагов)",
+      "module": "Формации (Formation) + NPC/движение",
+      "track_ref": "form-s7",
+      "status": "new",
+      "fix_wave": 3,
+      "assignee": "",
+      "found": "2026-10-19",
+      "summary": "Trap-формации генерируют Control-эффекты (Freeze/Slow, StatType.Speed, TargetTag=enemy), но в рунтайме их никто не применяет: замедления врагов в зоне не существует. Обнаружено верификацией VER-001.",
+      "analysis": "Три отсутствующих звена (10-19-fix-b): (1) zone-entry-триггер — никто не сканирует врагов в радиусе формации (FormationModule.Tick не опрашивает NPC/зверей); (2) применение — ControlType.Freeze/Slow/Root не имеют потребителей (FormationEffects хранит записи, но Control не агрегируется и не публикуется); (3) потребление — даже применённый через IBuffService slow-дебафф (buffId 'slow'/'ice' → BuffType.Slow, StatType.Speed) не влияет на движение: NPCMovementService использует конфиг-константы, GWC speedMult игрока = терраин+экипировка+вес; StatModifierChangedEvent публикуется без подписчиков. Оценка объёма: зоновый скан в FormationModule.Tick (~30 строк, EVT-01 — через INPCService-провайдер или событие позиции) + IBuffService.ApplyBuff при входе (~15 строк) + потребление Speed в NPCMovementService и GWC (~2×10 строк) + снятие при выходе/деактивации (~20 строк) + QA-шаг; затрагивает Modules/NPC и GWC — координация с владельцем обязательна (баланс: замедление врагов меняет всю боевую динамику).",
+      "fix_plan": "Волна 3: (а) потребление StatType.Speed-модификаторов в NPC-движении и скорости игрока; (б) zone-scan Trap-формаций (вход врага в радиус → ApplyBuff slow/freeze, выход/деактивация → снятие); (в) баланс-проход (замедление до −80% на L9 — сильный контроль); QA — расширение шага 4d FormationShotSimDebug (замер скорости NPC в зоне/вне зоны).",
+      "progress_pct": 0,
+      "refs": [
+        "checkpoints/10_19_project_map.md",
+        "docs/docs_v2/00_overview/PROJECT_MAP.md §5"
+      ],
+      "history": [
+        {
+          "date": "2026-10-19",
+          "event": "Обнаружено верификацией VER-001 (10-19-fix-b); жизненный цикл Trap (установка/заполнение/активация) работает — шаг 4d FormationShotSimDebug"
+        }
+      ]
+    }
+  ]
+}

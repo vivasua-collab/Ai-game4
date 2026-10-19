@@ -219,6 +219,14 @@ export DOTNET_ROOT="$DOTNET_DIR"
 export PATH="$DOTNET_ROOT:$PATH"
 timeout 15 "$GODOT_BIN" --headless --path . --quit 2>&1 | grep -E "(GameBoot|MainMenu|Started|Error|hostfxr)" | head -3
 
+# ─── Портал: восстановление каркаса (idempotent, безопасен при отсутствии) ──
+# Возвращает страницу /, API /api/portal и компоненты портала из skeleton
+# в my-project (каркас тонкий, все данные — JSON в этом репозитории).
+# || true: сбой портала не должен ломать холодный старт окружения.
+if [ -f "$HOME/my-project/aigame4/portal/restore_portal.sh" ]; then
+    bash "$HOME/my-project/aigame4/portal/restore_portal.sh" || true
+fi
+
 echo ""
 echo "═══════════════════════════════════════════════════════════════"
 echo "  COLD START ЗАВЕРШЁН"

@@ -1,0 +1,34 @@
+{
+  "version": "1.1",
+  "updated": "2026-10-19T12:55:00Z",
+  "headline": "Волна 1 аудита закрыта: BUG-001 / VER-001 / GAP-001 — verified · Полная регрессия 23/23 PASS · Портал поднят",
+  "playtest": {
+    "note": "Физический плейтест владельца — после 20:00 МСК 19.10",
+    "window": "2026-10-19 после 20:00"
+  },
+  "build": {
+    "head": "a136aff",
+    "last_verified": "2026-10-19",
+    "result": "dotnet build 0 errors; headless-старт OK",
+    "qa": "Полная регрессия 23/23 PASS (21 дефолт + FORM + RESPAWN) — волна 1, 19.10"
+  },
+  "focus": [
+    "Волна 1 закрыта: каст-эффекты 4 типов техник (BUG-001 — verified)",
+    "Экран смерти игрока (GAP-001 — verified) + барьер формаций починен (VER-001 — verified)",
+    "Новая находка верификации: GAP-009 — Trap-формации без механизма наложения (волна 3)"
+  ],
+  "next": [
+    "Плейтест владельца после 20:00 МСК (19.10)",
+    "Волна 2: крафт-UI (GAP-002), форм-факторы зарядников (GAP-003), NPC-категории (GAP-004)",
+    "Волна 3 (дизайн): события мира (GAP-007), AI-слои (GAP-008), Trap-механика (GAP-009), рост mastery (BUG-002)"
+  ],
+  "portal": {
+    "born": "2026-10-19",
+    "data_sources": [
+      "docs/docs_v2/00_overview/project_map.json",
+      "portal/data/bugs.json",
+      "portal/data/status.json"
+    ],
+    "restore": "bash aigame4/portal/restore_portal.sh"
+  }
+}
