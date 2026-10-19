@@ -3,7 +3,7 @@
 **Дата:** 2026-08-26 (СР), старт 12:49 MSK
 **Сессия:** основная, без субагентов
 **HEAD на старте:** `31d679b` ( synced с origin/main, push 5 коммитов выполнен )
-**План-компаньон:** `checkpoints/plans/08_26_epic_legendary_overcap_and_audit_plan.md`
+**План-компаньон:** `checkpoints/08_26_epic_legendary_overcap_and_audit_plan.md`
 **Чекпоинты аудитов:** `08_26_audit_pass1_architecture.md` (и др. по мере прохождения)
 
 ---

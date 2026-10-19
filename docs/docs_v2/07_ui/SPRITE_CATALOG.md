@@ -206,7 +206,7 @@ Point-фильтрация даёт чёткие пиксельные грани
 ### Equipped-спрайты оружия (реализовано — R15, 2026-09-10)
 
 Система **equipped-спрайтов** для оружия реализована (план
-`checkpoints/plans/2026-09-10_r15_weapon_visualization_plan.md`,
+`checkpoints/09_10_r15_weapon_visualization_plan.md`,
 RimWorld-подобные overlay-слои). Броня — по-прежнему планируется (R16-кандидат).
 
 **Модель:** ключ = `(WeaponClassId, MaterialTier, Rarity)` → пара спрайтов:
@@ -567,7 +567,7 @@ sprites/
 
 ## 23. Мировые VFX боя (R29, 2026-09-21)
 
-> План: checkpoints/plans/2026-09-21_r29_vfx_design.md. Паттерн §22
+> План: checkpoints/09_21_r29_vfx_design.md. Паттерн §22
 > (StrikeFX): процедурно Node2D + _Draw, пул структур, QA-статики в
 > обработчиках событий (headless-совместимо). Цвета — общий
 > `ElementPalette` (единый источник для мировых VFX; UI-панели —

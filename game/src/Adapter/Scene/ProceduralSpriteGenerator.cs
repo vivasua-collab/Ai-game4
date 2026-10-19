@@ -214,7 +214,7 @@ public static class ProceduralSpriteGenerator
     //     Лук — вертикально (в левой руке), 2H — диагональ через корпус.
     // Легендарки+ (Legendary/Mythic) — тонкая золотая обводка свечения.
     // Цвет = материал тира (см. WeaponMaterialPalette). План:
-    // checkpoints/plans/2026-09-10_r15_weapon_visualization_plan.md §1.
+    // checkpoints/09_10_r15_weapon_visualization_plan.md §1.
 
     /// <summary>Палитра материала по тиру (R15 §1.2): iron→steel→spirit→star→void.</summary>
     private static (Color main, Color dark, Color edge) WeaponMaterialPalette(int tier)

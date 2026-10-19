@@ -1,6 +1,6 @@
 #nullable enable
 // Создано: 2026-09-21 — R28 «Хоуминг A: снаряды-сущности» (план
-//   checkpoints/plans/2026-09-20_r23_multicombat_aoe_design.md §3.2-A,
+//   checkpoints/09_20_r23_multicombat_aoe_design.md §3.2-A,
 //   подтверждён пользователем §6.6: Reynolds seek + ограничение поворота).
 //
 // ЗАЧЕМ: самонаведение БЕЗ «turn on a dime» — снаряд не разворачивается

@@ -10,7 +10,7 @@
 - Prefix/postfix runtime-логи были заявлены в чекпоинте, но НЕ закоммичены
   в git-tree R34 → runtime-часть подтверждена «на уровне harness + заявление».
 - **Директива этого эпизода: логи prefix/postfix ОБЯЗАТЕЛЬНО в
-  `checkpoints/logs/` и в коммите.**
+  `checkpoints/` и в коммите.**
 
 ## §1. Реестр фаз 11–14 (новые находки)
 
@@ -153,7 +153,7 @@ P2-37…P2-42, P3-12…14 — весь блок в бэклог (аудитор:
 1. Сим-секции + API-заготовки (TickCatchUpClock в prefix-поведении,
    сигнатура валидатора с опциональными параметрами, helper dash без клэмпа
    — дословный перенос) → **prefix-прогон** (ожидание: DEFECT по каждому P1)
-   → лог в checkpoints/logs/09_22_r35_prefix_audit0922.log (В GIT).
+   → лог в checkpoints/09_22_r35_prefix_audit0922.log (В GIT).
 2. Фиксы §3.
 3. **Постфикс-прогон** → лог (В GIT).
 4. Полная QA-регрессия 19/19 (чанками в foreground), build 0 err.
@@ -186,10 +186,10 @@ P2-37…P2-42, P3-12…14 — весь блок в бэклог (аудитор:
 ### 7.1. Runtime-пруфы (претензия верификатора к R34 — логи теперь В GIT)
 
 - **Prefix** (контракт написан, дефекты ещё в коде):
-  `checkpoints/logs/09_22_r35_prefix_audit0922.log` —
+  `checkpoints/09_22_r35_prefix_audit0922.log` —
   **VERDICT: FAIL, 32 DEFECT** по всем 8 P1 (P1-13…P1-20) + P2-31/32/43/44/45/49.
 - **Postfix** (после фиксов):
-  `checkpoints/logs/09_22_r35_postfix_audit0922.log` —
+  `checkpoints/09_22_r35_postfix_audit0922.log` —
   **VERDICT: PASS, 76 OK, 0 DEFECT.**
 - Сим №19 AUDIT0922 расширен секциями M (time), N (items), O (equipment),
   P (storage rings), Q (stats), R (revive/dash) — 35 новых проверок.

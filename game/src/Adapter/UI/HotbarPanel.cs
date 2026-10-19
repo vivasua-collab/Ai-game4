@@ -49,7 +49,7 @@ namespace CultivationGame.Adapter.UI;
 ///     метка «◉» в углу, тултип «повторный Z/клик = выпуск».
 /// Спуск = повторное нажатие той же клавиши (Z/3-9/клик слота — механика
 /// PlayerTechniqueCaster/AuraHoldService, без изменений).
-/// Источник: план R23 §6.5 (checkpoints/plans/2026-09-20_r23_...md).
+/// Источник: план R23 §6.5 (checkpoints/2026-09-20_r23_...md).
 /// </summary>
 public partial class HotbarPanel : Panel
 {

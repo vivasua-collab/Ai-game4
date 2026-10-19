@@ -1,6 +1,6 @@
 #nullable enable
 // Создано: 2026-09-21 — R25 «AoE-A: мгновенный залп» (план
-//   checkpoints/plans/2026-09-20_r23_multicombat_aoe_design.md §2.2-A,
+//   checkpoints/09_20_r23_multicombat_aoe_design.md §2.2-A,
 //   выбор пользователя 2026-09-21: вариант A, friendly-fire = нейтралы
 //   задеваются, эпицентр = точка прицеливания).
 //

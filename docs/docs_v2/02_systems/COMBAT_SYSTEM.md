@@ -39,7 +39,7 @@
 
 #### 1.4.0. МУЛЬТИБОЙ «реестр входов» (R24-C, 2026-09-21, выбор пользователя)
 
-> План: checkpoints/plans/2026-09-20_r23_multicombat_aoe_design.md §1-C
+> План: checkpoints/09_20_r23_multicombat_aoe_design.md §1-C
 > (вариант C «реестр входов»; B «per-pair сессии» — целевая миграция,
 > «надстройка» +1-2 эпизода). Исследование DF/RimWorld/M&B: §6.1 плана.
 
@@ -317,7 +317,7 @@ qiDensity = 2^(cultivationLevel - 1)
 
 ### 4.4. Площадные техники — AoE «мгновенный залп» (R25, 2026-09-21)
 
-> План: checkpoints/plans/2026-09-20_r23_multicombat_aoe_design.md §2.2-A
+> План: checkpoints/09_20_r23_multicombat_aoe_design.md §2.2-A
 > (вариант A — выбор пользователя; B «живые зоны» — фаза 2). Решения
 > пользователя 2026-09-21: friendly-fire — нейтралы ЗАДЕВАЮТСЯ («мир
 > жесток», месть включается сама); эпицентр — точка прицеливания (курсор).
@@ -370,7 +370,7 @@ qiDensity = 2^(cultivationLevel - 1)
 
 ### 4.5. Выбор цели игрока — Tab-цикл (R27, 2026-09-21)
 
-> План: checkpoints/plans/2026-09-20_r23_multicombat_aoe_design.md §3.1.
+> План: checkpoints/09_20_r23_multicombat_aoe_design.md §3.1.
 > Мультибой R24-C сделал толпу реальной — «ближайший» перестал быть
 > достаточным: игрок выбирает, КОГО бить.
 
@@ -397,7 +397,7 @@ qiDensity = 2^(cultivationLevel - 1)
 
 ### 4.6. Самонаводящиеся снаряды — хоуминг A «снаряды-сущности» (R28, 2026-09-21)
 
-> План: checkpoints/plans/2026-09-20_r23_multicombat_aoe_design.md §3.2-A
+> План: checkpoints/09_20_r23_multicombat_aoe_design.md §3.2-A
 > (вариант A — выбор пользователя, §6.6: Reynolds seek + ограничение
 > поворота). B «отложенный хит» (заглушка без полёта) — не реализовывался.
 
@@ -428,7 +428,7 @@ qiDensity = 2^(cultivationLevel - 1)
 
 ### 4.7. Графика боя (VFX): события → рендереры (R29, 2026-09-21)
 
-> План: checkpoints/plans/2026-09-21_r29_vfx_design.md (роадмап R23 §6.7).
+> План: checkpoints/09_21_r29_vfx_design.md (роадмап R23 §6.7).
 > Носители изданы заранее: AoeImpactEvent (R25), ProjectileSpawnedEvent
 > (R28), HeldTechniqueChangedEvent (Stage 1 — «визуал ауры»).
 

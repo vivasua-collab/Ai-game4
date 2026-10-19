@@ -77,12 +77,12 @@ Charger никогда не был связан с предметами):
 
 ## 3. Пруфы
 
-- **Prefix** (checkpoints/logs/09_23_r37c_prefix_charger.log): статический
+- **Prefix** (checkpoints/09_23_r37c_prefix_charger.log): статический
   слепок ДО правок — charger_window отсутствует во всей input-цепочке,
   ChargerWindow.cs отсутствует, моста QiStoneData→QiStone нет,
   IsBeltEquipped без гейта (73), ChargerInitPhase — стаб; VERDICT: FAIL.
   + скриншот пользователя (VLM): зарядник надет → ряд пояса виден.
-- **Postfix** (checkpoints/logs/09_23_r37c_postfix_charger.log): ChargerSim
+- **Postfix** (checkpoints/09_23_r37c_postfix_charger.log): ChargerSim
   (сим №20, GODOT_CHARGERQA_DEBUG=1) — A1/A2 инфраструктура, B1 честный
   отказ с тостом (предмет не потерян), C1-C4 генерация L3+/надевание/
   гейт пояса (IsBeltEquipped=false при заряднике — РАНЬШЕ true)/режим On,

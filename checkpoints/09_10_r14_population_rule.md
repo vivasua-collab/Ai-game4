@@ -60,7 +60,7 @@ TRANSITION_SYSTEM.md §5.3 «таймер памяти» + §11.1: NPC — по�
 - Живой QA на ПК пользователя (вечер): убедиться, что после зачистки
   население не восполняется, трупы остаются до TTL.
 - R15: концепция+план «отображение оружия в руках» (см.
-  checkpoints/plans/2026-09-10_r15_weapon_visualization_plan.md).
+  checkpoints/09_10_r15_weapon_visualization_plan.md).
 - Будущее: event-pipeline (караван/набег) → TrySpawnEventNpc; travel-pipeline
   → «таймер памяти» локаций (TRANSITION §5.3).
 

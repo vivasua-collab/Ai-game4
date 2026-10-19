@@ -13,7 +13,7 @@ Cultivation World Simulator (Ai-game4), Godot 4.7.2 .NET, C#
 ### 2026-09-22 R35 (фазы 11–14 внешнего аудита 09.22 12:00 — 8 P1 + 6 P2)
 - Источник: upload/audit_09_22_12_00 (верификация R34 принята + Фазы 11–14).
   Претензия верификатора к R34: prefix/postfix логи не были в git — теперь
-  checkpoints/logs/09_22_r35_{prefix,postfix}_audit0922.log коммитятся.
+  checkpoints/09_22_r35_{prefix,postfix}_audit0922.log коммитятся.
 - Сим №19 расширен секциями M/N/O/P/Q/R (+35 проверок): prefix = VERDICT
   FAIL с 32 DEFECT по всем восьми P1, postfix = PASS (76 OK / 0 DEFECT).
 - Закрыто: P1-13 (честный catch-up: TickCatchUpClock + BulkAdvanceTicks +
@@ -59,7 +59,7 @@ Cultivation World Simulator (Ai-game4), Godot 4.7.2 .NET, C#
   слой» по Фазе 10): секция L сима №19 — «guard ПОТЕРЯН в дрене, maxDepth=3»
   (queued self-publish идёт прямой рекурсией). Вердикт не гейтим.
 - Сим №19: +12 проверок (I/J/K) + L; префикс FAIL / постфикс PASS — логи в
-  checkpoints/logs/09_22_r34_*. Ответы аудитору:
+  checkpoints/09_22_r34_*. Ответы аудитору:
   checkpoints/09_22_r34_ext_audit_final_phases.md. Доки: DI_AND_EVENTBUS
   §1.8 (retry-resume + world-reset fail-closed), COMBAT §5, TESTING_RULES.
   **Регрессия 19/19 PASS, build 0 err.** Аудит 09.22 закрыт полностью
@@ -151,7 +151,7 @@ Cultivation World Simulator (Ai-game4), Godot 4.7.2 .NET, C#
   TRADE_SYSTEM.md, аудит 09_06). Хвосты: README:25 «16 модулей»
   (устарело), §2.17 не знает про экономику внутри Trade (R22-1 стабы
   CurrencyExchangeService живут там). → всё в план аудита доков.
-- **`checkpoints/plans/2026-09-21_r31_doc_audit_plan.md` (НОВЫЙ, ПЛАН —
+- **`checkpoints/09_21_r31_doc_audit_plan.md` (НОВЫЙ, ПЛАН —
   обновления НЕ применены по указанию пользователя):** реестр дрейфа
   docs_v2 vs код (r30-1 фиксил 10 пунктов БЕЗ синка доков; R31
   намеренно), 5 проходов (P0 «доки врут»: SAVE_SYSTEM 19→21 блоков +
@@ -216,8 +216,8 @@ Cultivation World Simulator (Ai-game4), Godot 4.7.2 .NET, C#
   RestoreState→bool, legacy AttitudeScore, ConfigureAwait-гард,
   Trade-декомпозиция, Corpse FNV-сид, Initialize-идемпотентность,
   GetAllSaves-мета, сейв-версии, Load-after-Reset)
-- ❌ **План аудита доков R31 — ОБРАБОТАТЬ** (checkpoints/plans/
-  2026-09-21_r31_doc_audit_plan.md: 5 проходов, обновления НЕ применены;
+- ❌ **План аудита доков R31 — ОБРАБОТАТЬ** (checkpoints/09_21_r31_doc_audit_plan.md:
+  5 проходов, обновления НЕ применены;
   +новые дрейф-пункты от R32-фиксов — в следующий проход плана)
 - ❌ R30+ отложено пользователем: мультибой-B, живые зоны AoE-B,
   SpareAllies-ауры (ждут party-систему)

@@ -410,7 +410,7 @@ DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 GODOT_NEWGAME=1 \
 | `checkpoints/09_10_r14_population_rule.md` | Чекпоинт R14 (правило населения) |
 | `checkpoints/09_10_r15_weapon_visuals.md` | Чекпоинт R15 (оружие в руках) |
 | `checkpoints/09_10_r16_combat_ai.md` | Чекпоинт R16 (боевой ИИ + план + аудит D1–D8) |
-| `checkpoints/plans/2026-09-10_r15_weapon_visualization_plan.md` | R15 план (фазы A+B реализованы) |
+| `checkpoints/09_10_r15_weapon_visualization_plan.md` | R15 план (фазы A+B реализованы) |
 | `checkpoints/09_10_r13_full_loot.md` | Чекпоинт R13 (фичи) |
 | `docs/docs_v2/02_systems/COMBAT_SYSTEM.md` | Бой: §1.4.1 ИИ NPC + §1.4.2 стойка G (R16) |
 | `docs/docs_v2/04_entities/NPC_AI_SYSTEM.md` | ИИ NPC: статус реализации R16 в шапке |

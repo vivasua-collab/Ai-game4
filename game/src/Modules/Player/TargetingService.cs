@@ -1,6 +1,6 @@
 #nullable enable
 // Создано: 2026-09-21 — R27 «TargetingService» (план
-//   checkpoints/plans/2026-09-20_r23_multicombat_aoe_design.md §3.1).
+//   checkpoints/09_20_r23_multicombat_aoe_design.md §3.1).
 //
 // ЗАЧЕМ: выбор цели игрока БЕЗ атаки (Tab-цикл). Прежде таргетинг был
 // неявным: каждая система сама искала «ближайшего» (PlayerCombatAdapter.

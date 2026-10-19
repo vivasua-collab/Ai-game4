@@ -13,7 +13,7 @@ cross-system проход). Базлайн аудитора: **R33 70dc4d2** —
 аудитора Фазы 7, без фикса — см. §4).
 
 Runtime-доказательства: префикс-прогон (ДО фиксов, DEFECT-строки) и
-постфикс-прогон (PASS) — `checkpoints/logs/09_22_r34_prefix_audit0922.log` /
+постфикс-прогон (PASS) — `checkpoints/09_22_r34_prefix_audit0922.log` /
 `09_22_r34_postfix_audit0922.log`. Сим №19 AUDIT0922 расширен секциями
 I/J/K (+L-диагностика), 36 проверок.
 
@@ -135,7 +135,7 @@ TryConsumeQi не вызван; K4 контроль Physical: absorbed=80, Ци 
 | K3 P1-12 | Pure→npc: Ци 500→100 → DEFECT | Ци 500→500 → OK |
 | K4 контроль | Physical: absorbed>0, Ци тратится → OK | absorbed=80, Ци 500→100 → OK |
 
-Логи: `checkpoints/logs/09_22_r34_{prefix,postfix}_audit0922.log`
+Логи: `checkpoints/09_22_r34_{prefix,postfix}_audit0922.log`
 (полные прогоны с диагностикой). Вердикты сима: префикс FAIL / постфикс PASS.
 
 ## 4. P2-22 — runtime-диагностика по запросу Фазы 7 (без фикса)

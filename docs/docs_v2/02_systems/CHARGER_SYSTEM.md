@@ -453,7 +453,7 @@ QA: сим №20 `GODOT_CHARGERQA_DEBUG=1` (ChargerSimDebug) — полный п
 анти-дюп (частичный/полный/пустой) → сейв round-trip → пояс-контроль.
 Скриншот: `GODOT_CHARGER_SHOT=<префикс>` (Xvfb+opengl3, Xvfb вручную —
 xvfb-run требует отсутствующий xauth). Логи:
-`checkpoints/logs/09_23_r37c_{prefix,postfix}_charger.log`.
+`checkpoints/09_23_r37c_{prefix,postfix}_charger.log`.
 
 ---
 

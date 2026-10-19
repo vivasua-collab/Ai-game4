@@ -2,7 +2,7 @@
 
 **Дата:** 2026-09-10 (сессия №4, агент Z.ai Code)
 **Тип:** feature (визуальная система, RimWorld-подобные слои экипировки)
-**План:** `checkpoints/plans/2026-09-10_r15_weapon_visualization_plan.md`
+**План:** `checkpoints/09_10_r15_weapon_visualization_plan.md`
   (одобрен пользователем: дефолтные ответы §6, статичные спрайты,
   процедурные текстуры — PNG-ассеты отдельным планом, анимация — фаза C)
 **QA-хук:** `GODOT_WEAPONVIS_DEBUG=1` → VERDICT: PASS

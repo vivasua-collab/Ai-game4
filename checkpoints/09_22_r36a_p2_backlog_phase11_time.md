@@ -74,9 +74,9 @@ R35 закрыл все P1 фаз 11–14. Директива пользоват
 
 ## Пруфы (prefix FAIL / postfix PASS, логи в git)
 
-- Prefix: checkpoints/logs/09_22_r36a_prefix_audit0922.log — 12 S-DEFECT
+- Prefix: checkpoints/09_22_r36a_prefix_audit0922.log — 12 S-DEFECT
   (S2b OK и в старом коде — не гейтит), VERDICT FAIL.
-- Postfix: checkpoints/logs/09_22_r36a_postfix_audit0922.log — 88 OK /
+- Postfix: checkpoints/09_22_r36a_postfix_audit0922.log — 88 OK /
   0 DEFECT, VERDICT PASS.
 - Build 0 errors; полная QA-регрессия 19/19 PASS.
 - Доки: TIME_SYSTEM §4.3-примечание + §4.4 (P2-26…30+P3-11 контракты),
