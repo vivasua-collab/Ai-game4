@@ -1,0 +1,600 @@
+{
+  "version": "1.0-iter1",
+  "updated": "2026-10-19",
+  "format": {
+    "purpose": "Детальная карта проекта (роадмап) — ядро данных для веб-портала «звуковые дорожки»: каждый трек = шкала последовательных этапов (начало → выполненные → текущая позиция → запланированные → финал модуля).",
+    "stage_status": {
+      "done": "выполнено, есть пруф (чекпоинт/коммит/QA-вердикт)",
+      "in_progress": "в работе (текущая позиция трека)",
+      "planned": "запланировано (источник: бэклог/план/спека)",
+      "deferred": "осознанно отложено (причина в note)",
+      "not_started": "не начато (из дальних планов)"
+    },
+    "track_status": {
+      "complete": "финал трека достигнут (возможна только полировка)",
+      "in_progress": "часть этапов выполнена, работа продолжается",
+      "foundation": "инфраструктура готова, основная функциональность впереди",
+      "not_started": "трек не начат"
+    },
+    "progress_rule": "progress_pct = доля выполненных этапов (done) от общего числа этапов трека (без учёта deferred)."
+  },
+  "project": {
+    "title": "Cultivation World Simulator (Ai-game4)",
+    "repo": "https://github.com/vivasua-collab/Ai-game4",
+    "engine": "Godot 4.7.2 .NET (C#, .NET 8), чистый 2D top-down (gl_compatibility)",
+    "vision": "Xianxia cultivation life-sim: Kenshi × RimWorld × cultivation-романы. Однопользовательская песочница, 9 уровней культивации (10 = Вознесение = финал игры).",
+    "architecture": "3-слойная engine-agnostic: Core (DI/EventBus/контракты) → 17 Modules → Entry (10 фаз сборки) → Adapter (Godot). Hub-and-Spoke, tick-based (1 тик = 1 игровая минута).",
+    "head_at_mapping": "1edcbdc (2026-10-18, R41 закрыт)"
+  },
+  "milestones": [
+    { "id": "M0", "title": "Концепт и выбор движка", "status": "done", "window": ["2026-08-10", "2026-08-15"], "summary": "Unity 6.3 → Phaser → решение: Godot 4.7.2 .NET. Архив итераций: docs/, docs_old/." },
+    { "id": "M1", "title": "Перенос Core из Ai-game3", "status": "done", "window": ["2026-08-15", "2026-08-16"], "summary": "Data/Interfaces/Messaging/DI/Events — engine-agnostic ядро, ~130 контрактов." },
+    { "id": "M2", "title": "Игровые системы живые (16 модулей)", "status": "done", "window": ["2026-08-19", "2026-08-28"], "summary": "Body/Qi/Combat/NPC/Inventory/Trade/Quest циклы, спрайты процедурные, QA-симы." },
+    { "id": "M3", "title": "Ревью и внешние аудиты (P1 закрыты)", "status": "done", "window": ["2026-09-03", "2026-09-24"], "summary": "Стадии 2–7 ревью, аудиты 09.11 (14 дефектов) и 09.22 (P1-1…P1-20 + P2-бэклог), save 21 блок, L500 мир основной." },
+    { "id": "M4", "title": "Плейтесты владельца и полировка UX", "status": "in_progress", "window": ["2026-09-25", null], "summary": "Раунды R37→R41 закрыты (23.09, 02.10, 18.10). Следующий физический плейтест — после 20:00 19.10." },
+    { "id": "M5", "title": "Визуальная миграция G1–G5 (спрайты PNG)", "status": "in_progress", "window": ["2026-09-24", null], "summary": "G0-контур готов (аниматоры+загрузчик+реестр 221 позиция), доставлено 2/221 спрайта. I-раунды кода: 4/11 готовы." },
+    { "id": "M6", "title": "Контент и мир (lore, фракции, квесты, экономика)", "status": "not_started", "window": [null, null], "summary": "Широкая контентная программа из концепции §5.1: фракции, секты, события мира, предметы/техники масштабно." },
+    { "id": "M7", "title": "MVP / vertical slice: жизнь культиватора L1→L3", "status": "not_started", "window": [null, null], "summary": "Финальная цель: играбельная песочница (концепция §5.1-1): рождение смертным → развитие → фракции. Критерии будут уточнены." }
+  ],
+  "tracks": [
+    {
+      "id": "core",
+      "group": "A. Инфраструктура",
+      "number": 1,
+      "title": "Ядро Core (DI, EventBus, контракты)",
+      "goal": "Engine-agnostic фундамент: DI-контейнер, EventBus, ~130 readonly-контрактов, data-модели. Смена движка = только Adapter.",
+      "final": "P2-бэклог аудита 09.22 закрыт (остаток: RestoreState→bool, legacy AttitudeScore, ConfigureAwait-гард); zero-GC канон задокументирован и соблюдён.",
+      "status": "in_progress",
+      "progress_pct": 85,
+      "start": { "date": "2026-08-15", "milestone": "Перенос Core из Ai-game3 (08_15_start_transfer)" },
+      "stages": [
+        { "id": "core-s1", "title": "Перенос Data/Constants/Enums/Structs", "status": "done", "window": ["2026-08-15"], "proofs": ["checkpoints/08_15_transfer_core_data.md", "checkpoints/08_15_transfer_progress_core_done.md"] },
+        { "id": "core-s2", "title": "Перенос 30+ сервисных интерфейсов", "status": "done", "window": ["2026-08-15"], "proofs": ["checkpoints/08_15_transfer_core_interfaces.md"] },
+        { "id": "core-s3", "title": "Перенос Messaging/Contracts (~130 событий)", "status": "done", "window": ["2026-08-15"], "proofs": ["checkpoints/08_15_transfer_core_messaging.md"] },
+        { "id": "core-s4", "title": "DI: фикс резолва и регистраций", "status": "done", "window": ["2026-08-15"], "proofs": ["checkpoints/08_15_transfer_done_di_fix_needed.md", "checkpoints/08_15_fix_di_registration.md", "checkpoints/08_15_fix_interface_mismatches.md"] },
+        { "id": "core-s5", "title": "Аудит ядра (pass1: Core/DI/EventBus)", "status": "done", "window": ["2026-08-26"], "proofs": ["checkpoints/08_26_audit_pass1_architecture.md"] },
+        { "id": "core-s6", "title": "EventBus: изоляция исключений + re-entrancy-дрен (P1-5)", "status": "done", "window": ["2026-09-22"], "proofs": ["checkpoints/09_22_r32_external_audit.md", "checkpoints/09_22_r33_ext_audit_phase4.md"] },
+        { "id": "core-s7", "title": "DI: override prune + startup fail-closed + cycle detection (P1-6, P2-12/13/14)", "status": "done", "window": ["2026-09-22"], "proofs": ["checkpoints/09_22_r32_external_audit.md", "checkpoints/09_22_r33_ext_audit_phase4.md"] },
+        { "id": "core-s8", "title": "P2-бэклог аудита 09.22 (10 пунктов)", "status": "in_progress", "window": ["2026-09-22", null], "proofs": ["checkpoints/09_22_r36a_p2_backlog_phase11_time.md", "checkpoints/09_22_r36b_p2_backlog_phase12_items.md"], "note": "Часть P2 закрыта R36a/R36b (time/items/trade); остаток: P2-1 RestoreState→bool, P2-2 legacy AttitudeScore, P2-3 ConfigureAwait-гард, P2-16/17 идемпотентность Initialize, P2-18 версии сейвов, P2-19 Load-after-Reset." }
+      ]
+    },
+    {
+      "id": "qa-infra",
+      "group": "A. Инфраструктура",
+      "number": 2,
+      "title": "QA-инфраструктура (headless-симы, регрессия, VLM)",
+      "goal": "Каждая фича верифицируется headless-симом с VERDICT; регрессия ~2-3 мин; визуальные пруфы через Xvfb-скриншоты + VLM.",
+      "final": "Полный регрессионный набор покрывает все 17 модулей; симы стабильны (0 флапов); VLM-харнес для каждого UI-изменения.",
+      "status": "in_progress",
+      "progress_pct": 75,
+      "start": { "date": "2026-08-19", "milestone": "Первые headless-симы (08_19_full_audit)" },
+      "stages": [
+        { "id": "qa-s1", "title": "Формат QA-симов: env-хук + VERDICT", "status": "done", "window": ["2026-08-19"], "proofs": ["checkpoints/08_19_full_audit.md"] },
+        { "id": "qa-s2", "title": "Раннер регрессии tools/qa_regression.sh", "status": "done", "window": ["2026-09-15"], "proofs": ["checkpoints/09_15_l500_primary_world.md"] },
+        { "id": "qa-s3", "title": "Ревью-стадии 2–7: 7 симов (storage/dot/respawn/quest/…)", "status": "done", "window": ["2026-09-08"], "proofs": ["checkpoints/09_08_review_stages_2-7_final.md", "checkpoints/09_08_external_review_validation.md"] },
+        { "id": "qa-s4", "title": "UI-сессии S1–S5 (HUD, тосты, killfeed, хотбар, стрелки урона)", "status": "done", "window": ["2026-09-04"], "proofs": ["checkpoints/09_04_s1_ui_hud_session1.md", "checkpoints/09_04_s2_toast_stack_lowhp_vignette.md", "checkpoints/09_04_s3_killfeed_attacker_attribution.md", "checkpoints/09_04_s4_hotbar_v2_techniques_cooldowns.md", "checkpoints/09_04_s5_damage_direction_indicator.md"] },
+        { "id": "qa-s5", "title": "Сим №19 Audit0922 (76 проверок, prefix/postfix)", "status": "done", "window": ["2026-09-22"], "proofs": ["checkpoints/09_22_r34_ext_audit_final_phases.md", "checkpoints/09_22_r35_ext_audit_phases_11_14.md"] },
+        { "id": "qa-s6", "title": "Сим №20 ChargerQA, №21 ANIMQA", "status": "done", "window": ["2026-09-23", "2026-09-25"], "proofs": ["checkpoints/09_23_r37c_charger_qi_stones.md", "checkpoints/09_25_g0_sprite_prep.md"] },
+        { "id": "qa-s7", "title": "VLM-харнес: Xvfb+opengl3 скриншоты, UIShot/GODOT_VFX_SHOT", "status": "done", "window": ["2026-09-29", "2026-10-02"], "proofs": ["checkpoints/09_21_r29_vfx_design.md", "checkpoints/10_02_r38_playtest_six_bugs.md"] },
+        { "id": "qa-s8", "title": "Стабилизация флапов (COMBATAI, COMBAT_SIM multi, позиционные гонки)", "status": "done", "window": ["2026-10-02", "2026-10-18"], "proofs": ["checkpoints/10_02_r38_playtest_six_bugs.md", "checkpoints/10_18_r41_playtest_round2.md"] },
+        { "id": "qa-s9", "title": "Флап-иммунитет всех 21+ симов (3 прогона подряд без FAIL)", "status": "planned", "window": [null, null], "note": "COMBATAI стабилизирован R38, но полного многократного прогона всей линейки с фиксацией результата не было." }
+      ]
+    },
+    {
+      "id": "docs",
+      "group": "A. Инфраструктура",
+      "number": 3,
+      "title": "Документация docs_v2 (спека = канон)",
+      "goal": "docs_v2 — первичная спецификация; дрейф код↔доки = баг. Аудит-план R31: 5 проходов синка.",
+      "final": "План аудита доков R31 обработан полностью; дрейф docs_v2 ↔ код = 0 по grep-критериям плана.",
+      "status": "in_progress",
+      "progress_pct": 70,
+      "start": { "date": "2026-08-21", "milestone": "Аудит соответствия доков (08_21_audit4_docs_compliance)" },
+      "stages": [
+        { "id": "docs-s1", "title": "Каркас docs_v2 (00_overview … 10_godot_reference)", "status": "done", "window": ["2026-08-15", "2026-08-21"], "proofs": ["checkpoints/08_15_index_godot_docs.md", "checkpoints/08_15_world_docs_audit.md"] },
+        { "id": "docs-s2", "title": "Аудит качества/соответствия (09_06)", "status": "done", "window": ["2026-09-06"], "proofs": ["checkpoints/09_06_full_audit_architecture_docs_lore_quality.md"] },
+        { "id": "docs-s3", "title": "План аудита доков R31 (реестр дрейфа, 5 проходов)", "status": "done", "window": ["2026-09-21"], "proofs": ["checkpoints/09_21_r31_doc_audit_plan.md"] },
+        { "id": "docs-s4", "title": "Синхронизация после P1/P2-фиксов (TIME, STAT, INVENTORY, COMBAT, DI)", "status": "done", "window": ["2026-09-22", "2026-10-18"], "proofs": ["checkpoints/09_22_r35_ext_audit_phases_11_14.md", "checkpoints/10_18_r41_playtest_round2.md"] },
+        { "id": "docs-s5", "title": "Pass 1–5 плана R31 (доки врут: README 16→17, §2.17, SAVE 19→21 и др.)", "status": "in_progress", "window": ["2026-09-21", null], "proofs": ["checkpoints/09_21_r31_doc_audit_plan.md"], "note": "Обновления применялись попутно в R32-R41; полный прогон проходов плана с приёмкой по grep-критериям не завершён; +новые дрейф-пункты от фиксов R32+." }
+      ]
+    },
+    {
+      "id": "save",
+      "group": "A. Инфраструктура",
+      "number": 4,
+      "title": "Сохранения (Save/Load)",
+      "goal": "Атомарный save/load всего состояния мира: tmp→rename, RestoreOrder, автосейв.",
+      "final": "Версионирование формата (P2-18), Load-after-Reset семантика (P2-19), полная round-trip целостность 21+ блоков при каждом изменении схем.",
+      "status": "in_progress",
+      "progress_pct": 85,
+      "start": { "date": "2026-09-09", "milestone": "R10 SlotId + R11 Save/Load" },
+      "stages": [
+        { "id": "save-s1", "title": "R10: SlotId-адресация (TOCTOU/stale drop)", "status": "done", "window": ["2026-09-09"], "proofs": ["checkpoints/09_09_r10_slotid_toctou.md"] },
+        { "id": "save-s2", "title": "R11: Save/Load round-trip (ревью-этап)", "status": "done", "window": ["2026-09-09"], "proofs": ["checkpoints/09_09_r11_save_load.md"] },
+        { "id": "save-s3", "title": "R17: 19 ISaveable-блоков, RestoreOrder, атомарный tmp→rename, автосейв", "status": "done", "window": ["2026-09-15"], "proofs": ["checkpoints/09_15_r17_save_completeness.md"] },
+        { "id": "save-s4", "title": "r30-1: трупы+full-loot в сейве; R31: npc_relationships — 21 блок", "status": "done", "window": ["2026-09-21"], "proofs": ["checkpoints/09_21_r30_playtest_audit_plan.md", "checkpoints/09_22_r32_external_audit.md"] },
+        { "id": "save-s5", "title": "P1-7/P2-15: честный DeleteSave; санация имён слотов", "status": "done", "window": ["2026-09-22"], "proofs": ["checkpoints/09_22_r32_external_audit.md"] },
+        { "id": "save-s6", "title": "P2-18: версии формата сейва + P2-19: Load-after-Reset", "status": "planned", "window": [null, null], "note": "P2-бэклог аудита 09.22 (чекпоинт 09_22_r32 §4)." },
+        { "id": "save-s7", "title": "P2-16/P2-17: GetAllSaves читает save_meta (UI-список сейвов с датой/версией)", "status": "planned", "window": [null, null], "note": "P2-бэклог аудита 09.22." }
+      ]
+    },
+    {
+      "id": "body",
+      "group": "B. Игровые модули",
+      "number": 5,
+      "title": "Тело (Body, Kenshi-style)",
+      "goal": "Двойная HP (красная/чёрная), 7 морфологий, ампутации, регенерация, материалы тела, SeveredDebuff.",
+      "final": "Все 6+ материалов дают ощутимую разницу; ампутация → долгосрочные последствия (протезы/лечение вне регенерации — при появлении контента); тела всех категорий сущностей (гуманоид/зверь/giant) ощущаются в бою.",
+      "status": "in_progress",
+      "progress_pct": 80,
+      "start": { "date": "2026-08-22", "milestone": "Body impl plan (08_22_body_impl_plan)" },
+      "stages": [
+        { "id": "body-s1", "title": "BodyFactory/TemplateProvider/SpeciesRegistry (11 видов, морфологии)", "status": "done", "window": ["2026-08-22"], "proofs": ["checkpoints/08_22_body_impl_complete.md"] },
+        { "id": "body-s2", "title": "Двойная HP, SplitDamage 70/30, ампутации, регенерация", "status": "done", "window": ["2026-08-22"], "proofs": ["checkpoints/08_22_body_impl_complete.md"] },
+        { "id": "body-s3", "title": "Аудит Body (09.11) + фиксы P1", "status": "done", "window": ["2026-09-11"], "proofs": ["checkpoints/09_11_audit_body.md", "checkpoints/09_11_full_audit_and_p1_fixes.md"] },
+        { "id": "body-s4", "title": "R41-1: каскад овекилла (избыток урона переносится: конечности → витальные; гигантский удар = смерть)", "status": "done", "window": ["2026-10-18"], "proofs": ["checkpoints/10_18_r41_playtest_round2.md"], "note": "Корень «бессмертного оленя»: кламп в одну часть + дискард избытка; смерть была только Head|Heart." },
+        { "id": "body-s5", "title": "Материалы тела в пайплайне урона (NaturalArmor зверей, хитин/эфир/минерал)", "status": "in_progress", "window": [null, null], "note": "R41-аудит: NaturalArmor зверей НЕ участвует (EquipmentDataProvider не знает зверей, Organic=0‰). Частично закрыто R38-4 (CoreCapacity=0 у зверей), остаток — материалы." },
+        { "id": "body-s6", "title": "Протезы/долгосрочные последствия ампутации (SeveredDebuff → контент лечения)", "status": "planned", "window": [null, null], "note": "Ждёт контентную программу M6." }
+      ]
+    },
+    {
+      "id": "qi",
+      "group": "B. Игровые модули",
+      "number": 6,
+      "title": "Ци и культивация (Qi)",
+      "goal": "Ядро Ци (long-арифметика, L9 ~524M), плотность, проводимость, прорывы 0→9, медитация, буфер Ци как щит.",
+      "final": "Полный путь L0→L9→(10 Вознесение = финал игры): пробитие瓶颈 через медитацию/ресурсы, экспонента ядер, атмосфера локаций (Ци среды) влияет на скорость.",
+      "status": "in_progress",
+      "progress_pct": 75,
+      "start": { "date": "2026-08-23", "milestone": "Qi impl (08_23_qi_impl_plan, стадии 1–8)" },
+      "stages": [
+        { "id": "qi-s1", "title": "Ядро/ёмкость/плотность/проводимость (long, 2^(level-1))", "status": "done", "window": ["2026-08-23"], "proofs": ["checkpoints/08_23_qi_stage1_techniques_grant.md", "checkpoints/08_23_qi_stage6_8_final.md"] },
+        { "id": "qi-s2", "title": "Техники: грейты/изучение (стадии 1–2)", "status": "done", "window": ["2026-08-23"], "proofs": ["checkpoints/08_23_qi_stage1_techniques_grant.md", "checkpoints/08_23_qi_stage2_techniques_ui.md"] },
+        { "id": "qi-s3", "title": "Формации: генератор/lifecycle (стадии 3–5) — см. трек formation", "status": "done", "window": ["2026-08-23"], "proofs": ["checkpoints/08_23_qi_stage4_formation_generator.md", "checkpoints/08_23_qi_stage5_formation_lifecycle.md"] },
+        { "id": "qi-s4", "title": "Буфер Ци: авто-RawQi-щит (90/10, 3:1), Pure сквозь Ци (P1-12)", "status": "done", "window": ["2026-09-21", "2026-09-22"], "proofs": ["checkpoints/09_21_r24_multicombat_c_aura_ui.md", "checkpoints/09_22_r34_ext_audit_final_phases.md"] },
+        { "id": "qi-s5", "title": "Медитация: спец-слот ☯, дрейн/резюм вне радиуса", "status": "done", "window": ["2026-09-21"], "proofs": ["checkpoints/09_21_r30_playtest_audit_plan.md"] },
+        { "id": "qi-s6", "title": "Прорывы уровней (breakthrough) как игровая церемония", "status": "planned", "window": [null, null], "note": "Уровни есть (L1..L9 в генераторах, гейты экипировки), но механика самого ПРОРЫВА (условия/событие/риск) не реализована как игровой момент. Ждёт решения владельца по кривой прогрессии." },
+        { "id": "qi-s7", "title": "Ци среды/локаций (geysers, благоприятные зоны)", "status": "planned", "window": [null, null], "note": "IWorldService уже отдаёт Ци локации (TileInspectorOverlay F4 показывает) — расход в медитации/восстановлении не реализован." }
+      ]
+    },
+    {
+      "id": "charger",
+      "group": "B. Игровые модули",
+      "number": 7,
+      "title": "Зарядники и камни Ци (Charger)",
+      "goal": "Поясные зарядники: буфер 50–2000, тепло (5 состояний), проводимость, вставка камней, анти-дюп, инвариант stones−N ⇔ buffer+N.",
+      "final": "5 форм-факторов (belt/bracelet/necklace/ring/backpack), тепло как тактический ресурс в бою, полная интеграция с AI-NPC (зарядники у врагов).",
+      "status": "in_progress",
+      "progress_pct": 70,
+      "start": { "date": "2026-09-11", "milestone": "Аудит Charger (09_11_audit_charger)" },
+      "stages": [
+        { "id": "charger-s1", "title": "Домен: буфер/тепло/слоты/проводимость", "status": "done", "window": ["2026-09-11"], "proofs": ["checkpoints/09_11_audit_charger.md"] },
+        { "id": "charger-s2", "title": "R37c: окно H, мост вставки камней, гейт пояса, анти-дюп, сейв-инвариант MaxQi", "status": "done", "window": ["2026-09-23"], "proofs": ["checkpoints/09_23_r37c_charger_qi_stones.md"] },
+        { "id": "charger-s3", "title": "Инвариант stones−N ⇔ buffer+N (B2/B3) + тосты причин", "status": "done", "window": ["2026-09-21", "2026-10-01"], "proofs": ["checkpoints/09_21_r30_playtest_audit_plan.md", "checkpoints/10_01_r37_cheatequip_postfix.md"] },
+        { "id": "charger-s4", "title": "Форм-факторы кроме Belt (bracelet/necklace/ring/backpack)", "status": "planned", "window": [null, null], "note": "Реализован Belt (пояс); остальные слоты спроектированы (ChargerSlot), контент-генерация не подключена." },
+        { "id": "charger-s5", "title": "Зарядники у NPC/AI", "status": "planned", "window": [null, null], "note": "Ждёт NPC-экипировку экономикой (M6)." }
+      ]
+    },
+    {
+      "id": "combat",
+      "group": "B. Игровые модули",
+      "number": 8,
+      "title": "Бой (Combat)",
+      "goal": "Real-time-with-pause, tick-resolved: 11-слойный пайплайн урона, readiness-модель, мультибой-C, AoE-формы, homing, clash/парирование, Miss от дистанции, каскад овекилла.",
+      "final": "Мультибой-B (участники >2 без UI-сессии пары), живые AoE-B зоны, SpareAllies-ауры (все ждут party-систему), тюнинг NPC-урона по плейтестам; 5 подтипов атак все живые (melee_strike/weapon, ranged_projectile/beam/aoe).",
+      "status": "in_progress",
+      "progress_pct": 80,
+      "start": { "date": "2026-08-19", "milestone": "NPC combat prep (08_19_npc_combat_prep)" },
+      "stages": [
+        { "id": "combat-s1", "title": "11-слойный пайплайн урона + DamageCalculator", "status": "done", "window": ["2026-08-22", "2026-08-26"], "proofs": ["checkpoints/08_22_npc_combat_impl.md", "checkpoints/08_26_audit_pass3_combat_qi.md"] },
+        { "id": "combat-s2", "title": "Ranged (стрелы/LOS/трассеры/боезапас) Phase8p2-3", "status": "done", "window": ["2026-09-03"], "proofs": ["checkpoints/09_03_phase8p2_ranged_starter_kit.md", "checkpoints/09_03_phase8p3_los_ammo_tracer.md"] },
+        { "id": "combat-s3", "title": "Аудит боя 09.11 + animal combat fix", "status": "done", "window": ["2026-09-11"], "proofs": ["checkpoints/09_11_audit_combat.md", "checkpoints/09_11_animal_combat_fix.md"] },
+        { "id": "combat-s4", "title": "M1/M2: per-attacker pending + чит-контроль", "status": "done", "window": ["2026-09-03"], "proofs": ["checkpoints/09_03_m1_per_attacker_pending.md", "checkpoints/09_03_m2_combat_cheats.md"] },
+        { "id": "combat-s5", "title": "R21: readiness-модель (ходы удалены), CLASH-парирование, броня §5.2", "status": "done", "window": ["2026-09-19", "2026-09-20"], "proofs": ["checkpoints/09_19_r20_eight_bugs_plan.md", "checkpoints/09_20_r21_attack_speed.md"] },
+        { "id": "combat-s6", "title": "R23–R25: мультибой-C (реестр входов, толпы) + AoE-A залп (формы int-математика)", "status": "done", "window": ["2026-09-20", "2026-09-21"], "proofs": ["checkpoints/09_20_r23_multicombat_aoe_design.md", "checkpoints/09_21_r24_multicombat_c_aura_ui.md"] },
+        { "id": "combat-s7", "title": "R27–R28: Tab-таргетинг + хоуминг-A (Reynolds seek, turn-budget)", "status": "done", "window": ["2026-09-21"], "proofs": ["checkpoints/09_21_r30_playtest_audit_plan.md"] },
+        { "id": "combat-s8", "title": "R31: LOS звери, AoE в пустую область, хоуминг только к живым, спавн болта из центра тайла", "status": "done", "window": ["2026-09-21"], "proofs": ["checkpoints/09_21_r31_doc_audit_plan.md"] },
+        { "id": "combat-s9", "title": "R39: Miss дальнего оружия от дистанции; кинжал суммируется с кулаком (3+10=13)", "status": "done", "window": ["2026-10-02"], "proofs": ["checkpoints/10_02_r39_playtest_followup.md"] },
+        { "id": "combat-s10", "title": "R41-1: каскад овекилла v2 (конечности до витальных)", "status": "done", "window": ["2026-10-18"], "proofs": ["checkpoints/10_18_r41_playtest_round2.md"] },
+        { "id": "combat-s11", "title": "R40-5b/R41: DamageTraceEvent [DMG] под GODOT_DAMAGE_TRACE=1", "status": "done", "window": ["2026-10-18"], "proofs": ["checkpoints/10_18_r41_playtest_round2.md"] },
+        { "id": "combat-s12", "title": "Мультибой-B + живые AoE-B зоны + SpareAllies-ауры", "status": "deferred", "window": [null, null], "note": "Отложено пользователем (R30+): ждут party-систему. См. трек party." },
+        { "id": "combat-s13", "title": "NPC-урон тюнинг (баланс плейтестов)", "status": "planned", "window": [null, null], "note": "Архитектурный долг из SESSION_SUMMARY; калибруется по плейтестам M4." },
+        { "id": "combat-s14", "title": "ranged_beam (5-й подтип атак)", "status": "planned", "window": [null, null], "note": "Концепция §3.4: 5 подтипов; beam не реализован (homing/AoE/projectile/strike — есть)." }
+      ]
+    },
+    {
+      "id": "techniques",
+      "group": "B. Игровые модули",
+      "number": 9,
+      "title": "Техники (генерация «Матрёшка», изучение, каст, слоты)",
+      "goal": "Изучаемые техники: тип/подтип/грейд/мастерство; генерация по принципу Матрёшка (Base×Grade×Spec); слоты 1–9 + спец-слот ☯; drag&drop из Книги Техник.",
+      "final": "Все типы техник из спеки (боевые/защитные/лечебные/движущие/сенсорные/проклятые) реализованы и генерируются; мастерство растёт от использования; книга техник полная.",
+      "status": "in_progress",
+      "progress_pct": 70,
+      "start": { "date": "2026-08-23", "milestone": "Qi стадии 1–2 (грант+UI)" },
+      "stages": [
+        { "id": "tech-s1", "title": "Генератор техник (База×Грейд×Специализация, ultimate ×2)", "status": "done", "window": ["2026-08-23"], "proofs": ["checkpoints/08_23_qi_stage1_techniques_grant.md"] },
+        { "id": "tech-s2", "title": "Каст: charge/cooldown/Qi-cost, hold&release (аура удержания)", "status": "done", "window": ["2026-08-25"], "proofs": ["checkpoints/08_25_technique_hold_impl.md"] },
+        { "id": "tech-s3", "title": "Книга техник + слот-бар 3–9 (назначение)", "status": "done", "window": ["2026-08-28"], "proofs": ["checkpoints/08_28_technique_book_and_ui_cleanup.md"] },
+        { "id": "tech-s4", "title": "R38-6: книга техник layout (PanelContainer-блоки, скролл)", "status": "done", "window": ["2026-10-02"], "proofs": ["checkpoints/10_02_r38_playtest_six_bugs.md"] },
+        { "id": "tech-s5", "title": "R41-7/R41-8: K-окно без вкладки Техники; drag&drop чип→слот + тост причин", "status": "done", "window": ["2026-10-18"], "proofs": ["checkpoints/10_18_r41_playtest_round2.md"] },
+        { "id": "tech-s6", "title": "Мастерство техник (mastery 0–100% растёт от использования)", "status": "in_progress", "window": [null, null], "note": "Mastery есть в формулах (capacity ×(1+mastery×0.005), R41-аудит), но рост от использования не подтверждён — итерация 2 проверит." },
+        { "id": "tech-s7", "title": "Недостающие типы: сенсорные/проклятые/движущие (dash есть?)", "status": "planned", "window": [null, null], "note": "Спека §3.5: 6 категорий. Движущие (dash) — в спрайт-плане I-4 (визуализация). Итерация 2 сверит реализованные типы." }
+      ]
+    },
+    {
+      "id": "formation",
+      "group": "B. Игровые модули",
+      "number": 10,
+      "title": "Формации (магические массивы)",
+      "goal": "Массивы на земле: контур, пул Ци, зарядка практиками, бонусы в зоне, Disk/Altar носители.",
+      "final": "До 50 помощников вносят Ци; ловушки/барьеры; размеры до 300×300 (L6+); FormationCore Disk (L1–L6) и Altar (L5–L9) как предметы.",
+      "status": "in_progress",
+      "progress_pct": 65,
+      "start": { "date": "2026-08-23", "milestone": "Qi стадии 3–5 (генератор/lifecycle)" },
+      "stages": [
+        { "id": "form-s1", "title": "Генератор формаций + lifecycle (активация/пул/контур)", "status": "done", "window": ["2026-08-23"], "proofs": ["checkpoints/08_23_qi_stage4_formation_generator.md", "checkpoints/08_23_qi_stage5_formation_lifecycle.md"] },
+        { "id": "form-s2", "title": "Аудит Formation (09.11)", "status": "done", "window": ["2026-09-11"], "proofs": ["checkpoints/09_11_audit_formation.md"] },
+        { "id": "form-s3", "title": "R30 П1-П3/П7: тёмная подложка (контраст), радиус зарядки (пауза дрейна), FullDescription, guard триангуляции", "status": "done", "window": ["2026-09-21"], "proofs": ["checkpoints/09_21_r30_playtest_audit_plan.md"] },
+        { "id": "form-s4", "title": "Бонусы формаций в бою (аура, спуск по techniqueId B5)", "status": "done", "window": ["2026-09-21"], "proofs": ["checkpoints/09_21_r24_multicombat_c_aura_ui.md", "checkpoints/09_21_r30_playtest_audit_plan.md"] },
+        { "id": "form-s5", "title": "Помощники вносят Ци (до 50 практиков)", "status": "planned", "window": [null, null], "note": "Зарядка одиночная работает (R30); участие других NPC/игроков в зарядке — не реализовано. Проверить в итерации 2." },
+        { "id": "form-s6", "title": "FormationCore предметы: Disk/Altar (переносной/стационарный)", "status": "planned", "window": [null, null], "note": "Спека §3.6. Проверить в итерации 2, есть ли предметы-носители." },
+        { "id": "form-s7", "title": "Ловушки/барьеры как типы формаций", "status": "planned", "window": [null, null], "note": "Спека §3.6: барьеры, ловушки, усиление культивации в зоне. Боевые бонусы есть; барьер/ловушка — нет." }
+      ]
+    },
+    {
+      "id": "buff",
+      "group": "B. Игровые модули",
+      "number": 11,
+      "title": "Баффы и DoT (Buff)",
+      "goal": "28 типов, 5 категорий, мягкие капы, иммунитеты (BF-A03), DoT (Poison/Burn/Bleed/Freeze) с реальным уроном.",
+      "final": "Полный контент статусов (элементные, окружение, культивационные), визуальная индикация активных баффов, диспел/резисты у NPC.",
+      "status": "in_progress",
+      "progress_pct": 75,
+      "start": { "date": "2026-08-26", "milestone": "Audit pass4 (kernel modules)" },
+      "stages": [
+        { "id": "buff-s1", "title": "BuffService/Calculator/TickProcessor, мягкие капы, иммунитеты", "status": "done", "window": ["2026-08-26"], "proofs": ["checkpoints/08_26_audit_pass4_kernel_modules.md"] },
+        { "id": "buff-s2", "title": "Аудит Buff (09.11) + B6 дабл-стек фикс", "status": "done", "window": ["2026-09-11", "2026-09-21"], "proofs": ["checkpoints/09_11_audit_buff.md", "checkpoints/09_21_r30_playtest_audit_plan.md"] },
+        { "id": "buff-s3", "title": "DoT наносит реальный урон через DamageAppliedEvent (ревью-этап-5)", "status": "done", "window": ["2026-09-08"], "proofs": ["checkpoints/09_08_review_stages_2-7_final.md"] },
+        { "id": "buff-s4", "title": "Визуальная индикация активных баффов (панель/иконки)", "status": "planned", "window": [null, null], "note": "Активные баффы в API есть (GetActiveBuffs), UI-панели статусов нет." },
+        { "id": "buff-s5", "title": "Контент статусов: элементные/окружение/культивационные", "status": "planned", "window": [null, null], "note": "28 значений enum есть; сколько реально НАНОСИТСЯ источниками — итерация 2." }
+      ]
+    },
+    {
+      "id": "npc",
+      "group": "B. Игровые модули",
+      "number": 12,
+      "title": "NPC: спавн, группы, отношения, перки, трупы",
+      "goal": "Спавн-композиция по ролям (8 ролей), группы (банды), отношения (AttitudeScore→мутации), перки, трупы с full-loot, популяция не восполняется.",
+      "final": "Три категории NPC (Temp/Plot/Unique) с разной персистентностью; экипировка NPC из экономики; флористика городов/лагерей; NPC живут своей жизнью (расписания, потребности).",
+      "status": "in_progress",
+      "progress_pct": 70,
+      "start": { "date": "2026-08-19", "milestone": "NPC combat prep" },
+      "stages": [
+        { "id": "npc-s1", "title": "NPCService/Spawner/Composition (12 NPC/6 ролей, детерминизм)", "status": "done", "window": ["2026-08-19", "2026-08-22"], "proofs": ["checkpoints/08_19_npc_combat_prep.md", "checkpoints/08_22_npc_combat_impl.md"] },
+        { "id": "npc-s2", "title": "Аудит NPC (09.11) + P1-3 zero-GC hot path", "status": "done", "window": ["2026-09-11", "2026-09-22"], "proofs": ["checkpoints/09_11_audit_npc.md", "checkpoints/09_22_r32_external_audit.md"] },
+        { "id": "npc-s3", "title": "R13/R14: трупы full-loot, популяция не восполняется", "status": "done", "window": ["2026-09-10"], "proofs": ["checkpoints/09_10_r13_full_loot.md", "checkpoints/09_10_r14_population_rule.md"] },
+        { "id": "npc-s4", "title": "R31: NPCRelationshipService IWorldResettable+ISaveable (обида −15 round-trip)", "status": "done", "window": ["2026-09-21"], "proofs": ["checkpoints/09_21_r30_playtest_audit_plan.md"] },
+        { "id": "npc-s5", "title": "R41: банды бандитов (враждебные группы), плотность 109 на 500×500", "status": "done", "window": ["2026-10-18"], "proofs": ["checkpoints/10_18_r41_playtest_round2.md"] },
+        { "id": "npc-s6", "title": "P2-2: убрать legacy AttitudeScore после миграции сейвов", "status": "planned", "window": [null, null], "note": "P2-бэклог + план аудита доков R31 §6." },
+        { "id": "npc-s7", "title": "Категории Temp/Plot/Unique (разная персистентность)", "status": "planned", "window": [null, null], "note": "Спека §3.7: три категории. Сейчас все NPC одинаково в сейве — итерация 2 проверит." },
+        { "id": "npc-s8", "title": "Экипировка/экономика NPC + расписание жизни", "status": "planned", "window": [null, null], "note": "Дальний план M6: NPC получают лут из генератора (есть базово), но не торгуют/не производят." }
+      ]
+    },
+    {
+      "id": "npc-ai",
+      "group": "B. Игровые модули",
+      "number": 13,
+      "title": "NPC AI (нервная система)",
+      "goal": "3-tier: Spinal (рефлексы: уклон/щит/бегство) + Neural Router + Brain Controller; Behavior Tree; 15 состояний; 8 черт личности.",
+      "final": "Полный Behavior Tree с 15 AI-состояниями; Neural Router маршрутизирует сигналы; личности влияют на весь спектр решений; leash, патрули, тревога групп.",
+      "status": "in_progress",
+      "progress_pct": 45,
+      "start": { "date": "2026-09-10", "milestone": "R16 боевой ИИ" },
+      "stages": [
+        { "id": "ai-s1", "title": "R16: месть (Attacking/Fleeing по личности), селектор защит (щит→Block/силовик→Parry/прочие→Dodge)", "status": "done", "window": ["2026-09-10"], "proofs": ["checkpoints/09_10_r16_combat_ai.md"] },
+        { "id": "ai-s2", "title": "R16: бегство HP<20%, leash AggroRadius×3, disengage", "status": "done", "window": ["2026-09-10"], "proofs": ["checkpoints/09_10_r16_combat_ai.md"] },
+        { "id": "ai-s3", "title": "Мультибой-C: NPC-NPC бои без слота, месть Threats, ретрай-удары", "status": "done", "window": ["2026-09-21"], "proofs": ["checkpoints/09_21_r24_multicombat_c_aura_ui.md"] },
+        { "id": "ai-s4", "title": "Погоня: ChaseRange 15-20, grace, ranged-погоня зверей 3т/тик", "status": "done", "window": ["2026-10-02", "2026-10-18"], "proofs": ["checkpoints/10_02_r38_playtest_six_bugs.md", "checkpoints/10_18_r41_playtest_round2.md"] },
+        { "id": "ai-s5", "title": "Spinal AI рефлексы: систематизация (уклон ИИ выбирает сам каждый удар)", "status": "in_progress", "window": [null, null], "note": "Селектор защит работает при DefenseIntent; автономный спинной слой (уклон без команды) — частично. Итерация 2." },
+        { "id": "ai-s6", "title": "Behavior Tree + 15 состояний (Selector→Sequence→Condition→Action)", "status": "planned", "window": [null, null], "note": "Архитектурный каркас описан в спеке; в коде — сервисные реакции на события, полного BT нет." },
+        { "id": "ai-s7", "title": "Neural Router (10–50 мс маршрутизация сигналов)", "status": "planned", "window": [null, null], "note": "Спека §3.7 tier-2. В коде не выделен как слой." },
+        { "id": "ai-s8", "title": "Brain Controller (100–500 мс сложные решения)", "status": "planned", "window": [null, null], "note": "Спека §3.7 tier-3." }
+      ]
+    },
+    {
+      "id": "animals",
+      "group": "B. Игровые модули",
+      "number": 14,
+      "title": "Звери (AnimalService, в модуле NPC)",
+      "goal": "Дикие звери: мирные/хищники, погоня, HP-бары, трупы с камнями, плотность по биомам.",
+      "final": "Экосистема: хищники охотятся на травоядных, популяция восстанавливается со временем, редкие звери (boss-тиры), приручение (дальний план).",
+      "status": "in_progress",
+      "progress_pct": 75,
+      "start": { "date": "2026-09-11", "milestone": "Animal combat fix" },
+      "stages": [
+        { "id": "anim-s1", "title": "Бой с животными end-to-end (таргетинг Space, месть, труп «Волк», killfeed)", "status": "done", "window": ["2026-09-11"], "proofs": ["checkpoints/09_11_animal_combat_fix.md"] },
+        { "id": "anim-s2", "title": "R18-1: HP-бары врагов + тумблер ShowEnemyVitals", "status": "done", "window": ["2026-09-19"], "proofs": ["checkpoints/09_19_r18_enemy_vitals.md"] },
+        { "id": "anim-s3", "title": "R38-4: звери CoreCapacity=0 (RawQi-щит выключен; двойной грейд-мультипликатор убран)", "status": "done", "window": ["2026-10-02"], "proofs": ["checkpoints/10_02_r38_playtest_six_bugs.md"] },
+        { "id": "anim-s4", "title": "R41: плотность ×3.3 (100 зверей на 500×500), погоня 3т/тик, LOS-звери", "status": "done", "window": ["2026-10-18"], "proofs": ["checkpoints/10_18_r41_playtest_round2.md"] },
+        { "id": "anim-s5", "title": "Экосистема: хищник охотится на травоядного, восстановление популяции", "status": "planned", "window": [null, null], "note": "Популяция зверей сейчас не восполняется (аналогично NPC R14); хищная пища-цепочка не моделируется." },
+        { "id": "anim-s6", "title": "Боссы/редкие звери", "status": "planned", "window": [null, null], "note": "Контент M6." }
+      ]
+    },
+    {
+      "id": "player",
+      "group": "B. Игровые модули",
+      "number": 15,
+      "title": "Игрок (ввод, движение, сон, стойки)",
+      "goal": "Клавиатурно-мышное управление, grid-движение (плавное), сон (закрепление статов), боевые стойки (G), dash.",
+      "final": "Полный набор действий из спеки: движение 8 направлений, взаимодействие E, стойки, сон в кроватях/лагере, dash-техника, ревайв.",
+      "status": "in_progress",
+      "progress_pct": 80,
+      "start": { "date": "2026-08-20", "milestone": "Mouse input fix" },
+      "stages": [
+        { "id": "player-s1", "title": "Мышь/клавиатура: ввод и фокусы (фикс 08_20)", "status": "done", "window": ["2026-08-20"], "proofs": ["checkpoints/08_20_mouse_input_fix.md"] },
+        { "id": "player-s2", "title": "Аудит Player (09.11) + lifecycle B1 (TargetingService, PlayerCombatAdapter)", "status": "done", "window": ["2026-09-11", "2026-09-21"], "proofs": ["checkpoints/09_11_audit_player.md", "checkpoints/09_21_r30_playtest_audit_plan.md"] },
+        { "id": "player-s3", "title": "Стойки G (DefenseIntent), ревайв (P2-44 оживляет тело), dash-кламп границ", "status": "done", "window": ["2026-09-22"], "proofs": ["checkpoints/09_22_r36b_p2_backlog_phase12_items.md"] },
+        { "id": "player-s4", "title": "Сон: StartSleep 8ч→480 тиков→авто-вейк + закрепление статов (P1-20)", "status": "done", "window": ["2026-09-22"], "proofs": ["checkpoints/09_22_r35_ext_audit_phases_11_14.md"] },
+        { "id": "player-s5", "title": "Смерть игрока: экран/респавн-флоу", "status": "in_progress", "window": [null, null], "note": "NotifyRespawn есть в аниматоре (G0); полный UX смерти (экран, место возрождения, потери) — итерация 2 проверит." }
+      ]
+    },
+    {
+      "id": "stats",
+      "group": "B. Игровые модули",
+      "number": 16,
+      "title": "Развитие персонажа (статы, пороги, сон)",
+      "goal": "4 первичных стата (STR/AGI/VIT/INT), порог floor(stat/10), виртуальная дельта, закрепление сном (4–8ч, +0.20 макс), кап 1000.",
+      "final": "Прогрессия ощущается: тренировки дают рост, сон закрепляет, лист персонажа показывает; вторичные статы пересчитываются.",
+      "status": "in_progress",
+      "progress_pct": 80,
+      "start": { "date": "2026-09-22", "milestone": "P1-20 stat pipeline (Фаза 14)" },
+      "stages": [
+        { "id": "stats-s1", "title": "Продюсеры §5.1/§5.2 (удар→STR, уклон→AGI, урон→VIT, техника/медитация→INT)", "status": "done", "window": ["2026-09-22"], "proofs": ["checkpoints/09_22_r35_ext_audit_phases_11_14.md"] },
+        { "id": "stats-s2", "title": "ConsolidateSleep §6.2/§6.4 (порог, остаток, <4ч нет, капы)", "status": "done", "window": ["2026-09-22"], "proofs": ["checkpoints/09_22_r35_ext_audit_phases_11_14.md"] },
+        { "id": "stats-s3", "title": "Лист персонажа: вкладка Характеристики с прогрессом (R38-5)", "status": "done", "window": ["2026-10-02"], "proofs": ["checkpoints/10_02_r38_playtest_six_bugs.md"] },
+        { "id": "stats-s4", "title": "Тренировочные активности (докачка статов вне боя)", "status": "planned", "window": [null, null], "note": "Прогресс от боевых действий есть; тренировки (качалка/бег/медитация-интенсив) как источники — итерация 2/контент." }
+      ]
+    },
+    {
+      "id": "inventory",
+      "group": "B. Игровые модули",
+      "number": 17,
+      "title": "Инвентарь, экипировка, крафт, хранилища",
+      "goal": "Стаки (SlotId-адресация), кукла экипировки, гейты (RequiredCultivationLevel, StatRequirements), overweight, крафт, spiritual storage, StorageRing.",
+      "final": "Крафт как полноценная система (рецепты, станции); хранение в домах/складах; полная матрёшка экипировки на теле (G4 спрайты).",
+      "status": "in_progress",
+      "progress_pct": 80,
+      "start": { "date": "2026-08-19", "milestone": "Character doll (08_19_character_doll)" },
+      "stages": [
+        { "id": "inv-s1", "title": "Кукла персонажа + drag&drop экипировки", "status": "done", "window": ["2026-08-19"], "proofs": ["checkpoints/08_19_character_doll.md"] },
+        { "id": "inv-s2", "title": "Аудит Inventory (09.11) + ревью-этап-4 транзакции (P0-1/P1-2..5)", "status": "done", "window": ["2026-09-08", "2026-09-11"], "proofs": ["checkpoints/09_11_audit_inventory.md", "checkpoints/09_08_review_stages_2-7_final.md"] },
+        { "id": "inv-s3", "title": "Overweight система (вес/переноска 50/100)", "status": "done", "window": ["2026-08-21"], "proofs": ["checkpoints/08_21_overweight_system.md"] },
+        { "id": "inv-s4", "title": "Гейты экипировки P1-17/P1-18 (уровень/статы/двуручное) + тост причин (R37 U2)", "status": "done", "window": ["2026-09-22", "2026-10-01"], "proofs": ["checkpoints/09_22_r35_ext_audit_phases_11_14.md", "checkpoints/10_01_r37_cheatequip_postfix.md"] },
+        { "id": "inv-s5", "title": "P1-16 counter-based ItemId (коллизии 5/1005) + валидация RestoreState", "status": "done", "window": ["2026-09-22"], "proofs": ["checkpoints/09_22_r36b_p2_backlog_phase12_items.md"] },
+        { "id": "inv-s6", "title": "P1-19 StorageRing ISaveable+IWorldResettable", "status": "done", "window": ["2026-09-22"], "proofs": ["checkpoints/09_22_r35_ext_audit_phases_11_14.md"] },
+        { "id": "inv-s7", "title": "ПКМ-контекст: разделение стака, потребление (R19), слайдер", "status": "done", "window": ["2026-09-09", "2026-09-19"], "proofs": ["checkpoints/09_09_r10_slotid_toctou.md", "checkpoints/09_19_r19_consumables_use.md"] },
+        { "id": "inv-s8", "title": "Крафт: рецепты/станции/прогресс", "status": "planned", "window": [null, null], "note": "ICraftingService есть (ревью-этап-4 craft overflow P1-4), но контент рецептов и UI крафта — итерация 2 проверит глубину." }
+      ]
+    },
+    {
+      "id": "trade-economy",
+      "group": "B. Игровые модули",
+      "number": 18,
+      "title": "Торговля и экономика",
+      "goal": "Лавки NPC: сток, цены, покупка/продажа, тотал в long, saturating-арифметика валюты; канон 1 камень = 100 золота.",
+      "final": "Живая экономика: кошельки NPC, ассортимент зависит от локации/фракции, покупка лута игроком влияет на сток, CurrencyExchange проводки; декомпозиция TradeService (P2-4).",
+      "status": "in_progress",
+      "progress_pct": 60,
+      "start": { "date": "2026-08-25", "milestone": "Phase 7–8 trade (08_25)" },
+      "stages": [
+        { "id": "trade-s1", "title": "Trade циклы: лавка, покупка/продажа, UX (S6)", "status": "done", "window": ["2026-08-25", "2026-09-04"], "proofs": ["checkpoints/08_25_phase7_8_trade.md", "checkpoints/09_04_s2_toast_stack_lowhp_vignette.md"] },
+        { "id": "trade-s2", "title": "Аудит Trade (09.11) + P1-1 IWorldResettable (сток/сессия)", "status": "done", "window": ["2026-09-11", "2026-09-22"], "proofs": ["checkpoints/09_11_audit_trade.md", "checkpoints/09_22_r32_external_audit.md"] },
+        { "id": "trade-s3", "title": "R22-1: канон 1 камень=100 золота, CurrencyExchange стабы, смертным не владеть камнями", "status": "done", "window": ["2026-09-20"], "proofs": ["checkpoints/09_20_r22_economy_stubs.md"] },
+        { "id": "trade-s4", "title": "R36-b: валютная saturating-арифметика, тотал в long, RestoreState-валидация", "status": "done", "window": ["2026-09-22"], "proofs": ["checkpoints/09_22_r36b_p2_backlog_phase12_items.md"] },
+        { "id": "trade-s5", "title": "R39-3: Lx-префиксы в лавке (FormatItemName)", "status": "done", "window": ["2026-10-02"], "proofs": ["checkpoints/10_02_r39_playtest_followup.md"] },
+        { "id": "trade-s6", "title": "P2-4: декомпозиция TradeService (Session/Stock/Pricing/Exchange)", "status": "planned", "window": [null, null], "note": "P2-бэклог: при развитии экономики." },
+        { "id": "trade-s7", "title": "Кошельки NPC + проводки + динамический ассортимент", "status": "planned", "window": [null, null], "note": "Архитектурный долг из SESSION_SUMMARY: золотой кошелёк/проводка экономики (стабы готовы)." }
+      ]
+    },
+    {
+      "id": "quest",
+      "group": "B. Игровые модули",
+      "number": 19,
+      "title": "Квесты",
+      "goal": "Цикл: accept (диалог старейшины) → событие → complete → reward; гейты RequiredCultivationLevel.",
+      "final": "Контентная программа квестов (основные линии секты, побочные, репутационные); цепочки с выбором; награды уникальными предметами.",
+      "status": "in_progress",
+      "progress_pct": 55,
+      "start": { "date": "2026-09-08", "milestone": "Ревью-этап-7 (стадия 7)" },
+      "stages": [
+        { "id": "quest-s1", "title": "Полный цикл квеста end-to-end (ревью-этап-7)", "status": "done", "window": ["2026-09-08"], "proofs": ["checkpoints/09_08_review_stages_2-7_final.md"] },
+        { "id": "quest-s2", "title": "Аудит Quest (09.11): ID/награды", "status": "done", "window": ["2026-09-11"], "proofs": ["checkpoints/09_11_audit_quest.md"] },
+        { "id": "quest-s3", "title": "Контент квестов (линии секты, цепочки)", "status": "planned", "window": [null, null], "note": "Работает цикл на тестовых квестах; контентная программа — M6 (см. трек content)." }
+      ]
+    },
+    {
+      "id": "interaction",
+      "group": "B. Игровые модули",
+      "number": 20,
+      "title": "Диалоги и взаимодействия",
+      "goal": "Диалоговые окна (геометрия/fit/индикатор/выбор), ПКМ-взаимодействия, IDialogueService lifecycle.",
+      "final": "Ветвящиеся диалоги с условиями (репутация/уровень), торговля/квесты из диалога, узлы-события; взаимодействия с объектами мира (двери, кровати, станции).",
+      "status": "in_progress",
+      "progress_pct": 55,
+      "start": { "date": "2026-09-11", "milestone": "Аудит Interaction" },
+      "stages": [
+        { "id": "inter-s1", "title": "Аудит Interaction/Dialogue (09.11) + lifecycle (reuse EndDialogue)", "status": "done", "window": ["2026-09-11", "2026-09-21"], "proofs": ["checkpoints/09_11_audit_interaction.md", "checkpoints/09_21_r30_playtest_audit_plan.md"] },
+        { "id": "inter-s2", "title": "S6: диалог-окно UX (fit, индикатор, выбор, Esc)", "status": "done", "window": ["2026-09-04"], "proofs": ["checkpoints/09_04_s2_toast_stack_lowhp_vignette.md"] },
+        { "id": "inter-s3", "title": "Ветвящиеся диалоги с условиями + контент", "status": "planned", "window": [null, null], "note": "Механика выбора есть; глубина ветвления и контент — M6." }
+      ]
+    },
+    {
+      "id": "world",
+      "group": "B. Игровые модули",
+      "number": 21,
+      "title": "Мир, тайлы, ресурсы, время",
+      "goal": "Карта 500×500 (осн.) / 50×50 (полигон), биомы, ресурсы с истощением/респавном 7 дней, время 4 скорости + catch-up, пояс жизни, терраин-скорость с гейтом L5.",
+      "final": "Сектора 10×10км и чанки сохранения 100×100км (масштаб концепции §2); фракции/секты; события мира (IEventService контент); подземелья (см. трек dungeons); мегаполис 2000 NPC.",
+      "status": "in_progress",
+      "progress_pct": 65,
+      "start": { "date": "2026-08-19", "milestone": "Perf 500×500 (08_19)" },
+      "stages": [
+        { "id": "world-s1", "title": "TileModule: сетка, биомы, генерация 500×500", "status": "done", "window": ["2026-08-19"], "proofs": ["checkpoints/08_19_perf_500x500.md"] },
+        { "id": "world-s2", "title": "Ресурсы: harvest, истощение→7 дней→восстановление (ревью-этап-6)", "status": "done", "window": ["2026-09-08"], "proofs": ["checkpoints/09_08_review_stages_2-7_final.md"] },
+        { "id": "world-s3", "title": "Ground items + аудит World/Tile (09.11)", "status": "done", "window": ["2026-08-21", "2026-09-11"], "proofs": ["checkpoints/08_21_ground_items.md", "checkpoints/09_11_audit_world_tile.md"] },
+        { "id": "world-s4", "title": "P1-13/14/15: time catch-up (инвариант Σdelta×speed), ResetWorld сброс Speed, календарь", "status": "done", "window": ["2026-09-22"], "proofs": ["checkpoints/09_22_r35_ext_audit_phases_11_14.md", "checkpoints/09_22_r36a_p2_backlog_phase11_time.md"] },
+        { "id": "world-s5", "title": "L500: мир 500×500 основной, пояс жизни, MaxActiveNPCs", "status": "done", "window": ["2026-09-15"], "proofs": ["checkpoints/09_15_l500_primary_world.md"] },
+        { "id": "world-s6", "title": "R41: терраин-скорость (штрафы биома L1–4, иммунитет L5+), селектор генерации", "status": "done", "window": ["2026-10-18"], "proofs": ["checkpoints/10_18_r41_playtest_round2.md"] },
+        { "id": "world-s7", "title": "Фракции/секты (IWorldService локации)", "status": "planned", "window": [null, null], "note": "Локации в API есть (пояс жизни); фракции как система (репутация, войны) — не реализованы. M6." },
+        { "id": "world-s8", "title": "События мира (IEventService контент: караваны уже?)", "status": "in_progress", "window": [null, null], "note": "TrySpawnEventNpc(Caravan) работает (R14); систематический генератор событий мира — итерация 2 проверит." },
+        { "id": "world-s9", "title": "Чанки/сектора (масштаб концепции: мир 200к×200км)", "status": "planned", "window": [null, null], "note": "Дальний план: сейчас один тайловый массив 500×500 без чанкинга." }
+      ]
+    },
+    {
+      "id": "loot-death",
+      "group": "B. Игровые модули",
+      "number": 22,
+      "title": "Смерть, трупы, лут",
+      "goal": "CorpseService: труп-контейнер, окно обыска, SlotId-взятие, full-loot, TTL, сейв трупов.",
+      "final": "Смерть NPC/зверей даёт полный лут (экипировка на теле видна), разложение трупов со временем, лут-gen привязан к роли/уровню.",
+      "status": "in_progress",
+      "progress_pct": 75,
+      "start": { "date": "2026-09-10", "milestone": "R13 full loot" },
+      "stages": [
+        { "id": "loot-s1", "title": "R13: full-loot (12 NPC/6 ролей, труп-контейнер, окно обыска, TTL)", "status": "done", "window": ["2026-09-10"], "proofs": ["checkpoints/09_10_r13_full_loot.md"] },
+        { "id": "loot-s2", "title": "P1-4: CorpseService контракт IWorldResettable; r30-1: трупы в сейве", "status": "done", "window": ["2026-09-21"], "proofs": ["checkpoints/09_22_r32_external_audit.md", "checkpoints/09_21_r30_playtest_audit_plan.md"] },
+        { "id": "loot-s3", "title": "P2-5: FNV-1a вместо GetHashCode (кросс-процессный детерминизм лута)", "status": "planned", "window": [null, null], "note": "P2-бэклог аудита 09.22." },
+        { "id": "loot-s4", "title": "Разложение трупов (визуальное/временное)", "status": "planned", "window": [null, null], "note": "TTL есть (исчезновение); стадийность разложения — контент M6." }
+      ]
+    },
+    {
+      "id": "ui",
+      "group": "C. Представление",
+      "number": 23,
+      "title": "UI/UX (окна, HUD, тосты, модальность)",
+      "goal": "Пергамент-тема WCAG, модальная пауза (инвариант пауза⇔стек окон∨Esc), тост-стек, killfeed, хотбар, окна: инвентарь/кукла/лист/лавка/диалог/книга/K/зарядник/хоткеи/читы.",
+      "final": "Полный UI-набор v1: все системы имеют окна; gamepad-навигация; настройки (тумблеры сохраняются); туториал-подсказки.",
+      "status": "in_progress",
+      "progress_pct": 75,
+      "start": { "date": "2026-09-04", "milestone": "S1 HUD" },
+      "stages": [
+        { "id": "ui-s1", "title": "S1–S5: HUD, тост-стек, killfeed+атрибуция, хотбар v2, стрелка урона, виньетка HP<35%", "status": "done", "window": ["2026-09-04"], "proofs": ["checkpoints/09_04_s1_ui_hud_session1.md", "checkpoints/09_04_s4_hotbar_v2_techniques_cooldowns.md"] },
+        { "id": "ui-s2", "title": "08_26: окно культивации + хоткеи; INP-1 модальная пауза (инвариант)", "status": "done", "window": ["2026-08-26", "2026-09-15"], "proofs": ["checkpoints/08_26_cultivation_window_and_hotkeys.md", "checkpoints/09_15_inp1_modal_freeze.md"] },
+        { "id": "ui-s3", "title": "R38-3: WCAG-палитра золота (ParchmentTheme, 7.12:1 и т.д.)", "status": "done", "window": ["2026-10-02"], "proofs": ["checkpoints/10_02_r38_playtest_six_bugs.md"] },
+        { "id": "ui-s4", "title": "R40-3: перетаскиваемое окно статов (drag, ZIndex, скролл); R41: PerfOverlay F6 + TileInspector F4", "status": "done", "window": ["2026-10-18"], "proofs": ["checkpoints/10_18_r41_playtest_round2.md"] },
+        { "id": "ui-s5", "title": "R41-7/8: K-окно без Техник + drag&drop техник + тосты причин", "status": "done", "window": ["2026-10-18"], "proofs": ["checkpoints/10_18_r41_playtest_round2.md"] },
+        { "id": "ui-s6", "title": "Панель активных баффов/статусов", "status": "planned", "window": [null, null], "note": "См. трек buff." },
+        { "id": "ui-s7", "title": "Экран смерти игрока + настройки (тумблеры в сейв)", "status": "planned", "window": [null, null], "note": "PauseOnModalWindows тумблер есть (R30); полноценное меню настроек — нет." },
+        { "id": "ui-s8", "title": "Gamepad-навигация + туториал-подсказки", "status": "planned", "window": [null, null], "note": "Дальний план; приоритет после M5." }
+      ]
+    },
+    {
+      "id": "gfx-vfx",
+      "group": "C. Представление",
+      "number": 24,
+      "title": "Боевые VFX и рендеры",
+      "goal": "Программные эффекты: AoE-формы, хоуминг-снаряды, аура удержания, цифры урона, HP-бары, StrikeFX, спрайты оружия в руках, туман/терраин.",
+      "final": "Читаемость боя: каждый тип атаки визуально различим; стихии (ElementPalette) влияют на цвет всех эффектов; лут-подсветка.",
+      "status": "in_progress",
+      "progress_pct": 85,
+      "start": { "date": "2026-09-10", "milestone": "R15 weapon visuals" },
+      "stages": [
+        { "id": "vfx-s1", "title": "R15: оружие в руках (7 классов × 5 тиров, NPC-overlay, facing)", "status": "done", "window": ["2026-09-10"], "proofs": ["checkpoints/09_10_r15_weapon_visuals.md"] },
+        { "id": "vfx-s2", "title": "R21: спрайты брони/Qi-свет", "status": "done", "window": ["2026-09-20"], "proofs": ["checkpoints/09_20_r21_sprite_armor_qi.md"] },
+        { "id": "vfx-s3", "title": "R29: AoeFx/HomingProjectile/HoldAura рендеры + ElementPalette", "status": "done", "window": ["2026-09-21"], "proofs": ["checkpoints/09_21_r29_vfx_design.md"] },
+        { "id": "vfx-s4", "title": "R41-2: перф-оверлей F6, struct-анимации, 15Гц-редравы, camera-dirty", "status": "done", "window": ["2026-10-18"], "proofs": ["checkpoints/10_18_r41_playtest_round2.md"] },
+        { "id": "vfx-s5", "title": "Стихийные вариации эффектов (все техники окрашены)", "status": "in_progress", "window": [null, null], "note": "ElementPalette есть; покрытие всех техник/снарядов — итерация 2 проверит." }
+      ]
+    },
+    {
+      "id": "gfx-sprites",
+      "group": "C. Представление",
+      "number": 25,
+      "title": "Спрайт-миграция G0→G5 (PNG 64×64)",
+      "goal": "Замена процедурных спрайтов анимированными PNG: sprite-swap 10–15 fps; манифест 221 позиция; пайплайн intake_batch.py; промпты для генерации.",
+      "final": "G5 полировка: 8 направлений (D2-сетки), dash/sleep/breakthrough анимации, м/ж NPC, спец-архетипы, трупы-позы; броня на теле (торсо-варианты G4); ~150–200 генераций.",
+      "status": "in_progress",
+      "progress_pct": 20,
+      "start": { "date": "2026-09-24", "milestone": "GFX animation plan (09_24)" },
+      "stages": [
+        { "id": "gfx-s1", "title": "План G1–G5 + манифест 221 + пайплайн приёмки батчей (intake_batch.py)", "status": "done", "window": ["2026-09-24", "2026-09-25"], "proofs": ["checkpoints/09_24_gfx_animation_plan.md", "checkpoints/09_25_g0_sprite_prep.md"] },
+        { "id": "gfx-s2", "title": "G0: аниматор игрока + NPC + звери (fallback-контур), загрузчик листов, реестр, ANIMQA-сим №21", "status": "done", "window": ["2026-09-25"], "proofs": ["checkpoints/09_25_g0_sprite_prep.md"] },
+        { "id": "gfx-s3", "title": "Батч-1 доставки: 2/221 спрайта (player_idle + 1)", "status": "done", "window": ["2026-09-24"], "proofs": ["checkpoints/09_24_g0_2_sprite_batch1.md"] },
+        { "id": "gfx-s4", "title": "I-раунды кода: I-1/I-2/I-5/I-7 (готовы в G0); I-3 октантный facing, I-4 дэш/сон, I-6 вариативность NPC, I-8 иконки, I-9/I-10 экипировка на теле, cast", "status": "in_progress", "window": [null, null], "note": "NEXT из R41: код-раунды I-3/I-8/I-9/I-10/cast. G0-готовые: аниматор (I-1), загрузчик (I-2), NPC-аниматор (I-5), звери (I-7)." },
+        { "id": "gfx-s5", "title": "G1 Статичная база (~10 генераций: idle игрока/NPC/3 зверя, иконки)", "status": "planned", "window": [null, null] },
+        { "id": "gfx-s6", "title": "G2 Живой игрок (~6: walk/melee, звери walk/attack)", "status": "planned", "window": [null, null] },
+        { "id": "gfx-s7", "title": "G3 NPC-жизнь (~8 листов + 16 перекрасок ролей; player meditate/hit/death/cast)", "status": "planned", "window": [null, null] },
+        { "id": "gfx-s8", "title": "G4 Экипировка на теле (~25: торсо ×5, стикеры, weapon PNG 14+56)", "status": "planned", "window": [null, null] },
+        { "id": "gfx-s9", "title": "G5 Полировка (~20: 8 направлений, dash/sleep/breakthrough, м/ж, трупы-позы)", "status": "planned", "window": [null, null] }
+      ]
+    },
+    {
+      "id": "perf",
+      "group": "C. Представление",
+      "number": 26,
+      "title": "Производительность",
+      "goal": "Zero-GC hot paths, 500×500 без просадок, рендер 15Гц, GC-churn устранён, перф-инструменты (F6, GODOT_PERF_LOG).",
+      "final": "Цель из концепции: мегаполис 2000 NPC на рекомендованном железе; чанкинг/LOD; профильные бюджеты в PERFOMANCE_STRATEGY соблюдены.",
+      "status": "in_progress",
+      "progress_pct": 60,
+      "start": { "date": "2026-08-19", "milestone": "Perf 500×500" },
+      "stages": [
+        { "id": "perf-s1", "title": "Perf-полигон 500×500 (08_19)", "status": "done", "window": ["2026-08-19"], "proofs": ["checkpoints/08_19_perf_500x500.md"] },
+        { "id": "perf-s2", "title": "P1-3: NPC zero-GC hot path (CopyStatesTo, персистентные буферы)", "status": "done", "window": ["2026-09-22"], "proofs": ["checkpoints/09_22_r32_external_audit.md"] },
+        { "id": "perf-s3", "title": "R41-2: три источника FPS-дропа убраны (консоль-IO 1/5с, GC-churn редрава, холостые QueueRedraw) + инструменты", "status": "done", "window": ["2026-10-18"], "proofs": ["checkpoints/10_18_r41_playtest_round2.md"] },
+        { "id": "perf-s4", "title": "Профилирование больших популяций (150+ NPC, 100+ зверей)", "status": "in_progress", "window": [null, null], "note": "Плотность поднята R41 (109 зверей); фрейм-тайминги снять после плейтеста." },
+        { "id": "perf-s5", "title": "Чанкинг мира / LOD / 2000 NPC мегаполис", "status": "planned", "window": [null, null], "note": "Дальний план PERFORMANCE_STRATEGY." }
+      ]
+    },
+    {
+      "id": "party",
+      "group": "D. Горизонт",
+      "number": 27,
+      "title": "Party-система (компаньоны)",
+      "goal": "Группы с игроком: компаньоны-NPC в отряде, совместные бои, ауры на своих.",
+      "final": "Отряд до N компаньонов: тактические приказы, общий лут, лояльность; разблокирует мультибой-B, AoE-B живые зоны, SpareAllies-ауры.",
+      "status": "not_started",
+      "progress_pct": 0,
+      "start": { "date": null, "milestone": "Не начат; блокер для 3 отложенных фич боя" },
+      "stages": [
+        { "id": "party-s1", "title": "Дизайн party (состав, приказы, лояльность)", "status": "planned", "window": [null, null] },
+        { "id": "party-s2", "title": "Компаньон-контракты + AI-роли в отряде", "status": "planned", "window": [null, null] },
+        { "id": "party-s3", "title": "Мультибой-B + AoE-B зоны + SpareAllies (снятие моратория R30+)", "status": "planned", "window": [null, null], "note": "Отложено пользователем до party-системы." }
+      ]
+    },
+    {
+      "id": "content",
+      "group": "D. Горизонт",
+      "number": 28,
+      "title": "Контент (lore, предметы, техники, квесты — широкий масштаб)",
+      "goal": "Широкая контентная программа: предметы всех категорий, техники всех типов/стихий, lore-тексты, имена, локации-секты.",
+      "final": "Контентный массив v1: играбельный акт L1–L3 с полным набором предметов/техник/квестов стартовой зоны.",
+      "status": "foundation",
+      "progress_pct": 15,
+      "start": { "date": "2026-08-23", "milestone": "Генераторы (матрёшка) — контент-порождающая машина" },
+      "stages": [
+        { "id": "content-s1", "title": "Генераторы: предметы/техники/формации/камни (матрёшка, грейды, epic/legendary overcap)", "status": "done", "window": ["2026-08-23", "2026-08-27"], "proofs": ["checkpoints/08_26_epic_legendary_overcap_checkpoint.md", "checkpoints/08_27_generators_verification_checkpoint.md"] },
+        { "id": "content-s2", "title": "Стартовый набор: кинжал/лук/доспехи L1-L2, пилюли, материалы, камни", "status": "done", "window": ["2026-09-03", "2026-10-02"], "proofs": ["checkpoints/09_03_phase8p2_ranged_starter_kit.md", "checkpoints/10_02_r38_playtest_six_bugs.md"] },
+        { "id": "content-s3", "title": "LORE_SYSTEM.md (документ-«TODO» из концепции)", "status": "planned", "window": [null, null], "note": "Упомянут в PROJECT_CONCEPT §связанные как TODO." },
+        { "id": "content-s4", "title": "Широкая программа: типовые наборы всех стихий/уровней, уникальные предметы", "status": "planned", "window": [null, null], "note": "START_PROMPT §10 «Что НЕ начато»." }
+      ]
+    },
+    {
+      "id": "dungeons",
+      "group": "D. Горизонт",
+      "number": 29,
+      "title": "Процедурная генерация уровней/подземелий",
+      "goal": "Подземелья/инстансы: процедурные уровни с монстрами и лутом.",
+      "final": "Данжи как контент-слой: входы в мире, генерация комнат, боссы, награды.",
+      "status": "not_started",
+      "progress_pct": 0,
+      "start": { "date": null, "milestone": "START_PROMPT §10 «Что НЕ начато»" },
+      "stages": [
+        { "id": "dun-s1", "title": "Дизайн-спека подземелий", "status": "planned", "window": [null, null] },
+        { "id": "dun-s2", "title": "Генератор уровней (комнаты/коридоры)", "status": "planned", "window": [null, null] },
+        { "id": "dun-s3", "title": "Интеграция: входы в мире, боссы, лут-таблицы", "status": "planned", "window": [null, null] }
+      ]
+    }
+  ]
+}
