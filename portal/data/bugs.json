@@ -1,6 +1,6 @@
 {
-  "version": "1.1",
-  "updated": "2026-10-20T13:20:00Z",
+  "version": "1.5",
+  "updated": "2026-10-20",
   "format": {
     "purpose": "Реестр находок аудита и волн их исправления. Запуск процесса: директива владельца от 19.10.2026 — «по важным находкам аудита запустить анализ и исправление». Источник находок: аудит-вердикты итерации 2 карты проекта (коммит dfb98d0) + открытые верификации PROJECT_MAP.md §5. Ведёт main-агент Z.ai Code; веб-портал читает файл напрямую (runtime, no-store).",
     "type": {
@@ -799,6 +799,78 @@
           "event": "Обнаружено верификацией VER-001 (10-19-fix-b); жизненный цикл Trap (установка/заполнение/активация) работает — шаг 4d FormationShotSimDebug"
         }
       ]
+    },
+    {
+      "id": "STAGE3-001",
+      "type": "bug",
+      "severity": "P1",
+      "title": "Неполный/пустой сейв считался успешно загруженным",
+      "module": "Сохранение (Save)",
+      "track_ref": "save-s3",
+      "status": "fixed",
+      "fix_wave": 2,
+      "assignee": "assistant",
+      "found": "2026-10-20",
+      "verified": "2026-10-20",
+      "summary": "Файл «{}» или сейв без критических блоков (world/world_time/player/body) проходил Load как успех: RestoreOne молча пропускал отсутствующие блоки, GameSession запускала мир с пустыми доменами. Версия формата писалась в save_meta, но не проверялась.",
+      "analysis": "SaveDataAggregator.Load возвращал true при пустом errors; RestoreOne пропускал отсутствующие ключи (форвард-совместимость без различения критичности). Цепочка: сброс доменов → Load=true → Data от fallback TestPolygon → RunAssembly(LoadGame) → Playing на пустом состоянии.",
+      "fix": "ValidateFormat ДО RestoreState: save_meta обязателен; версия ≤ CurrentFormatVersion(=1); критические блоки версии обязательны (таблица CriticalBlocksForVersion); отказ = RestoreState не вызывается, домены нетронуты.",
+      "qa": "SaveLoadSimDebug шаг 9: «{}»→отказ(save_meta), без world_time→отказ, без player→отказ, version+99→отказ «новее», инвариант «домены нетронуты» = камни неизменны.",
+      "fix_note": "Этап 3 аудита adit_10_20 (сохранение/загрузка/сброс мира), 2026-10-20"
+    },
+    {
+      "id": "STAGE3-002",
+      "type": "bug",
+      "severity": "P2",
+      "title": "Каталог сейвов выдавал пустую папку за сохранённую игру (Adapter)",
+      "module": "Сохранение (Save)",
+      "track_ref": "save-s3",
+      "status": "fixed",
+      "fix_wave": 2,
+      "assignee": "assistant",
+      "found": "2026-10-20",
+      "verified": "2026-10-20",
+      "summary": "Adapter/Persistence/SaveFileHandler: HasSave проверял Directory.Exists, GetAllSaves перечислял все каталоги. Каталог создаётся ДО записи main.json — сбой записи оставлял «фантомный слот»: HasSave=true, Load падает.",
+      "analysis": "Write() делает Directory.CreateDirectory до File.WriteAllText(tmp)+rename; исключение ловится в ISaveFileHandler.Save → false, но пустой каталог остаётся. Modules-хендлер (flat *.json) дефектом не задет.",
+      "fix": "HasSave → File.Exists(main.json); GetAllSaves → только каталоги с main.json.",
+      "qa": "SaveLoadSimDebug шаг 10: каталог-без-main.json → HasSave=false, в перечне нет; реальный слот в перечне есть.",
+      "fix_note": "Этап 3 аудита adit_10_20 (сохранение/загрузка/сброс мира), 2026-10-20"
+    },
+    {
+      "id": "STAGE3-003",
+      "type": "bug",
+      "severity": "P2",
+      "title": "DeleteSave возвращал успех при неудачном удалении (Adapter)",
+      "module": "Сохранение (Save)",
+      "track_ref": "save-s3",
+      "status": "fixed",
+      "fix_wave": 2,
+      "assignee": "assistant",
+      "found": "2026-10-20",
+      "verified": "2026-10-20",
+      "summary": "DeleteSave звал void-Delete (глотавший исключения в catch) и безусловно возвращал true — сбой ФС давал UI ложный успех при оставшемся слоте. Комментарий «R17 SAV-7 честный false» не соответствовал коду.",
+      "analysis": "Цепочка результата разорвана: Delete() сам ловит IOException и возвращает void; внешний ISaveFileHandler.DeleteSave не имеет способа узнать исход.",
+      "fix": "Удаление перенесено внутрь DeleteSave с try/catch и фактическим результатом (true = существовал и удалён; false = отсутствовал/I/O-отказ). Паритет с Modules-хендлером.",
+      "qa": "SaveLoadSimDebug шаг 11: несуществующий→false, существующий→true, повтор→false.",
+      "fix_note": "Этап 3 аудита adit_10_20 (сохранение/загрузка/сброс мира), 2026-10-20"
+    },
+    {
+      "id": "STAGE3-004",
+      "type": "bug",
+      "severity": "P2",
+      "title": "Загрузка прерывала сброс доменов на первом исключении",
+      "module": "Сброс мира (World transition)",
+      "track_ref": "core-s8",
+      "status": "fixed",
+      "fix_wave": 2,
+      "assignee": "assistant",
+      "found": "2026-10-20",
+      "verified": "2026-10-20",
+      "summary": "GameSession.LoadGame перебирал IWorldResettable голым foreach: первое исключение прерывало цикл (последующие домены НЕ сброшены), внешний catch терял диагностику. WorldDomainResetPhase при NewGame — противоположный контракт (агрегация + AggregateException). Один процесс — две семантики.",
+      "analysis": "P1-9 fail-closed контракт был реализован только в фазе 0 NewGame; LoadGame-путь (сброс до RestoreState) остался без защиты.",
+      "fix": "WorldDomainResetCoordinator.ResetAll(IResolver) — единая точка: try/catch на каждый домен, ВСЕ получают ResetWorld, ошибки → AggregateException, weapon-cache сброс всегда. Используют WorldDomainResetPhase и GameSession.LoadGame.",
+      "qa": "SaveLoadSimDebug шаг 12: [good1, throwing, good2] → AggregateException, оба good-домена сброшены после исключения, 1 ошибка в агрегате.",
+      "fix_note": "Этап 3 аудита adit_10_20 (сохранение/загрузка/сброс мира), 2026-10-20"
     }
   ]
 }
