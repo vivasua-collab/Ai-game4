@@ -6,10 +6,19 @@
 //   2. P1-2: TryTravel возвращает false БЕЗ смены CurrentLocationId
 //      (физический переход мира не реализован — честный контракт).
 //   3. P2-4: TimeChangedEvent.Delta == ITimeService.DeltaTime (1.0, не 1/60).
-//   4. GAP-001 (10-19-fix-b): смерть игрока → DeathScreenOverlay в дереве
-//      и показан (причина из PlayerDeathEvent.Cause), авто-респавн 3с ОТМЕНЁН
-//      (игрок мёртв и оверлей виден спустя 3.6с), нажатие «Возродиться» →
-//      существующий респавн-флоу (IsAlive + телепорт в центр) + оверлей скрыт.
+//   4. GAP-001 (10-19-fix-b) + АУДИТ-1020 (10-20-fix-d): экран смерти:
+//      4a — честная смерть с ЯВНЫМ источником (детекция гонки кэша
+//          BUG-010: сначала несмертельный удар источником "player_0" через
+//          шину → кэши содержат "player_0"; смертельный удар с
+//          "npc_qa_killer" → строка «неведомая сила», НЕ «собственное
+//          рассеяние» — сломанный код показал бы протухший кэш);
+//      4a2 — GWC-гейты управления (BUG-009): BlocksInput + headless-заметка
+//          (движение/хоткеи вводом не эмулируются — гейт по коду);
+//      4b — авто-респавн 3с ОТМЕНЁН (игрок мёртв и оверлей виден спустя 3.6с);
+//      4c — «Возродиться» → существующий респавн-флоу (IsAlive + центр);
+//      4d — BUG-011: повторная смерть → нажатие БЕЗ делегата НЕ скрывает
+//          экран (игрок мёртв), перепривязка RequestPlayerRespawn →
+//          подтверждённый респавн (скрыт + жив + центр).
 // Запуск: GODOT_NEWGAME=1 GODOT_RESPAWN_DEBUG=1 godot --headless --path . scenes/MainMenu.tscn
 using Godot;
 using CultivationGame.Core.DI;
@@ -33,6 +42,9 @@ public partial class RespawnSimDebug : Node
     // GAP-001 (шаг 4): честная смерть игрока через тело + респавн-проверки.
     [Inject] private IPlayerService? _player;
     [Inject] private IBodyService? _body;
+    // АУДИТ-1020 (BUG-010, шаг 4a): синтетический DamageAppliedEvent — прогон
+    // реального пайплайна урона (BodyService.OnDamageApplied + кэш оверлея).
+    [Inject] private IPublisher<DamageAppliedEvent>? _damagePub;
 
     private System.IDisposable? _timeChangedToken;
     private System.IDisposable? _tileChangedToken;
@@ -79,9 +91,9 @@ public partial class RespawnSimDebug : Node
             PrintVerdict(false);
             return;
         }
-        if (_player == null || _body == null)
+        if (_player == null || _body == null || _damagePub == null)
         {
-            GD.Print("[RespawnSim] FAIL — DI not wired (player/body для шага 4)");
+            GD.Print("[RespawnSim] FAIL — DI not wired (player/body/damagePub для шага 4)");
             PrintVerdict(false);
             return;
         }
@@ -168,31 +180,62 @@ public partial class RespawnSimDebug : Node
             pass &= respawnOk;
         }
 
-        // === 4. GAP-001 (10-19-fix-b): экран смерти ========================
+        // === 4. GAP-001 + АУДИТ-1020: экран смерти ========================
         // Честная смерть через тело (каскад R41): ApplyDamage(Head) →
         // BodyCriticalEvent → PlayerService.Die → PlayerDeathEvent →
         // GameWorldController показывает DeathScreenOverlay.
         var player = _player;   // локали — nullable-flow без предупреждений
         var body = _body;
+        var damagePub = _damagePub;
         var gwc = GetParent() as GameWorldController;
         var overlay = gwc?.GetNodeOrNull<UI.DeathScreenOverlay>("HUDCanvas/DeathScreenOverlay");
         bool overlayInTree = overlay != null;
         GD.Print($"[RespawnSim] 4. DeathScreenOverlay в дереве = {overlayInTree} (HUDCanvas/DeathScreenOverlay)");
         pass &= overlayInTree;
 
-        if (overlay != null && player != null && body != null)
+        if (overlay != null && player != null && body != null && damagePub != null)
         {
-            // 4a. Живой игрок → разрушаем голову → оверлей показан, причина
-            //     из события, ввод заблокирован (MouseFilter=Stop).
+            // 4a. Детекция гонки кэша (BUG-010). Сначала НЕсмертельный удар
+            //     по игроку с источником "player_0" — ЧЕРЕЗ ШИНУ (синтетический
+            //     DamageAppliedEvent, паттерн Audit0922Sim Q1-Q3): прямой
+            //     body.ApplyDamage событий НЕ публикует, а кэш ОВЕРЛЕЯ
+            //     обновляет именно подписчик DamageAppliedEvent — он в fan-out
+            //     идёт ПОСЛЕ BodyService.OnDamageApplied. Так прогоняются ОБА
+            //     кэша: BodyService.LastDamageSourceId и оверлея := "player_0"
+            //     (сломанный код взял бы убийцу отсюда → «собственное рассеяние»).
             bool wasAlive = player.IsAlive;
-            body.ApplyDamage(BodyPartType.Head, 10_000_000);
+            damagePub.Publish(new DamageAppliedEvent(
+                player.PlayerId, player.PlayerId, 30,
+                DamageType.Physical, Element.Neutral, BodyPartType.Torso,
+                CombatAttackResult.Hit, CombatSubtype.None));
+            // Кадры после первого удара: кэш оверлея гарантированно содержит
+            // "player_0" → гонка ловится надёжно.
+            await ToSignal(GetTree().CreateTimer(0.25), SceneTreeTimer.SignalName.Timeout);
+            // Смертельный удар с ЯВНЫМ источником-«убийцей» (qa-выдуманный:
+            // имя НЕ резолвится в NPC/зверях → «неведомая сила"). Источник
+            // кэшируется BodyService ДО урона → PlayerDeathEvent.KillerId.
+            body.ApplyDamage(BodyPartType.Head, 10_000_000, "npc_qa_killer");
             bool playerDead = !player.IsAlive;
             bool overlayShown = overlay.Visible && overlay.BlocksInput;
             bool causeOk = overlay.DebugCauseText.Contains("Голова");
+            string killerLine = overlay.DebugKillerText;
+            bool killerOk = killerLine.Contains("Последний удар: неведомая сила")
+                            && !killerLine.Contains("собственное рассеяние");
             GD.Print($"[RespawnSim] 4a. смерть: был жив={wasAlive}, IsAlive={player.IsAlive} (ожидали false), " +
                      $"оверлей виден={overlay.Visible}, ввод блокирован={overlay.BlocksInput}, " +
                      $"причина='{overlay.DebugCauseText}' (ожидали 'Голова…')");
-            pass &= wasAlive && playerDead && overlayShown && causeOk;
+            GD.Print($"[RespawnSim] 4a-killer (BUG-010): '{killerLine}' (ожидали 'неведомая сила' " +
+                     $"из KillerId=npc_qa_killer; гонка кэша показала бы 'собственное рассеяние' от удара player_0)");
+            pass &= wasAlive && playerDead && overlayShown && causeOk && killerOk;
+
+            // 4a2. GWC-гейты управления при смерти (BUG-009). Headless-прогон
+            //      ввод НЕ эмулирует: гейт DeathScreenShown (движение/
+            //      хоткеи/атаки/LMB/зум в GWC) проверяется КОДОМ; факт
+            //      «экран блокирует ввод» уже ассертнут в 4a (BlocksInput:
+            //      вуаль MouseFilter=Stop). Вердику шаг НЕ влияет (честная
+            //      headless-лимитация, как Trap в FormationShotSimDebug).
+            GD.Print("[RespawnSim] 4a2. GWC-гейты смерти (BUG-009) — headless: ввод не эмулируется, " +
+                     "гейт по коду (DeathScreenShown: HandleFreeMovement/HandleStickyInput/V-T-X-Z-Space/_UnhandledInput)");
 
             // 4b. Авто-респавн ОТМЕНЁН: 3.6с > прежних 3с — игрок всё ещё
             //     мёртв, оверлей всё ещё показан (респавн только по кнопке).
@@ -215,10 +258,41 @@ public partial class RespawnSimDebug : Node
                      $"оверлей скрыт={overlayHidden}, позиция=({player.Position.X},{player.Position.Y}) " +
                      $"(ожидали центр {cx},{cy})");
             pass &= respawnedNow && overlayHidden && atCenter;
+
+            // 4d. BUG-011: респавн без гарантии НЕ скрывает экран. Убиваем
+            //     снова (явный источник), затем: (1) отвязываем делегат →
+            //     нажатие обязано оставить экран открытым (мёртвый игрок без
+            //     фальшивого «возрождения»); (2) перепривязываем публичный
+            //     RequestPlayerRespawn (bool — метод-группа → Action
+            //     совместим) → подтверждённый респавн: скрыт + жив + центр.
+            body.ApplyDamage(BodyPartType.Head, 10_000_000, "npc_qa_killer");
+            await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+            bool deadAgain = !player.IsAlive && overlay.Visible;
+            overlay.BindRespawnAction(null!); // BUG-011: orphan-нажатие — экран обязан остаться
+            overlay.SimulateRespawnPressForQa();
+            await ToSignal(GetTree().CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
+            bool orphanKeepsShown = overlay.Visible;
+            bool orphanStillDead = !player.IsAlive;
+            // gwc не null: overlay получен из его дерева (HUDCanvas). Биндим
+            // Action-обёртку: bool-метод-группа → Action не конвертируется
+            // (CS0407) — см. RequestPlayerRespawnForOverlay в GWC.
+            overlay.BindRespawnAction(gwc!.RequestPlayerRespawnForOverlay);
+            overlay.SimulateRespawnPressForQa();
+            await ToSignal(GetTree().CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
+            bool confirmedAlive = player.IsAlive;
+            bool confirmedHidden = !overlay.Visible;
+            bool confirmedCenter = player.Position.X == cx && player.Position.Y == cy;
+            GD.Print($"[RespawnSim] 4d. BUG-011: повторная смерть={deadAgain} (ожидали true), " +
+                     $"нажатие без делегата: экран виден={orphanKeepsShown} (ожидали true), " +
+                     $"мёртв={orphanStillDead} (ожидали true); после перепривязки: " +
+                     $"IsAlive={confirmedAlive} (ожидали true), скрыт={confirmedHidden} (ожидали true), " +
+                     $"позиция=({player.Position.X},{player.Position.Y}) (ожидали {cx},{cy})");
+            pass &= deadAgain && orphanKeepsShown && orphanStillDead
+                    && confirmedAlive && confirmedHidden && confirmedCenter;
         }
         else if (overlay != null)
         {
-            GD.Print("[RespawnSim] FAIL — player/body пустые при живом оверлее (шаг 4)");
+            GD.Print("[RespawnSim] FAIL — player/body/damagePub пустые при живом оверлее (шаг 4)");
             pass = false;
         }
 
@@ -227,6 +301,6 @@ public partial class RespawnSimDebug : Node
 
     private static void PrintVerdict(bool pass)
     {
-        GD.Print($"[RespawnSim] VERDICT: {(pass ? "PASS — resource respawn + honest travel + time delta + death screen (GAP-001)" : "FAIL")}");
+        GD.Print($"[RespawnSim] VERDICT: {(pass ? "PASS — resource respawn + honest travel + time delta + death screen (GAP-001 + АУДИТ-1020: BUG-009/010/011)" : "FAIL")}");
     }
 }

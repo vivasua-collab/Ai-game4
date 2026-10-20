@@ -195,7 +195,7 @@ public sealed class PlayerService : IPlayerService, ISaveable, IWorldResettable,
 
     public void SetFacing(Direction dir) => _data.Facing = dir;
 
-    public void Die(string cause)
+    public void Die(string cause, string? killerId = null)
     {
         // AUDIT-0911 BOD-2: флаг вместо `!IsAlive` — при vital-смерти
         // (Head RedHP→0) IsAlive УЖЕ false, старый гейт глотал PlayerDeathEvent.
@@ -204,8 +204,12 @@ public sealed class PlayerService : IPlayerService, ISaveable, IWorldResettable,
         _data.Health = 0f;
         Stance = PlayerStance.Normal;
         if (SleepState != PlayerSleepState.Awake) WakeUp();
-        _deathPub.Publish(new PlayerDeathEvent(cause));
-        Console.WriteLine($"[PlayerService] Player died: {cause}");
+        // АУДИТ-1020 (BUG-010): убийца — из BodyService.LastDamageSourceId
+        // (кэширован ДО применения урона), НЕ из кэша подписчика-оверлея:
+        // смерть публикуется синхронно внутри ApplyDamage, fan-out кэша
+        // оверлея ещё не дошёл → показывался бы предыдущий атакующий.
+        _deathPub.Publish(new PlayerDeathEvent(cause, killerId));
+        Console.WriteLine($"[PlayerService] Player died: {cause} (killer: {killerId ?? "?"})");
     }
 
     public void Revive()
@@ -277,7 +281,9 @@ public sealed class PlayerService : IPlayerService, ISaveable, IWorldResettable,
         if (vitalDestroyed)
         {
             string partName = e.Part == BodyPartType.Heart ? "Сердце остановлено" : "Голова разрушена";
-            Die($"{partName} ({e.HealthRatio:P0} HP)");
+            // АУДИТ-1020 (BUG-010): атрибуция убийцы через BodyService-кэш
+            // (заполнен ДО урона) — см. комментарий в BodyService.ApplyDamage.
+            Die($"{partName} ({e.HealthRatio:P0} HP)", _bodyService?.LastDamageSourceId);
         }
     }
 

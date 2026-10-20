@@ -60,6 +60,14 @@
 //      day=0, hour=29, minute=-10, год до эпохи) → битый сейв = честный отказ.
 //   S7 (P3-11) WorldConfig без мёртвых источников времени.
 //
+// 2026-10-20 (R41-wave2, АУДИТ-1020): ДОПОЛНЕНА секциями U/V/W — волна 2
+// внешнего аудита (bugs.json): BUG-004 (EventBus: re-entrant дрен очереди —
+// итеративный цикл под сентинелом _draining, ранее P2-22), BUG-005
+// (ContainerBuilder.Build() — снапшот регистраций, контейнер immutable к
+// мутациям builder), BUG-006 (Container: честный выбор конструктора —
+// перебор от жадного к простому до первого резолвящегося). Диагностический
+// шаг L (P2-22) теперь подтверждает закрытие: guard держится в дрене.
+//
 // Сим написан под ПОСТФИКС-контракт (как должен вести себя исправленный код):
 //   A. EventBus (P1-5): исключение в одном подписчике НЕ прерывает fan-out
 //      (подписчики после падавшего получают событие), НЕ покидает Publish,
@@ -123,6 +131,14 @@ using CultivationGame.Modules.Player;
 using CultivationGame.Modules.Trade;
 
 namespace CultivationGame.Adapter.Scene;
+
+// АУДИТ-1020 (BUG-004): сообщения re-entrancy-цепочек шага U — сим
+// самодостаточен (чистый C#, без игровых событий).
+/// <summary>Self-publish-цепочка: подписчик MsgA публикует MsgA снова.</summary>
+public readonly struct Audit1020MsgA { }
+
+/// <summary>Пара взаимной публикации: подписчик MsgA публикует MsgB и обратно.</summary>
+public readonly struct Audit1020MsgB { }
 
 public partial class Audit0922SimDebug : Node
 {
@@ -375,6 +391,39 @@ public partial class Audit0922SimDebug : Node
         public List<ItemData> GenerateConsumableLoot(int playerLevel, int count, long seed = 0) => new();
     }
 
+    // ── Тестовые классы АУДИТ-1020 (волна 2: BUG-004/005/006) ──
+    // BUG-006: сервис, НИГДЕ не регистрируемый — «неразрешимая зависимость».
+    private interface INeverRegisteredService { }
+
+    // BUG-006: два публичных ctor — длинный (INeverRegisteredService, int)
+    // неразрешим, короткий (int с default) резолвится через DefaultValue.
+    // Честный выбор обязан взять короткий (маркер: N == ShortCtorDefault,
+    // UsedLongCtor == false).
+    private sealed class CtorPick_A
+    {
+        public const int ShortCtorDefault = 4242;
+        public readonly int N;
+        public readonly bool UsedLongCtor;
+        public CtorPick_A(INeverRegisteredService never, int n) { _ = never; UsedLongCtor = true; N = n; }
+        public CtorPick_A(int n = ShortCtorDefault) => N = n;
+    }
+
+    // BUG-006: единственный ctor с неразрешимой обязательной зависимостью →
+    // честный InvalidOperationException (а не падение в никуда).
+    private sealed class CtorPick_SingleCtor
+    {
+        public CtorPick_SingleCtor(INeverRegisteredService never) { _ = never; }
+    }
+
+    // BUG-006-регресс: оба ctor разрешимы → жадный (с зависимостью) приоритетен,
+    // фолбэк не «проседает» до безпараметрного без причины.
+    private sealed class CtorPick_Greedy
+    {
+        public readonly IDummySvc? Dep;
+        public CtorPick_Greedy() { }
+        public CtorPick_Greedy(IDummySvc dep) => Dep = dep;
+    }
+
     private bool _allPass = true;
     private void Check(bool condition, string label, string defectId)
     {
@@ -474,15 +523,29 @@ public partial class Audit0922SimDebug : Node
         try { RunCarryLimitsCanonTest(); }
         catch (Exception ex) { GD.Print($"[Audit0922Sim] DEFECT T4-крэш: {ex.GetType().Name}: {ex.Message}"); _allPass = false; }
 
-        // === L. P2-22 (диагностика, бэклог): queued-drain re-entrancy =========
-        // Запрос аудитора (Фаза 7): runtime-чек edge-case-а. Фикс — «следующий
-        // слой» реестра Фазы 10, в этот эпизод НЕ входит → вердикт не гейтит.
+        // === U. BUG-004 (АУДИТ-1020): EventBus — итеративный re-entrant дрен ===
+        try { RunBug004EventBusDrainTest(); }
+        catch (Exception ex) { GD.Print($"[Audit0922Sim] DEFECT U-крэш: {ex.GetType().Name}: {ex.Message}"); _allPass = false; }
+
+        // === V. BUG-005 (АУДИТ-1020): DI Build() — снапшот регистраций ========
+        try { RunBug005DiBuildSnapshotTest(); }
+        catch (Exception ex) { GD.Print($"[Audit0922Sim] DEFECT V-крэш: {ex.GetType().Name}: {ex.Message}"); _allPass = false; }
+
+        // === W. BUG-006 (АУДИТ-1020): честный выбор конструктора ===============
+        try { RunBug006CtorPickTest(); }
+        catch (Exception ex) { GD.Print($"[Audit0922Sim] DEFECT W-крэш: {ex.GetType().Name}: {ex.Message}"); _allPass = false; }
+
+        // === L. P2-22 (диагностика): queued-drain re-entrancy =================
+        // Запрос аудитора (Фаза 7): runtime-чек edge-case-а. Фикс закрыт
+        // АУДИТ-1020 (BUG-004) — диагностический шаг остаётся non-gating
+        // (теперь подтверждает закрытие: guard держится в дрене);
+        // гейтящая проверка — шаг U выше.
         try { RunQueueDrainReentrancyDiagnostic(); }
         catch (Exception ex) { GD.Print($"[Audit0922Sim] diag-крэш L: {ex.GetType().Name}: {ex.Message}"); }
 
         GD.Print($"[Audit0922Sim] VERDICT: {(_allPass
-            ? "PASS — EventBus isolation/re-entrancy, path sanitisation, DI override prune, DeleteSave honesty, Trade/Corpse reset-контракты, ResolveAll registration order, startup fail-closed, cycle detection (Фаза 4: P2-12/P2-13/P2-14), world-reset fail-closed (P1-9), startup retry без дублей (P1-10), Pure без расхода Ци (P1-12), time catch-up/speed/markers (Фаза 11: P1-13/P1-14/P1-15), item identity/DB (Фаза 12: P1-16+P2-31/P2-32), equipment гейты (P1-17/P1-18), storage-ring persistence (P1-19), stat progression (Фаза 14: P1-20+P2-43/P2-49), revive/dash (P2-44/P2-45), time P2-бэклог Фазы 11: автосейв по мировым тикам / pause-authority / DeltaTime / канонизация / валидация даты (P2-26…30), items/trade P2-бэклог Фазы 12: saturating-валюта / честный тотал сделки / валидация Restore / переноска — владельческий канон 50/100 (P2-33/34/35 + P2-36 by-user)"
-            : "FAIL — см. DEFECT-строки выше (runtime-подтверждение аудита 09.22 + Фаза 4 + финальные фазы 6–10 + фазы 11–14 + P2-26…30 + P2-33…35)")}");
+            ? "PASS — EventBus isolation/re-entrancy, path sanitisation, DI override prune, DeleteSave honesty, Trade/Corpse reset-контракты, ResolveAll registration order, startup fail-closed, cycle detection (Фаза 4: P2-12/P2-13/P2-14), world-reset fail-closed (P1-9), startup retry без дублей (P1-10), Pure без расхода Ци (P1-12), time catch-up/speed/markers (Фаза 11: P1-13/P1-14/P1-15), item identity/DB (Фаза 12: P1-16+P2-31/P2-32), equipment гейты (P1-17/P1-18), storage-ring persistence (P1-19), stat progression (Фаза 14: P1-20+P2-43/P2-49), revive/dash (P2-44/P2-45), time P2-бэклог Фазы 11: автосейв по мировым тикам / pause-authority / DeltaTime / канонизация / валидация даты (P2-26…30), items/trade P2-бэклог Фазы 12: saturating-валюта / честный тотал сделки / валидация Restore / переноска — владельческий канон 50/100 (P2-33/34/35 + P2-36 by-user), EventBus drain re-entrancy (АУДИТ-1020: BUG-004), DI Build snapshot (BUG-005), честный выбор ctor (BUG-006)"
+            : "FAIL — см. DEFECT-строки выше (runtime-подтверждение аудита 09.22 + Фаза 4 + финальные фазы 6–10 + фазы 11–14 + P2-26…30 + P2-33…35 + АУДИТ-1020 BUG-004/005/006)")}");
 
         // Чистка временных каталогов теста B/D.
         await ToSignal(GetTree().CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
@@ -1844,9 +1907,193 @@ public partial class Audit0922SimDebug : Node
         }
     }
 
+    // ── U. BUG-004 (АУДИТ-1020): EventBus — re-entrant дрен итеративен ======
+    private void RunBug004EventBusDrainTest()
+    {
+        GD.Print("[Audit0922Sim] === U. bug004-eventbus: дрен очереди без вложенного Publish (BUG-004; ранее P2-22) ===");
+
+        // (a) Самопубликация: подписчик MsgA публикует MsgA снова, пока
+        // доставлено < 250 (счётчик в замыкании). Итеративный дрен обрабатывает
+        // всю цепочку НА ОДНОМ уровне стека: процесс жив (сим дошёл до ассерта —
+        // StackOverflow нет), доставлено ровно 250, хендлеры не вкладываются
+        // (guard держится и в normal-path, и в дрене).
+        const int Chain = 250;
+        {
+            var bus = new EventBus();
+            int delivered = 0, handlerDepth = 0, maxHandlerDepth = 0;
+            var tok = bus.Subscribe<Audit1020MsgA>((in Audit1020MsgA _) =>
+            {
+                handlerDepth++;
+                try
+                {
+                    if (handlerDepth > maxHandlerDepth) maxHandlerDepth = handlerDepth;
+                    delivered++;
+                    if (delivered < Chain) bus.Publish(new Audit1020MsgA());
+                }
+                finally { handlerDepth--; }
+            });
+            bus.Publish(new Audit1020MsgA()); // стартовый Publish; вся цепочка — очередь+дрен
+            tok.Dispose();
+
+            Check(delivered == Chain,
+                $"U1 самопубликация {Chain}: доставлено ровно {Chain} (deliveries={delivered}) — процесс жив, StackOverflow нет", "BUG-004");
+            Check(maxHandlerDepth <= 2,
+                $"U2 самопубликация {Chain}: хендлеры не вкладываются — итеративный дрен (maxHandlerDepth={maxHandlerDepth})", "BUG-004");
+        }
+
+        // (b) Взаимная публикация A↔B с лимитом 200: handler A публикует MsgB,
+        // handler B публикует MsgA. Оба события доставлены, лимит соблюдён
+        // точно, вложенности хендлеров нет.
+        const int Limit = 200;
+        {
+            var bus = new EventBus();
+            int aDelivered = 0, bDelivered = 0, handlerDepth = 0, maxHandlerDepth = 0;
+            var tokA = bus.Subscribe<Audit1020MsgA>((in Audit1020MsgA _) =>
+            {
+                handlerDepth++;
+                try
+                {
+                    if (handlerDepth > maxHandlerDepth) maxHandlerDepth = handlerDepth;
+                    aDelivered++;
+                    if (aDelivered + bDelivered < Limit) bus.Publish(new Audit1020MsgB());
+                }
+                finally { handlerDepth--; }
+            });
+            var tokB = bus.Subscribe<Audit1020MsgB>((in Audit1020MsgB _) =>
+            {
+                handlerDepth++;
+                try
+                {
+                    if (handlerDepth > maxHandlerDepth) maxHandlerDepth = handlerDepth;
+                    bDelivered++;
+                    if (aDelivered + bDelivered < Limit) bus.Publish(new Audit1020MsgA());
+                }
+                finally { handlerDepth--; }
+            });
+            bus.Publish(new Audit1020MsgA());
+            tokA.Dispose(); tokB.Dispose();
+
+            bool bothDelivered = aDelivered > 0 && bDelivered > 0;
+            bool limitRespected = aDelivered + bDelivered == Limit;
+            GD.Print($"[Audit0922Sim] diag: U4 mutual A↔B — A={aDelivered}, B={bDelivered}, " +
+                     $"total={aDelivered + bDelivered} (лимит {Limit}), maxHandlerDepth={maxHandlerDepth}");
+            Check(bothDelivered && limitRespected,
+                $"U4 взаимная публикация A↔B: обе доставлены (A={aDelivered}, B={bDelivered}), лимит {Limit} соблюдён", "BUG-004");
+            Check(maxHandlerDepth <= 2,
+                $"U5 взаимная публикация A↔B: без вложенных хендлеров (maxHandlerDepth={maxHandlerDepth})", "BUG-004");
+        }
+    }
+
+    // ── V. BUG-005 (АУДИТ-1020): DI Build() — независимый снапшот ============
+    private void RunBug005DiBuildSnapshotTest()
+    {
+        GD.Print("[Audit0922Sim] === V. bug005-disnapshot: Build() — снапшот регистраций (BUG-005) ===");
+
+        // Регистрация X: singleton, интерфейсный ключ + impl-ключ (форвард).
+        var b = new ContainerBuilder();
+        b.Register<IDummySvc, DummyImplA>(Lifetime.Singleton);
+        var containerA = b.Build();
+        var instanceA1 = containerA.Resolve<IDummySvc>();
+        var instanceA1ByImpl = containerA.Resolve<DummyImplA>();
+        Check(instanceA1 is DummyImplA && ReferenceEquals(instanceA1, instanceA1ByImpl),
+            "V1 форвард impl-ключ: Resolve<Impl> даёт тот же синглтон, что Resolve<IFace>", "BUG-005");
+
+        // Мутация ТОГО ЖЕ builder ПОСЛЕ Build: новая регистрация (новый ключ).
+        b.Register<IOtherSvc, DummyImplB>(Lifetime.Singleton);
+
+        // Снапшот словаря: containerA не видит пост-Build регистрацию.
+        bool leakSeen = containerA.TryResolve<IOtherSvc>(out var leaked);
+        Check(!leakSeen && leaked is null,
+            "V2 словарь-снапшот: контейнер не видит регистрацию, добавленную в builder ПОСЛЕ Build", "BUG-005");
+
+        // Снапшот ordered-списка: ResolveAll<IOtherSvc> даёт ровно ОДИН инстанс —
+        // исходный multi-forward (DummyImplA реализует оба интерфейса); у общего
+        // списка пост-Build регистрация добавила бы второй.
+        int otherCountViaA = containerA.ResolveAll<IOtherSvc>().Count();
+        Check(otherCountViaA == 1,
+            $"V3 ordered-снапшот: ResolveAll не подхватил пост-Build регистрацию (инстансов {otherCountViaA}, ожидается 1)", "BUG-005");
+
+        // containerA продолжает резолвить ТОТ ЖЕ instanceA1 (снапшот не мутировал).
+        var instanceA1again = containerA.Resolve<IDummySvc>();
+        Check(ReferenceEquals(instanceA1, instanceA1again),
+            "V4 containerA.Resolve<IDummySvc> — тот же инстанс (снапшот не мутировал)", "BUG-005");
+
+        // Второй Build того же builder: видит новую регистрацию, свой кэш синглтонов.
+        var containerB = b.Build();
+        var fromB = containerB.Resolve<IDummySvc>();
+        var otherFromB = containerB.Resolve<IOtherSvc>();
+        Check(otherFromB is DummyImplB,
+            "V5 containerB резолвит пост-Build регистрацию IOtherSvc → DummyImplB", "BUG-005");
+        Check(fromB is DummyImplA && !ReferenceEquals(instanceA1, fromB),
+            "V6 containerB — свой DummyImplA-синглтон (независимый кэш)", "BUG-005");
+
+        // RegisterInstance-оверрайд в builder ПОСЛЕ Build: новый контейнер
+        // честно отдаёт prebuilt, старый продолжает жить в снапшоте.
+        var prebuilt = new DummyImplB();
+        b.RegisterInstance<IDummySvc>(prebuilt);
+        var containerB2 = b.Build();
+        var fromB2 = containerB2.Resolve<IDummySvc>();
+        var aStill = containerA.Resolve<IDummySvc>();
+        Check(ReferenceEquals(prebuilt, fromB2),
+            "V7 RegisterInstance после Build: новый контейнер отдаёт prebuilt-инстанс", "BUG-005");
+        Check(ReferenceEquals(instanceA1, aStill) && aStill is DummyImplA,
+            "V8 старый контейнер не затронут инстанс-оверрайдом builder (тот же инстанс)", "BUG-005");
+
+        // Dispose одного контейнера не калечит другие: каждый владеет СВОЕЙ
+        // копией регистраций (прежний общий словарь — Dispose чистил его для всех).
+        containerA.Dispose();
+        bool bAliveAfterADispose = false;
+        try { bAliveAfterADispose = containerB.Resolve<IDummySvc>() is DummyImplA; }
+        catch (InvalidOperationException) { bAliveAfterADispose = false; }
+        Check(bAliveAfterADispose,
+            "V9 Dispose(containerA) не ломает containerB (независимые снапшоты регистраций)", "BUG-005");
+    }
+
+    // ── W. BUG-006 (АУДИТ-1020): честный выбор конструктора =================
+    private void RunBug006CtorPickTest()
+    {
+        GD.Print("[Audit0922Sim] === W. bug006-ctorpick: перебор ctor от жадного к простому (BUG-006) ===");
+
+        // W1: длинный ctor (INeverRegisteredService, int) неразрешим (сервис
+        // нигде не регистрируется) → используется короткий (int с default) —
+        // маркер-поля фиксируют выбор. Прежний код ронял Resolve на длинном.
+        var b1 = new ContainerBuilder();
+        b1.Register<CtorPick_A>(Lifetime.Singleton);
+        var c1 = b1.Build();
+        var a = c1.Resolve<CtorPick_A>();
+        Check(!a.UsedLongCtor && a.N == CtorPick_A.ShortCtorDefault,
+            $"W1 неразрешимый длинный ctor пропущен, работает короткий (N={a.N}, longCtor={a.UsedLongCtor})", "BUG-006");
+
+        // W2: единственный ctor с неразрешимой обязательной зависимостью →
+        // честный InvalidOperationException с понятной причиной.
+        var b2 = new ContainerBuilder();
+        b2.Register<CtorPick_SingleCtor>(Lifetime.Singleton);
+        var c2 = b2.Build();
+        InvalidOperationException? thrown = null;
+        Type? wrongType = null;
+        try { _ = c2.Resolve<CtorPick_SingleCtor>(); }
+        catch (InvalidOperationException ex) { thrown = ex; }
+        catch (Exception ex) { wrongType = ex.GetType(); }
+        Check(thrown is not null && wrongType is null,
+            $"W2 единственный ctor с неразрешимой зависимостью → InvalidOperationException" +
+            (wrongType is null ? "" : $" (фактически {wrongType.Name})"), "BUG-006");
+        if (thrown is not null)
+            GD.Print($"[Audit0922Sim] diag: W2 сообщение: {thrown.Message}");
+
+        // W3 (регресс BUG-006): оба ctor разрешимы → жадный (с зависимостью)
+        // остаётся приоритетным, фолбэк не проседает без причины.
+        var b3 = new ContainerBuilder();
+        b3.Register<IDummySvc, DummyImplA>(Lifetime.Singleton);
+        b3.Register<CtorPick_Greedy>(Lifetime.Singleton);
+        var c3 = b3.Build();
+        var g = c3.Resolve<CtorPick_Greedy>();
+        Check(g.Dep is not null,
+            "W3 жадный ctor выбирается, когда он разрешим (регресс-контракт BUG-006)", "BUG-006");
+    }
+
     private void RunQueueDrainReentrancyDiagnostic()
     {
-        GD.Print("[Audit0922Sim] === L. EventBus: queued-drain re-entrancy guard (P2-22 — диагностика, бэклог) ===");
+        GD.Print("[Audit0922Sim] === L. EventBus: queued-drain re-entrancy guard (P2-22 — диагностика) ===");
         var bus = new EventBus();
         int depth = 0, maxDepth = 0, deliveries = 0;
         var tok = bus.Subscribe<PingMsg>((in PingMsg msg) =>
@@ -1865,17 +2112,18 @@ public partial class Audit0922SimDebug : Node
         bus.Publish(new PingMsg(1));
         tok.Dispose();
 
-        // Починенный контракт: во время дрен queued-события повторный Publish
-        // ТОГО ЖЕ типа ставится в очередь (guard) → maxDepth ≤ 2. Текущий код:
-        // guard снят после внешнего Publish → прямая рекурсия растёт с длиной
-        // цепочки (maxDepth == длина цепочки).
+        // Контракт после BUG-004 (АУДИТ-1020; ранее P2-22): во время дрена
+        // повторный Publish ставится в очередь под сентинелом _draining →
+        // maxDepth ≤ 2 (цепочка обрабатывается итеративно, на одном уровне
+        // стека). Прежний код снимал guard после внешнего Publish → прямая
+        // рекурсия росла с длиной цепочки (maxDepth == длина цепочки) —
+        // runtime-подтверждение P2-22, закрытого как BUG-004.
         bool guardHeldDuringDrain = maxDepth <= 2;
         GD.Print($"[Audit0922Sim] diag: L queued-drain maxDepth={maxDepth}, deliveries={deliveries} (цепочка 6) — " +
                  (guardHeldDuringDrain
-                     ? "guard держится в дрене (P2-22 закрыт)"
+                     ? "guard держится в дрене (P2-22 закрыт как BUG-004, АУДИТ-1020)"
                      : "guard ПОТЕРЯН в дрене: queued self-publish идёт прямой рекурсией " +
-                       "(P2-22 runtime-подтверждён; классификация P2 — бэклог следующего слоя, " +
-                       "по указанию аудитора Фазы 10 в этот эпизод не входит)"));
+                       "(P2-22 runtime-подтверждён; фикс BUG-004 АУДИТ-1020 не работает)"));
     }
 
     private static void CleanupTemp()

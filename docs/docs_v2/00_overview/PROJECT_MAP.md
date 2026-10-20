@@ -1,7 +1,7 @@
 # Карта проекта — Cultivation World Simulator (Ai-game4)
 
 > **Раздел:** 00_overview · **Статус:** активный документ-роадмап
-> **Обновлено:** 2026-10-19 (1.3-wave1) · **Ядро данных:** [project_map.json](project_map.json) (машиночитаемое — единственный источник правды)
+> **Обновлено:** 2026-10-20 (1.4-wave2) · **Ядро данных:** [project_map.json](project_map.json) (машиночитаемое — единственный источник правды)
 >
 > **Назначение:** детальный роадмап для веб-портала «звуковые дорожки»: каждый трек = шкала
 > последовательных этапов (начало → выполненные → текущая позиция → запланированные → финал модуля).
@@ -44,7 +44,7 @@
 | 12 | **NPC: спавн, группы, отношения, перки, трупы** `npc` | Игровые модули | 🔧 62% | ✅5 🔧1 ◻️2 | Три категории NPC (Temp/Plot/Unique) с разной персистентностью; экипировка NPC из экономики; флористика городо… |
 | 13 | **NPC AI (нервная система)** `npc-ai` | Игровые модули | 🔧 50% | ✅4 🔧1 ◻️3 | Полный Behavior Tree с 15 AI-состояниями; Neural Router маршрутизирует сигналы; личности влияют на весь спектр… |
 | 14 | **Звери (AnimalService, в модуле NPC)** `animals` | Игровые модули | 🔧 67% | ✅4 🔧0 ◻️2 | Экосистема: хищники охотятся на травоядных, популяция восстанавливается со временем, редкие звери (boss-тиры),… |
-| 15 | **Игрок (ввод, движение, сон, стойки)** `player` | Игровые модули | 🔧 80% | ✅4 🔧1 ◻️0 | Полный набор действий из спеки: движение 8 направлений, взаимодействие E, стойки, сон в кроватях/лагере, dash-… |
+| 15 | **Игрок (ввод, движение, сон, стойки)** `player` | Игровые модули | 🔧 80% | ✅5 🔧0 ◻️0 | Полный набор действий из спеки: движение 8 направлений, взаимодействие E, стойки, сон в кроватях/лагере, dash-… |
 | 16 | **Развитие персонажа (статы, пороги, сон)** `stats` | Игровые модули | 🔧 75% | ✅3 🔧0 ◻️1 | Прогрессия ощущается: тренировки дают рост, сон закрепляет, лист персонажа показывает; вторичные статы пересчи… |
 | 17 | **Инвентарь, экипировка, крафт, хранилища** `inventory` | Игровые модули | 🔧 88% | ✅7 🔧0 ◻️1 | Крафт как полноценная система (рецепты, станции); хранение в домах/складах; полная матрёшка экипировки на теле… |
 | 18 | **Торговля и экономика** `trade-economy` | Игровые модули | 🔧 71% | ✅5 🔧0 ◻️2 | Живая экономика: кошельки NPC, ассортимент зависит от локации/фракции, покупка лута игроком влияет на сток, Cu… |
@@ -83,7 +83,7 @@
 | Аудит ядра (pass1: Core/DI/EventBus) | ✅ done | 2026-08-26 | `checkpoints/08_26_audit_pass1_architecture.md` |
 | EventBus: изоляция исключений + re-entrancy-дрен (P1-5) | ✅ done | 2026-09-22 | `checkpoints/09_22_r32_external_audit.md` · `checkpoints/09_22_r33_ext_audit_phase4.md` |
 | DI: override prune + startup fail-closed + cycle detection (P1-6, P2-12/13/14) | ✅ done | 2026-09-22 | `checkpoints/09_22_r32_external_audit.md` · `checkpoints/09_22_r33_ext_audit_phase4.md` |
-| P2-бэклог аудита 09.22 (10 пунктов) | 🔧 in_progress | 2026-09-22 | `checkpoints/09_22_r36a_p2_backlog_phase11_time.md` · `checkpoints/09_22_r36b_p2_backlog_phase12_items.md` — Часть P2 закрыта R36a/R36b (time/items/trade); остаток: P2-1 RestoreState→bool, P2-2 legacy AttitudeScore, P2-3 ConfigureAwait-гард, P2-16/17 идемпотентность Initialize, P2-18 версии сейвов, P2-19 Load-after-Reset. |
+| P2-бэклог аудита 09.22 (10 пунктов) | 🔧 in_progress | 2026-09-22 | `checkpoints/09_22_r36a_p2_backlog_phase11_time.md` · `checkpoints/09_22_r36b_p2_backlog_phase12_items.md` · `checkpoints/10_20_audit_wave2.md` — Часть P2 закрыта R36a/R36b (time/items/trade); остаток: P2-1 RestoreState→bool, P2-2 legacy AttitudeScore, P2-3 ConfigureAwait-гард, P2-16/17 идемпотентность Initialize, P2-18 версии сейвов, P2-19 Load-after-Reset. Волна 2 (20.10): EventBus re-entrancy на дренировании (BUG-004 — сентинел _draining, итеративный дрен; ранее R34 P2-22), DI Build() снапшот регистраций (BUG-005), честный выбор ctor по разрешимости (BUG-006) — самотесты AUDIT0922 U/V/W. |
 
 #### 2. QA-инфраструктура (headless-симы, регрессия, VLM) — 89% (🔧)
 
@@ -119,7 +119,7 @@
 | Аудит качества/соответствия (09_06) | ✅ done | 2026-09-06 | `checkpoints/09_06_full_audit_architecture_docs_lore_quality.md` |
 | План аудита доков R31 (реестр дрейфа, 5 проходов) | ✅ done | 2026-09-21 | `checkpoints/09_21_r31_doc_audit_plan.md` |
 | Синхронизация после P1/P2-фиксов (TIME, STAT, INVENTORY, COMBAT, DI) | ✅ done | 2026-09-22→2026-10-18 | `checkpoints/09_22_r35_ext_audit_phases_11_14.md` · `checkpoints/10_18_r41_playtest_round2.md` |
-| Pass 1–5 плана R31 (доки врут: README 16→17, §2.17, SAVE 19→21 и др.) | 🔧 in_progress | 2026-09-21 | `checkpoints/09_21_r31_doc_audit_plan.md` — Обновления применялись попутно в R32-R41; полный прогон проходов плана с приёмкой по grep-критериям не завершён; +новые дрейф-пункты от фиксов R32+. |
+| Pass 1–5 плана R31 (доки врут: README 16→17, §2.17, SAVE 19→21 и др.) | 🔧 in_progress | 2026-09-21 | `checkpoints/09_21_r31_doc_audit_plan.md` · `checkpoints/10_20_audit_wave2.md` — Обновления применялись попутно в R32-R41; полный прогон проходов плана с приёмкой по grep-критериям не завершён; +новые дрейф-пункты от фиксов R32+. Волна 2 (20.10, DOC-001): README/START_PROMPT 16→17 модулей, §12 актуализирован, SESSION_SUMMARY дополнен R36→R41 + волны 1-2 (20.10). Остаток: ~15 упоминаний «16 модулей» в docs_v2 — следующий проход R31-плана. |
 
 #### 4. Сохранения (Save/Load) — 71% (🔧)
 
@@ -234,7 +234,7 @@
 | R38-6: книга техник layout (PanelContainer-блоки, скролл) | ✅ done | 2026-10-02 | `checkpoints/10_02_r38_playtest_six_bugs.md` |
 | R41-7/R41-8: K-окно без вкладки Техники; drag&drop чип→слот + тост причин | ✅ done | 2026-10-18 | `checkpoints/10_18_r41_playtest_round2.md` |
 | Мастерство техник (mastery 0–100% растёт от использования) | ◻️ planned |  | Аудит 19.10: mastery фиксируется СЛУЧАЙНО при генерации (rng), роста от использования НЕТ; при этом формулы чувствительны (capacity ×(1+mastery×0.005)). Механику роста — в контент-план M6. |
-| Недостающие типы техник: каст-эффекты Sensory/Curse/Poison/Support | ✅ done | 2026-10-19→2026-10-19 | `checkpoints/10_19_audit_fixes_wave1.md` — Волна 1 (19.10): 4 типа получили честные минимальные эффекты через IBuffService — Poison DoT (6×BaseDamage/6), Curse −15% атаки 8с, Sensory +20% урона себе 10с, Support самолечение BaseDamage/2; гейты цели/тела и RefundUse при отказе. COMBAT_SIM шаг 3m PASS. |
+| Недостающие типы техник: каст-эффекты Sensory/Curse/Poison/Support | ✅ done | 2026-10-19→2026-10-19 | `checkpoints/10_19_audit_fixes_wave1.md` · `checkpoints/10_20_audit_wave2.md` — Волна 1 (19.10): 4 типа получили честные минимальные эффекты через IBuffService — Poison DoT (6×BaseDamage/6), Curse −15% атаки 8с, Sensory +20% урона себе 10с, Support самолечение BaseDamage/2; гейты цели/тела и RefundUse при отказе. COMBAT_SIM шаг 3m PASS. Волна 2 (20.10, BUG-012): ранний гейт Healing/Support до StartCharge — Ци не тратится на заведомо невозможное лечение (COMBAT_SIM 3m2 PASS); модульный гейт «мёртвый не кастует» (BUG-009). |
 
 #### 10. Формации (магические массивы) — 57% (🔧)
 
@@ -252,7 +252,7 @@
 | Бонусы формаций в бою (аура, спуск по techniqueId B5) | ✅ done | 2026-09-21 | `checkpoints/09_21_r24_multicombat_c_aura_ui.md` · `checkpoints/09_21_r30_playtest_audit_plan.md` |
 | Помощники вносят Ци (до 50 практиков) | ◻️ planned |  | Аудит 19.10: зарядник→формация работает (ChargerService публикует FormationContributeQiRequestEvent); участие NPC-помощников (до 50 практиков по спеке §3.6) — не реализовано. |
 | FormationCore предметы: Disk/Altar (переносной/стационарный) | ◻️ planned |  | Аудит 19.10: enum FormationCoreType (Disk L1–L6 / Altar L5–L9) есть в Core; предметы-носители НЕ генерируются (0 вхождений в генераторе/инвентаре). |
-| Ловушки/барьеры как типы формаций | 🔧 in_progress |  | Волна 1 (19.10, VER-001): Barrier — Shield-агрегация в статбонусы починена (Defense 250‰ L1, FORM шаг 4a PASS, снятие при деактивации честное); Amplification подтверждён (Damage 220‰); Trap — механизм Control-эффектов не реализован (GAP-009 реестра аудита, волна 3). |
+| Ловушки/барьеры как типы формаций | 🔧 in_progress |  | `checkpoints/10_20_audit_wave2.md` — Волна 1 (19.10): Barrier Shield-агрегация (VER-001), Trap → GAP-009. Волна 2 (20.10, BUG-008): бонусы стали entity-aware — радиус Чебышёва + TargetTag (ally/enemy), барьер больше не защищает врагов, Amplification не усиливает чужой урон (FormationShotSimDebug 4a/4a2/4a3/4c). |
 
 #### 11. Баффы и DoT (Buff) — 60% (🔧)
 
@@ -339,7 +339,7 @@
 | Аудит Player (09.11) + lifecycle B1 (TargetingService, PlayerCombatAdapter) | ✅ done | 2026-09-11→2026-09-21 | `checkpoints/09_11_audit_player.md` · `checkpoints/09_21_r30_playtest_audit_plan.md` |
 | Стойки G (DefenseIntent), ревайв (P2-44 оживляет тело), dash-кламп границ | ✅ done | 2026-09-22 | `checkpoints/09_22_r36b_p2_backlog_phase12_items.md` |
 | Сон: StartSleep 8ч→480 тиков→авто-вейк + закрепление статов (P1-20) | ✅ done | 2026-09-22 | `checkpoints/09_22_r35_ext_audit_phases_11_14.md` |
-| Смерть игрока: экран смерти / выбор места возрождения | 🔧 in_progress | 2026-10-19 | `checkpoints/10_19_audit_fixes_wave1.md` — Волна 1 (19.10): экран смерти DeathScreenOverlay реализован — вуаль, причина гибели, «Возродиться» по кнопке (таймер 3с снят; RESPAWN шаг 4 PASS). Осталось: потери при смерти и выбор места возрождения. |
+| Смерть игрока: экран смерти / выбор места возрождения | ✅ done | 2026-10-19 | `checkpoints/10_19_audit_fixes_wave1.md` · `checkpoints/10_20_audit_wave2.md` — Волна 1 (19.10): DeathScreenOverlay (GAP-001). Волна 2 (20.10): управление блокируется при смерти (BUG-009: WASD/хоткеи/каст/Space/LMB; мир НЕ паузится — живой мир), убийца в PlayerDeathEvent (BUG-010: гонка кэша закрыта переносом KillerId по цепочке Damage→Body→Player→UI), респавн по подтверждению (BUG-011: провал не скрывает кнопку). RespawnSimDebug 4a/4b/4c/4d PASS. Остаток: потери при смерти и выбор места возрождения — за владельцем. |
 
 #### 16. Развитие персонажа (статы, пороги, сон) — 75% (🔧)
 
@@ -529,7 +529,7 @@
 | P1-3: NPC zero-GC hot path (CopyStatesTo, персистентные буферы) | ✅ done | 2026-09-22 | `checkpoints/09_22_r32_external_audit.md` |
 | R41-2: три источника FPS-дропа убраны (консоль-IO 1/5с, GC-churn редрава, холостые QueueRedraw) + инструменты | ✅ done | 2026-10-18 | `checkpoints/10_18_r41_playtest_round2.md` |
 | Профилирование больших популяций (150+ NPC, 100+ зверей) | 🔧 in_progress |  | Плотность поднята R41 (109 зверей); фрейм-тайминги снять после плейтеста. |
-| Чанкинг мира / LOD / 2000 NPC мегаполис | ◻️ planned |  | Дальний план PERFORMANCE_STRATEGY. |
+| Чанкинг мира / LOD / 2000 NPC мегаполис | ◻️ planned |  | `checkpoints/10_20_audit_wave2.md` — Дальний план PERFORMANCE_STRATEGY. Волна 2 (20.10, BUG-007): viewport culling NPC/Animal рендереров — отсечение до резолва анимации/HP/рамок (паттерн ObjectLayerRenderer, margin 80px); на L500 отсекается ~97% сущностей (L500SimDebug bug007-culling 4/4). |
 
 
 ### D. Горизонт
@@ -591,7 +591,7 @@
 
 ## 5. Открытые верификации (перенос в следующие итерации)
 
-- player-s5: потери при смерти и выбор места возрождения — экран смерти реализован в волне 1 (19.10), остаток в стадии
+- player-s5: остаток волн 1-2 закрыт 20.10 (BUG-009/010/011: гейты управления при смерти, убийца в событии, подтверждённый респавн); за владельцем — потери при смерти/выбор места возрождения
 - form-s7 (Trap): механизм наложения Control-эффектов — GAP-009 реестра аудита (zone-scan, применение, потребление Speed)
 - world-s8: решение о событийной системе мира — генератор событий (GAP-007)
 - ai-s6..s8: Behavior Tree / Neural Router / Brain Controller — большой дизайн-этап, спека §3.7 (GAP-008)

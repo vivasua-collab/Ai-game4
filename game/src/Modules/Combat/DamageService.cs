@@ -1,5 +1,8 @@
 #nullable enable
 // Создано: 2026-05-09
+// Редактировано: 2026-10-20 — АУДИТ-1020 (BUG-008): formation-бонусы стали
+//   entity-aware (радиус EffectRadiusMeters + сторона TargetTag) — резолв
+//   тайлов атакующего/цели по паттерну CombatRangeGateService.TryResolveTile.
 // Редактировано: 2026-08-22 — IMPL-6 (Q5): Random.Shared → ICombatRng (детерминированный бой).
 // Редактировано: 2026-05-09 — CMB-A01: порядок пайплайна урона (QiBuffer ДО брони)
 // Редактировано: 2026-05-09 — CMB-A02: интеграция LevelSuppression через DamageRequest
@@ -31,6 +34,7 @@ using CultivationGame.Core;
 using CultivationGame.Core.Messaging.Contracts;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.Events;
+using CultivationGame.Core.Helpers; // АУДИТ-1020 (BUG-008): PlayerIdResolver (TryResolveTile)
 using CultivationGame.Core.Interfaces;
 
 namespace CultivationGame.Modules.Combat
@@ -90,6 +94,16 @@ namespace CultivationGame.Modules.Combat
         // Инжектируется через конструктор, бои воспроизводимы при том же seed.
         private readonly ICombatRng _rng;
 
+        // АУДИТ-1020 (BUG-008): резолв тайловых позиций для entity-aware
+        // бонусов формаций. Паттерн «sanctioned exceptions» как у
+        // CombatRangeGateService (тот же модуль Combat): позиционные данные
+        // нужны ДЛЯ проверки, событие повреждения публикуется как раньше.
+        // Опциональные (null → позиция не резолвится → формация = 0):
+        // DI собирает в рантайме, ручные сборки/тесты не ломаются.
+        private readonly IPlayerService? _playerService;
+        private readonly INPCService? _npcService;
+        private readonly IAnimalService? _animalService;
+
         // EVT-01: кэш состояния из событий
         private bool _cachedBufferIsActive;
         private QiBufferMode _cachedBufferMode;
@@ -113,7 +127,12 @@ namespace CultivationGame.Modules.Combat
             IQiDataProvider qiDataProvider, // Спринт 4 B8: per-entity QiBuffer
             ICombatRng combatRng, // IMPL-6 (Q5): deterministic RNG
             IPublisher<DamageTraceEvent> damageTracePub, // R40-5b/R41-1
-            IBodyDataProvider bodyDataProvider) // R41-1: HP до/после в трейсе
+            IBodyDataProvider bodyDataProvider, // R41-1: HP до/после в трейсе
+            // АУДИТ-1020 (BUG-008): опциональные позиционные резолверы в КОНЦЕ
+            // сигнатуры — существующие вызовы/DI-регистрации не меняются.
+            IPlayerService? player = null,
+            INPCService? npcs = null,
+            IAnimalService? animals = null)
         {
             _damageAppliedPub = damageAppliedPub;
             _damageTracePub = damageTracePub;
@@ -126,6 +145,9 @@ namespace CultivationGame.Modules.Combat
             _formationService = formationService; // Спринт 2 B2/C9
             _qiDataProvider = qiDataProvider; // Спринт 4 B8
             _rng = combatRng ?? throw new ArgumentNullException(nameof(combatRng)); // Q5
+            _playerService = player;   // АУДИТ-1020 (BUG-008)
+            _npcService = npcs;        // АУДИТ-1020 (BUG-008)
+            _animalService = animals; // АУДИТ-1020 (BUG-008)
 
             // EVT-01: подписка на кэш состояния буфера
             _qiBufferStateChangedSubscription = _qiBufferStateChangedSub.Subscribe((in QiBufferStateChangedEvent e) => {
@@ -179,7 +201,10 @@ namespace CultivationGame.Modules.Combat
 
             // СЛОЙ 3b: Бафф формаций — DAMAGE (Спринт 2 B2/C9)
             // CRIT-1: integer math — GetFormationBonusPermil() возвращает бонус в промилле.
-            int formationDmgPermil = _formationService.GetFormationBonusPermil(StatType.Damage);
+            // АУДИТ-1020 (BUG-008): entity-aware — бонус только если АТАКУЮЩИЙ
+            // в радиусе формации и на её стороне (Amplification бустит урон
+            // союзника игрока, но НЕ вражеского NPC; позиция не резолвится → 0).
+            int formationDmgPermil = GetEntityFormationPermil(StatType.Damage, request.AttackerId);
             if (formationDmgPermil != 0)
             {
                 preDefenseDamage = (int)((long)preDefenseDamage * (1000 + formationDmgPermil) / 1000);
@@ -367,7 +392,10 @@ namespace CultivationGame.Modules.Combat
             int buffReductionPermil = defBuffPermil > 0 ? defBuffPermil : 0;
 
             // MED-2: Formation defense bonus
-            int formationDefPermil = _formationService.GetFormationBonusPermil(StatType.Defense);
+            // АУДИТ-1020 (BUG-008): entity-aware — бонус только если ЦЕЛЬ
+            // в радиусе формации и на её стороне (барьер игрока защищает
+            // союзников игрока, но НЕ врагов по всей карте).
+            int formationDefPermil = GetEntityFormationPermil(StatType.Defense, request.TargetId);
             if (formationDefPermil > 0)
                 buffReductionPermil += formationDefPermil;
 
@@ -455,6 +483,60 @@ namespace CultivationGame.Modules.Combat
                 finalDamage, !aliveAfter, hpBefore, hpAfter));
 
             return damageResult;
+        }
+
+        // === АУДИТ-1020 (BUG-008): entity-aware бонусы формаций ============
+
+        /// <summary>
+        /// АУДИТ-1020 (BUG-008): бонус формации для сущности пайплайна урона.
+        /// Резолвит тайловую позицию сущности → entity-aware overload
+        /// IFormationService.GetFormationBonusPermil(stat, id, x, y) —
+        /// формация активна + сущность в радиусе EffectRadiusMeters + сущность
+        /// на стороне TargetTag. Не резолвится (нет DI-сервиса позиций /
+        /// неизвестный тип сущности) → 0 — формация НЕ бустит «вслепую».
+        /// </summary>
+        private int GetEntityFormationPermil(StatType stat, string entityId)
+        {
+            if (_formationService == null || string.IsNullOrEmpty(entityId)) return 0;
+            if (!TryResolveTile(entityId, out int x, out int y)) return 0;
+            return _formationService.GetFormationBonusPermil(stat, entityId, x, y);
+        }
+
+        /// <summary>
+        /// АУДИТ-1020 (BUG-008): тайловая позиция сущности — игрок (оба
+        /// исторических алиаса), NPC или зверь. Паттерн
+        /// CombatRangeGateService.TryResolveTile (АУДИТ-0921_2030 Ф3-1:
+        /// звери — полноценные боевые цели). false = сущность позиционно
+        /// неизвестна → зональный бонус формации не применяется.
+        /// </summary>
+        private bool TryResolveTile(string entityId, out int x, out int y)
+        {
+            x = y = -1;
+
+            if (PlayerIdResolver.IsPlayer(entityId))
+            {
+                if (_playerService == null) return false;
+                x = _playerService.Position.X;
+                y = _playerService.Position.Y;
+                return true;
+            }
+
+            var npc = _npcService?.GetNPC(entityId);
+            if (npc != null)
+            {
+                x = npc.Position.X;
+                y = npc.Position.Y;
+                return true;
+            }
+
+            var animal = _animalService?.TryGetAnimal(entityId);
+            if (animal.HasValue && animal.Value.IsValid)
+            {
+                x = animal.Value.Position.X;
+                y = animal.Value.Position.Y;
+                return true;
+            }
+            return false;
         }
 
         /// <summary>

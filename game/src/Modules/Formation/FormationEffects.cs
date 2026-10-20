@@ -1,5 +1,8 @@
 #nullable enable
 // Создано: 2026-05-09
+// Редактировано: 2026-10-20 — АУДИТ-1020 (BUG-008): агрегация бонусов по
+//   (StatType, TargetTag) — TargetTag больше не теряется (прежде бонусы
+//   формации действовали на ЛЮБЫЕ сущности на всей карте).
 // Эффекты формации — БЕЗ статического изменяемого состояния.
 // Каждый экземпляр FormationEffects привязан к конкретной формации.
 using System.Collections.Generic;
@@ -22,7 +25,20 @@ namespace CultivationGame.Modules.Formation
     {
         // === Состояние (instance-based, NOT static) ===
         private readonly List<FormationEffectData> _activeEffects = new List<FormationEffectData>();
-        private readonly Dictionary<StatType, float> _statBonuses = new Dictionary<StatType, float>();
+
+        // АУДИТ-1020 (BUG-008): агрегация по (StatType, TargetTag).
+        // Прежний словарь по StatType терял TargetTag → DamageService тянул
+        // бонус формации для ЛЮБОЙ сущности (барьер игрока «защищал» врагов
+        // по всей карте, Amplification усиливал вражеский урон).
+        private readonly Dictionary<(StatType Stat, string Tag), float> _statBonusesByTag =
+            new Dictionary<(StatType, string), float>();
+
+        // АУДИТ-1020 (BUG-008): LEGACY-словарь по StatType — сумма по всем тегам,
+        // прежняя семантика до бага. Оставлен для старых QA-вызовов
+        // GetFormationBonus(stat); боевые потребители перешли на
+        // tag-aware GetFormationBonus(stat, targetTag).
+        private readonly Dictionary<StatType, float> _statBonusesLegacy = new Dictionary<StatType, float>();
+
         private bool _isActive;
 
         /// <summary>Активны ли эффекты формации</summary>
@@ -34,7 +50,8 @@ namespace CultivationGame.Modules.Formation
         public void Initialize(FormationData formationData)
         {
             _activeEffects.Clear();
-            _statBonuses.Clear();
+            _statBonusesByTag.Clear();
+            _statBonusesLegacy.Clear();
 
             foreach (var entry in formationData.Effects)
             {
@@ -61,10 +78,23 @@ namespace CultivationGame.Modules.Formation
                     entry.EffectType == FormationEffectType.Shield)
                 {
                     float sign = entry.EffectType == FormationEffectType.Debuff ? -1f : 1f;
-                    if (_statBonuses.ContainsKey(entry.TargetStat))
-                        _statBonuses[entry.TargetStat] += sign * entry.Value;
+
+                    // АУДИТ-1020 (BUG-008): tag-aware агрегация — ключ
+                    // (StatType, TargetTag). Tag пустой → «ally» (дефолт
+                    // FormationEffectData/генератора).
+                    string tag = string.IsNullOrEmpty(entry.TargetTag) ? "ally" : entry.TargetTag;
+                    var key = (entry.TargetStat, tag);
+                    if (_statBonusesByTag.ContainsKey(key))
+                        _statBonusesByTag[key] += sign * entry.Value;
                     else
-                        _statBonuses[entry.TargetStat] = sign * entry.Value;
+                        _statBonusesByTag[key] = sign * entry.Value;
+
+                    // LEGACY: сумма по всем тегам (прежняя семантика;
+                    // см. комментарий у _statBonusesLegacy).
+                    if (_statBonusesLegacy.ContainsKey(entry.TargetStat))
+                        _statBonusesLegacy[entry.TargetStat] += sign * entry.Value;
+                    else
+                        _statBonusesLegacy[entry.TargetStat] = sign * entry.Value;
                 }
             }
         }
@@ -90,8 +120,11 @@ namespace CultivationGame.Modules.Formation
         }
 
         /// <summary>
-        /// Получить бонус формации для указанной характеристики.
-        /// Используется в пайплайне урона (Слой 3b).
+        /// LEGACY: бонус формации для характеристики по ЛЮБОМУ тегу —
+        /// СУММА бонусов всех тегов (прежняя семантика до АУДИТ-1020/BUG-008,
+        /// когда TargetTag терялся при агрегации).
+        /// Боевые потребители используют tag-aware перегрузку ниже; этот метод
+        /// оставлен для старых QA-вызовов FormationShotSimDebug (4b/4d).
         /// Возвращает 0 если формация неактивна.
         /// </summary>
         /// <param name="stat">Тип характеристики</param>
@@ -99,7 +132,25 @@ namespace CultivationGame.Modules.Formation
         public float GetFormationBonus(StatType stat)
         {
             if (!_isActive) return 0f;
-            if (_statBonuses.TryGetValue(stat, out float bonus))
+            if (_statBonusesLegacy.TryGetValue(stat, out float bonus))
+                return bonus;
+            return 0f;
+        }
+
+        /// <summary>
+        /// АУДИТ-1020 (BUG-008): бонус формации для характеристики по тегу
+        /// цели ("ally"/"enemy") — TargetTag учитывается.
+        /// Возвращает 0 если формация неактивна или тег не имеет бонуса
+        /// (барьер с Shield/ally не даёт Defense врагам).
+        /// </summary>
+        /// <param name="stat">Тип характеристики</param>
+        /// <param name="targetTag">Тег стороны цели ("ally" или "enemy")</param>
+        /// <returns>Модификатор (0 если неактивна или нет бонуса для тега)</returns>
+        public float GetFormationBonus(StatType stat, string targetTag)
+        {
+            if (!_isActive) return 0f;
+            if (string.IsNullOrEmpty(targetTag)) return 0f; // без тега — нет зонального бонуса
+            if (_statBonusesByTag.TryGetValue((stat, targetTag), out float bonus))
                 return bonus;
             return 0f;
         }
@@ -119,7 +170,8 @@ namespace CultivationGame.Modules.Formation
         {
             _isActive = false;
             _activeEffects.Clear();
-            _statBonuses.Clear();
+            _statBonusesByTag.Clear();
+            _statBonusesLegacy.Clear();
         }
     }
 }

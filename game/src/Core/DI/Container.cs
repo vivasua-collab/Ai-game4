@@ -134,14 +134,24 @@ public sealed class ContainerBuilder : IContainerBuilder
         return false;
     }
 
-    public Container Build() => new Container(_registrations, _orderedRegistrations);
+    // АУДИТ-1020 (BUG-005): снапшот коллекций — построенный контейнер immutable
+    // к мутациям builder. Прежний код передавал ссылки: Register*/RegisterInstance
+    // в ТОТ ЖЕ builder ПОСЛЕ Build() меняли словарь/ordered-список уже построенного
+    // контейнера (новые регистрации «прорастали» в него, prune P1-6 и Dispose
+    // вычищали/чистили его ключи). Registration-объекты остаются ОБЩИМИ по
+    // ссылке — это допустимо: builder на каждый Register* создаёт НОВЫЙ
+    // Registration и после Build их не мутирует (Instance имеет setter,
+    // но используется только на этапе конструирования, которого builder не делает).
+    public Container Build() => new Container(
+        new Dictionary<Type, Registration>(_registrations),
+        new List<Registration>(_orderedRegistrations));
 }
 
 /// <summary>
 /// Lightweight DI container supporting:
 /// <list type="bullet">
 ///   <item>Singleton / Transient / Scoped lifetimes (Scoped ≡ Singleton for v1).</item>
-///   <item>Constructor injection (greediest public ctor).</item>
+///   <item>Constructor injection (greediest SATISFIABLE public ctor — АУДИТ-1020 BUG-006).</item>
 ///   <item>Property injection via <see cref="InjectAttribute"/>.</item>
 ///   <item>Pre-built instances via <c>RegisterInstance</c>.</item>
 ///   <item>ResolveAll iterates registrations in registration order (P2-12).</item>
@@ -363,24 +373,38 @@ public sealed class Container : IResolver, IDisposable
         if (ctors.Length == 0)
             return Activator.CreateInstance(implType)!;
 
-        // Pick greediest ctor we can satisfy.
-        var ctor = ctors
-            .OrderByDescending(c => c.GetParameters().Length)
-            .First();
-
-        var args = ctor.GetParameters()
-            .Select(p =>
+        // АУДИТ-1020 (BUG-006): честный выбор конструктора — кандидаты от
+        // самого параметризованного к простому; берётся ПЕРВЫЙ, у которого
+        // каждый обязательный параметр резолвится (throwIfMissing:false) или
+        // имеет DefaultValue. Прежний код брал OrderByDescending(…).First()
+        // БЕЗ проверки разрешимости: длиннейший ctor с неразрешимой
+        // обязательной зависимостью ронял Resolve даже при пригодном коротком.
+        // Исключения разрешения (циклы P2-14, depth>50) по-прежнему
+        // распространяются наружу — фолбэк не маскирует диагностику циклов.
+        string failureDetail = "";
+        foreach (var ctor in ctors.OrderByDescending(c => c.GetParameters().Length))
+        {
+            var pars = ctor.GetParameters();
+            var args = new object?[pars.Length];
+            var missing = new List<string>();
+            for (int i = 0; i < pars.Length; i++)
             {
-                var resolved = Resolve(p.ParameterType, depth + 1, throwIfMissing: false);
-                if (resolved is null && !p.HasDefaultValue)
-                    throw new InvalidOperationException(
-                        $"Cannot resolve parameter '{p.Name}' ({p.ParameterType.FullName}) " +
-                        $"for constructor of '{implType.FullName}'.");
-                return resolved ?? p.DefaultValue;
-            })
-            .ToArray();
+                var resolved = Resolve(pars[i].ParameterType, depth + 1, throwIfMissing: false);
+                if (resolved is not null) { args[i] = resolved; continue; }
+                if (pars[i].HasDefaultValue) { args[i] = pars[i].DefaultValue; continue; }
+                missing.Add($"'{pars[i].Name}' ({pars[i].ParameterType.FullName})");
+                args[i] = null;
+            }
+            if (missing.Count == 0)
+                return ctor.Invoke(args)!;
+            if (failureDetail.Length == 0)
+                failureDetail = $"ctor({string.Join(", ", pars.Select(p => p.ParameterType.Name))}): " +
+                                $"cannot resolve {string.Join(", ", missing)}";
+        }
 
-        return ctor.Invoke(args)!;
+        throw new InvalidOperationException(
+            $"No satisfiable constructor for '{implType.FullName}': every public ctor has " +
+            $"an unresolvable mandatory parameter. Greediest failure: {failureDetail}.");
     }
 
     private void InjectProperties(object instance, int depth)

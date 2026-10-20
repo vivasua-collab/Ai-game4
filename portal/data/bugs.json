@@ -1,6 +1,6 @@
 {
-  "version": "1.0",
-  "updated": "2026-10-19T13:00:00Z",
+  "version": "1.1",
+  "updated": "2026-10-20T13:20:00Z",
   "format": {
     "purpose": "Реестр находок аудита и волн их исправления. Запуск процесса: директива владельца от 19.10.2026 — «по важным находкам аудита запустить анализ и исправление». Источник находок: аудит-вердикты итерации 2 карты проекта (коммит dfb98d0) + открытые верификации PROJECT_MAP.md §5. Ведёт main-агент Z.ai Code; веб-портал читает файл напрямую (runtime, no-store).",
     "type": {
@@ -23,9 +23,10 @@
       "deferred": "осознанно отложено (причина в analysis)"
     },
     "fix_wave": {
-      "1": "текущая сессия 19.10.2026 — параллельные субагенты 10-19-fix-a / 10-19-fix-b",
-      "2": "ближайшие сессии — малые фичи (крафт-UI, зарядники, NPC-категории)",
-      "3": "дизайн-этап / контент-план M6+ — требует решения владельца"
+      "1": "сессия 19.10.2026 — волна 1 аудита карты проекта (ЗАКРЫТА): BUG-001/VER-001/GAP-001, субагенты 10-19-fix-a/fix-b",
+      "2": "сессия 20.10.2026 — волна 2: багфикс внешнего аудита upload/adit_10_20 (10 находок + доки), субагенты 10-20-fix-c..fix-h",
+      "3": "дизайн-этап / контент-план M6+ — требует решения владельца",
+      "4": "малые фичи (бывш. волна 2): крафт-UI, зарядники, NPC-категории"
     }
   },
   "items": [
@@ -139,7 +140,7 @@
       "module": "Инвентарь (Inventory)",
       "track_ref": "inv-s8",
       "status": "planned",
-      "fix_wave": 2,
+      "fix_wave": 4,
       "found": "2026-10-19",
       "summary": "CraftingService + RegisterRecipe(s) API готовы; UI крафта и рецепты — 0 вхождений в коде. Игрок не может крафтить.",
       "analysis": "Сервисный слой готов (аудит dfb98d0); отсутствуют окно (Adapter/UI) и стартовый набор рецептов.",
@@ -167,7 +168,7 @@
       "module": "Зарядники Ци (Charger)",
       "track_ref": "charger-s4",
       "status": "planned",
-      "fix_wave": 2,
+      "fix_wave": 4,
       "found": "2026-10-19",
       "summary": "Домен ChargerData готов для 5 форм-факторов (аудит dfb98d0); генерация предметов и окно ChargerWindow покрывают только Belt.",
       "analysis": "Модельная часть форм-факторов завершена, презентационная и генеративная — за Belt не выходили.",
@@ -195,7 +196,7 @@
       "module": "NPC",
       "track_ref": "npc-s7",
       "status": "planned",
-      "fix_wave": 2,
+      "fix_wave": 4,
       "found": "2026-10-19",
       "summary": "Enum NPCCategory и сохранение есть; реальные различия спавна/поведения/историй между Temp / Plot / Unique частичны.",
       "analysis": "Аудит dfb98d0: семантика категорий реализована не полностью — категории есть в данных, но не всегда различаются поведением.",
@@ -352,6 +353,424 @@
         {
           "date": "2026-10-19",
           "event": "Запланировано в волну 3 (контент-план M6)"
+        }
+      ]
+    },
+    {
+      "id": "BUG-003",
+      "type": "bug",
+      "severity": "P1",
+      "title": "Провал NewGame/LoadGame всё равно переводит в GameWorld",
+      "module": "Главное меню (Adapter/UI)",
+      "track_ref": "entry-s2",
+      "status": "verified",
+      "fix_wave": 2,
+      "assignee": "10-20-fix-e",
+      "found": "2026-10-20",
+      "summary": "GameSession.NewGame/LoadGame перехватывают исключения и возвращают состояние в MainMenu (LoadGame также честно отказывает по битому сейву), но MainMenuController безусловно вызывает ChangeSceneToFile(GameWorldScenePath) после обоих методов. Игрок попадает в мир с нерабочей сессией.",
+      "analysis": "Валидация 20.10 по коду: ПОДТВЕРЖДЕНО. GameSession.cs:99-112 (NewGame catch → SetState(MainMenu)), :170-175 (Load: битый слот → MainMenu), :201-205 (catch) — исключений наружу нет; MainMenuController.cs OnNewGame:215-216, OnTestPolygon:229-230, OnLoadGame:257-258, OnNewGameInWorld:74-75 — безусловный свитч сцены после Session-вызова. Провал сборки мира = игрок в GameWorld с мёртвой сессией.",
+      "fix_plan": "Гейт: смена сцены только при Session.State == SessionState.Playing; иначе GD.PrintErr + видимый статус-лейбл в меню с причиной. 4 точки вызова (OnNewGame, OnTestPolygon, OnLoadGame, QA-путь OnNewGameInWorld).",
+      "progress_pct": 100,
+      "refs": [
+        "upload/adit_10_20 (этап 1, находка 1)",
+        "checkpoints/10_20_audit_wave2.md"
+      ],
+      "history": [
+        {
+          "date": "2026-10-20",
+          "event": "Найдено внешним аудитом adit_10_20, валидировано по коду (main-агент)"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2: назначено 10-20-fix-e"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2: код исправлен субагентом 10-20-fix-e (build 0 err, профильные QA-симы PASS); статус до полной 23-симовой регрессии main-агента"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2 ЗАКРЫТА: полная регрессия 23/23 PASS (21 дефолт + FORM + RESPAWN), build 0 err — верифицировано main-агентом"
+        }
+      ]
+    },
+    {
+      "id": "BUG-004",
+      "type": "bug",
+      "severity": "P2",
+      "title": "EventBus теряет re-entrancy-защиту при дренировании очереди (StackOverflow)",
+      "module": "Ядро (Core/Events)",
+      "track_ref": "core-s1",
+      "status": "verified",
+      "fix_wave": 2,
+      "assignee": "10-20-fix-f",
+      "found": "2026-10-20",
+      "summary": "Дрен re-entrant-очереди выполняется ПОСЛЕ _publishing.Remove(typeof(T)) — тип уже вне защиты. Хендлер дрена, публикующий тот же (или взаимно-циклический) тип, уходит в normal-path → finally-дрен вложенного Publish → неограниченный рост стека → StackOverflowException. Отмечено ещё аудитом R34 (P2-22), не исправлено.",
+      "analysis": "Валидация 20.10 по коду: ПОДТВЕРЖДЕНО трассировкой. EventBus.cs:100 (Remove) → :109-121 (дрен вызывает InvokeHandlers напрямую, без маркера типа/сентинела). Сценарии воспроизводятся: цепочка самопубликаций того же типа и взаимная публикация A↔B — в обоих случаях стек растёт на ~4-5 кадров за цикл дрена-в-finally.",
+      "fix_plan": "Сентинел [ThreadStatic] _draining на всём дренировании: публикации в момент дрена ставятся в очередь; дрен — итеративный while до опустошения очереди на ОДНОМ уровне стека. QA: самотест в Audit0922SimDebug — цепочка 200+ повторных публикаций (одного типа и A↔B) без переполнения стека, все события доставлены.",
+      "progress_pct": 100,
+      "refs": [
+        "upload/adit_10_20 (этап 1, находка 2)",
+        "checkpoints/10_20_audit_wave2.md"
+      ],
+      "history": [
+        {
+          "date": "2026-10-20",
+          "event": "Найдено внешним аудитом adit_10_20 (ранее R34 P2-22), валидировано трассировкой"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2: назначено 10-20-fix-f"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2: код исправлен субагентом 10-20-fix-f (build 0 err, профильные QA-симы PASS); статус до полной 23-симовой регрессии main-агента"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2 ЗАКРЫТА: полная регрессия 23/23 PASS (21 дефолт + FORM + RESPAWN), build 0 err — верифицировано main-агентом"
+        }
+      ]
+    },
+    {
+      "id": "BUG-005",
+      "type": "bug",
+      "severity": "P2",
+      "title": "DI Build() передаёт коллекции регистраций по ссылке (контейнер не immutable)",
+      "module": "Ядро (Core/DI)",
+      "track_ref": "core-s1",
+      "status": "verified",
+      "fix_wave": 2,
+      "assignee": "10-20-fix-f",
+      "found": "2026-10-20",
+      "summary": "ContainerBuilder.Build() передаёт _registrations/_orderedRegistrations без копирования; конструктор Container сохраняет те же ссылки. Последующие регистрации/перезаписи через builder мутируют уже построенный контейнер; кэш singleton может не соответствовать новым регистрациям (Resolve<T> vs ResolveAll<T> разные результаты).",
+      "analysis": "Валидация 20.10 по коду: ПОДТВЕРЖДЕНО. Container.cs:137 (Build → new Container(ref, ref)), :165-172 (ctor сохраняет ссылки). Контракт неизменяемости нарушен; текущий игровой путь не мутирует builder после Build (латентно).",
+      "fix_plan": "Build() копирует обе коллекции (new Dictionary/List снапшотом). Контракт зафиксирован в комментариях. QA: самотест в Audit0922SimDebug — build → мутация builder → resolve из контейнера не изменился.",
+      "progress_pct": 100,
+      "refs": [
+        "upload/adit_10_20 (этап 1, находка 3)",
+        "checkpoints/10_20_audit_wave2.md"
+      ],
+      "history": [
+        {
+          "date": "2026-10-20",
+          "event": "Найдено внешним аудитом adit_10_20, валидировано по коду"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2: назначено 10-20-fix-f"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2: код исправлен субагентом 10-20-fix-f (build 0 err, профильные QA-симы PASS); статус до полной 23-симовой регрессии main-агента"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2 ЗАКРЫТА: полная регрессия 23/23 PASS (21 дефолт + FORM + RESPAWN), build 0 err — верифицировано main-агентом"
+        }
+      ]
+    },
+    {
+      "id": "BUG-006",
+      "type": "bug",
+      "severity": "P2",
+      "title": "DI выбор конструктора не соответствует контракту «greediest we can satisfy»",
+      "module": "Ядро (Core/DI)",
+      "track_ref": "core-s1",
+      "status": "verified",
+      "fix_wave": 2,
+      "assignee": "10-20-fix-f",
+      "found": "2026-10-20",
+      "summary": "Комментарий обещает выбор наиболее параметризованного конструктора, зависимости которого можно разрешить. Реализация — OrderDescending(paramCount).First(): самый длинный конструктор с неразрешимой обязательной зависимостью роняет Resolve даже при наличии пригодного короткого.",
+      "analysis": "Валидация 20.10 по коду: ПОДТВЕРЖДЕНО. Container.cs:360-384 (Construct) — сортировка + First() без проверки разрешимости аргументов.",
+      "fix_plan": "Перебор кандидатов от самого длинного: первый, у которого все обязательные параметры резолвятся (или имеют DefaultValue) — используется; если ни один не подходит — исключение с перечнем причин. QA: самотест в Audit0922SimDebug — класс с 2 ctor (длинный с несуществующей зависимостью + короткий рабочий) резолвится коротким; одиночный неразрешимый ctor → InvalidOperationException.",
+      "progress_pct": 100,
+      "refs": [
+        "upload/adit_10_20 (этап 1, находка 4)",
+        "checkpoints/10_20_audit_wave2.md"
+      ],
+      "history": [
+        {
+          "date": "2026-10-20",
+          "event": "Найдено внешним аудитом adit_10_20, валидировано по коду"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2: назначено 10-20-fix-f"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2: код исправлен субагентом 10-20-fix-f (build 0 err, профильные QA-симы PASS); статус до полной 23-симовой регрессии main-агента"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2 ЗАКРЫТА: полная регрессия 23/23 PASS (21 дефолт + FORM + RESPAWN), build 0 err — верифицировано main-агентом"
+        }
+      ]
+    },
+    {
+      "id": "BUG-007",
+      "type": "bug",
+      "severity": "P2",
+      "title": "NPC/Animal рендереры не отсекают сущности вне экрана (масштаб тысячи NPC)",
+      "module": "Рендер (Adapter/Scene)",
+      "track_ref": "perf-r41",
+      "status": "verified",
+      "fix_wave": 2,
+      "assignee": "10-20-fix-g",
+      "found": "2026-10-20",
+      "summary": "NPCSpriteRenderer._Draw и AnimalSpriteRenderer._Draw обходят ВСЕ сущности мира (резолв анимации, HP-бары, индикаторы) без проверки попадания в видимую область камеры. ObjectLayerRenderer уже вычисляет видимый тайл-диапазон. Для large_world (500×500, тысячи NPC) — значительная доля _Draw тратится на невидимое.",
+      "analysis": "Валидация 20.10 по коду: ПОДТВЕРЖДЕНО. NPCSpriteRenderer.cs:259-314 (полный обход _idSnapshot), AnimalSpriteRenderer.cs:137-189 (полный обход _snapshot). Троттл 15 Гц (R41-2) уже есть, стоимость обхода не ограничена.",
+      "fix_plan": "По паттерну ObjectLayerRenderer: видимый пиксельный Rect мира по камере → отсечение до резолва анимации/HP/индикаторов (margin на размер спрайта). Математика отсечения — статический хелпер (headless-тестируемый). QA: ассерты хелпера в L500SimDebug + L500/ANIMQA регрессия.",
+      "progress_pct": 100,
+      "refs": [
+        "upload/adit_10_20 (этап 1, находка 5)",
+        "checkpoints/10_20_audit_wave2.md"
+      ],
+      "history": [
+        {
+          "date": "2026-10-20",
+          "event": "Найдено внешним аудитом adit_10_20, валидировано по коду"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2: назначено 10-20-fix-g"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2: код исправлен субагентом 10-20-fix-g (build 0 err, профильные QA-симы PASS); статус до полной 23-симовой регрессии main-агента"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2 ЗАКРЫТА: полная регрессия 23/23 PASS (21 дефолт + FORM + RESPAWN), build 0 err — верифицировано main-агентом"
+        }
+      ]
+    },
+    {
+      "id": "BUG-008",
+      "type": "bug",
+      "severity": "P1",
+      "title": "Бонусы формаций глобальны: без радиуса и без проверки союзник/враг",
+      "module": "Формации + Бой (Formation, Combat)",
+      "track_ref": "form-s7",
+      "status": "verified",
+      "fix_wave": 2,
+      "assignee": "10-20-fix-c",
+      "found": "2026-10-20",
+      "summary": "Активный барьер игрока даёт Defense-бонус ЛЮБОЙ получающей урон сущности по всей карте (включая врагов, атакующих игрока); бонус урона Amplification применяется к ЛЮБОМУ атакующему (включая враждебных NPC). FormationService.GetFormationBonusPermil(stat) знает только тип статы — ни позиции, ни TargetTag; DamageService тянет его глобально на слоях 3b и 6-8.",
+      "analysis": "Валидация 20.10 по коду: ПОДТВЕРЖДЕНО. FormationEffects._statBonuses агрегируется без TargetTag (FormationEffects.cs:59-68); DamageService.cs:182 (слой 3b — глобально к атакующему), :370-372 (MED-2 — глобально к защитнику). Радиус есть только в PlayerTechniqueCaster.GetAmplificationBonusPermil (локальный гейт кастера, боевой пайплайн не покрыт). Регрессия волны 1: VER-001 сделал Shield агрегируемым → глобальность стала боеспособной (барьер теперь реально «работает» — но и врагам).",
+      "fix_plan": "Entity-aware запрос: IFormationService.GetFormationBonusPermil(stat, entityId, tileX, tileY) — радиус Чебышёва (EffectRadiusMeters, int-математика ЗАПРЕТ 3.9) + сторона (TargetTag: v1 ally = кастер/игрок-сторона, PlayerIdResolver; enemy = остальные); FormationEffects — агрегация по (StatType, TargetTag); DamageService слои 3b/6-8 — с позициями сущностей (паттерн резолва CombatRangeGateService.TryResolveTile); неизвестная позиция → 0. QA: FormationShotSimDebug — союзник в зоне > 0, союзник снаружи = 0, враг в зоне = 0.",
+      "progress_pct": 100,
+      "refs": [
+        "upload/adit_10_20 (этап 2, находка 1)",
+        "checkpoints/10_20_audit_wave2.md"
+      ],
+      "history": [
+        {
+          "date": "2026-10-20",
+          "event": "Найдено внешним аудитом adit_10_20, валидировано по коду (main-агент)"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2: назначено 10-20-fix-c"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2: код исправлен субагентом 10-20-fix-c (build 0 err, профильные QA-симы PASS); статус до полной 23-симовой регрессии main-агента"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2 ЗАКРЫТА: полная регрессия 23/23 PASS (21 дефолт + FORM + RESPAWN), build 0 err — верифицировано main-агентом"
+        }
+      ]
+    },
+    {
+      "id": "BUG-009",
+      "type": "bug",
+      "severity": "P1",
+      "title": "Игрок может двигаться и управлять миром под открытым экраном смерти",
+      "module": "Игрок / UI (Player, Adapter/Scene)",
+      "track_ref": "player-s5",
+      "status": "verified",
+      "fix_wave": 2,
+      "assignee": "10-20-fix-d",
+      "found": "2026-10-20",
+      "summary": "DeathScreenOverlay блокирует только мышь (вуаль MouseFilter=Stop). HandleFreeMovement продолжает двигать игрока по WASD (гейт только Time.IsPaused); HandleStickyInput продолжает обрабатывать хоткеи: инвентарь B, лист C, каст 3-9/Z, медитация V, пауза Esc и др. _deathOverlay отсутствует в AnyModalWindowOpen(). Нарушен контракт «смерть → экран → возрождение по кнопке».",
+      "analysis": "Валидация 20.10 по коду: ПОДТВЕРЖДЕНО. GWC.cs:1752+ (HandleFreeMovement — нет гейта смерти), :1927+ (HandleStickyInput — B/C/K/3-9/F/Esc без гейта), :1602-1658 (V/T/X/Z/Space вне StickyInput — тоже без гейта), :425-440 (AnyModalWindowOpen без _deathOverlay). Дизайн-решение волны 1 (оверлей НЕ в INP-1 стеке) сохранено — смерть блокирует УПРАВЛЕНИЕ ИГРОКА, но НЕ мировое время (живой мир; симуляция не паузится — зафиксировать комментарием и в тесте).",
+      "fix_plan": "Центральный предикат DeathScreenShown в GWC: гейт в HandleFreeMovement (стоп-кадр _lastMoving=false), HandleStickyInput (полный early-return), блоке V/T/X/Z/Space в _PhysicsProcess, modalOpen в _UnhandledInput (LMB/зум). Плюс модульный гейт в PlayerTechniqueCaster (мёртвый не кастует — зона fix-c). QA: RespawnSimDebug — DeathScreenShown-ассерты (показан при смерти, снят после респавна).",
+      "progress_pct": 100,
+      "refs": [
+        "upload/adit_10_20 (этап 2, находка 2)",
+        "checkpoints/10_20_audit_wave2.md"
+      ],
+      "history": [
+        {
+          "date": "2026-10-20",
+          "event": "Найдено внешним аудитом adit_10_20, валидировано по коду"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2: назначено 10-20-fix-d"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2: код исправлен субагентом 10-20-fix-d (build 0 err, профильные QA-симы PASS); статус до полной 23-симовой регрессии main-агента"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2 ЗАКРЫТА: полная регрессия 23/23 PASS (21 дефолт + FORM + RESPAWN), build 0 err — верифицировано main-агентом"
+        }
+      ]
+    },
+    {
+      "id": "BUG-010",
+      "type": "bug",
+      "severity": "P2",
+      "title": "Экран смерти называет предыдущего атакующего вместо убийцы (+протухший кэш после оживления)",
+      "module": "Игрок / UI (Body, Player, Adapter/UI)",
+      "track_ref": "player-s5",
+      "status": "verified",
+      "fix_wave": 2,
+      "assignee": "10-20-fix-d",
+      "found": "2026-10-20",
+      "summary": "Кэш убийцы DeathScreenOverlay._lastAttackerId обновляется СОБСТВЕННЫМ подписчиком DamageAppliedEvent, который в fan-out идёт ПОСЛЕ BodyModule — а смерть (BodyCriticalEvent → PlayerDeathEvent → Show) происходит синхронно ВНУТРИ хендлера BodyModule. BuildKillerLine читает кэш ДО его обновления → показывается предыдущий атакующий или «неведомая сила». Второй риск: OnPlayerRevived скрывает экран, не очищая кэш.",
+      "analysis": "Валидация 20.10 по коду: ПОДТВЕРЖДЕНО. Порядок подписок: BodyService.OnDamageApplied (module start) раньше DeathScreenOverlay.OnDamageApplied (_Ready в BuildHud) → при смертельном ударе Show() выполняется до обновления кэша оверлея. KillerId отсутствует во всей цепочке (PlayerContracts.PlayerDeathEvent{Cause}, BodyService.ApplyDamage без source, BodyCriticalEvent без source).",
+      "fix_plan": "Пронести убийцу по цепочке: IBodyService.ApplyDamage(+sourceId=null, back-compat) → BodyService.LastDamageSourceId (player-ветка OnDamageApplied из e.SourceId) → PlayerService.Die(cause, killerId) → PlayerDeathEvent{Cause, KillerId} → GWC.OnPlayerDeath → overlay.Show(cause, e.KillerId) — killerId приоритетнее кэша; кэш очищается при любом оживлении (OnPlayerRevived) и респавне. QA: RespawnSimDebug — не-смертельный удар с source «player_0» (кэш бы показал «собственное рассеяние»), смертельный с source NPC → строка убийцы НЕ «собственное рассеяние» (детекция гонки детерминирована).",
+      "progress_pct": 100,
+      "refs": [
+        "upload/adit_10_20 (этап 2, находка 3)",
+        "checkpoints/10_20_audit_wave2.md"
+      ],
+      "history": [
+        {
+          "date": "2026-10-20",
+          "event": "Найдено внешним аудитом adit_10_20, валидировано трассировкой порядка подписок"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2: назначено 10-20-fix-d"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2: код исправлен субагентом 10-20-fix-d (build 0 err, профильные QA-симы PASS); статус до полной 23-симовой регрессии main-агента"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2 ЗАКРЫТА: полная регрессия 23/23 PASS (21 дефолт + FORM + RESPAWN), build 0 err — верифицировано main-агентом"
+        }
+      ]
+    },
+    {
+      "id": "BUG-011",
+      "type": "bug",
+      "severity": "P2",
+      "title": "Ошибка респавна скрывает единственную кнопку «Возродиться»",
+      "module": "Игрок / UI (Adapter/UI, Adapter/Scene)",
+      "track_ref": "player-s5",
+      "status": "verified",
+      "fix_wave": 2,
+      "assignee": "10-20-fix-d",
+      "found": "2026-10-20",
+      "summary": "RequestPlayerRespawn возвращает void и перехватывает исключения внутри себя (тост об ошибке). DeathScreenOverlay.OnRespawnPressed ПОСЛЕ вызова делегата безусловно вызывает HideScreen() — и даже при непризванном делегате. Провал респавна = мёртвый игрок без кнопки повторной попытки.",
+      "analysis": "Валидация 20.10 по коду: ПОДТВЕРЖДЕНО. GWC.RequestPlayerRespawn:2537-2573 (try/catch, void), DeathScreenOverlay.OnRespawnPressed:256-269 (HideScreen безусловно после if/else, в т.ч. при null-делегате).",
+      "fix_plan": "Сокрытие — только по подтверждению: PlayerReviveEvent (Revive публикует синхронно) ИЛИ проверка _player.IsAlive после вызова делегата; при неудаче экран остаётся, GD.Print о причине. Null-делегат — экран не скрывается, PrintErr. RequestPlayerRespawn → bool (совместимо с Action). QA: RespawnSimDebug 4d — отвязать делегат, нажать: экран жив, игрок мёртв; привязать, нажать: скрыт, жив.",
+      "progress_pct": 100,
+      "refs": [
+        "upload/adit_10_20 (этап 2, находка 4)",
+        "checkpoints/10_20_audit_wave2.md"
+      ],
+      "history": [
+        {
+          "date": "2026-10-20",
+          "event": "Найдено внешним аудитом adit_10_20, валидировано по коду"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2: назначено 10-20-fix-d"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2: код исправлен субагентом 10-20-fix-d (build 0 err, профильные QA-симы PASS); статус до полной 23-симовой регрессии main-агента"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2 ЗАКРЫТА: полная регрессия 23/23 PASS (21 дефолт + FORM + RESPAWN), build 0 err — верифицировано main-агентом"
+        }
+      ]
+    },
+    {
+      "id": "BUG-012",
+      "type": "bug",
+      "severity": "P2",
+      "title": "Support/Healing тратят Ци на заведомо невозможное лечение",
+      "module": "Бой и техники (Player/TechniqueCast)",
+      "track_ref": "tech-s7",
+      "status": "verified",
+      "fix_wave": 2,
+      "assignee": "10-20-fix-c",
+      "found": "2026-10-20",
+      "summary": "Проверка «Тело не ранено» для Support/Healing выполняется только в FireTechnique — ПОСЛЕ завершения зарядки (Ци уже списана тиками). В отличие от Combat/Poison/Curse, раннего гейта перед StartCharge нет. Игрок заряжает Support при полном здоровье → Ци потрачена → отказ.",
+      "analysis": "Валидация 20.10 по коду: ПОДТВЕРЖДЕНО. PlayerTechniqueCaster.OnCastRequested:190-224 — ранние гейты есть только для Combat (цель/прицел), Poison/Curse (цель); Healing/Support идут сразу в StartCharge:227. FireTechnique:306-313 проверяет _hasDamagedParts уже после зарядки. Правило для вложенной Ци (зафиксировать): Ци, вложенная в зарядку, не возвращается — консистентно с отказами Combat «Цель исчезла».",
+      "fix_plan": "Ранний гейт Healing/Support в OnCastRequested (до StartCharge): !_hasDamagedParts() → PublishFail «Тело не ранено» без траты Ци. Повторная проверка в FireTechnique сохраняется (состояние могло измениться за время зарядки). QA: CombatSimDebug 3m2 — Support при полном HP: мгновенный отказ с причиной, Ци не списана, аура пуста.",
+      "progress_pct": 100,
+      "refs": [
+        "upload/adit_10_20 (этап 2, находка 5)",
+        "checkpoints/10_20_audit_wave2.md"
+      ],
+      "history": [
+        {
+          "date": "2026-10-20",
+          "event": "Найдено внешним аудитом adit_10_20, валидировано по коду"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2: назначено 10-20-fix-c"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2: код исправлен субагентом 10-20-fix-c (build 0 err, профильные QA-симы PASS); статус до полной 23-симовой регрессии main-агента"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2 ЗАКРЫТА: полная регрессия 23/23 PASS (21 дефолт + FORM + RESPAWN), build 0 err — верифицировано main-агентом"
+        }
+      ]
+    },
+    {
+      "id": "DOC-001",
+      "type": "bug",
+      "severity": "P3",
+      "title": "Документация для AI-агентов отстала от состояния проекта (README/START_PROMPT/SESSION_SUMMARY)",
+      "module": "Документация",
+      "track_ref": "docs",
+      "status": "verified",
+      "fix_wave": 2,
+      "assignee": "10-20-fix-h",
+      "found": "2026-10-20",
+      "summary": "README.md:96 — «16 модулей» (фактически 17: R31). START_PROMPT.md §12 — «Перенос кода из Ai-game3 (текущий приоритет)», статусная секция от 15.09; §11 — «16 модулей». SESSION_SUMMARY.md — сводка заканчивается 22.09 (R32-R35), несмотря на R36-R41, карту проекта, волну 1 аудита и веб-портал. START_PROMPT требует читать SESSION_SUMMARY при старте сессии — устаревшая сводка ведёт к повторному аудиту исправленных вещей.",
+      "analysis": "Валидация 20.10: ПОДТВЕРЖДЕНО по всем трём файлам (ls Modules = 17 каталогов).",
+      "fix_plan": "README/START_PROMPT: 16→17 модулей; §12 переписать под актуальный приоритет (аудит-фиксы волны, портал, плейтесты) с пометкой даты актуальности. SESSION_SUMMARY: дополнить R36→R41 + 19.10 (карта, волна 1, портал) + 20.10 (волна 2) по worklog.md/checkpoints, следуя формату файла.",
+      "progress_pct": 100,
+      "refs": [
+        "upload/adit_10_20 (этап 1, несоответствия документации)",
+        "checkpoints/10_20_audit_wave2.md"
+      ],
+      "history": [
+        {
+          "date": "2026-10-20",
+          "event": "Найдено внешним аудитом adit_10_20, валидировано"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2: назначено 10-20-fix-h"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2: код исправлен субагентом 10-20-fix-h (build 0 err, профильные QA-симы PASS); статус до полной 23-симовой регрессии main-агента"
+        },
+        {
+          "date": "2026-10-20",
+          "event": "Волна 2 ЗАКРЫТА: полная регрессия 23/23 PASS (21 дефолт + FORM + RESPAWN), build 0 err — верифицировано main-агентом"
         }
       ]
     },

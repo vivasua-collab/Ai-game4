@@ -10,7 +10,24 @@ namespace CultivationGame.Core.Messaging.Contracts;
 public readonly struct PlayerDeathEvent
 {
     public readonly string Cause;
-    public PlayerDeathEvent(string cause) { Cause = cause; }
+
+    /// <summary>
+    /// АУДИТ-1020 (BUG-010, волна 2): источник killing blow — кто нанёс
+    /// смертельный удар (ID NPC/зверя/игрока; null — источник неизвестен).
+    /// Прежнее поведение: экран смерти брал атакующего из СВОЕГО кэша
+    /// DamageAppliedEvent, который в синхронном fan-out обновляется ПОСЛЕ
+    /// хендлера BodyService.OnDamageApplied — смерть (BodyCriticalEvent →
+    /// PlayerService.Die → сюда) происходила ВНУТРИ этого хендлера, ДО
+    /// обновления кэша → показывался ПРЕДЫДУЩИЙ атакующий. Теперь убийца
+    /// детерминированно переносится по цепочке BodyService.LastDamageSourceId
+    /// (кэшируется ДО применения урона) → PlayerService.Die → событие.
+    /// </summary>
+    public readonly string? KillerId;
+
+    /// <summary>Back-compat: источник неизвестен (KillerId=null).</summary>
+    public PlayerDeathEvent(string cause) { Cause = cause; KillerId = null; }
+
+    public PlayerDeathEvent(string cause, string? killerId) { Cause = cause; KillerId = killerId; }
 }
 
 public readonly struct PlayerReviveEvent { }

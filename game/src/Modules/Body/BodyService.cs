@@ -178,6 +178,17 @@ namespace CultivationGame.Modules.Body
         // BD-12: EntityId возвращает string.Empty вместо null до Initialize
         public string EntityId => _entityId ?? string.Empty;
 
+        // === АУДИТ-1020 (BUG-010, волна 2) ================================
+        // Источник последнего удара по игроку. Кэшируется в ApplyDamage ДО
+        // применения урона: смерть (BodyCriticalEvent → PlayerService.Die →
+        // PlayerDeathEvent.KillerId → экран смерти) происходит синхронно
+        // ВНУТРИ того же вызова ApplyDamage — подписчик-оверлей смерти успевает
+        // прочитать СВОЙ кэш DamageAppliedEvent только после fan-out, т.е.
+        // видит ПРЕДЫДУЩИЙ атакующий (гонка). Этот кэш — единственная точка,
+        // детерминированно знающая источник killing blow. PlayerService.Die
+        // читает его при vitalDestroyed (см. OnBodyCritical).
+        public string? LastDamageSourceId { get; private set; }
+
         public BodyPartState GetPartState(BodyPartType type)
         {
             if (_parts.TryGetValue(type, out var part))
@@ -218,10 +229,16 @@ namespace CultivationGame.Modules.Body
         /// R-06: Принимает totalDamage — split происходит внутри один раз.
         /// Для прямого урона в конкретный HP тип используйте ApplyDirectDamage.
         /// </summary>
-        public void ApplyDamage(BodyPartType target, int totalDamage)
+        public void ApplyDamage(BodyPartType target, int totalDamage, string? sourceId = null)
         {
             if (!_isInitialized) return;
             if (totalDamage <= 0) return;
+
+            // АУДИТ-1020 (BUG-010): источник удара кэшируем ДО применения
+            // урона — killing blow (смерть ниже по вызову) обязан видеть
+            // ИМЕННО этот источник, а не протухший от предыдущего удара.
+            if (sourceId != null)
+                LastDamageSourceId = sourceId;
 
             // Определяем реальную цель
             BodyPart part = ResolveTarget(target);
@@ -497,7 +514,11 @@ namespace CultivationGame.Modules.Body
             // сравнение приводило к бессмертию игрока (NPC урон не применялся).
             if (PlayerIdResolver.AreSameEntity(e.TargetId, _entityId))
             {
-                ApplyDamage(e.HitPart, e.Damage);
+                // АУДИТ-1020 (BUG-010): передаём источник удара (e.SourceId) —
+                // BodyService кэширует его ДО применения урона, и killing blow
+                // из боевого пайплайна детерминированно известен к моменту
+                // BodyCriticalEvent (смерть внутри этого же вызова).
+                ApplyDamage(e.HitPart, e.Damage, e.SourceId);
                 return;
             }
 

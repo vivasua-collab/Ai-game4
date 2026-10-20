@@ -8,6 +8,10 @@
 // 2026-08-25 Phase 7): если повреждён ИЛИ hostile (месть), под глобальным
 // тумблером GameSettings.ShowEnemyVitals (высокая сложность — без
 // индикации противника; HP зверей — IBodyDataProvider per-entity).
+// Редактировано: 2026-10-20 АУДИТ-1020 (BUG-007) — viewport culling: звери
+// вне видимой области камеры пропускаются в _Draw ДО резолва анимации/HP
+// (хелперы NPCSpriteRenderer — общая математика без дублирования; паттерн
+// ObjectLayerRenderer; троттл R41-2 не уменьшал стоимость обхода).
 using Godot;
 using System.Collections.Generic;
 using CultivationGame.Core.Data;
@@ -146,12 +150,32 @@ public partial class AnimalSpriteRenderer : Node2D
 
         float halfTile = _tilePixels * 0.5f;
 
+        // АУДИТ-1020 (BUG-007): видимый прямоугольник мировых пикселей
+        // (координаты _Draw) — общая математика NPCSpriteRenderer (тот же
+        // источник, что у ObjectLayerRenderer.GetVisibleTileRange: canvas-
+        // транс узла + экранный Rect viewport'а; зум Camera2D учтён;
+        // сиблинги _worldRoot — общее пространство).
+        var visibleRect = NPCSpriteRenderer.ComputeVisibleWorldRect(
+            GetGlobalTransformWithCanvas(), GetViewportRect());
+
         foreach (var animal in _snapshot)
         {
             if (!animal.IsAlive) continue;
 
             float cx = animal.Position.X * _tilePixels + halfTile;
             float cy = animal.Position.Y * _tilePixels + halfTile;
+
+            // АУДИТ-1020 (BUG-007): viewport culling — зверь вне видимой
+            // области камеры пропускается ДО резолва анимации/HP-баров
+            // (паттерн ObjectLayerRenderer; R41-2 троттл не уменьшал
+            // стоимость обхода). Отсечённый зверь не рисуется вовсе — в т.ч.
+            // рамка выбранной цели (Tab): цель вне экрана не видна, рамка
+            // не нужна. Кэш движения (_animalLastPos) у отсечённых не
+            // обновляется — вернувшийся на экран зверь может один кадр
+            // показать walk вместо idle (кэш протух до старой позиции);
+            // безопасно, самокоррекция на следующем кадре.
+            if (!NPCSpriteRenderer.IsEntityOnScreen(cx, cy, in visibleRect,
+                    NPCSpriteRenderer.EntityCullMarginPx)) continue;
 
             // G0 (I-7): анимационный резолв — PNG-лист animal_{species}_{kind}
             // → регион кадра; нет PNG → процедурный кэш по виду КАК СЕЙЧАС.

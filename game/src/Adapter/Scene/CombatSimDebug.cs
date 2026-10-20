@@ -1739,6 +1739,65 @@ public partial class CombatSimDebug : Node
             bug001Ok = false;
         }
 
+        // 3m2. BUG-012 (АУДИТ-1020, волна 2): ранний гейт Support/Healing в
+        // OnCastRequested (Stage 0) — отказ «Тело не ранено» ДО StartCharge:
+        // Ци НЕ тратится зарядкой, аура НЕ занимается. Прежне отказ приходил
+        // только в FireTechnique (после полной зарядки) — Ци сгорала впустую.
+        // Паттерны 3m: GenerateSpecified (seed), подписка TechniqueCastResultEvent
+        // (существующая, _lastCastFail), ChargeToAuraAsync НЕ нужен — зарядка
+        // не должна начаться.
+        bool bug012Ok = true;
+        if (_castRequestPub != null && _techniqueGenerator != null && _techniqueService != null
+            && _playerService != null && _auraHold != null && _qiService != null
+            && _bodyService != null && _bodyProvider != null && _damageAppliedPub != null)
+        {
+            // Полное здоровье — гейт «нечего лечить» обязан сработать на Stage 0.
+            // Инвариант summary (playerTookDamage) сохраняем: после шага
+            // возвращаем синтет-урон (паттерн 3m(d)).
+            HealPlayerFully();
+            int bug012HpFull = _bodyProvider.GetCurrentHealth("player");
+
+            int b2level = (int)_qiService.CultivationLevel;
+            if (b2level < 1) b2level = 1;
+            _techniqueService.ExtraLibraryCapacity += 1; // место под Support-технику шага
+            var supportTech2 = _techniqueGenerator.GenerateSpecified(
+                TechniqueType.Support, b2level, b2level, 99056);
+            bool learned2 = _techniqueService.LearnTechnique(supportTech2);
+
+            _lastCastFail = ""; // следим только за отказом ЭТОГО шага
+            long qiBefore = _qiService.CurrentQi;
+            var mpos = _playerService.Position;
+            int mx = mpos.X * GameConstants.TILE_PIXELS * 1000;
+            int my = mpos.Y * GameConstants.TILE_PIXELS * 1000;
+            _castRequestPub.Publish(new Core.Messaging.Contracts.TechniqueCastRequestedEvent(
+                supportTech2.TechniqueId, mx, my));
+
+            // EventBus синхронный — отказ уже в подписке; короткое ожидание —
+            // чтобы зарядка НЕ успела бы начаться даже гипотетически ( её тики
+            // идут в CombatModule.Tick — 0.6с достаточно для контроля).
+            bool failArrived = _lastCastFail.Contains("Тело не ранено");
+            await ToSignal(GetTree().CreateTimer(0.6), SceneTreeTimer.SignalName.Timeout);
+            long qiAfter = _qiService.CurrentQi;
+            bool qiNotSpent = qiAfter >= qiBefore; // зарядка списала бы Ци; пассивный реген только добавляет
+            bool auraStillEmpty = _auraHold.IsEmpty;
+            GD.Print($"[CombatSim] bug012: полный HP={bug012HpFull}, изучена={learned2}, " +
+                     $"отказ='{_lastCastFail}' (содержит причину={failArrived}), " +
+                     $"Ци {qiBefore}→{qiAfter} (не списана={qiNotSpent}, qiCost={supportTech2.QiCost}), " +
+                     $"аура пуста={auraStillEmpty} (ожид: отказ True, Ци не списана, аура пуста)");
+            bug012Ok &= learned2 && failArrived && qiNotSpent && auraStillEmpty;
+
+            // Инвариант summary: HealPlayerFully шага не должен «вылечить»
+            // playerTookDamage — возвращаем синтет-урон торсу (паттерн 3m(d)).
+            _damageAppliedPub.Publish(new Core.Messaging.Contracts.DamageAppliedEvent(
+                "qa_bug012_selfhit", "player", 50, DamageType.Physical, Element.Neutral,
+                BodyPartType.Torso, CombatAttackResult.Hit, CombatSubtype.None));
+        }
+        else
+        {
+            GD.Print("[CombatSim] WARN — bug012 skipped (no cast/gen/technique/player/aura/qi/body services)");
+            bug012Ok = false;
+        }
+
         // 4. Итоги.
         int playerHpAfter = _bodyProvider.GetCurrentHealth("player");
         int npcHpAfter = _bodyProvider.GetCurrentHealth(npcId);
@@ -1751,7 +1810,7 @@ public partial class CombatSimDebug : Node
                  $"npc {npcHpBefore}→{npcHpAfter}, arrows now={_inventory?.GetItemCount(CombatRangeGateService.ArrowItemId) ?? -1}");
 
         bool pass = playerTookDamage && npcTookDamage && weaponWiringOk && rangedWiringOk && gatesOk && turnGateOk
-                    && r21ArmorOk && r21QiOk && multiOk && aoeOk && targetingOk && homingOk && vfxOk && bug001Ok;
+                    && r21ArmorOk && r21QiOk && multiOk && aoeOk && targetingOk && homingOk && vfxOk && bug001Ok && bug012Ok;
         if (!playerTookDamage)
             GD.Print("[CombatSim] FAIL — NPC→player damage did NOT apply (BodyService player-id mismatch?)");
         if (!npcTookDamage)
@@ -1780,6 +1839,8 @@ public partial class CombatSimDebug : Node
             GD.Print("[CombatSim] FAIL — vfx (R29): проводка событий→рендереры сломана (план R23 §6.7?)");
         if (!bug001Ok)
             GD.Print("[CombatSim] FAIL — bug001 (аудит 10-19): каст-эффекты Sensory/Curse/Poison/Support не применяются (посл. отказ: " + $"{_lastCastFail})");
+        if (!bug012Ok)
+            GD.Print("[CombatSim] FAIL — bug012 (аудит 10-20): ранний гейт Support не сработал (посл. отказ: " + $"{_lastCastFail})");
 
         PrintVerdict(pass);
     }
@@ -1953,6 +2014,6 @@ public partial class CombatSimDebug : Node
 
     private static void PrintVerdict(bool pass)
     {
-        GD.Print($"[CombatSim] VERDICT: {(pass ? "PASS — обе стороны боя получают урон (melee + ranged + LOS/ammo gates + readiness-gate + multi R24-C + vfx R29 + bug001 каст-эффекты 4 типов)" : "FAIL")}");
+        GD.Print($"[CombatSim] VERDICT: {(pass ? "PASS — обе стороны боя получают урон (melee + ranged + LOS/ammo gates + readiness-gate + multi R24-C + vfx R29 + bug001 каст-эффекты 4 типов + bug012 ранний гейт Support)" : "FAIL")}");
     }
 }

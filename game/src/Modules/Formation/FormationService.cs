@@ -1,5 +1,7 @@
 #nullable enable
 // Создано: 2026-05-09
+// Редактировано: 2026-10-20 — АУДИТ-1020 (BUG-008): entity-aware
+//   GetFormationBonusPermil(stat, entityId, tileX, tileY) — радиус + сторона.
 // Редактировано: 2026-05-09 — FMT-A02: использованы кэшированные Qi-значения в ContributeQi
 // Редактировано: 2026-05-09 — FMT-A03: Depleted — стабильная стадия (перезарядка)
 // Редактировано: 2026-05-09 — FMT-A04: проверка уровня культивации создателя
@@ -463,10 +465,51 @@ namespace CultivationGame.Modules.Formation
         /// <summary>
         /// Аудит CRIT-1: бонус формации в промилле (ЗАПРЕТ 3.9).
         /// Конвертирует float-результат в промилле: 0.2 → 200, -0.15 → -150.
+        /// АУДИТ-1020 (BUG-008): LEGACY-семантика «любой тег» (сумма по тегам) —
+        /// для старых QA-вызовов; боевой пайплайн использует entity-aware ниже.
         /// </summary>
         public int GetFormationBonusPermil(StatType stat)
         {
             float bonus = _effects.GetFormationBonus(stat);
+            return (int)(bonus * 1000f);
+        }
+
+        /// <summary>
+        /// АУДИТ-1020 (BUG-008): entity-aware бонус формации в промилле —
+        /// формация активна + сущность в радиусе EffectRadiusMeters + сущность
+        /// на стороне TargetTag. Полное правило — в XML-doc интерфейса.
+        /// Семантика возвратов:
+        ///   • не активна / _currentFormation == null → 0;
+        ///   • координаты-сентинелы (x&lt;0 || y&lt;0) → 0 — неизвестная позиция
+        ///     не даёт зонального бонуса (консервативно, в отличие от гейта
+        ///     зарядки П2, где «позиция неизвестна» = «в зоне»);
+        ///   • сторона (v1-правило, BUG-008): ally = entityId == _casterId ИЛИ
+        ///     (PlayerIdResolver.IsPlayer(_casterId) && PlayerIdResolver.IsPlayer(entityId))
+        ///     — формации кастует только игрок, NPC-союзники как система
+        ///     отсутствуют (алиасы игрока покрываются вторым условием);
+        ///     всё остальное — enemy → тег "enemy";
+        ///   • радиус — Чебышёв в int (ЗАПРЕТ 3.9): вне зоны, если
+        ///     dist * GameConstants.TILE_SIZE_M &gt; EffectRadiusMeters;
+        ///   • бонус — из FormationEffects по (stat, tag).
+        /// </summary>
+        public int GetFormationBonusPermil(StatType stat, string entityId, int entityTileX, int entityTileY)
+        {
+            if (!IsFormationActive || _currentFormation == null) return 0;
+
+            // Сентинелы: неизвестная позиция = без зонального бонуса.
+            if (entityTileX < 0 || entityTileY < 0) return 0;
+
+            // Сторона (v1-правило BUG-008, см. комментарий метода).
+            bool isAlly = entityId == _casterId
+                || (PlayerIdResolver.IsPlayer(_casterId) && PlayerIdResolver.IsPlayer(entityId));
+            string tag = isAlly ? "ally" : "enemy";
+
+            // Чебышёв до центра формации, int-математика (ЗАПРЕТ 3.9):
+            // в метрах дистанция = dist * TILE_SIZE_M (2 м/тайл).
+            int dist = Math.Max(Math.Abs(entityTileX - _positionX), Math.Abs(entityTileY - _positionY));
+            if (dist * GameConstants.TILE_SIZE_M > _currentFormation.EffectRadiusMeters) return 0;
+
+            float bonus = _effects.GetFormationBonus(stat, tag);
             return (int)(bonus * 1000f);
         }
 

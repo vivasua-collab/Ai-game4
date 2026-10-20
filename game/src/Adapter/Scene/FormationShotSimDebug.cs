@@ -61,11 +61,21 @@ public partial class FormationShotSimDebug : Node
         bool pass = true;
 
         // Мир + формация у игрока (Barrier — щит, описания П3).
+        // BUG-008 (АУДИТ-1020): контур НЕ в центре карты — за EffectRadius
+        // Small (50м = 25 тайлов, FormationGeneratorService.EffectRadiusBySize)
+        // в границах QA-мира 50×50 можно уйти только от нецентральной точки
+        // (из (25,25) до любого угла ≤ 25т — радиус «упирается» в края).
+        // Смещаем контур на ~15 тайлов от старта, игрок — рядом (радиус
+        // зарядки Small 8т: п2 near-дрейн обязан работать).
         var p0 = Player.Position;
+        int fx = Mathf.Max(3, p0.X - 15);
+        int fy = Mathf.Max(3, p0.Y - 15);
+        TeleportPlayer(fx + 1, fy + 1);
+        await Frames(2);
         var data = Gen.GenerateSpecified(FormationType.Barrier, FormationSize.Small, 1, 424242);
-        bool started = Formations.StartDrawing(data.Id, Player.PlayerId, p0.X, p0.Y);
+        bool started = Formations.StartDrawing(data.Id, Player.PlayerId, fx, fy);
         pass &= started;
-        GD.Print($"[FormShot] StartDrawing(Barrier Small @ {p0.X},{p0.Y}) = {started}");
+        GD.Print($"[FormShot] StartDrawing(Barrier Small @ {fx},{fy}) = {started}");
         await Frames(10);
         if (shot != null) Snap(shot + "_drawing.png");
 
@@ -87,10 +97,10 @@ public partial class FormationShotSimDebug : Node
         // R29-урок: через GWC.DEBUG_TeleportPlayer (обе позиции), иначе
         // _PhysicsProcess вернёт игрока назад и «пауза» не сработает.
         int radius = Formations.ChargingRadiusTiles;
-        // QA-мир test_polygon 50×50: кламп в границы (п0=25,25 → 45,45,
-        // Чебышёв-дистанция 20 > radius 8 — за радиусом зарядки).
-        int tx = Mathf.Min(p0.X + radius + 30, 45);
-        int ty = Mathf.Min(p0.Y + radius + 30, 45);
+        // QA-мир test_polygon 50×50: кламп в границы (fx,fy=(10,10) → 45,45,
+        // Чебышёв-дистанция 35 > radius 8 — за радиусом зарядки).
+        int tx = Mathf.Min(fx + radius + 30, 45);
+        int ty = Mathf.Min(fy + radius + 30, 45);
         TeleportPlayer(tx, ty);
         // PlayerPositionChangedEvent публикуется PlayerService.SetPosition.
         await Frames(10);
@@ -102,7 +112,7 @@ public partial class FormationShotSimDebug : Node
         pass &= pausedFar;
 
         // Возврат — резюм.
-        TeleportPlayer(p0.X + 1, p0.Y + 1);
+        TeleportPlayer(fx + 1, fy + 1);
         await Frames(10);
         await ToSignal(GetTree().CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
         GD.Print($"[FormShot] П2 return: стадия={Formations.CurrentStage}");
@@ -131,14 +141,49 @@ public partial class FormationShotSimDebug : Node
         // эффект-логики формаций по типам. Пайплайн урона тянет бонусы
         // через IFormationService.GetFormationBonusPermil (DamageService
         // слои 3b/MED-2) — здесь проверяем ПРОИЗВОДИТЕЛЬНУЮ сторону.
-        // 4a. Barrier (Shield/Defense): после активации Defense-промилле > 0
-        //     (фикс VER-001: агрегация Shield в FormationEffects).
-        int barrierDef = Formations.GetFormationBonusPermil(StatType.Defense);
+        // BUG-008 (АУДИТ-1020): пайплайн урона теперь entity-aware
+        // (радиус + сторона) — шаги 4a/4a2/4a3/4c проверяют новую семантику.
+        // 4a. Barrier (Shield/Defense, тег ally): игрок-кастер В радиусе →
+        //     entity-aware Defense-промилле > 0 (фикс VER-001: агрегация
+        //     Shield в FormationEffects). Глобальный вызов заменён на
+        //     entity-aware с позицией игрока.
+        var pap = Player.Position;
+        int barrierDef = Formations.GetFormationBonusPermil(StatType.Defense, Player.PlayerId, pap.X, pap.Y);
         bool barrierOk = barrierDef > 0;
-        GD.Print($"[FormShot] VER-001 4a Barrier: Defense permil={barrierDef} (ожидали > 0)");
+        GD.Print($"[FormShot] VER-001 4a Barrier (entity-aware, ally в зоне): Defense permil={barrierDef} (ожидали > 0)");
         pass &= barrierOk;
 
+        // 4a2 (BUG-008): телепорт игрока ЗА EffectRadius → бонус = 0;
+        //     возврат в зону → бонус восстановлен. Small: 50м = 25т;
+        //     +30 тайлов от контура, кламп в границы 50×50 (как П2).
+        int farEx = Mathf.Min(fx + 30, 45);
+        int farEy = Mathf.Min(fy + 30, 45);
+        TeleportPlayer(farEx, farEy);
+        await Frames(10);
+        var papFar = Player.Position;
+        int barrierDefFar = Formations.GetFormationBonusPermil(StatType.Defense, Player.PlayerId, papFar.X, papFar.Y);
+        bool farZeroOk = barrierDefFar == 0;
+        GD.Print($"[FormShot] BUG-008 4a2 far: игрок @({papFar.X},{papFar.Y}), дистанция {Mathf.Max(Mathf.Abs(papFar.X - fx), Mathf.Abs(papFar.Y - fy))}т " +
+                 $"> EffectRadius 25т → Defense permil={barrierDefFar} (ожидали 0)");
+        pass &= farZeroOk;
+        TeleportPlayer(fx + 1, fy + 1);
+        await Frames(10);
+        var papBack = Player.Position;
+        int barrierDefBack = Formations.GetFormationBonusPermil(StatType.Defense, Player.PlayerId, papBack.X, papBack.Y);
+        bool backOk = barrierDefBack > 0;
+        GD.Print($"[FormShot] BUG-008 4a2 возврат: Defense permil={barrierDefBack} (ожидали > 0)");
+        pass &= backOk;
+
+        // 4a3 (BUG-008): враг В зоне формации (formation+1) → его Defense = 0:
+        //     Barrier Shield имеет TargetTag=ally — чужая сторона не бустится
+        //     (прежде глобальный баг защищал врагов по всей карте).
+        int enemyDef = Formations.GetFormationBonusPermil(StatType.Defense, "npc_hostile_qa", fx + 1, fy + 1);
+        bool enemyZeroOk = enemyDef == 0;
+        GD.Print($"[FormShot] BUG-008 4a3 enemy: Defense permil={enemyDef} @({fx + 1},{fy + 1}) (ожидали 0)");
+        pass &= enemyZeroOk;
+
         // 4b. Деактивация снимает бонус (FormationEffects.Deactivate → 0).
+        //     LEGACY-вызов (любой тег) — проверяем и старый контур API.
         Formations.DeactivateFormation();
         await Frames(2);
         int defAfter = Formations.GetFormationBonusPermil(StatType.Defense);
@@ -146,18 +191,23 @@ public partial class FormationShotSimDebug : Node
         GD.Print($"[FormShot] VER-001 4b деактивация: Defense permil={defAfter} (ожидали 0)");
         pass &= barrierCleared;
 
-        // 4c. Amplification (Buff/Damage): генерация → мгновенное заполнение
-        //     → активация → Damage-промилле > 0.
+        // 4c. Amplification (Buff/Damage, тег ally): генерация → мгновенное
+        //     заполнение → активация → entity-aware Damage-промилле: игрок
+        //     в зоне → > 0; враг-атакующий в зоне → 0 (BUG-008).
         Qi.AddQi(Qi.MaxQi); // топ-ап Ци (контур+ёмкость L1 Small ~880)
         var amp = Gen.GenerateSpecified(FormationType.Amplification, FormationSize.Small, 1, 777001);
-        bool ampStarted = Formations.StartDrawing(amp.Id, Player.PlayerId, p0.X, p0.Y);
+        bool ampStarted = Formations.StartDrawing(amp.Id, Player.PlayerId, fx, fy);
         Formations.ContributeQi(Player.PlayerId, Formations.QiPoolMax);
         await Frames(2);
-        int ampDmg = Formations.GetFormationBonusPermil(StatType.Damage);
+        var papAmp = Player.Position;
+        int ampDmg = Formations.GetFormationBonusPermil(StatType.Damage, Player.PlayerId, papAmp.X, papAmp.Y);
+        int ampEnemyDmg = Formations.GetFormationBonusPermil(StatType.Damage, "npc_hostile_qa", fx + 1, fy + 1);
         bool ampOk = ampStarted
             && Formations.CurrentStage == FormationStage.Active
-            && ampDmg > 0;
-        GD.Print($"[FormShot] VER-001 4c Amplification: started={ampStarted}, стадия={Formations.CurrentStage}, Damage permil={ampDmg} (ожидали > 0)");
+            && ampDmg > 0
+            && ampEnemyDmg == 0;
+        GD.Print($"[FormShot] VER-001 4c Amplification (entity-aware): started={ampStarted}, стадия={Formations.CurrentStage}, " +
+                 $"игрок Damage permil={ampDmg} (ожидали > 0), враг в зоне={ampEnemyDmg} (ожидали 0)");
         pass &= ampOk;
         Formations.DeactivateFormation();
 

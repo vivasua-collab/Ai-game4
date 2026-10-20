@@ -2,7 +2,7 @@
 
 > **Назначение:** Этот файл читается ПЕРВЫМ при старте любой сессии AI-агента.
 > Содержит правила работы, структуру проекта, запреты, точку входа в память.
-> **Дата обновления:** 2026-10-19
+> **Дата обновления:** 2026-10-20
 >
 > **Единственное каноническое место для ПРАВИЛ работы** — этот файл (§14 и далее).
 > worklog.md — только хроника (история), НЕ источник правил.
@@ -53,7 +53,7 @@
 │   │   │   ├── Messaging/Contracts/   ← readonly struct события (~130)
 │   │   │   ├── DI/                    ← IContainerBuilder, Container, InjectAttribute
 │   │   │   └── Events/                ← IPublisher<T>, ISubscriber<T>, EventBus
-│   │   ├── Modules/                   ← 16 модулей (Body, Qi, Combat, NPC, ...)
+│   │   ├── Modules/                   ← 17 модулей (Body, Qi, Combat, NPC, Trade, ...)
 │   │   ├── Entry/                     ← GameSession, SceneOrchestrator, 10 Phases
 │   │   └── Adapter/                   ← Godot-specific (Input, Rendering, UI, Scene)
 │   ├── scenes/                        ← .tscn файлы (MainMenu, GameWorld)
@@ -98,7 +98,7 @@
 | Слой | Зависимости | Назначение | Engine-agnostic? |
 |------|-------------|------------|------------------|
 | **Core** | чистый C# | DI, EventBus, интерфейсы, контракты, data models | ✅ Да |
-| **Modules** | Core | 16 модулей: Body, Qi, Combat, NPC, Player, World, Tile, ... | ✅ Да |
+| **Modules** | Core | 17 модулей: Body, Qi, Combat, NPC, Player, World, Tile, Trade, ... | ✅ Да |
 | **Entry** | Core + Modules | GameSession, SceneOrchestrator, 10 фаз сборки | ✅ Да |
 | **Adapter** | Core + Modules + Godot | Input, Rendering, UI, Scene, Persistence | ❌ Godot |
 
@@ -322,28 +322,46 @@ Cultivation World Simulator, Godot 4.7.2 .NET, C#
 
 ## 10. Текущий статус (на момент обновления)
 
-**Дата:** 2026-09-15
+**Дата:** 2026-10-20
 **Версия:** v0.2.x
-**Стадия:** игровые системы живые, подготовка к плейтесту боевки
+**Стадия:** плейтесты владельца + багфикс-волны внешних аудитов (реестр `portal/data/bugs.json`)
 
 **Что работает:**
-- Core (DI, EventBus, ~130 контрактов) + 16 Modules — бо́льшая часть не-stub
+- Core (DI, EventBus, ~130 контрактов) + 17 Modules — бо́льшая часть не-stub
 - Body/Qi/Combat/NPC/Inventory/Trade/Quest/Save — игровые циклы
-- R17 save/load: 19 ISaveable-блоков, RestoreOrder, атомарный tmp→rename, автосейв
+- Save/load: 21 ISaveable-блок (R31 +npc_relationships, r30-1 +corpses
+  full-loot), RestoreOrder, атомарный tmp→rename, автосейв
 - INP-1 модальная пауза: инвариант «пауза ⇔ стек окон ∨ Esc» (см. 09_15_inp1_modal_freeze.md)
-- **Основной мир: large_world 500×500** (полигон 50×50 — второй кнопкой/QA)
-- QA-регрессия: 17 симов PASS через `tools/qa_regression.sh` (~2 мин)
-- Аудиты 09-11 (14 дефектов) и 09-15 (3 P1 + 4 P2) — исправлены, закоммичены
+- **Основной мир: large_world 500×500** (полигон 50×50 — второй кнопкой/QA);
+  звери ~100 (факт 109), NPC 48, враждебные банды бандитов (R41)
+- **Бой:** readiness-модель (R21), Miss от дистанции (R39), урон кулак+оружие
+  суммой для игрока (R39), овекилл-каскад тел (R41), каст-эффекты техник 4
+  типов (BUG-001, волна 1), экран смерти + респавн по кнопке (GAP-001)
+- **Диагностика:** F3 FPS, F4 тайл-инспектор, F6 перф-оверлей (R41);
+  GODOT_DAMAGE_TRACE / GODOT_PERF_LOG; терраин-скорость L5+ иммунна (R41)
+- Веб-портал «Карта проекта» (19.10): дорожки вех M0–M7, реестр аудита,
+  статус; данные — JSON в git, восстановление `cold_start.sh` →
+  `portal/restore_portal.sh`
+- QA-регрессия: **23/23 PASS** через `tools/qa_regression.sh` (21 дефолтный
+  сим + FORM + RESPAWN; 19.10, волна 1); ANIMQA/CHEATEQUIP/TRADEUX — отдельно
+- Аудиты 09.11/09.15/09.21/09.22 — P1 закрыты; внешние аудиты 19.10–20.10 —
+  волнами 1–4 по реестру bugs.json (волна 1 закрыта 19.10 с регрессией 23/23)
 
 **Что в работе:**
-- Плейтест боевки пользователем в большом мире 500×500
-- R18-очередь: F-5, CH-4, SAV-4, SAV-6, G-1+NPC-6, NPC-2, трупы на земле вне сейва
+- Волна 2 аудита (20.10): BUG-003…BUG-012 + DOC-001 — параллельные субагенты,
+  интеграция main-агентом
+- Плейтест владельца: баланс новых механик (каст-эффекты, экран смерти,
+  терраин-скорость, овекилл-каскад)
 
 **Что НЕ начато (дальние планы):**
-- Процедурная генерация уровней/подземелий
+- Волна 4 малых фич: крафт-UI (GAP-002), форм-факторы зарядников (GAP-003),
+  NPC-категории Temp/Plot/Unique (GAP-004)
+- Волна 3 дизайн-этапов с владельцем: события мира (GAP-007), AI-слои
+  (GAP-008), mastery-рост (BUG-002), Trap-контроль (GAP-009)
+- Спрайты G0: доставлено 2/221; процедурная генерация уровней/подземелий
 - Контент (lore, items, техники — широкий масштаб)
 
-**Подробный статус:** `SESSION_SUMMARY.md`, `worklog.md` (хвост), последний чекпоинт.
+**Подробный статус:** `SESSION_SUMMARY.md`, `worklog.md` (хвост), последний чекпоинт, `portal/data/status.json`.
 
 ---
 
@@ -354,7 +372,7 @@ Cultivation World Simulator, Godot 4.7.2 .NET, C#
 | Концепция игры | `docs/docs_v2/00_overview/PROJECT_CONCEPT.md` |
 | Тех. решения | `docs/docs_v2/00_overview/TECHNOLOGY_DECISIONS.md` |
 | Архитектура | `docs/docs_v2/01_architecture/ARCHITECTURE.md` |
-| 16 модулей | `docs/docs_v2/01_architecture/MODULE_STRUCTURE.md` |
+| 17 модулей | `docs/docs_v2/01_architecture/MODULE_STRUCTURE.md` |
 | Производительность | `docs/docs_v2/01_architecture/PERFORMANCE_STRATEGY.md` |
 | Алгоритмы | `docs/docs_v2/09_workflow/ALGORITHMS.md` |
 | AI workflow | `docs/docs_v2/09_workflow/AI_DEVELOPMENT_WORKFLOW.md` |
@@ -364,19 +382,36 @@ Cultivation World Simulator, Godot 4.7.2 .NET, C#
 
 ## 12. Приоритеты разработки
 
-1. **Перенос кода из Ai-game3** (текущий приоритет)
-   - Core (Data + Interfaces + Messaging) — чистый C#, переносится напрямую
-   - Modules (Calculators + Configs) — чистая логика, переносится напрямую
-   - Modules (Services) — адаптация MessagePipe→EventBus, VContainer→наш DI
-   - Tests — перенос с минимальной адаптацией
+Статус актуален на 20.10.2026 (R41 закрыт, волна 2 аудита)
 
-2. **После переноса:** реализация реальных игровых систем
-   - Combat (11-layer damage pipeline)
-   - Qi (long arithmetic, breakthrough)
-   - Body (Kenshi-style, dual HP)
-   - NPC AI (3-tier nervous system)
+1. **Багфикс-волны внешних аудитов** (текущий приоритет)
+   - Реестр находок: `portal/data/bugs.json` (23 записи, волны 1–4;
+     статусы/история видны на веб-портале в рантайме)
+   - Волна 1 закрыта 19.10 (a136aff, субагенты fix-a/fix-b): BUG-001
+     каст-эффекты 4 типов, GAP-001 экран смерти, VER-001 Barrier —
+     регрессия 23/23
+   - Волна 2 идёт 20.10: параллельные субагенты по BUG-003…BUG-012
+     (NewGame/LoadGame fail-closed, EventBus re-entrancy, DI, culling
+     рендеров, зональность формаций, экран смерти ×3, Support/Healing) +
+     DOC-001 (синхронизация README/START_PROMPT/SESSION_SUMMARY)
 
-3. **Далее:** UI Views, Save system, контент
+2. **Плейтесты владельца**
+   - R41 закрыт 18.10 (чекпоинт 10_18): олень-80к, терраин-скорость,
+     перф-оверлей F6, тайл-инспектор F4, drag&drop техник
+   - Смотреть баланс новых механик: каст-эффекты 4 типов, экран смерти,
+     овекилл-каскад, терраин-штрафы L1–L4/L5+
+
+3. **Волна малых фич** (после багфикс-волн)
+   - Крафт: UI-окно + рецепты (GAP-002; CraftingService API готов)
+   - Зарядники: генерация+UI форм-факторов сверх Belt (GAP-003;
+     домен ChargerData 5 форм-факторов готов)
+   - NPC-категории Temp/Plot/Unique: семантика различий (GAP-004)
+
+4. **Дизайн-этапы с владельцем** (волна 3)
+   - События мира: событийная система — караваны/нападения/находки (GAP-007)
+   - NPC AI: слои Behavior Tree / Neural Router / Brain Controller (GAP-008)
+   - Mastery-рост техник от использования (BUG-002, веха M6)
+   - Trap-контроль формаций: механизм Control-эффектов (GAP-009)
 
 ---
 

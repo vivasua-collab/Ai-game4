@@ -10,7 +10,7 @@ Ai-game4/
 ├── game/                    # Godot 4 проект (C# .NET 8)
 │   ├── src/                 # исходный код (4 слоя)
 │   │   ├── Core/            # engine-agnostic: DI, EventBus, интерфейсы, контракты
-│   │   ├── Modules/         # 16 игровых модулей (stub реализации)
+│   │   ├── Modules/         # 17 игровых модулей (бо́льшая часть не-stub)
 │   │   ├── Entry/           # GameSession, SceneOrchestrator, 10 фаз сборки
 │   │   └── Adapter/         # Godot-specific: Input, Rendering, UI, Scene
 │   ├── scenes/              # .tscn файлы (MainMenu, GameWorld)
@@ -93,7 +93,7 @@ godot --headless --path . --quit
 | Слой | Зависимости | Назначение |
 |------|-------------|------------|
 | **Core** | чистый C# (нет Godot) | DI контейнер, EventBus, интерфейсы, контракты, data models |
-| **Modules** | Core | 16 модулей: World, Tile, Body, Qi, Combat, NPC, Player, etc. |
+| **Modules** | Core | 17 модулей: World, Tile, Body, Qi, Combat, NPC, Player, Trade, etc. |
 | **Entry** | Core + Modules | GameSession, SceneOrchestrator, 10 фаз сборки сцены |
 | **Adapter** | Core + Modules + Godot | Godot-specific: Input, Rendering, UI, Scene, Persistence |
 

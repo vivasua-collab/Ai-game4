@@ -13,6 +13,11 @@
 // Редактировано: 2026-09-19 R18-1 — HP-бар/нейм-плейт: показ и при полном HP
 // если NPC в бою (IsInCombat), глобальный тумблер GameSettings.ShowEnemyVitals
 // (высокая сложность — без индикации противника).
+// Редактировано: 2026-10-20 АУДИТ-1020 (BUG-007) — viewport culling: NPC вне
+// видимой области камеры пропускаются в _Draw ДО GetNPCState/резолва анимации/
+// HP-баров (паттерн ObjectLayerRenderer; на large_world 500×500 — тысячи
+// сущностей, значительная часть _Draw уходила в невидимое; троттл R41-2 не
+// уменьшал стоимость обхода).
 using Godot;
 using System.Collections.Generic;
 using CultivationGame.Core.Data;
@@ -268,6 +273,15 @@ public partial class NPCSpriteRenderer : Node2D
 
         float halfTile = _tilePixels * 0.5f;
 
+        // АУДИТ-1020 (BUG-007): видимый прямоугольник мировых пикселей
+        // (в координатах, в которых рисует _Draw) — ТОТ ЖЕ источник, что у
+        // ObjectLayerRenderer.GetVisibleTileRange: canvas-трансформация
+        // узла + экранный Rect viewport'а → аффинный обратный (зум Camera2D
+        // учтён). Рендереры — сиблинги _worldRoot без локальных смещений
+        // (SceneBuilder), пространство общее.
+        var visibleRect = ComputeVisibleWorldRect(
+            GetGlobalTransformWithCanvas(), GetViewportRect());
+
         foreach (var id in _idSnapshot)
         {
             var npc = _npcService.GetNPC(id);
@@ -275,6 +289,17 @@ public partial class NPCSpriteRenderer : Node2D
 
             float cx = npc.Position.X * _tilePixels + halfTile;
             float cy = npc.Position.Y * _tilePixels + halfTile;
+
+            // АУДИТ-1020 (BUG-007): viewport culling — NPC вне видимой области
+            // камеры пропускается ДО GetNPCState/резолва анимации/HP/рамок
+            // (паттерн ObjectLayerRenderer; R41-2 троттл не уменьшал стоимость
+            // обхода). Отсечённый NPC не рисуется вовсе — в т.ч. рамка
+            // выбранной цели (Tab): цель вне экрана не видна, рамка не нужна.
+            // Кэши движения (_npcLastPos/_npcLastX) у отсечённых не
+            // обновляются — вернувшийся на экран NPC может один кадр показать
+            // walk вместо idle (кэш протух до старой позиции); безопасно,
+            // самокоррекция на следующем кадре. IsAlive-гейт выше сохранён.
+            if (!IsEntityOnScreen(cx, cy, in visibleRect, EntityCullMarginPx)) continue;
 
             // R21-1: звериный NPC (Quadruped) → звериный спрайт по виду
             // (CreateAnimalSprite: тело-эллипс/уши/хвост), НЕ гуманоидный
@@ -348,6 +373,53 @@ public partial class NPCSpriteRenderer : Node2D
                 }
             }
         }
+    }
+
+    // === АУДИТ-1020 (BUG-007): viewport culling NPC/Animal рендереров ======
+    // P2: large_world (500×500 = 32000px) — тысячи сущностей, видимый экран
+    // ~30×17 тайлов (~1920×1080px) → без culling'а почти весь обход _Draw
+    // тратился на невидимое (GetNPCState, резолв анимации, HP-бар,
+    // нейм-плейт, weapon overlay). Референс — ObjectLayerRenderer.
+
+    /// <summary>
+    /// АУДИТ-1020: margin отсечения (мировые пиксели) — центр спрайта должен
+    /// попасть в видимый прямоугольник ± margin. Запас: половина макс.
+    /// спрайта (PNG-листы ≤96px → 48px) + HP-бар с нейм-плейтом над спрайтом
+    /// (~24px) + рамка выбранной цели (3px) + буфер. Общий для NPC и зверей —
+    /// AnimalSpriteRenderer использует тот же (звериный спрайт ≤ NPC).
+    /// internal: L500SimDebug («bug007-culling») локает значение в QA.
+    /// </summary>
+    internal const float EntityCullMarginPx = 80f;
+
+    /// <summary>
+    /// АУДИТ-1020 (BUG-007): видимый прямоугольник МИРОВЫХ пикселей (в
+    /// координатах _Draw) из canvas-трансформации узла и экранного Rect
+    /// viewport'а — паттерн ObjectLayerRenderer.GetVisibleTileRange (та же
+    /// математика: AffineInverse от canvas-транса × углы viewport'а; зум
+    /// Camera2D учтён). internal static: переиспользуется
+    /// AnimalSpriteRenderer'ом (сиблинг _worldRoot — то же пространство).
+    /// Headless-QA проверяет только чистую IsEntityOnScreen (headless _Draw
+    /// не выполняется — полная визуальная проверка на плейтесте).
+    /// </summary>
+    internal static Rect2 ComputeVisibleWorldRect(Transform2D canvasXform, Rect2 viewportScreenRect)
+    {
+        var topLeft = canvasXform.AffineInverse() * viewportScreenRect.Position;
+        var botRight = canvasXform.AffineInverse() * (viewportScreenRect.Position + viewportScreenRect.Size);
+        return new Rect2(topLeft, botRight - topLeft);
+    }
+
+    /// <summary>
+    /// АУДИТ-1020 (BUG-007): чистая математика отсечения (headless-тестируемая
+    /// — шаг L500SimDebug «bug007-culling»): попадает ли центр спрайта
+    /// сущности в видимый прямоугольник, расширенный на margin. Границы
+    /// включительны: сущность ровно на границе rect+margin — ещё видна.
+    /// </summary>
+    internal static bool IsEntityOnScreen(float cx, float cy, in Rect2 visibleWorldRect, float margin)
+    {
+        return cx >= visibleWorldRect.Position.X - margin
+            && cx <= visibleWorldRect.End.X + margin
+            && cy >= visibleWorldRect.Position.Y - margin
+            && cy <= visibleWorldRect.End.Y + margin;
     }
 
     /// <summary>

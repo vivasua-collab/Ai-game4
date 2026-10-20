@@ -26,7 +26,23 @@ namespace CultivationGame.Core.Interfaces
         /// </summary>
         bool IsEntityAlive(string entityId);
         float GetPartHealthRatio(BodyPartType type);
-        void ApplyDamage(BodyPartType target, int totalDamage);
+
+        /// <summary>
+        /// АУДИТ-1020 (BUG-010, волна 2): источник последнего нанесённого удара
+        /// по игроку (ID атакующего; null — урон без явного источника, напр.
+        /// прямой вызов из QA/старых путей). BodyService кэширует его в
+        /// ApplyDamage ДО применения урона — к моменту BodyCriticalEvent
+        /// (смерть публикуется синхронно внутри того же вызова) killing blow
+        /// детерминированно известен (гонка кэша оверлея смерти исключена).
+        /// </summary>
+        string? LastDamageSourceId { get; }
+
+        /// <summary>
+        /// АУДИТ-1020 (BUG-010): sourceId — источник удара (кэшируется в
+        /// LastDamageSourceId ДО применения урона). Опционален: все прежние
+        /// вызовы (2 аргумента) не меняются.
+        /// </summary>
+        void ApplyDamage(BodyPartType target, int totalDamage, string? sourceId = null);
         void HealPart(BodyPartType target, int amount);
         bool IsSlotBlocked(EquipmentSlot slot);
         IReadOnlyList<BodyPartData> GetAllParts();

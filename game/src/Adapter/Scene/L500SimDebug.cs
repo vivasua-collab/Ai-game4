@@ -306,6 +306,33 @@ public partial class L500SimDebug : Node
             }
         }
 
+        // === bug007-culling: АУДИТ-1020 (BUG-007), P2 ===================
+        // Viewport culling NPC/Animal рендереров. Замечание: headless _Draw
+        // не выполняется (рендер-конвейер отключён) — полная визуальная
+        // проверка culling'а остаётся на плейтесте; здесь ассертируется
+        // чистая математика хелпера (синтетический Rect, без камеры) +
+        // отсутствие регрессий L500 — целевой QA-уровень для этого бага.
+        {
+            // Синтетический видимый прямоугольник 0..1000px (мировые
+            // пиксели, координаты _Draw); margin — реальная константа
+            // рендереров (QA локает значение).
+            var rect = new Rect2(0f, 0f, 1000f, 1000f);
+            float m = NPCSpriteRenderer.EntityCullMarginPx;
+            // (a) сущность в центре прямоугольника → видна.
+            bool a = NPCSpriteRenderer.IsEntityOnScreen(500f, 500f, in rect, m);
+            // (b) сущность за пределами (5000px) → не видна.
+            bool b = !NPCSpriteRenderer.IsEntityOnScreen(5000f, 5000f, in rect, m);
+            // (c) ровно на границе с margin (rect+margin, обе оси) → видна
+            //     (граница включительна, margin покрывает спрайт/HP-бар).
+            bool c = NPCSpriteRenderer.IsEntityOnScreen(1000f + m, 1000f + m, in rect, m);
+            // (d) за границей на margin+10 → не видна.
+            bool d = !NPCSpriteRenderer.IsEntityOnScreen(1000f + m + 10f, 1000f + m + 10f, in rect, m);
+            bool helperOk = a && b && c && d;
+            GD.Print($"[L500Sim] bug007-culling: helper={(helperOk ? "4/4" : "FAIL")}/ок " +
+                      $"margin={m:F0}px (центр={a}, даль={b}, граница-margin={c}, за-margin={d})");
+            pass &= helperOk;
+        }
+
         GD.Print($"[L500Sim] VERDICT: {(pass
             ? "PASS — мир 500×500 основной: сетка/NPC/звери/группы интегрированы, пояс жизни у центра, кап не превышен"
             : "FAIL")}");

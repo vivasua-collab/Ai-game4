@@ -14,14 +14,24 @@
 //   • GameWorldController.OnPlayerDeath вызывает Show(cause) — единая точка
 //     смерти (GWC уже подписан на PlayerDeathEvent; дубль-подписки нет);
 //   • причина — PlayerDeathEvent.Cause (часть тела: «Голова разрушена …»,
-//     каскад R41 Head|Heart); источник последнего удара — кэш последнего
-//     DamageAppliedEvent по игроку (имя NPC/зверя резолвится на показе);
-//   • уровень культивации — IQiService.CultivationLevel (дёшево, из кэша);
+//     каскад R41 Head|Heart); источник последнего удара — АУДИТ-1020
+//     (BUG-010): PlayerDeathEvent.KillerId (детерминированная цепочка
+//     BodyService.LastDamageSourceId → PlayerService.Die; кэш
+//     DamageAppliedEvent — только fallback: он обновляется в fan-out ПОЗЖЕ
+//     хендлера BodyService, из-за которого публикуется смерть — гонка);
+//   • АУДИТ-1020 (BUG-009): GameWorldController гейтит УПРАВЛЕНИЕ игрока
+//     по DeathScreenShown (движение/хоткеи/атаки/LMB/зум); МИРОВОЕ ВРЕМЯ
+//     НЕ паузится — экран смерти не «окно планирования» (не в INP-1 стеке);
 //   • «Возродиться» → делегат _respawnAction, привязанный GWC к СУЩЕСТВУЮЩЕМУ
 //     респавн-флоу (RequestPlayerRespawn: полное лечение частей + Revive +
 //     телепорт в центр карты) — логика респавна НЕ дублируется в UI;
+//     АУДИТ-1020 (BUG-011): скрытие — ТОЛЬКО по подтверждению (жив игрок /
+//     PlayerReviveEvent); провал (null-делегат, исключение в GWC) — экран
+//     ОСТАЁТСЯ открытым, кнопка доступна;
+//   • уровень культивации — IQiService.CultivationLevel (дёшево, из кэша);
 //   • PlayerReviveEvent (любой путь оживления) → защитный Hide()
-//     (оверлей не может «залипнуть» над живым игроком).
+//     (оверлей не может «залипнуть» над живым игроком) + чистка кэша
+//     атакующего (АУДИТ-1020 BUG-010 — протухший кэш после оживления).
 //
 // Паттерны: LootWindow (FullRect-вуаль + центральная Panel +
 // ParchmentTheme, MouseFilter Stop/Ignore), TileInspectorOverlay
@@ -223,11 +233,18 @@ public partial class DeathScreenOverlay : Control
     /// <summary>
     /// Показать экран смерти. Вызывает GameWorldController.OnPlayerDeath
     /// (единый подписчик PlayerDeathEvent) с причиной из события.
+    /// АУДИТ-1020 (BUG-010): killerId — источник killing blow из
+    /// PlayerDeathEvent.KillerId (детерминированная цепочка через кэш
+    /// BodyService, заполненный ДО применения урона). Прежний источник —
+    /// собственный кэш DamageAppliedEvent — обновляется подписчиком ПОЗЖЕ
+    /// хендлера BodyService.OnDamageApplied (синхронный fan-out), а смерть
+    /// происходит внутри него → показывался предыдущий атакующий (гонка).
+    /// killerId=null/пусто → честный fallback на кэш (старый путь).
     /// </summary>
-    public void Show(string cause)
+    public void Show(string cause, string? killerId = null)
     {
         _causeLabel.Text = string.IsNullOrEmpty(cause) ? "Причина неизвестна" : cause;
-        _killerLabel.Text = BuildKillerLine();
+        _killerLabel.Text = BuildKillerLine(killerId);
         _metaLabel.Text = BuildMetaLine();
 
         Visible = true;
@@ -257,15 +274,24 @@ public partial class DeathScreenOverlay : Control
     {
         if (_respawnAction == null)
         {
-            GD.PrintErr("[DeathScreen] Респавн-делегат не привязан (GameWorldController не вызвал BindRespawnAction)");
+            GD.PrintErr("[DeathScreen] Респавн-делегат не привязан — экран остаётся открытым");
+            return; // БЕЗ HideScreen
+        }
+        _respawnAction.Invoke();
+        // Скрытие — только по подтверждению (АУДИТ-1020 BUG-011):
+        // PlayerReviveEvent уже скрыл (OnPlayerRevived) либо игрок жив —
+        // тогда скрываем; провал (исключение поймано в GWC, игрок мёртв) —
+        // экран ОСТАЁТСЯ, кнопка доступна для повторной попытки.
+        if (_player != null && _player.IsAlive)
+        {
+            HideScreen();
+            _lastAttackerId = string.Empty;
+            GD.Print("[DeathScreen] Респавн подтверждён — оверлей скрыт");
         }
         else
         {
-            _respawnAction.Invoke();
+            GD.Print("[DeathScreen] Респавн НЕ подтверждён (игрок не жив) — экран остаётся открытым");
         }
-        HideScreen();
-        _lastAttackerId = string.Empty;
-        GD.Print("[DeathScreen] «Возродиться» нажата — оверлей скрыт");
     }
 
     // === Подписки ===
@@ -278,25 +304,34 @@ public partial class DeathScreenOverlay : Control
             _lastAttackerId = e.SourceId ?? string.Empty;
     }
 
-    /// <summary>Защита: игрок оживлён любым путём → экран обязан скрыться.</summary>
+    /// <summary>Защита: игрок оживлён любым путём → экран обязан скрыться.
+    /// АУДИТ-1020 (BUG-010): кэш атакующего протухает после оживления —
+    /// новый экран смерти обязан показать только НОВОГО убийцу.</summary>
     private void OnPlayerRevived(in Contracts.PlayerReviveEvent e)
     {
         if (Visible) HideScreen();
+        _lastAttackerId = string.Empty;
     }
 
     // === Строки панели ===
 
-    /// <summary>«Последний удар: Имя» — имя NPC/зверя по кэшу атакующего.</summary>
-    private string BuildKillerLine()
+    /// <summary>
+    /// «Последний удар: Имя». АУДИТ-1020 (BUG-010): приоритет — attackerId из
+    /// PlayerDeathEvent.KillerId (детерминированно кэширован BodyService ДО
+    /// killing blow); пустой/null → честный fallback на кэш DamageAppliedEvent
+    /// оверлея (старый путь — для совместимости, напр. чужие вызовы Show).
+    /// </summary>
+    private string BuildKillerLine(string? attackerId = null)
     {
-        if (string.IsNullOrEmpty(_lastAttackerId))
+        string id = string.IsNullOrEmpty(attackerId) ? _lastAttackerId : attackerId!;
+        if (string.IsNullOrEmpty(id))
             return "Последний удар: неведомая сила";
 
-        if (PlayerIdResolver.IsPlayer(_lastAttackerId))
+        if (PlayerIdResolver.IsPlayer(id))
             return "Последний удар: собственное рассеяние";
 
-        string? name = _npcs?.GetNPCState(_lastAttackerId)?.DisplayName
-                      ?? _animals?.GetDisplayName(_lastAttackerId);
+        string? name = _npcs?.GetNPCState(id)?.DisplayName
+                      ?? _animals?.GetDisplayName(id);
         return $"Последний удар: {name ?? "неведомая сила"}";
     }
 

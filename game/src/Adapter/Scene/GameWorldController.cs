@@ -460,6 +460,21 @@ public partial class GameWorldController : Node2D
         || (_dialogueWindow is { IsOpen: true });
 
     /// <summary>
+    /// АУДИТ-1020 (BUG-009): экран смерти показан — блокируем игровое
+    /// УПРАВЛЕНИЕ игрока (движение/хоткеи/атаки/LMB/зум). Дизайн-решение
+    /// (зафиксировано волной 2): смерть НЕ паузит МИРОВОЕ ВРЕМЯ — экран
+    /// смерти сознательно НЕ входит в INP-1 модальный стек: это не «окно
+    /// планирования», мир живой (NPC ходят, время тикает — см. комментарии
+    /// DeathScreenOverlay._Ready). Поэтому _deathOverlay НЕ добавлен в
+    /// AnyModalWindowOpen: иначе сломались бы Esc-семантика (Esc обязан
+    /// закрывать окна, но НЕ экран смерти) и pause-снапшоты
+    /// (_wasPausedBeforeInventory перетирался бы). Вместо этого — явные
+    /// гейты по этому предикату: HandleFreeMovement, HandleStickyInput,
+    /// блок V/T/X/Z/Space в _PhysicsProcess, modalOpen в _UnhandledInput.
+    /// </summary>
+    private bool DeathScreenShown => _deathOverlay is { Visible: true };
+
+    /// <summary>
     /// Открытие модального окна: пауза тиков, если ещё не стоит. Снапшот
     /// «мир был запаузен до окон» делается только при входе ПЕРВОГО окна
     /// стека (otherModalAlreadyOpen=false) — открытие поверх существующих
@@ -1284,7 +1299,10 @@ public partial class GameWorldController : Node2D
         // (OnPlayerDeath), кнопка «Возродиться» → RequestPlayerRespawn
         // (СУЩЕСТВУЮЩИЙ респавн-флоу, логика не дублируется в UI).
         _deathOverlay = new UI.DeathScreenOverlay { Name = "DeathScreenOverlay" };
-        _deathOverlay.BindRespawnAction(RequestPlayerRespawn);
+        // АУДИТ-1020 (BUG-011): биндим Action-обёртку — метод-группа bool →
+        // Action НЕ конвертируется (CS0407); подтверждение оверлей проверяет
+        // сам (IsAlive + PlayerReviveEvent), возвращаемое значение не нужно.
+        _deathOverlay.BindRespawnAction(RequestPlayerRespawnForOverlay);
         _hudCanvas.AddChild(_deathOverlay);
 
         // 2026-09-04 S5: стрелки направления атакующих вне экрана — игрок
@@ -1598,63 +1616,70 @@ public partial class GameWorldController : Node2D
         UpdatePauseIndicator();
         // П6 (репорт 21.09): FPS-счётчик (троттл 0.25с, только при изменении текста).
         UpdateFpsCounter(delta);
-        // Этап 1 внедрения ЦИ: V — переключить медитацию (поглощение Ци из среды).
-        if (PlayerInput is { IsMeditatePressed: true })
+        // АУДИТ-1020 (BUG-009): экран смерти — весь блок игрового ЦИ/техник/
+        // атак игрока (V/T/X/Z/Space + CombatAdapter.Tick + ленивая подписка
+        // AttackRejected) заморожен. ResetFrameFlags ниже — ВНЕ блока
+        // (выполняется всегда, иначе sticky-флаги «залипали» бы).
+        if (!DeathScreenShown)
         {
-            MeditationTogglePub.Publish(
-                new Core.Messaging.Contracts.MeditationToggleRequestedEvent(!_meditationActive));
-        }
-
-        // 2026-08-28: T — Книга Техник (модальное окно с паузой, как инвентарь:
-        // планирование арсенала — Old School). X — следующая техника, Z — каст.
-        // R13-audit (P2-2): при открытом окне обыска T/F1/J/Q/B/C ЗАПРЕЩЕНЫ —
-        // они перезаписывали бы общий флаг паузы _wasPausedBeforeInventory
-        // (пауза «залипала» после закрытия окон). Обыск — полная модальность
-        // (как E); сначала закрыть окно обыска (Esc/«Уйти»).
-        if (PlayerInput is { IsTechniquesPressed: true } && _techniqueBook != null && Time != null
-            && _lootWindow is not { IsOpen: true })
-        {
-            bool otherModalOpen = AnyModalWindowOpen();
-            _techniqueBook.Toggle();
-            if (_techniqueBook.Visible)
-                HandleModalPauseOnOpen(otherModalOpen);
-            else
-                HandleModalResumeOnClose();
-        }
-        if (PlayerInput is { IsCycleTechniquePressed: true })
-        {
-            TechniqueSvc?.CycleSelection();
-            var sel = TechniqueSvc?.SelectedTechnique;
-            if (sel != null) ShowToast($"▣ Выбрано: {sel.Name} L{sel.Level}");
-        }
-        if (PlayerInput is { IsCastTechniquePressed: true } && TechniqueSvc != null)
-        {
-            var sel = TechniqueSvc.SelectedTechnique;
-            if (sel != null)
+            // Этап 1 внедрения ЦИ: V — переключить медитацию (поглощение Ци из среды).
+            if (PlayerInput is { IsMeditatePressed: true })
             {
-                var mouse = GetGlobalMousePosition();
-                TechniqueCastPub.Publish(new Core.Messaging.Contracts.TechniqueCastRequestedEvent(
-                    sel.TechniqueId, (int)(mouse.X * 1000), (int)(mouse.Y * 1000)));
+                MeditationTogglePub.Publish(
+                    new Core.Messaging.Contracts.MeditationToggleRequestedEvent(!_meditationActive));
             }
-            else
-            {
-                ShowToast("✖ Нет выбранной техники (T — панель, X — выбор)");
-            }
-        }
 
-        // Phase 6: player combat bridge — Space publishes AttackIntentEvent
-        // with the nearest NPC target. Must run BEFORE ResetFrameFlags below.
-        // M2 (2026-09-03): тост «⚔ Атака!» при polling убран — спамил каждый
-        // кадр при удержании Space (~60/сек). Фидбек атаки теперь честный:
-        // урон — цифрами (DamageNumberRenderer), отклонение — тостом по
-        // AttackRejectedEvent (подписка при первом нажатии Space), попадание
-        // «вхолостую» (нет цели в радиусе) — без тоста, как у NPC.
-        CombatAdapter?.Tick((float)delta);
-        if (PlayerInput is { IsAttackPressed: true } && _attackRejectedToken == null)
-        {
-            // Lazy-подписка на отклонения атак (первое нажатие Space):
-            // C-5 аудита-3 публикует AttackRejectedEvent при _isCasting.
-            _attackRejectedToken = AttackRejectedSub?.Subscribe(OnAttackRejected);
+            // 2026-08-28: T — Книга Техник (модальное окно с паузой, как инвентарь:
+            // планирование арсенала — Old School). X — следующая техника, Z — каст.
+            // R13-audit (P2-2): при открытом окне обыска T/F1/J/Q/B/C ЗАПРЕЩЕНЫ —
+            // они перезаписывали бы общий флаг паузы _wasPausedBeforeInventory
+            // (пауза «залипала» после закрытия окон). Обыск — полная модальность
+            // (как E); сначала закрыть окно обыска (Esc/«Уйти»).
+            if (PlayerInput is { IsTechniquesPressed: true } && _techniqueBook != null && Time != null
+                && _lootWindow is not { IsOpen: true })
+            {
+                bool otherModalOpen = AnyModalWindowOpen();
+                _techniqueBook.Toggle();
+                if (_techniqueBook.Visible)
+                    HandleModalPauseOnOpen(otherModalOpen);
+                else
+                    HandleModalResumeOnClose();
+            }
+            if (PlayerInput is { IsCycleTechniquePressed: true })
+            {
+                TechniqueSvc?.CycleSelection();
+                var sel = TechniqueSvc?.SelectedTechnique;
+                if (sel != null) ShowToast($"▣ Выбрано: {sel.Name} L{sel.Level}");
+            }
+            if (PlayerInput is { IsCastTechniquePressed: true } && TechniqueSvc != null)
+            {
+                var sel = TechniqueSvc.SelectedTechnique;
+                if (sel != null)
+                {
+                    var mouse = GetGlobalMousePosition();
+                    TechniqueCastPub.Publish(new Core.Messaging.Contracts.TechniqueCastRequestedEvent(
+                        sel.TechniqueId, (int)(mouse.X * 1000), (int)(mouse.Y * 1000)));
+                }
+                else
+                {
+                    ShowToast("✖ Нет выбранной техники (T — панель, X — выбор)");
+                }
+            }
+
+            // Phase 6: player combat bridge — Space publishes AttackIntentEvent
+            // with the nearest NPC target. Must run BEFORE ResetFrameFlags below.
+            // M2 (2026-09-03): тост «⚔ Атака!» при polling убран — спамил каждый
+            // кадр при удержании Space (~60/сек). Фидбек атаки теперь честный:
+            // урон — цифрами (DamageNumberRenderer), отклонение — тостом по
+            // AttackRejectedEvent (подписка при первом нажатии Space), попадание
+            // «вхолостую» (нет цели в радиусе) — без тоста, как у NPC.
+            CombatAdapter?.Tick((float)delta);
+            if (PlayerInput is { IsAttackPressed: true } && _attackRejectedToken == null)
+            {
+                // Lazy-подписка на отклонения атак (первое нажатие Space):
+                // C-5 аудита-3 публикует AttackRejectedEvent при _isCasting.
+                _attackRejectedToken = AttackRejectedSub?.Subscribe(OnAttackRejected);
+            }
         }
 
         // LMB movement is handled in _UnhandledInput (respects UI consumption).
@@ -1699,7 +1724,11 @@ public partial class GameWorldController : Node2D
 #if DEBUG
                       || (_cheatPanel is { Visible: true })
 #endif
-                      || (_cultivationWindow is { Visible: true });
+                      || (_cultivationWindow is { Visible: true })
+                      // АУДИТ-1020 (BUG-009): экран смерти — LMB-движение
+                      // и зум камеры под вуалью мертвы (мир не паузится,
+                      // но ввод игрока заблокирован; см. DeathScreenShown).
+                      || DeathScreenShown;
 
         if (@event is InputEventMouseButton mb && mb.Pressed)
         {
@@ -1752,6 +1781,15 @@ public partial class GameWorldController : Node2D
     private void HandleFreeMovement(double delta)
     {
         if (Player == null) return;
+
+        // АУДИТ-1020 (BUG-009): экран смерти — движение мертво (стоп-кадр
+        // аниматора, как при паузе). Мир НЕ паузится — DeathScreenShown
+        // сознательно не в INP-1 стеке (см. предикат).
+        if (DeathScreenShown)
+        {
+            _lastMoving = false; // G0: аниматор — стоп-кадр
+            return;
+        }
 
         // Check if paused — no movement when paused.
         if (Time != null && Time.IsPaused)
@@ -1927,6 +1965,13 @@ public partial class GameWorldController : Node2D
     private void HandleStickyInput()
     {
         if (PlayerInput == null || Time == null) return;
+
+        // АУДИТ-1020 (BUG-009): экран смерти — ВСЕ хоткеи метода заморожены
+        // (F2/F7/F3/F1/J/Q/H/Esc/B/C/K/1/2/3-9/F/E/PageUp/PageDown/F5/F9):
+        // мёртвый не открывает окна и не жмёт Esc — иначе Esc-пауза мира
+        // сработала бы под вуалью смерти и нарушила бы INP-1-снапшоты.
+        // Мировое время НЕ трогаем (см. DeathScreenShown).
+        if (DeathScreenShown) return;
 
 #if DEBUG
         // Этап 7: F2 — чит-меню (только в DEBUG-сборке).
@@ -2523,7 +2568,10 @@ public partial class GameWorldController : Node2D
         ShowToast($"☠ Вы пали ({e.Cause})");
         GD.Print($"[GameWorld] Player death: {e.Cause} — экран смерти (респавн по кнопке)");
         _playerAnimator?.NotifyDeath(); // G0: поза смерти (hold до респавна)
-        _deathOverlay?.Show(e.Cause);   // GAP-001: вуаль+причина+«Возродиться»
+        // АУДИТ-1020 (BUG-010): убийца — из PlayerDeathEvent.KillerId
+        // (детерминированная цепочка BodyService-кэш → Die → событие),
+        // а не из гонки кэша DamageAppliedEvent-подписчика оверлея.
+        _deathOverlay?.Show(e.Cause, e.KillerId); // GAP-001: вуаль+причина+«Возродиться»
     }
 
     /// <summary>
@@ -2533,8 +2581,13 @@ public partial class GameWorldController : Node2D
     /// защитный PlayerReviveEvent-путь остаётся рабочим).
     /// Аудит 2026-09-06 (P0): тело обёрнуто в try/catch — исключение внутри
     /// респавна не роняет процесс без лога.
+    /// АУДИТ-1020 (BUG-011): контракт void → bool — true = респавн выполнен,
+    /// false = провал (исключение поймано, игрок всё ещё мёртв).
+    /// DeathScreenOverlay скрывает экран ТОЛЬКО по подтверждению (живой
+    /// игрок / PlayerReviveEvent); bool-метод совместим с Action
+    /// (BindRespawnAction) — возвращаемое значение делегату отбрасывается.
     /// </summary>
-    public void RequestPlayerRespawn()
+    public bool RequestPlayerRespawn()
     {
         try
         {
@@ -2563,14 +2616,25 @@ public partial class GameWorldController : Node2D
             Player?.SetPosition(new Position2D(cx, cy));
             _mouseTarget = null;
             ShowToast("✦ Вы возродились");
+            return true; // АУДИТ-1020 (BUG-011): подтверждение для экрана смерти
         }
         catch (Exception ex)
         {
             // P0-фикс аудита: респавн не должен ронять игру молча.
             GD.PrintErr($"[GameWorld] RequestPlayerRespawn FAILED: {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
             ShowToast("⚠ Ошибка возрождения — см. лог");
+            return false; // АУДИТ-1020 (BUG-011): провал — экран остаётся открытым
         }
     }
+
+    /// <summary>
+    /// АУДИТ-1020 (BUG-011): Action-обёртка над bool-контрактом
+    /// RequestPlayerRespawn — прямая конвертация метод-группы bool → Action
+    /// запрещена компилятором (CS0407). Возвращаемое значение оверлею смерти
+    /// не нужно: он подтверждает респавн сам (IsAlive после Invoke + защитный
+    /// PlayerReviveEvent). internal — RespawnSimDebug 4d перепривязывает её.
+    /// </summary>
+    internal void RequestPlayerRespawnForOverlay() => RequestPlayerRespawn();
 
     /// <summary>
     /// Phase 2 fix: authoritative resume point for the dialogue pause.

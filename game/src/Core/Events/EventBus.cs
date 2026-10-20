@@ -40,6 +40,17 @@ public interface ISubscriber<T> where T : struct
 /// the current publish completes. This prevents StackOverflowException from
 /// cascading events (Q13: Queue re-entrant events).
 ///
+/// АУДИТ-1020 (BUG-004; ранее R34 P2-22): защита распространена и на ДРЕН —
+/// во время дрена ЛЮБАЯ публикация (того же типа и любых других) откладывается
+/// в очередь и обрабатывается тем же итеративным циклом НА ОДНОМ уровне стека
+/// (sentinel <c>_draining</c>). Раньше дрен выполнялся ПОСЛЕ снятия типа из
+/// <c>_publishing</c>: публикация из queued-хендлера уходила в normal-path, её
+/// finally-дрен выполнялся ВЛОЖЕННО, и цепочка drain→InvokeHandlers→handler→
+/// Publish→finally-drain→… росла без границы → StackOverflowException
+/// (самопубликация одного типа и взаимная публикация A↔B). Аллокационный
+/// контракт (P2-9) прежний: дрен — редкий путь, копия очереди живёт только
+/// в нём.
+///
 /// Exception isolation (аудит 09.22, P1-5): исключение одного подписчика НЕ
 /// прерывает fan-out (последующие подписчики получают событие) и НЕ покидает
 /// <see cref="Publish{T}"/> — иначе один неисправный хендлер роняет уже и
@@ -68,6 +79,14 @@ public sealed class EventBus : IDisposable
     [ThreadStatic]
     private static List<Action>? _pendingQueue;
 
+    // АУДИТ-1020 (BUG-004; ранее R34 P2-22): sentinel «идёт дрен отложенной
+    // очереди». Пока он выставлен, ЛЮБАЯ публикация на этом потоке уходит в
+    // _pendingQueue и обрабатывается тем же итеративным циклом дрена —
+    // queued-хендлер не может породить вложенный Publish/дрен (прежний
+    // источник безграничного роста стека → StackOverflowException).
+    [ThreadStatic]
+    private static bool _draining;
+
     /// <summary>
     /// Publish a message to all subscribers of type <typeparamref name="T"/>.
     /// Re-entrant publishes are queued and processed after current publish
@@ -79,11 +98,13 @@ public sealed class EventBus : IDisposable
         _publishing ??= new HashSet<Type>();
         _pendingQueue ??= new List<Action>();
 
-        // Check for re-entrancy: if this type is already being published, queue it.
-        if (_publishing.Contains(typeof(T)))
+        // Check for re-entrancy: if this type is already being published — or the
+        // deferred queue is being DRAINED right now (АУДИТ-1020, BUG-004) — queue
+        // it; queued publishes are processed iteratively by the drain loop,
+        // never nested. This allocates a closure (Action<T>), but re-entrancy
+        // is rare — acceptable cost.
+        if (_publishing.Contains(typeof(T)) || _draining)
         {
-            // Queue a deferred invocation. This allocates a closure (Action<T>),
-            // but re-entrancy is rare — acceptable cost.
             T msgCopy = message; // copy for closure
             _pendingQueue.Add(() => InvokeHandlers(msgCopy));
             return;
@@ -106,18 +127,36 @@ public sealed class EventBus : IDisposable
             // контексте (runtime-подтверждено: стэл-дрен рушил посторонний
             // Publish). Каждый queued-вызов тоже изолирован (InvokeHandlers
             // ловит исключения per-handler).
-            if (_publishing.Count == 0 && _pendingQueue.Count > 0)
+            //
+            // АУДИТ-1020 (BUG-004; ранее R34 P2-22): дрен итеративный, на
+            // ОДНОМ уровне стека, под сентинелом _draining. Публикация
+            // ЛЮБОГО типа из queued-хендлера (см. условие постановки в
+            // Publish) откладывается в ту же очередь и подбирается ЭТИМ
+            // циклом — вложенных Publish/дренов не возникает. Прежний код
+            // дренил уже ПОСЛЕ Remove из _publishing: queued-хендлер
+            // публиковал тот же/другой тип в normal-path, его finally-дрен
+            // выполнялся ВЛОЖЕННО → drain→handler→Publish→finally-drain→…
+            // → безграничный рост стека → StackOverflowException.
+            if (!_draining && _publishing.Count == 0 && _pendingQueue.Count > 0)
             {
-                var queue = new List<Action>(_pendingQueue);
-                _pendingQueue.Clear();
-                for (int i = 0; i < queue.Count; i++)
+                _draining = true;
+                try
                 {
-                    try { queue[i](); }
-                    catch (Exception ex)
+                    while (_pendingQueue.Count > 0)
                     {
-                        Console.WriteLine($"[EventBus] Queued re-entrant handler threw: {ex.GetType().Name}: {ex.Message}");
+                        var queue = new List<Action>(_pendingQueue);
+                        _pendingQueue.Clear();
+                        for (int i = 0; i < queue.Count; i++)
+                        {
+                            try { queue[i](); }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"[EventBus] Queued re-entrant handler threw: {ex.GetType().Name}: {ex.Message}");
+                            }
+                        }
                     }
                 }
+                finally { _draining = false; }
             }
         }
     }

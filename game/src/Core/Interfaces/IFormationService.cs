@@ -1,6 +1,8 @@
 #nullable enable
 // Создано: 2026-05-09
 // Редактировано: 2026-05-22 07:55:00 UTC — Аудит CRIT-1: +GetFormationBonusPermil() для ЗАПРЕТ 3.9
+// Редактировано: 2026-10-20 — АУДИТ-1020 (BUG-008): +entity-aware overload
+//   GetFormationBonusPermil(stat, entityId, tileX, tileY) — радиус + сторона цели.
 // Интерфейс сервиса формаций.
 // Управление жизненным циклом формаций: прорисовка, наполнение, активация, деактивация.
 using System.Collections.Generic;
@@ -87,11 +89,36 @@ namespace CultivationGame.Core.Interfaces
         float GetFormationBonus(StatType stat);
 
         /// <summary>
-        /// Получить бонус формации в промилле (ЗАПРЕТ 3.9).
+        /// LEGACY: получить бонус формации в промилле (ЗАПРЕТ 3.9).
         /// 0 = нет бонуса, 200 = +20%, -150 = -15%.
         /// Аудит CRIT-1: для integer math в боевом пайплайне.
+        /// АУДИТ-1020 (BUG-008): семантика — «любой тег» (сумма бонусов всех
+        /// тегов, прежняя глобальная семантика до бага). Боевой пайплайн
+        /// перешёл на entity-aware overload ниже; этот — для старых QA-вызовов.
         /// </summary>
         int GetFormationBonusPermil(StatType stat);
+
+        /// <summary>
+        /// АУДИТ-1020 (BUG-008): entity-aware бонус формации в промилле
+        /// (ЗАПРЕТ 3.9: Чебышёв-дистанция в int — dist * GameConstants.TILE_SIZE_M,
+        /// без float). Условия ненулевого бонуса (все три обязательны):
+        ///   1) формация АКТИВНА (стадия Active);
+        ///   2) сущность в радиусе действия: Чебышёв-дистанция от центра
+        ///      формации до (entityTileX, entityTileY) в метрах НЕ превышает
+        ///      EffectRadiusMeters (сравнение: dist * TILE_SIZE_M &gt; EffectRadiusM
+        ///      → вне зоны);
+        ///   3) сущность на СТОРОНЕ TargetTag эффектов формации (v1-правило:
+        ///      формации кастует только игрок; ally = сам кастер или любой из
+        ///      алиасов игрока; всё остальное — enemy → тег "enemy").
+        /// Координаты-сентинелы (x&lt;0 или y&lt;0) → 0: неизвестная позиция = без
+        /// зонального бонуса. Неактивна/нет эффекта для тега → 0.
+        /// </summary>
+        /// <param name="stat">Тип характеристики (Damage — слой 3b, Defense — MED-2)</param>
+        /// <param name="entityId">Id сущности (игрок/NPC/зверь)</param>
+        /// <param name="entityTileX">Тайловая X-координата сущности (сентинел &lt;0 → 0)</param>
+        /// <param name="entityTileY">Тайловая Y-координата сущности (сентинел &lt;0 → 0)</param>
+        /// <returns>Модификатор в промилле (0 — формация не активна/вне зоны/чужая сторона)</returns>
+        int GetFormationBonusPermil(StatType stat, string entityId, int entityTileX, int entityTileY);
 
         /// <summary>Текущее Ци в пуле формации</summary>
         long QiPoolCurrent { get; }

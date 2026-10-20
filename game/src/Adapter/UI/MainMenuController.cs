@@ -25,6 +25,7 @@ public partial class MainMenuController : Control
     private Button  _settingsBtn = null!;
     private Button  _quitBtn     = null!;
     private Label   _titleLabel  = null!;
+    private Label   _statusLabel = null!;
 
     private const string GameWorldScenePath = "res://scenes/GameWorld.tscn";
 
@@ -72,7 +73,9 @@ public partial class MainMenuController : Control
         try
         {
             Session?.NewGame(1, worldId);
-            GetTree().ChangeSceneToFile(GameWorldScenePath);
+            // АУДИТ-1020 (BUG-003): QA-миры стартуют детерминированно
+            // (state=Playing) — их путь не меняется; гейт ловит только сбой.
+            EnterWorldIfSessionReady("QA auto-start");
         }
         catch (System.Exception ex)
         {
@@ -182,6 +185,22 @@ public partial class MainMenuController : Control
         UIFactory.AddPressShrink(_quitBtn);
         buttonContainer.AddChild(_quitBtn);
 
+        // ---- Status label (АУДИТ-1020 / BUG-003): видимый игроку отказ ----
+        // Красный текст на пергаменте (AccentRed — паттерн pressed-цвета
+        // кнопок файла), центрирование, перенос по словам. Скрытый лейбл
+        // не занимает место в VBox — кнопки не сдвигаются, пока нет ошибки.
+        _statusLabel = new Label
+        {
+            Name = "StatusError",
+            Visible = false,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+        };
+        _statusLabel.AddThemeFontSizeOverride("font_size", 16);
+        _statusLabel.AddThemeColorOverride("font_color", ParchmentTheme.AccentRed);
+        _statusLabel.CustomMinimumSize = new Vector2(400, 0);
+        buttonContainer.AddChild(_statusLabel);
+
         // ---- Version label (bottom-right corner) ----
         var version = new Label
         {
@@ -202,6 +221,39 @@ public partial class MainMenuController : Control
         AddChild(version);
     }
 
+    // ---- Session gate + status (АУДИТ-1020 / BUG-003) ----
+
+    /// <summary>
+    /// АУДИТ-1020 (BUG-003): смена сцены ТОЛЬКО при подтверждённо поднятой
+    /// сессии. GameSession.NewGame/LoadGame глотают исключения и возвращают
+    /// состояние в MainMenu — прежде меню безусловно свитчило сцену, и игрок
+    /// попадал в GameWorld с мёртвой сессией/сброшенным миром.
+    /// </summary>
+    private void EnterWorldIfSessionReady(string opName)
+    {
+        var state = Session?.State ?? SessionState.MainMenu;
+        if (state == SessionState.Playing)
+        {
+            GetTree().ChangeSceneToFile(GameWorldScenePath);
+            return;
+        }
+        GD.PrintErr($"[MainMenu] {opName} провален — сессия не Playing (state={state}); остаёмся в меню");
+        ShowStatusError($"{opName} не удалось (состояние: {state}). Подробности — в логе; попробуйте снова.");
+    }
+
+    /// <summary>
+    /// АУДИТ-1020 (BUG-003): показываем игроку причину отказа прямо в меню.
+    /// Лейбл не блокирует кнопки — можно повторить старт или выбрать другой
+    /// режим (сбой сессии уже вернул её в MainMenu). При успешном старте
+    /// сцена сменится — лейбл уходит вместе с меню.
+    /// </summary>
+    private void ShowStatusError(string message)
+    {
+        if (_statusLabel == null) return; // BuildUI не отработал (защита QA-путей)
+        _statusLabel.Text = $"✖ {message}";
+        _statusLabel.Visible = true;
+    }
+
     // ---- Button handlers ----
 
     private void OnNewGame()
@@ -213,7 +265,8 @@ public partial class MainMenuController : Control
         try
         {
             Session?.NewGame(1, "large_world");
-            GetTree().ChangeSceneToFile(GameWorldScenePath);
+            // АУДИТ-1020 (BUG-003): вход в мир только при state=Playing.
+            EnterWorldIfSessionReady("New Game");
         }
         catch (System.Exception ex)
         {
@@ -227,7 +280,8 @@ public partial class MainMenuController : Control
         try
         {
             Session?.NewGame(1, "test_polygon");
-            GetTree().ChangeSceneToFile(GameWorldScenePath);
+            // АУДИТ-1020 (BUG-003): вход в мир только при state=Playing.
+            EnterWorldIfSessionReady("Test Polygon");
         }
         catch (System.Exception ex)
         {
@@ -255,7 +309,9 @@ public partial class MainMenuController : Control
                 // 2026-09-08 (ревью-1): передаём ПОЛНЫЙ слот — тот же SaveSlot,
                 // что проверялся в HasSave (тип QuickSave совпадает с чтением).
                 Session?.LoadGame(new SaveSlot("quicksave", SaveSlotType.QuickSave));
-                GetTree().ChangeSceneToFile(GameWorldScenePath);
+                // АУДИТ-1020 (BUG-003): битый/повреждённый слот возвращает
+                // сессию в MainMenu — свитч сцены только при state=Playing.
+                EnterWorldIfSessionReady("Load Game");
             }
             catch (System.Exception ex)
             {

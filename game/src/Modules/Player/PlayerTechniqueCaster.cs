@@ -1,6 +1,9 @@
 #nullable enable
 // Stage 0+1 (2026-08-25, GLM-5.3): каст техник игрока через модель заполнения
 // + вариант В (аура держит одну).
+// Редактировано: 2026-10-20 — АУДИТ-1020 (BUG-008/012/009): Amplification —
+//   entity-aware сервис; ранний гейт Support/Healing до StartCharge;
+//   модульный гейт «мёртвый не кастует» (UI-гейты — GWC/fix-d).
 //
 // Поток:
 //   1. TechniqueCastRequestedEvent (Z / клик в панели T):
@@ -151,6 +154,17 @@ public sealed class PlayerTechniqueCaster : IDisposable
 
     private void OnCastRequested(in TechniqueCastRequestedEvent e)
     {
+        // АУДИТ-1020 (BUG-009, модульный гейт; UI-гейты — GWC/fix-d):
+        // мёртвый игрок не начинает НОВЫЙ каст и не выпускает удержанный
+        // (гейт ДО обработки held-техники — второе нажатие по ауре тоже
+        // заблокировано). Смерть могла прийти ДО этого запроса (клавиша
+        // успела отработать) или ожидать в очереди событий.
+        if (!_player.IsAlive)
+        {
+            PublishFail(e.TechniqueId, "Вы мертвы — возродитесь");
+            return;
+        }
+
         int mouseX = e.TargetMouseX;
         int mouseY = e.TargetMouseY;
 
@@ -222,6 +236,22 @@ public sealed class PlayerTechniqueCaster : IDisposable
                 return;
             }
         }
+        // BUG-012 (АУДИТ-1020): ранний гейт Support/Healing ДО StartCharge —
+        // прежде Ци тратилась зарядкой, а отказ «Тело не ранено» приходил
+        // только в FireTechnique (по завершении зарядки). Повторная проверка
+        // в FireTechnique СОХРАНЕНА — тело может излечиться (бафф/реген) за
+        // время зарядки, и наоборот.
+        // Правило о Ци: Ци, вложенная в НАЧАТУЮ зарядку, не возвращается —
+        // консистентно с отказами Combat «Цель исчезла» (R23-1: рефанд
+        // кулдауна/мастерства, но не Ци). Ранний гейт предотвращает сам старт.
+        else if (tech.Type == TechniqueType.Healing || tech.Type == TechniqueType.Support)
+        {
+            if (!_hasDamagedParts())
+            {
+                PublishFail(e.TechniqueId, "Тело не ранено");
+                return;
+            }
+        }
 
         // Запускаем зарядку (валидация кулдауна/Ци внутри StartCharge)
         bool started = _chargeService.StartCharge(_player.PlayerId, e.TechniqueId, mouseX, mouseY);
@@ -240,6 +270,16 @@ public sealed class PlayerTechniqueCaster : IDisposable
     private void OnChargeCompleted(in TechniqueChargeCompletedEvent e)
     {
         if (e.EntityId != _player.PlayerId) return;
+
+        // АУДИТ-1020 (BUG-009, модульный гейт; UI-гейты — GWC/fix-d):
+        // игрок умер ВО ВРЕМЯ зарядки — мёртвый не паркует технику в ауру
+        // и не выпускает её. Заряженная Ци рассеялась (правило R23-1 —
+        // вложенная в зарядку Ци не возвращается).
+        if (!_player.IsAlive)
+        {
+            PublishFail(e.TechniqueId, "Вы мертвы");
+            return;
+        }
 
         var tech = _techniques.GetTechnique(e.TechniqueId);
         if (tech == null)
@@ -569,17 +609,22 @@ public sealed class PlayerTechniqueCaster : IDisposable
         ? _tiles.MapHeight - 1
         : GameConstants.DEFAULT_MAP_HEIGHT - 1;
 
-    /// <summary>Бонус урона от активной формации Amplification, если игрок в зоне (этап 5).</summary>
+    /// <summary>
+    /// Бонус урона от активной формации Amplification (этап 5).
+    /// АУДИТ-1020 (BUG-008): упрощено — делегирует entity-aware overload
+    /// FormationService.GetFormationBonusPermil(stat, id, x, y): радиус
+    /// (Чебышёв, int — ЗАПРЕТ 3.9) и сторона (TargetTag) проверяются в
+    /// сервисе. Смысловой тест прежнего поведения сохранён: игрок в зоне
+    /// → бонус, вне зоны → 1000 (теперь через сервис, а не локально).
+    /// </summary>
     private int GetAmplificationBonusPermil()
     {
         if (_formations is not Modules.Formation.FormationService svc) return 1000;
         if (!svc.IsFormationActive || svc.CurrentFormation is not { } f) return 1000;
         if (f.FormationType != FormationType.Amplification) return 1000;
         var pos = _player.Position;
-        float radiusTiles = f.EffectRadiusMeters / (float)GameConstants.TILE_SIZE_M;
-        int dist = Math.Max(Math.Abs(pos.X - svc.PositionX), Math.Abs(pos.Y - svc.PositionY));
-        if (dist > radiusTiles) return 1000;
-        return 1000 + svc.GetFormationBonusPermil(StatType.Damage);
+        // Игрок = кастер (ally): бонус только в зоне Amplification.
+        return 1000 + svc.GetFormationBonusPermil(StatType.Damage, _player.PlayerId, pos.X, pos.Y);
     }
 
     /// <summary>

@@ -121,3 +121,39 @@ NEXT: (1) плейтест владельца после 20:00 МСК — тех
 форм-факторы зарядников, GAP-004 NPC-категории; (3) итерация 4 карты —
 верификации §5; (4) волна 3 — дизайн-этапы с владельцем (GAP-007/008/009,
 BUG-002).
+
+## 2026-10-20 — Волна 2: багфикс внешнего аудита adit_10_20 (11/11 verified)
+
+Директива: валидация 2-этапного внешнего аудита → план → исправления.
+Валидация main-агента: **10/10 находок + 3 док-расхождения подтверждены**.
+Реестр portal/data/bugs.json: 12 → **23 записи** (v1.1, волна 2 = BUG-003…012
++ DOC-001; малые фечи сдвинуты волна 2 → волна 4).
+
+**Параллельные субагенты (6, непересекающиеся зоны):**
+- fix-c → BUG-008 (entity-aware бонусы формаций: радиус Чебышёва int +
+  TargetTag ally/enemy; DamageService 3b/6-8 с позициями; FormationShot
+  4a/4a2/4a3/4c) + BUG-012 (ранний гейт Support/Healing до StartCharge,
+  3m2: Ци 444→444) + модульный гейт «мёртвый не кастует» (BUG-009).
+- fix-d → BUG-009 (DeathScreenShown: WASD/хоткеи/каст/Space/LMB гейты;
+  мир НЕ паузится — зафиксировано) + BUG-010 (KillerId по цепочке
+  Damage→Body.LastDamageSourceId→PlayerDeathEvent→Show; RespawnSim 4a
+  ловит гонку детерминированно) + BUG-011 (скрытие только по
+  подтверждению ReviveEvent/IsAlive; 4d orphan-делегат держит экран).
+- fix-e → BUG-003 (EnterWorldIfSessionReady в 4 точках меню + статус-лейбл;
+  QA-автостарт цел — CHARGE PASS).
+- fix-f → BUG-004 (EventBus: сентинел _draining + итеративный дрен —
+  StackOverflow закрыт, ранее R34 P2-22) + BUG-005 (DI Build снапшот) +
+  BUG-006 (перебор ctor по разрешимости) — самотесты Audit0922 U/V/W.
+- fix-g → BUG-007 (viewport culling NPC/Animal до резолва анимации/HP;
+  паттерн ObjectLayerRenderer, margin 80px; на L500 отсекается ~97%;
+  L500Sim bug007-culling 4/4; headless _Draw выполняется — находка).
+- fix-h → DOC-001 (README/START_PROMPT 16→17 + §12 актуализирован;
+  SESSION_SUMMARY +5 сессий R36→волна 2; остаток: docs_v2 ~15 «16»).
+
+**Регрессия: 23/23 PASS** (21 дефолт + FORM + RESPAWN), build 0 err.
+Карта → **v1.4-wave2** (form-s7/tech-s7/player-s5/core/perf/docs, --check
+без дрейфа). Чекпоинт: checkpoints/10_20_audit_wave2.md.
+
+NEXT: плейтест владельца (UX смерти, баланс формаций, perf после culling);
+волна 4 (GAP-002/003/004); волна 3 — дизайн с владельцем (GAP-007/008,
+BUG-002, GAP-009); docs_v2 16→17 (план R31).
