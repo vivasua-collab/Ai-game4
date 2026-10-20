@@ -142,6 +142,14 @@ public partial class GameWorldController : Node2D
     // R37-c (баг-репорт 23.09): окно зарядника Ци (H) — слоты камней/буфер/
     // тепло/режим; гейт — надетый зарядник (слот Belt, ItemType="Charger").
     private UI.ChargerWindow _chargerWindow = null!;
+    // Этап-3 (adit_10_20 / меню сейвов, 2026-10-20): меню сохранения и
+    // загрузки (F5/F9) — слоты, запись в именованный слот, загрузка,
+    // удаление. Полноценное модальное INP-1 окно (пауза при открытии,
+    // закрытие Esc/кликом по фону/повторной клавишей). Сейвы включены
+    // штатно (система стабилизирована: 23/23 QA, волны 1–2 аудита
+    // закрыты, Этап-3-фиксы целостности применены) — прежний режим Q8
+    // («сейвы отключены, тост при F5/F9») снят.
+    private UI.SaveLoadMenu _saveLoadMenu = null!;
     // GAP-001 (10-19-fix-b): экран смерти игрока — вуаль+причина+кнопка
     // «Возродиться»; показ по PlayerDeathEvent, респавн — ТОЛЬКО по кнопке
     // (прежний 3с-автореспавн отключён: смерть → оверлей сразу).
@@ -437,7 +445,11 @@ public partial class GameWorldController : Node2D
         || (_cultivationWindow is { Visible: true })
         // R37-c: окно зарядника (H) — модальное с паузой (управление
         // камнями/режимом — планирование, как инвентарь).
-        || (_chargerWindow is { Visible: true });
+        || (_chargerWindow is { Visible: true })
+        // Этап-3: меню сейвов — модальное с паузой (управление слотами
+        // сейвов — планирование: мир не должен меняться между просмотром
+        // каталога и подтверждением загрузки).
+        || (_saveLoadMenu is { Visible: true });
 
     /// <summary>
     /// Аудит-0915 A3 (INP1-2): предикат «модальное окно открыто КРОМЕ лавки».
@@ -457,7 +469,8 @@ public partial class GameWorldController : Node2D
         || (_hotkeysWindow is { Visible: true })
         || (_techniqueBook is { Visible: true })
         || (_lootWindow is { IsOpen: true })
-        || (_dialogueWindow is { IsOpen: true });
+        || (_dialogueWindow is { IsOpen: true })
+        || (_saveLoadMenu is { Visible: true });
 
     /// <summary>
     /// АУДИТ-1020 (BUG-009): экран смерти показан — блокируем игровое
@@ -503,6 +516,53 @@ public partial class GameWorldController : Node2D
     {
         if (!AnyModalWindowOpen() && !_wasPausedBeforeInventory && Time is { IsPaused: true })
             Time.Resume();
+    }
+
+    // ── Этап-3 (adit_10_20 / меню сейвов): внутриигровая загрузка ─────
+    private const string GameWorldScenePath = "res://scenes/GameWorld.tscn";
+    private const string MainMenuScenePath = "res://scenes/MainMenu.tscn";
+
+    /// <summary>
+    /// Загрузка выбранного слота из внутриигрового меню сейвов
+    /// (SaveLoadMenu.LoadRequested). Гейт GameSession.LoadGame разрешает
+    /// переход из Playing (Этап-3) — пайплайн идентичен менюшному: единый
+    /// fail-closed сброс доменов → RestoreState → RunAssembly(LoadGame).
+    /// Успех → пересоздание сцены GameWorld (рендеры/тайлы/HUD строятся
+    /// под восстановленную сетку и локацию — как при входе из меню).
+    /// Провал (сессия вернулась в MainMenu, домены сброшены/пусты) — сцена
+    /// больше не отражает играбельное состояние: честный уход в главное
+    /// меню с видимой причиной в логе и тосте.
+    /// </summary>
+    private void HandleSaveMenuLoadRequested(string slotName)
+    {
+        GD.Print($"[GameWorld] Save-menu: загрузка слота '{slotName}' (in-game world-transition)");
+        try
+        {
+            Session?.LoadGame(new SaveSlot(slotName, SaveSlotType.Manual));
+        }
+        catch (System.Exception ex)
+        {
+            GD.PrintErr($"[GameWorld] Save-menu load '{slotName}' crashed: {ex.GetType().Name}: {ex.Message}");
+        }
+
+        var state = Session?.State ?? SessionState.MainMenu;
+        if (state == SessionState.Playing)
+        {
+            // Успех: мир восстановлен ДО смены сцены (LoadGame синхронен).
+            // Сцена умирает ЦЕЛИКОМ (HUD, окна, рендеры) — закрывать меню
+            // и снимать паузу вручную не нужно.
+            GD.Print("[GameWorld] Save-menu load OK — rebuilding GameWorld scene");
+            GetTree().ChangeSceneToFile(GameWorldScenePath);
+        }
+        else
+        {
+            // Провал: сессия честно вернулась в MainMenu. Живой мир уже
+            // сброшен (ResetAll ДО RestoreState) — оставаться в нём нельзя.
+            GD.PrintErr($"[GameWorld] Save-menu load FAILED — session state={state}; returning to MainMenu");
+            ToastPub?.Publish(new Core.Messaging.Contracts.ToastShownEvent(
+                $"Загрузка «{slotName}» не удалась — вернулись в главное меню", 4f));
+            GetTree().ChangeSceneToFile(MainMenuScenePath);
+        }
     }
 
     /// <summary>
@@ -566,6 +626,9 @@ public partial class GameWorldController : Node2D
         if (_dialogueWindow is { IsOpen: true }) names.Add("диалог");
         if (_cultivationWindow is { Visible: true }) names.Add("K·культивация");
         if (_chargerWindow is { Visible: true }) names.Add("H·зарядник");
+        // Этап-3: индикатор паузы показывает ПРИЧИНУ и для меню сейвов
+        // (см. UpdatePauseIndicator: «пауза без причины» = баг-репорт INP-1).
+        if (_saveLoadMenu is { Visible: true }) names.Add("F5·сейвы");
         return names;
     }
 
@@ -1389,6 +1452,15 @@ public partial class GameWorldController : Node2D
         _chargerWindow.Closed += HandleModalResumeOnClose;
         _hudCanvas.AddChild(_chargerWindow);
 
+        // Этап-3 (adit_10_20 / меню сейвов): F5/F9 — меню слотов сейвов
+        // (полный режим: запись+загрузка+удаление). Closed — единая точка
+        // резюма (Esc/клик по фону/кнопка/повторная клавиша). Загрузку
+        // выполняет сессия (HandleSaveMenuLoadRequested ниже) — не UI-слой.
+        _saveLoadMenu = new UI.SaveLoadMenu { Name = "SaveLoadMenu" };
+        _saveLoadMenu.Closed += HandleModalResumeOnClose;
+        _saveLoadMenu.LoadRequested += HandleSaveMenuLoadRequested;
+        _hudCanvas.AddChild(_saveLoadMenu);
+
 #if DEBUG
         // Этап 7: чит-меню разработки (F2, с 2026-08-28; раньше F1).
         // Видимость переключается в HandleStickyInput по PlayerInput.IsCheatMenuPressed.
@@ -2144,6 +2216,13 @@ public partial class GameWorldController : Node2D
         {
             _chargerWindow.Close();
         }
+        // Этап-3: Esc закрывает меню сейвов (то же правило «два типа закрытия»;
+        // ветка обязана стоять выше общего Esc-toggle паузы — AnyModalWindowOpen
+        // теперь включает меню, и пауза-ветка его бы «съела»).
+        else if (PlayerInput.IsPausePressed && _saveLoadMenu is { Visible: true })
+        {
+            _saveLoadMenu.Close();
+        }
         // Esc (sticky "escape") → toggle pause. INP-1: только когда НЕ открыто
         // ни одного модального окна (раньше гард проверял только инвентарь —
         // Esc под Q/J/F1/T снимал паузу под висящим окном).
@@ -2317,20 +2396,39 @@ public partial class GameWorldController : Node2D
                 || _characterSheetWindow is { Visible: true }
                 || _eventLogWindow is { Visible: true }
                 || _questWindow is { Visible: true }
+                || _saveLoadMenu is { Visible: true }
 #if DEBUG
                 || _cheatPanel is { Visible: true }
 #endif
                 || _cultivationWindow is { Visible: true });
         }
 
-        // Save/load DISABLED (Q8: user decision — saves invalid after each fix).
-        // Will be re-enabled when save system is stable.
-        // Аудит 2026-09-06 (P1, честность UI): тихий обман → явный тост.
-        // Игрок жмёт F5/F9 и не понимает, почему ничего не происходит.
-        if (PlayerInput.IsQuickSavePressed)
-            ShowToast("⏳ Сейвы отключены (этап разработки)");
-        if (PlayerInput.IsQuickLoadPressed)
-            ShowToast("⏳ Сейвы отключены (этап разработки)");
+        // Этап-3 (директива 20.10, снят режим Q8 «сейвы отложены»): F5/F9 —
+        // меню сохранения/загрузки. Сейв-система стабилизирована и прошла
+        // фиксы целостности Этапа-3 (критические блоки + версия формата,
+        // честные HasSave/DeleteSave, единый fail-closed сброс доменов).
+        // Гейты: поверх другого модального окна не открываем (одна
+        // планировочная поверхность за раз); при экране смерти ветка
+        // недостижима (ранний Return в HandleStickyInput).
+        if (PlayerInput.IsQuickSavePressed || PlayerInput.IsQuickLoadPressed)
+        {
+            if (_saveLoadMenu is { Visible: true })
+            {
+                // Повторная клавиша вызова — закрытие (правило UX).
+                _saveLoadMenu.Close();
+            }
+            else if (AnyModalWindowOpen())
+            {
+                ToastPub?.Publish(new Core.Messaging.Contracts.ToastShownEvent(
+                    "Сначала закройте активное окно", 1.5f));
+            }
+            else
+            {
+                // INP-1: открытие — снапшот паузы + пауза (паттерн K-окна).
+                HandleModalPauseOnOpen(false);
+                _saveLoadMenu.Open(UI.SaveLoadMenuMode.Full);
+            }
+        }
 
         // Time speed control: PageUp = faster, PageDown = slower.
         // Debounce: max 1 change per real second (prevents rapid cycling).

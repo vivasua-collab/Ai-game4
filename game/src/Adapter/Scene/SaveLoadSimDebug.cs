@@ -46,6 +46,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.Interfaces;
@@ -53,6 +54,7 @@ using CultivationGame.Core.Events;
 using CultivationGame.Core.Messaging.Contracts;
 using CultivationGame.Adapter.Di;
 using CultivationGame.Modules.Save;
+using CultivationGame.Entry.Phases;
 
 namespace CultivationGame.Adapter.Scene;
 
@@ -514,6 +516,121 @@ public partial class SaveLoadSimDebug : Node
         // === 8. Чистка =================================================
         _saveService.DeleteSave(new SaveSlot(SlotName, SaveSlotType.Manual));
 
+        // === 9. Этап-3 (adit_10_20, дефект 1 / P1): полнота и версия сейва ===
+        // Пустой «{}», отсутствие критического блока (world_time / player),
+        // битая версия формата — Load ОБЯЗАН отказать (до фикса «{}» проходил
+        // как успех), a домены остаться нетронутыми (RestoreState не звался).
+        int stonesBeforeBroken = _inventory.GetItemCount(StoneId);
+        bool s9 = true;
+        if (_saveService.Save(new SaveSlot(SlotName, SaveSlotType.Manual)))
+        {
+            string root = ProjectSettings.GlobalizePath("user://saves");
+            string srcPath = Path.Combine(root, SlotName, "main.json");
+            string validJson = File.ReadAllText(srcPath);
+
+            // 9a: пустой JSON-объект «{}».
+            string slotEmpty = SlotName + "_broken_empty";
+            WriteRawSave(root, slotEmpty, "{}");
+            bool a = !_saveService.Load(new SaveSlot(slotEmpty, SaveSlotType.Manual))
+                && (_saveService.LastError ?? "").Contains("save_meta");
+            s9 &= a;
+
+            // 9b: без критического блока world_time.
+            var bNode = JsonNode.Parse(validJson)!;
+            bNode.AsObject().Remove("world_time");
+            string slotNoWt = SlotName + "_broken_no_wt";
+            WriteRawSave(root, slotNoWt, bNode.ToJsonString());
+            bool b = !_saveService.Load(new SaveSlot(slotNoWt, SaveSlotType.Manual))
+                && (_saveService.LastError ?? "").Contains("world_time");
+            s9 &= b;
+
+            // 9c: без критического блока player.
+            var cNode = JsonNode.Parse(validJson)!;
+            cNode.AsObject().Remove("player");
+            string slotNoPlayer = SlotName + "_broken_no_player";
+            WriteRawSave(root, slotNoPlayer, cNode.ToJsonString());
+            bool c = !_saveService.Load(new SaveSlot(slotNoPlayer, SaveSlotType.Manual))
+                && (_saveService.LastError ?? "").Contains("player");
+            s9 &= c;
+
+            // 9d: версия формата новее игры → отказ (не тихое «загрузилось»).
+            var dNode = JsonNode.Parse(validJson)!;
+            dNode["save_meta"]!["version"] = SaveDataAggregator.CurrentFormatVersion + 99;
+            string slotFuture = SlotName + "_broken_future";
+            WriteRawSave(root, slotFuture, dNode.ToJsonString());
+            bool d = !_saveService.Load(new SaveSlot(slotFuture, SaveSlotType.Manual))
+                && (_saveService.LastError ?? "").Contains("новее");
+            s9 &= d;
+
+            // Инвариант: все отказы ДО RestoreState — домены не тронуты
+            // (камни те же, что после успешного round-trip Load шага 6).
+            bool untouched = _inventory.GetItemCount(StoneId) == stonesBeforeBroken;
+            s9 &= untouched;
+
+            Require(s9, "этап3-полнота", "9a emptyJSON=" + (a ? "OK" : "FAIL") + ", 9b no-world_time=" + (b ? "OK" : "FAIL")
+                + ", 9c no-player=" + (c ? "OK" : "FAIL") + ", 9d future-ver=" + (d ? "OK" : "FAIL")
+                + ", домены-нетронуты=" + (untouched ? "OK" : "FAIL"), problems);
+            GD.Print($"[SaveLoadSim] 9. Этап-3/P1 полнота: " +
+                     $"пустойJSON={a}, без world_time={b}, без player={c}, версия-из-будущего={d}, домены нетронуты={untouched}");
+
+            // === 10. Этап-3 (дефект 2 / P2): каталог без main.json ≠ сейв ===
+            string slotDirOnly = SlotName + "_emptydir";
+            Directory.CreateDirectory(Path.Combine(root, slotDirOnly));
+            bool hasSavePhantom = _saveService.HasSave(new SaveSlot(slotDirOnly, SaveSlotType.Manual));
+            bool listedPhantom = _saveService.GetAllSaves().Any(s => s.Slot.Name == slotDirOnly);
+            bool listedReal = _saveService.GetAllSaves().Any(s => s.Slot.Name == SlotName);
+            bool s10 = !hasSavePhantom && !listedPhantom && listedReal;
+            Require(s10, "этап3-фантом-каталог", $"HasSave(пустой каталог)={hasSavePhantom} (нужно false), " +
+                $"в перечне={listedPhantom} (нужно false), реальный слот в перечне={listedReal} (нужно true)", problems);
+            GD.Print($"[SaveLoadSim] 10. Этап-3/P2 фантом: HasSave(каталог-без-main.json)={hasSavePhantom}, " +
+                     $"в перечне={listedPhantom}, реальный={listedReal}");
+
+            // === 11. Этап-3 (дефект 3 / P2): честный результат удаления ===
+            bool delMissing = _saveService.DeleteSave(new SaveSlot(SlotName + "_nope", SaveSlotType.Manual));
+            bool delExisting = _saveService.DeleteSave(new SaveSlot(slotEmpty, SaveSlotType.Manual));
+            bool delAgain = _saveService.DeleteSave(new SaveSlot(slotEmpty, SaveSlotType.Manual));
+            bool s11 = !delMissing && delExisting && !delAgain;
+            Require(s11, "этап3-удаление", $"несуществующий→{delMissing} (нужно false), " +
+                $"существующий→{delExisting} (нужно true), повтор→{delAgain} (нужно false)", problems);
+            GD.Print($"[SaveLoadSim] 11. Этап-3/P2 удаление: нет→{delMissing}, да→{delExisting}, повтор→{delAgain}");
+
+            // Чистка QA-слотов этой волны.
+            foreach (var suffix in new[] { "_broken_empty", "_broken_no_wt", "_broken_no_player", "_broken_future", "_emptydir" })
+            {
+                var dir = Path.Combine(root, SlotName + suffix);
+                if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+            }
+            _saveService.DeleteSave(new SaveSlot(SlotName, SaveSlotType.Manual));
+        }
+        else
+        {
+            Require(false, "этап3-подготовка", "Save перед шагом 9 не удался — тесты полноты невозможны", problems);
+        }
+
+        // === 12. Этап-3 (дефект 4 / P2): единый сброс доменов fail-closed ===
+        // Проверяется КОНТРАКТ координатора: сброс продолжается после
+        // исключения (все домены получили ResetWorld), ошибка агрегируется.
+        var good1 = new FakeResettable(false);
+        var badDomain = new FakeResettable(true);
+        var good2 = new FakeResettable(false);
+        var fakeResolver = new FakeResolver(good1, badDomain, good2);
+        try
+        {
+            WorldDomainResetCoordinator.ResetAll(fakeResolver);
+            Require(false, "этап3-сброс", "AggregateException НЕ брошен — координатор глотает провал домена", problems);
+        }
+        catch (AggregateException agg)
+        {
+            bool good1Called = good1.Calls == 1;
+            bool good2Called = good2.Calls == 1;
+            bool oneFailure = agg.InnerExceptions.Count == 1;
+            bool s12 = good1Called && good2Called && oneFailure;
+            Require(s12, "этап3-сброс", $"домены после исключения: до-провала={good1Called}, после={good2Called} " +
+                $"(нужно оба true — сброс НЕ прерывается), внутренних ошибок={agg.InnerExceptions.Count} (нужно 1)", problems);
+            GD.Print($"[SaveLoadSim] 12. Этап-3/P2 сброс: после исключения домены продолжили сброс " +
+                     $"(до={good1Called}, после={good2Called}), ошибок в агрегате={agg.InnerExceptions.Count}");
+        }
+
         // Финальный integrity-гейт: если хоть одна мутация была нереальной,
         // равенства шага 7 ничего не доказывают.
         if (problems.Count > 0)
@@ -524,10 +641,48 @@ public partial class SaveLoadSimDebug : Node
         }
         pass &= problems.Count == 0;
 
-        GD.Print($"[SaveLoadSim] VERDICT: {(pass ? "PASS — Save/Load round-trip: 20 блоков (R17 полнота + Ф4: corpses/npc_relationships), типизация, IncludeFields, честный success, РЕАЛЬНЫЕ мутации (анти-тривиальность)" : "FAIL")}");
+        GD.Print($"[SaveLoadSim] VERDICT: {(pass ? "PASS — Save/Load round-trip: 20 блоков (R17 полнота + Ф4: corpses/npc_relationships), типизация, IncludeFields, честный success, РЕАЛЬНЫЕ мутации (анти-тривиальность) + Этап-3 (adit_10_20): полнота/версия формата, фантом-каталоги, честное удаление, fail-closed сброс доменов" : "FAIL")}");
 
         // QA-режим: сим терминален — завершаем процесс сразу.
         GetTree().Quit();
+    }
+
+    /// <summary>
+    /// Этап-3 (QA-шаги 9-12): записать «сырой» JSON-файл сейва напрямую
+    /// в каталог слота (воспроизведение битых/недописанных сейвов).
+    /// </summary>
+    private static void WriteRawSave(string root, string slotName, string json)
+    {
+        var dir = Path.Combine(root, slotName);
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, "main.json"), json);
+    }
+
+    // Этап-3 (QA-шаг 12): фейковые домены/резолвер для контракта сброса.
+    private sealed class FakeResettable : IWorldResettable
+    {
+        public int Calls;
+        private readonly bool _throw;
+        public FakeResettable(bool shouldThrow) => _throw = shouldThrow;
+        public void ResetWorld()
+        {
+            Calls++;
+            if (_throw) throw new InvalidOperationException("qa reset boom");
+        }
+    }
+
+    private sealed class FakeResolver : IResolver
+    {
+        private readonly List<object> _all;
+        public FakeResolver(params object[] all) => _all = new List<object>(all);
+        public T Resolve<T>() => _all.OfType<T>().First();
+        public IEnumerable<T> ResolveAll<T>() => _all.OfType<T>();
+        public bool TryResolve<T>(out T result)
+        {
+            var one = _all.OfType<T>().FirstOrDefault();
+            result = one!;
+            return one != null;
+        }
     }
 
     /// <summary>

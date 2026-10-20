@@ -191,6 +191,10 @@ public sealed class SaveFileHandler : ISaveFileHandler
 
     private const string FlatFileName = "main.json";
 
+    /// <summary>Абсолютный путь main.json слота (критерий готовности сейва).</summary>
+    private string FlatSlotPath(string slotName)
+        => Path.Combine(_saveRoot, SanitizeSlotName(slotName), FlatFileName);
+
     bool ISaveFileHandler.Save(string slotName, Dictionary<string, object> data)
     {
         if (string.IsNullOrEmpty(slotName)) return false;
@@ -222,14 +226,53 @@ public sealed class SaveFileHandler : ISaveFileHandler
         }
     }
 
-    bool ISaveFileHandler.HasSave(string slotName) => Exists(slotName);
+    // Этап-3 аудит (adit_10_20, дефект 2 / P2): слот существует ТОЛЬКО если
+    // присутствует файл состояния main.json. Прежнее HasSave проверяло
+    // Directory.Exists — а каталог создаётся ДО записи файла (Write), и при
+    // сбое записи оставался пустой каталог, выдававший себя за валидный
+    // слот: HasSave=true, перечисление в UI, но Load — файл не найден.
+    bool ISaveFileHandler.HasSave(string slotName)
+        => !string.IsNullOrEmpty(slotName) && File.Exists(FlatSlotPath(slotName));
 
+    // Этап-3 аудит (adit_10_20, дефект 3 / P2): честный результат удаления.
+    // Прежнее DeleteSave вызывало void-Delete (глотавший исключения в catch)
+    // и безусловно возвращало true — сбой ФС давал UI ложный успех при
+    // оставшемся на диске слоте. Теперь: операция + обработка + фактический
+    // результат. Контракт: true — слот существовал и удалён; false — файла
+    // не было или I/O-отказ (паритет с Modules.Save.SaveFileHandler.DeleteSave).
     bool ISaveFileHandler.DeleteSave(string slotName)
     {
-        if (!Exists(slotName)) return false;
-        Delete(slotName);
-        return true;
+        if (string.IsNullOrEmpty(slotName)) return false;
+        var dir = Path.Combine(_saveRoot, SanitizeSlotName(slotName));
+        if (!Directory.Exists(dir)) return false;
+        try
+        {
+            Directory.Delete(dir, recursive: true);
+            var deleted = !Directory.Exists(dir);
+            if (deleted)
+                GD.Print($"[SaveFileHandler] Deleted slot {slotName}");
+            else
+                GD.PrintErr($"[SaveFileHandler] DeleteSave slot '{slotName}' — каталог всё ещё существует после удаления");
+            return deleted;
+        }
+        catch (Exception ex)
+        {
+            GD.PrintErr($"[SaveFileHandler] DeleteSave slot '{slotName}' FAILED: {ex.Message}");
+            return false;
+        }
     }
 
-    IReadOnlyList<string> ISaveFileHandler.GetAllSaves() => GetAllSlots();
+    // Этап-3 (дефект 2 / P2): перечень слотов — только ГОТОВЫЕ к загрузке
+    // каталоги с main.json; пустые/недописанные каталоги не выдаются за
+    // сохранённые игры.
+    IReadOnlyList<string> ISaveFileHandler.GetAllSaves()
+    {
+        var result = new List<string>();
+        foreach (var slot in GetAllSlots())
+        {
+            if (File.Exists(Path.Combine(_saveRoot, slot, FlatFileName)))
+                result.Add(slot);
+        }
+        return result;
+    }
 }

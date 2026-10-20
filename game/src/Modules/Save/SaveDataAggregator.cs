@@ -69,6 +69,47 @@ public sealed class SaveDataAggregator
         "currency", "charger", "save_meta",
     };
 
+    // ──────────────────────────────────────────────────────────────────
+    // Этап-3 аудит (adit_10_20, дефект 1 / P1): версионированная схема
+    // целостности сейва. Прежде Load() возвращал true для ЛЮБОГО валидного
+    // JSON — включая пустой «{}»: RestoreOne молча пропускал отсутствующие
+    // блоки, errors оставался пустым, а GameSession.LoadGame запускала мир
+    // с несуществующим состоянием (Data от fallback TestPolygon, сетка от
+    // перегенерации, домены пусты). Версия формата писалась в save_meta,
+    // но никогда не проверялась.
+    //
+    // Новый контракт:
+    //  • save_meta.Version — ОБЯЗАТЕЛЕН: без него формат неизвестен → отказ
+    //    (в проекте не существовало формата без меты — SaveService пишет
+    //    save_meta с самой первой записи);
+    //  • версия новее текущей → отказ («обновите игру»);
+    //  • версия известна → её критические блоки ОБЯЗАНЫ присутствовать;
+    //  • неизвестная версия → отказ (не «считать все блоки необязательными»);
+    //  • некритические блоки по-прежнему опциональны (форвард-
+    //    совместимость: сейв v1 без formation/charger корректен);
+    //  • при провале формата RestoreState НЕ вызывается — домены остаются
+    //    нетронутыми (вызывающий честно вернёт сессию в меню).
+    //
+    // Миграции: при появлении v2 — добавить case в CriticalBlocksForVersion
+    // и (при необходимости) migrate-хук, преобразующий v1-данные до v2-формы.
+    // ──────────────────────────────────────────────────────────────────
+
+    /// <summary>Текущая версия формата сейва (пишется в save_meta.Version).</summary>
+    public const int CurrentFormatVersion = 1;
+
+    /// <summary>Критические блоки формата v1: без них мир нецелостен.</summary>
+    private static readonly string[] CriticalBlocksV1 = { "world", "world_time", "player", "body" };
+
+    /// <summary>
+    /// Критические блоки для конкретной версии сейва. null — версия
+    /// неизвестна (нет правил совместимости) → отказ загрузки.
+    /// </summary>
+    private static string[]? CriticalBlocksForVersion(int version) => version switch
+    {
+        1 => CriticalBlocksV1,
+        _ => null,
+    };
+
     /// <summary>Ошибки последней Save/Load (пусто = успех). Порядок — как у блоков.</summary>
     public IReadOnlyList<string> LastErrors { get; private set; } = Array.Empty<string>();
 
@@ -133,6 +174,16 @@ public sealed class SaveDataAggregator
         // R17: сначала — блоки из явного контракта RestoreOrder (в этом
         // порядке), затем остальные (будущие модули) в порядке регистраций.
         var errors = new List<string>();
+
+        // Этап-3 (P1): целостность файла ДО восстановления — битый/неполный
+        // сейв НЕ доходит до RestoreState (раньше «{}» проходил как успех).
+        if (!ValidateFormat(dict, errors))
+        {
+            LastErrors = errors;
+            foreach (var e in errors)
+                Console.WriteLine($"[SaveDataAggregator] Load REJECTED (format) — {e}");
+            return false;
+        }
         var restored = new HashSet<ISaveable>(
             System.Collections.Generic.ReferenceEqualityComparer.Instance);
         foreach (var key in RestoreOrder)
@@ -165,6 +216,67 @@ public sealed class SaveDataAggregator
         return true;
     }
 
+    /// <summary>
+    /// Этап-3 (P1): проверка целостности формата сейва. Возвращает false и
+    /// наполняет errors, если сейв не соответствует ни одному известному
+    /// формату (нет меты / версия неизвестна / версия новее игры / отсутствует
+    /// критический блок).
+    /// </summary>
+    private static bool ValidateFormat(Dictionary<string, object> dict, List<string> errors)
+    {
+        if (!dict.TryGetValue("save_meta", out var metaRaw) || metaRaw is not JsonElement metaEl)
+        {
+            errors.Add("format: блок 'save_meta' отсутствует — версия формата неизвестна; загрузка не поддерживается");
+            return false;
+        }
+
+        // Naming: CamelCase (SaveJson) с fallback на PascalCase — сейвы,
+        // записанные Modules-хендлером до единой naming-политики.
+        var versionProp = GetPropertyIgnoreCase(metaEl, "version");
+        if (versionProp is not { ValueKind: JsonValueKind.Number })
+        {
+            errors.Add("format: 'save_meta.version' не читается — сейв без версии формата не поддерживается");
+            return false;
+        }
+
+        int version = versionProp.Value.GetInt32();
+        if (version > CurrentFormatVersion)
+        {
+            errors.Add($"format: сейв версии {version} новее поддерживаемой ({CurrentFormatVersion}) — обновите игру");
+            return false;
+        }
+
+        var critical = CriticalBlocksForVersion(version);
+        if (critical == null)
+        {
+            errors.Add($"format: версия сейва {version} не поддерживается (правила совместимости не определены)");
+            return false;
+        }
+
+        bool ok = true;
+        foreach (var key in critical)
+        {
+            if (!dict.ContainsKey(key))
+            {
+                errors.Add($"format: отсутствует критический блок '{key}' (обязателен для версии {version})");
+                ok = false;
+            }
+        }
+        return ok;
+    }
+
+    /// <summary>Свойство JsonElement без учёта регистра (CamelCase/PascalCase сейвы).</summary>
+    private static JsonElement? GetPropertyIgnoreCase(JsonElement element, string name)
+    {
+        if (element.ValueKind != JsonValueKind.Object) return null;
+        foreach (var prop in element.EnumerateObject())
+        {
+            if (string.Equals(prop.Name, name, StringComparison.OrdinalIgnoreCase))
+                return prop.Value;
+        }
+        return null;
+    }
+
     /// <summary>Восстановить один блок (отсутствующий блок — не ошибка).</summary>
     private void RestoreOne(ISaveable s, Dictionary<string, object> dict, List<string> errors)
     {
@@ -185,6 +297,33 @@ public sealed class SaveDataAggregator
     public bool HasSave(string slotName) => _fileHandler.HasSave(slotName);
     public bool DeleteSave(string slotName) => _fileHandler.DeleteSave(slotName);
     public IReadOnlyList<string> GetAllSaves() => _fileHandler.GetAllSaves();
+
+    /// <summary>
+    /// Этап-3 (меню сейвов): мета слота для UI — без полного RestoreState.
+    /// Читает только save_meta (дата записи UTC-ticks + версия формата).
+    /// </summary>
+    public bool TryGetSlotMeta(string slotName, out long savedAtUtcTicks, out int version)
+    {
+        savedAtUtcTicks = 0;
+        version = 0;
+        var dict = _fileHandler.Load(slotName);
+        if (dict == null || !dict.TryGetValue("save_meta", out var raw) || raw is not JsonElement el)
+            return false;
+        try
+        {
+            var savedAt = GetPropertyIgnoreCase(el, "savedAt");
+            if (savedAt is { ValueKind: JsonValueKind.Number })
+                savedAtUtcTicks = savedAt.Value.GetInt64();
+            var ver = GetPropertyIgnoreCase(el, "version");
+            if (ver is { ValueKind: JsonValueKind.Number })
+                version = ver.Value.GetInt32();
+            return savedAt is { ValueKind: JsonValueKind.Number };
+        }
+        catch
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// R11 P0: конверсия сырого значения из файла в конкретный тип блока.

@@ -104,7 +104,21 @@ public sealed class SaveService : ISaveService, ISaveable
         var list = new List<SaveInfo>(names.Count);
         foreach (var n in names)
         {
-            list.Add(new SaveInfo(new SaveSlot(n), n, 0L, 0L, 0, string.Empty));
+            // Этап-3 (меню сейвов): фактическая дата записи из save_meta
+            // (раньше CreatedUnixSeconds=0 — UI не мог показать «когда сейвился»).
+            long createdUnix = 0;
+            if (_aggregator.TryGetSlotMeta(n, out long savedAtTicks, out _))
+            {
+                try
+                {
+                    createdUnix = new DateTimeOffset(new DateTime(savedAtTicks, DateTimeKind.Utc)).ToUnixTimeSeconds();
+                }
+                catch (ArgumentOutOfRangeException)
+                {
+                    createdUnix = 0;
+                }
+            }
+            list.Add(new SaveInfo(new SaveSlot(n), n, createdUnix, 0L, 0, string.Empty));
         }
         return list;
     }

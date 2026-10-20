@@ -157,3 +157,36 @@ BUG-002).
 NEXT: плейтест владельца (UX смерти, баланс формаций, perf после culling);
 волна 4 (GAP-002/003/004); волна 3 — дизайн с владельцем (GAP-007/008,
 BUG-002, GAP-009); docs_v2 16→17 (план R31).
+
+---
+
+## Сессия 2026-10-20 (день 3) — Этап 3 аудита: сохранение/загрузка/сброс мира + меню сейвов
+
+Вход: d88ee3b (волна 2 закрыта). Директива: меню загрузки/сохранения +
+«Загрузить мир» в стартовом меню; аудит Этапа 3 — 4 дефекта (P1+3×P2).
+
+Валидация: **4/4 подтверждены** по коду (RestoreOne пропускает отсутствующие
+блоки и Load=true на «{}»; Adapter HasSave/GetAllSaves по каталогам;
+DeleteSave → void-Delete глотает → безусловный true; голый foreach сброса
+в LoadGame vs AggregateException-контракт фазы).
+
+Исправления: (1) SaveDataAggregator — ValidateFormat: save_meta/версия/
+критические блоки v1 (world/world_time/player/body) ДО RestoreState,
+отказ = домены нетронуты; (2) Adapter HasSave/GetAllSaves по main.json;
+(3) честный DeleteSave (bool, try/catch); (4) WorldDomainResetCoordinator —
+единый fail-closed сброс для NewGame-фазы и LoadGame.
+
+Фича: SaveLoadMenu (Full/LoadOnly) + F5/F9 в GWC (режим Q8 «сейвы
+отключены» снят; INP-1: стек+Esc+пауза+индикатор «F5·сейвы») + внутриигровая
+загрузка (гейт LoadGame +Playing; успех → пересоздание сцены, провал →
+честный возврат в MainMenu) + «◇ Загрузить мир» в MainMenu (вместо
+quicksave-хака «или новая игра») + HotkeysWindow честно рекламирует F5/F9 +
+SaveService.GetAllSaves несёт дату сейва.
+
+QA: SaveLoadSimDebug +шаги 9–12 (битые форматы/фантом-каталог/удаление/
+fail-closed сброс через FakeResolver). Регрессия **23/23 PASS**
+(21 дефолт + FORM + RESPAWN), build 0 err. Доки: SAVE_SYSTEM §7.2/§8.0.
+Чекпоинт: checkpoints/10_20_audit_stage3_saveload.md.
+
+NEXT: плейтест владельца UX меню сейвов; реестр bugs.json + 4 этапа-3
+записи + находки вне зоны; волна 3 — дизайн.

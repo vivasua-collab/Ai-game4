@@ -167,7 +167,11 @@ public partial class MainMenuController : Control
         UIFactory.AddPressShrink(_largeWorldBtn);
         buttonContainer.AddChild(_largeWorldBtn);
 
-        _loadGameBtn = UIFactory.CreateButton("LoadGame", "◇ Загрузить игру",    400, 50);
+        // Этап-3 (директива 20.10 «В стартовое меню добавить загрузить мир»):
+        // список миров-слотов (SaveLoadMenu, LoadOnly). Прежнее поведение —
+        // хак «quicksave или старт НОВОЙ игры» — скрытый сюрприз: кнопка
+        // «Загрузить» МОГЛА запустить новую игру без спроса.
+        _loadGameBtn = UIFactory.CreateButton("LoadGame", "◇ Загрузить мир", 400, 50);
         _loadGameBtn.Pressed += OnLoadGame;
         UIFactory.AddHoverLift(_loadGameBtn);
         UIFactory.AddPressShrink(_loadGameBtn);
@@ -289,40 +293,57 @@ public partial class MainMenuController : Control
         }
     }
 
+    // ── Этап-3: меню загрузки мира (список слотов) ────────────────────
+    private UI.SaveLoadMenu? _loadWorldMenu;
+
+    /// <summary>
+    /// Открыть меню выбора мира для загрузки (LoadOnly: в главном меню
+    /// сохранять нечего). Ленивая инициализация: меню строится при первом
+    /// нажатии «Загрузить мир», DI — из контейнера GameBoot (как у самого
+    /// контроллера).
+    /// </summary>
+    private void OpenLoadWorldMenu()
+    {
+        if (_loadWorldMenu == null)
+        {
+            _loadWorldMenu = new UI.SaveLoadMenu { Name = "LoadWorldMenu" };
+            AddChild(_loadWorldMenu);
+            // Выбранный слот → полный LoadGame-пайплайн сессии + вход в мир
+            // только при подтверждённо поднятой сессии (BUG-003-контракт).
+            _loadWorldMenu.LoadRequested += slotName =>
+            {
+                try
+                {
+                    Session?.LoadGame(new SaveSlot(slotName, SaveSlotType.Manual));
+                }
+                catch (System.Exception ex)
+                {
+                    GD.PrintErr($"[MainMenu] LoadGame('{slotName}') failed: {ex}");
+                }
+                var state = Session?.State ?? SessionState.MainMenu;
+                if (state == SessionState.Playing)
+                {
+                    GetTree().ChangeSceneToFile(GameWorldScenePath);
+                }
+                else
+                {
+                    // Битый/неполный сейв: сессия вернулась в MainMenu —
+                    // остаёмся в меню, причина — в статусе SaveLoadMenu
+                    // (LastError можно показать).
+                    GD.PrintErr($"[MainMenu] LoadGame('{slotName}') — сессия не Playing (state={state})");
+                    _loadWorldMenu?.ShowLoadError(
+                        $"Загрузка «{slotName}» не удалась (состояние: {state}). Подробности — в логе.");
+                }
+            };
+        }
+        _loadWorldMenu.Open(UI.SaveLoadMenuMode.LoadOnly);
+        GD.Print("[MainMenu] Load World menu opened (LoadOnly)");
+    }
+
     private void OnLoadGame()
     {
-        GD.Print("[MainMenu] Load Game selected");
-        if (SaveService == null)
-        {
-            GD.PrintErr("[MainMenu] SaveService not wired");
-            return;
-        }
-
-        var saves = SaveService.GetAllSaves();
-        foreach (var s in saves)
-            GD.Print($"  Save slot: {s}");
-
-        if (SaveService.HasSave(new SaveSlot("quicksave", SaveSlotType.QuickSave)))
-        {
-            try
-            {
-                // 2026-09-08 (ревью-1): передаём ПОЛНЫЙ слот — тот же SaveSlot,
-                // что проверялся в HasSave (тип QuickSave совпадает с чтением).
-                Session?.LoadGame(new SaveSlot("quicksave", SaveSlotType.QuickSave));
-                // АУДИТ-1020 (BUG-003): битый/повреждённый слот возвращает
-                // сессию в MainMenu — свитч сцены только при state=Playing.
-                EnterWorldIfSessionReady("Load Game");
-            }
-            catch (System.Exception ex)
-            {
-                GD.PrintErr($"[MainMenu] LoadGame failed: {ex}");
-            }
-        }
-        else
-        {
-            GD.Print("[MainMenu] No quicksave slot — starting new game instead.");
-            OnNewGame();
-        }
+        GD.Print("[MainMenu] Load World selected");
+        OpenLoadWorldMenu();
     }
 
     private void OnSettings()

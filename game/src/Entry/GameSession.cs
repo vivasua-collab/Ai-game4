@@ -6,6 +6,7 @@ using CultivationGame.Core.DI;
 using CultivationGame.Core.Events;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Core.Messaging.Contracts;
+using CultivationGame.Entry.Phases;
 
 namespace CultivationGame.Entry;
 
@@ -130,7 +131,14 @@ public sealed class GameSession : IGameSession
     /// </summary>
     public void LoadGame(SaveSlot slot)
     {
-        if (State != SessionState.MainMenu && State != SessionState.Quitting)
+        // Этап-3 (меню сейвов, 2026-10-20): + Playing — внутриигровая загрузка
+        // из меню сохранения/загрузки (F5). Пайплайн идентичен менюшному
+        // (сброс → restore → RunAssembly(LoadGame)); вызывающий UI (GWC)
+        // после успешной загрузки пересоздаёт сцену GameWorld — рендеры
+        // строятся под восстановленную сетку/локацию. Провал возвращает
+        // сессию в MainMenu — GWC честно уводит игрока в главное меню.
+        if (State != SessionState.MainMenu && State != SessionState.Quitting
+            && State != SessionState.Playing)
         {
             Console.WriteLine($"[GameSession] LoadGame rejected — state={State}");
             return;
@@ -145,17 +153,17 @@ public sealed class GameSession : IGameSession
             // ДО RestoreState — в этом же процессе мог жить прошлый мир
             // (NewGame → меню → LoadGame): реестры/провайдеры/домены должны
             // быть пусты ДО того, как сейв наполнит их заново (RestoreState
-            // делает merge, не чистит). Аналог WorldDomainResetPhase (фаза 0,
-            // NewGame-режим): на Load фазы идут ПОСЛЕ восстановления —
-            // сброс в фазе опоздал бы. Раньше сбрасывался только NPC-домен:
-            // звери/формации/зарядник/инвентарь/кукла/время/квесты/валюта
-            // прошлого мира «переживали» загрузку.
-            int resetCount = 0;
-            foreach (var domain in _resolver.ResolveAll<IWorldResettable>())
-            {
-                domain.ResetWorld();
-                resetCount++;
-            }
+            // делает merge, не чистит).
+            //
+            // Этап-3 аудита (adit_10_20, дефект 4 / P2): сброс — через ЕДИНЫЙ
+            // координатор (WorldDomainResetCoordinator, тот же что и у фазы 0
+            // NewGame). Прежде: голый foreach прерывался на первом исключении
+            // — последующие домены оставались НЕ сброшенными, а LoadGame тихо
+            // терял диагностику. Теперь: ВСЕ домены получают ResetWorld()
+            // (попытки независимы), ошибки агрегируются → AggregateException
+            // → внешний catch возвращает сессию в MainMenu. Одна семантика
+            // fail-closed для всех world-transition.
+            int resetCount = WorldDomainResetCoordinator.ResetAll(_resolver);
             Console.WriteLine($"[GameSession] LoadGame: {resetCount} world-scoped доменов сброшено до RestoreState");
 
             // ISaveService.Load triggers ISaveable.RestoreState on every
