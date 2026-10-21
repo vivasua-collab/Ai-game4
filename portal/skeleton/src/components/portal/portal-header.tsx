@@ -25,9 +25,9 @@ export function PortalHeader({ data, loading }: PortalHeaderProps) {
   return (
     <header className="sticky top-0 z-40 border-b border-stone-800/70 bg-zinc-950/90 backdrop-blur-sm">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-1 px-4 py-2.5 sm:px-6 sm:py-3">
-        {/* flex-wrap: на узких экранах правый кластер (бейдж сборки + метка
-            обновления) переносится на вторую линию вместо выхода за вьюпорт
-            (390px: иконка + заголовок + shrink-0-кластер не помещались в одну) */}
+        {/* flex-wrap: на узких экранах бейджи переносятся на следующие линии
+            вместо выхода за вьюпорт (кластер НЕ shrink-0 — может сжиматься и
+            переноситься внутри себя: бейдж сборки + метка обновления) */}
         <div className="flex min-h-8 flex-wrap items-center gap-2.5 sm:gap-3">
           <Flame
             aria-hidden="true"
@@ -37,7 +37,7 @@ export function PortalHeader({ data, loading }: PortalHeaderProps) {
             Карта проекта{' '}
             <span className="text-amber-400">Ai-game4</span>
           </h1>
-          <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
+          <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-2 gap-y-1 sm:gap-x-3">
             {loading && !data ? (
               <Skeleton className="h-5 w-24 bg-zinc-800" />
             ) : buildResult ? (

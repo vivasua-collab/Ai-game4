@@ -15,11 +15,11 @@ import {
   Cable,
   Plug,
   Puzzle,
-  Search,
 } from 'lucide-react';
 
 import type { BusMapFile, BusNode } from '@/lib/portal/types';
 import { thinScrollClass } from '@/lib/portal/helpers';
+import { BusCatalog } from './bus-catalog';
 
 /* ── подкомпоненты ─────────────────────────────────────────────────────── */
 
@@ -80,7 +80,7 @@ function filterList<T>(items: T[], q: string, key: (t: T) => string): T[] {
 
 /* ── хаб ───────────────────────────────────────────────────────────────── */
 
-function HubPanel({ busMap }: { busMap: BusMapFile }) {
+function HubPanel({ busMap, query }: { busMap: BusMapFile; query: string }) {
   const hub = busMap.hub;
   const events = hub?.channels.find((c) => c.id === 'events');
   const services = hub?.channels.find((c) => c.id === 'services');
@@ -90,9 +90,9 @@ function HubPanel({ busMap }: { busMap: BusMapFile }) {
     <div className="flex flex-col gap-4">
       <p className="text-sm leading-relaxed text-stone-300">
         Центральная шина — единственный канал межмодульного взаимодействия
-        (Hub-and-Spoke). Выберите узел на схеме, чтобы увидеть, какие{' '}
-        <span className="text-amber-300">ресурсы он отдаёт</span> в шину и какие{' '}
-        <span className="text-emerald-300">запрашивает</span> из неё.
+        (Hub-and-Spoke). Ниже — <span className="text-stone-100">полный каталог
+        контрактов</span>: поимённо кто что кладёт в шину и кто забирает.
+        Выберите узел на схеме — его личные списки; наведите — быстрая сводка.
       </p>
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -141,6 +141,9 @@ function HubPanel({ busMap }: { busMap: BusMapFile }) {
           </div>
         ) : null}
       </div>
+
+      {/* каталог контрактов: поимённо всё, что кладут и забирают */}
+      <BusCatalog busMap={busMap} query={query} />
 
       {/* легенда */}
       <div className="rounded-lg border border-stone-800/70 bg-zinc-900/40 p-3.5">
@@ -287,7 +290,7 @@ export interface BusNodePanelProps {
 }
 
 export function BusNodePanel({ busMap, node, query }: BusNodePanelProps) {
-  if (!node) return <HubPanel busMap={busMap} />;
+  if (!node) return <HubPanel busMap={busMap} query={query} />;
   return (
     <div className="flex flex-col gap-3.5">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">

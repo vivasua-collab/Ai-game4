@@ -10,11 +10,13 @@
  *   provides (узел → шина)   сервисы: Register       — amber, пунктир
  *   requires (шина → узел)   сервисы: Resolve/Inject — emerald, пунктир
  *
- * Толщина ребра ~ числу событий/сервисов. Наведение подсвечивает связку узла,
- * клик выбирает узел для панели деталей (клик по хабу — сводка каналов).
+ * Толщина ребра ~ числу событий/сервисов. Наведение подсвечивает связку узла
+ * и показывает ВСПЛЫВАЮЩУЮ сводку — имена контрактов, которые узел кладёт
+ * в шину и забирает из неё (полные списки — клик, панель ниже).
+ * Клик по хабу — сводка каналов + каталог всех контрактов.
  */
 
-import { memo } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 
 import type { BusNode } from '@/lib/portal/types';
 
@@ -175,7 +177,48 @@ function BusDiagramImpl({ nodes, selectedId, hoverId, onHover, onSelect }: BusDi
   const hubActive = focus === 'Core';
   const hubHovered = hoverId === 'Core';
 
+  /* масштаб viewBox → пиксели (для позиционирования всплывающей сводки) */
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const update = () => setScale(el.clientWidth / W || 1);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const hovered = hoverId && hoverId !== 'Core' ? placed.find((p) => p.node.id === hoverId) : undefined;
+
+  /* всплывающая сводка: до 4 имён на секцию, полные списки — по клику */
+  const section = (label: string, items: string[], tone: 'amber' | 'emerald') =>
+    items.length > 0 ? (
+      <p className="mt-1 text-[10px] leading-relaxed">
+        <span
+          className={`font-mono ${tone === 'amber' ? 'text-amber-400/90' : 'text-emerald-400/90'}`}
+        >
+          {label} ×{items.length}:{' '}
+        </span>
+        <span className="font-mono text-stone-300">
+          {items.slice(0, 4).join(', ')}
+          {items.length > 4 ? <span className="text-stone-500"> +{items.length - 4}</span> : null}
+        </span>
+      </p>
+    ) : null;
+
+  const TW = 264; // ширина сводки, px
+  const half = TW / 2;
+  const cw = W * scale;
+  const left = hovered
+    ? Math.min(Math.max(hovered.x * scale, half + 8), Math.max(cw - half - 8, half + 8))
+    : 0;
+  const topPx = hovered ? hovered.y * scale : 0;
+  const below = topPx < 240;
+
   return (
+    <div ref={wrapRef} className="relative">
     <svg
       viewBox={`0 0 ${W} ${H}`}
       role="img"
@@ -286,15 +329,14 @@ function BusDiagramImpl({ nodes, selectedId, hoverId, onHover, onSelect }: BusDi
         return (
           <g
             key={p.node.id}
+            role="group"
+            aria-label={`${p.node.id} (${p.node.layer}) — публикаций ${p.node.publishes.length}, подписок ${p.node.subscribes.length}, предоставляет ${p.node.provides.length}, запрашивает ${p.node.requires.length}; файлов ${p.node.files}`}
             onMouseEnter={() => onHover(p.node.id)}
             onMouseLeave={() => onHover(null)}
             onClick={() => onSelect(p.node.id)}
             className="cursor-pointer"
             opacity={dimmed ? 0.45 : 1}
           >
-            <title>
-              {`${p.node.id} (${p.node.layer}) — публикаций ${p.node.publishes.length}, подписок ${p.node.subscribes.length}, предоставляет ${p.node.provides.length}, запрашивает ${p.node.requires.length}; файлов ${p.node.files}`}
-            </title>
             <rect
               x={p.x - p.boxW / 2}
               y={p.y - 15}
@@ -320,6 +362,36 @@ function BusDiagramImpl({ nodes, selectedId, hoverId, onHover, onSelect }: BusDi
         );
       })}
     </svg>
+
+      {/* всплывающая сводка наведённого узла (имена контрактов) */}
+      {hovered ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute z-10 w-[264px] rounded-lg border border-stone-700 bg-zinc-950/95 p-2.5 shadow-xl shadow-black/50"
+          style={{
+            left,
+            top: topPx,
+            transform: below
+              ? 'translate(-50%, 16px)'
+              : 'translate(-50%, calc(-100% - 16px))',
+          }}
+        >
+          <p className="flex flex-wrap items-baseline gap-x-1.5">
+            <span className="text-xs font-semibold text-stone-100">{hovered.node.id}</span>
+            <span className="font-mono text-[10px] text-stone-500">
+              {hovered.node.kind} · файлов {hovered.node.files}
+            </span>
+          </p>
+          {section('→ Publish', hovered.node.publishes, 'amber')}
+          {section('→ Register', hovered.node.provides.map((x) => x.service), 'amber')}
+          {section('← Subscribe', hovered.node.subscribes, 'emerald')}
+          {section('← Resolve', hovered.node.requires.map((x) => x.service), 'emerald')}
+          <p className="mt-1.5 border-t border-stone-800 pt-1 text-[9.5px] text-stone-600">
+            клик — полные списки в панели ниже
+          </p>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
