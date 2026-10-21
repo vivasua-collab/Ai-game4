@@ -1,6 +1,6 @@
 {
   "version": "1.6",
-  "updated": "2026-10-20",
+  "updated": "2026-10-22",
   "format": {
     "purpose": "Реестр находок аудита и волн их исправления. Запуск процесса: директива владельца от 19.10.2026 — «по важным находкам аудита запустить анализ и исправление». Источник находок: аудит-вердикты итерации 2 карты проекта (коммит dfb98d0) + открытые верификации PROJECT_MAP.md §5. Ведёт main-агент Z.ai Code; веб-портал читает файл напрямую (runtime, no-store).",
     "type": {
@@ -951,6 +951,63 @@
       "qa": "STAGE4 шаг 5: QA-группа (лидер+участник, Patrol, маршрут 3 точки) → Save → Disband → Load → группа восстановлена (id/лидер/состав/маршрут); SaveLoadSimDebug round-trip: блок npc_groups до==после (волчья стая с animal_* участниками восстанавливается).",
       "progress_pct": 100,
       "fix_note": "Этап 4 аудита (сохранение/загрузка/NPC), 2026-10-20"
+    },
+    {
+      "id": "STAGE5-001",
+      "type": "bug",
+      "severity": "P1",
+      "title": "Бой объявлял цель убитой до фактической смерти тела (BUG-015)",
+      "module": "Бой (Combat) + Тело (Body)",
+      "track_ref": "combat",
+      "status": "verified",
+      "fix_wave": 3,
+      "assignee": "assistant",
+      "found": "2026-10-22",
+      "verified": "2026-10-22",
+      "summary": "DamageCalculator.IsFatalHit объявлял удар смертельным по предикату «голова/сердце + итоговый урон ≥ 50», но BodyDamageCalculator.SplitDamage направлял в функциональную (красную) HP только 70% урона: голова с 50 HP при ударе 50 теряла 35 красной и оставалась жива (15/50), организм был жив, а CombatService уже считал защитника погибшим (defenderDead = result.IsFatal || …) — ложные Victory/Defeat и EnemyKilledEvent без NPCDeathEvent и трупа: домены смерти (NPCCombatAdapter/AnimalService) проверяют фактическое тело и с флагом расходились.",
+      "analysis": "Два независимых «предиктора смерти» (порог урона и состояние тела) без единого источника истины. Каскад последствий: ложная победа над NPC (квест зачитан, трупа нет), ложное поражение игрока при живом герое, рассинхрон боя/квестов/трупов. Порог 50 дополнительно искажался BUG-016 (сердцу реально доходило только 70% урона).",
+      "fix": "Единый источник истины — фактическое состояние тела: DamageResult.IsFatal пересчитывается DamageService ПОСЛЕ синхронного применения урона (EventBus fan-out внутри CalculateDamage уже прогоняет BodyService.ApplyDamage, включая овекилл-перенос R41-1) и равен HasEntity && !IsEntityAlive. IsFatalHit и константа FATAL_DAMAGE_THRESHOLD удалены; DamageTraceEvent.Fatal использует то же значение (ранее расходился при незарегистрированной цели). CombatService решает смерть только по телу (дублирующая проверка провайдера оставлена как гейт-страховка).",
+      "qa": "STAGE5: (2) удар 50 в голову — red 50→15, жив, kill/death-событий 0; повторный 50 → смерть подтверждена телом: EnemyKilled/NPCDeath(killer=player_0)/труп ровно по одному; (3) сердце: два удара 50 (80 HP) убивают, первый — жив; (4) инвариант result.IsFatal == !IsEntityAlive после каждого удара (5×20 + овекилл 3000); (6) реальный бой CombatService.ExecuteAttack: смерть завершает бой (IsInCombat=false), зачёт один; (7) игрок: голова-50 → жив, PlayerDeathEvent=0.",
+      "progress_pct": 100,
+      "fix_note": "Этап 5 аудита (бой/состояния сущностей), 2026-10-22"
+    },
+    {
+      "id": "STAGE5-002",
+      "type": "bug",
+      "severity": "P2",
+      "title": "30% урона по сердцу терялось — сплит без учёта способностей части (BUG-016)",
+      "module": "Тело (Body)",
+      "track_ref": "body",
+      "status": "verified",
+      "fix_wave": 3,
+      "assignee": "assistant",
+      "found": "2026-10-22",
+      "verified": "2026-10-22",
+      "summary": "Сердце по замыслу CORE-C01 не имеет структурной HP (MaxBlackHP = 0), но BodyService.ApplyDamage/ApplyDamageToEntityParts использовали безусловный сплит 70/30: 30% урона уходило в несуществующий структурный слой, где BodyPart.TakeDamage их отбрасывал. Прямое попадание 10 снимало с сердца только 7 красной HP (удар 50 — только 35 вместо 50): фактический урон искажался, бой затягивался, а порог смертельного удара (50) сравнивался с уроном, которого тело никогда не получало.",
+      "analysis": "Асимметрия лечения и урона: HealPart давно учитывал MaxBlackHP==0 (BD-24: сердце лечится на 100% в красную), а ApplyDamage — нет. Усугубляло BUG-015: порог фатальности был недостижим реальным уроном по сердцу (50 урона давало 35 красной при 80 HP).",
+      "fix": "SplitDamage стал part-aware: BodyDamageCalculator.SplitDamage(totalDamage, targetPart) — при MaxBlackHP ≤ 0 весь урон идёт в красную HP; обычные части сохраняют сплит 70/30 (зеркало правила лечения BD-24). Оба вызова в BodyService передают разрешённую часть.",
+      "qa": "STAGE5: (1) сердце NPC при прямом попадании 10: red 80→70 (−10, полный), black=0; торс 10: −7 красной/−3 чёрной (70/30 сохранён); (3) два удара по 50 в сердце (80 HP) убивают цель; (7) игрок: сердце-10 → −10 полный, торс-10 → −7/−3.",
+      "progress_pct": 100,
+      "fix_note": "Этап 5 аудита (бой/состояния сущностей), 2026-10-22"
+    },
+    {
+      "id": "STAGE5-003",
+      "type": "bug",
+      "severity": "P2",
+      "title": "Убийство DoT-уроном не засчитывалось в квестах, атрибуция убийцы терялась (BUG-017)",
+      "module": "Баффы/DoT (Buff) + Бой + Квесты",
+      "track_ref": "buff",
+      "status": "verified",
+      "fix_wave": 3,
+      "assignee": "assistant",
+      "found": "2026-10-22",
+      "verified": "2026-10-22",
+      "summary": "Периодический урон (Poison/Burn/Bleed/Freeze) шёл отдельным путём: BodyModule.OnBuffTicked → DamageAppliedEvent с SourceId=\"dot:{buffId}\" → домены смерти публиковали NPCDeathEvent (труп создавался), но EnemyKilledEvent — событие, по которому QuestProgressTracker засчитывает убийства — публиковал только CombatService в ветке обычного удара. Смерть от яда/горения не двигала квесты («Охота на волков»); в придачу SourceId «dot:…» не содержал первоначального атакующего — NPCDeathEvent.KillerId был фантомом.",
+      "analysis": "Подтверждение смерти и публикация событий о ней жили в двух несогласованных местах: CombatService (только прямые удары) и домены смерти (по фактическому телу, но без зачёта). Квест-прогресс и killfeed теряли DoT-убийства; авторство убийства не сохранялось нигде в цепочке ApplyBuff → BuffTicked → DamageApplied.",
+      "fix": "Единый доменный путь: EnemyKilledEvent публикуют домены смерти NPCCombatAdapter/AnimalService при подтверждении гибели по телу (ровно один зачёт и для прямого удара, и для DoT-тика; killer — только игрок). Атрибуция: IBuffService.ApplyBuff(+sourceId) → ActiveBuff.SourceId (Refresh обновляет) → BuffTickedEvent.SourceId → DamageAppliedEvent.OriginalAttackerId (SourceId остаётся фантомом dot:… — threat-таблицы NPC от яда не мстят, AUDIT-0911 NPC-7) → NPCDeathEvent.KillerId (реальный убийца) + BodyService.LastDamageSourceId (экран смерти игрока). Продюсеры передают автора: PlayerTechniqueCaster (яд), ElementalEffectService (burn/poison), CombatConsequencesService (bleed). CombatService зачёт не публикует.",
+      "qa": "STAGE5: (5) реальная цепочка ApplyBuff(elemental_poison, sourceId=player) → тик → смерть волка: EnemyKilledEvent ×1, NPCDeathEvent(killer=«player_0» — атрибуция, не «dot:…»), труп ×1, квест «Охота на волков» 1/3; добивание двух волков ударом → Completed 3/3, ровно по одному зачёту на волка (двойного счёта нет); (6) прямое убийство через CombatService — тоже ровно один EnemyKilledEvent.",
+      "progress_pct": 100,
+      "fix_note": "Этап 5 аудита (бой/состояния сущностей), 2026-10-22"
     }
   ]
 }

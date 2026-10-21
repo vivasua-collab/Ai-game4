@@ -784,6 +784,19 @@ public partial class GameWorldController : Node2D
             var stage4Sim = new Stage4SaveLoadSimDebug { Name = "Stage4SaveLoadSimDebug" };
             AddChild(stage4Sim);
         }
+        // Этап-5 аудита (22.10.2026, GODOT_STAGE5_DEBUG=1): тело = единый
+        // источник истины смерти (BUG-015: удар 50 в голову/сердце не убивает
+        // живое тело; IsFatalHit удалён), part-aware сплит урона (BUG-016:
+        // сердце без структурной HP принимает 100% в красную), унифицированный
+        // зачёт убийств (BUG-017: EnemyKilledEvent из домена смерти — и для
+        // прямого удара, и для DoT-тика; атрибуция источника ApplyBuff→Buff→
+        // DamageAppliedEvent.OriginalAttackerId; квест «Охота на волков»
+        // видит отравленного волка).
+        if (System.Environment.GetEnvironmentVariable("GODOT_STAGE5_DEBUG") == "1")
+        {
+            var stage5Sim = new Stage5CombatTruthSimDebug { Name = "Stage5CombatTruthSimDebug" };
+            AddChild(stage5Sim);
+        }
         // 2026-09-08 (баг-репорт пользователя): headless-верификация
         // инвентарного drag&drop в корзину (GODOT_TRASHDROP_DEBUG=1) —
         // материалы draggable, корзина выбрасывает, кукла отклоняет.

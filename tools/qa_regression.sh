@@ -28,6 +28,9 @@ ALL_SIMS=(
   # Этап-4 аудита (20.10): полный GameSession.LoadGame-путь — pre-flight,
   # транзакционный откат, полнота v2, BUG-013 спавнер, GAP-014 группы.
   "STAGE4:GODOT_STAGE4_DEBUG"
+  # Этап-5 аудита (22.10): тело=истина смерти (BUG-015), сплит сердца
+  # (BUG-016), DoT-зачёт квестов + атрибуция (BUG-017).
+  "STAGE5:GODOT_STAGE5_DEBUG"
   "KILLFEED:GODOT_KILLFEED_DEBUG"
   "QUEST:GODOT_QUEST_DEBUG"
   "STORAGE:GODOT_STORAGE_DEBUG"

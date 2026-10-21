@@ -302,3 +302,56 @@ NEXT: (1) владелец смотрит «Проверку полноты» �
 
 NEXT: владельцу — триаж 68 событий + 5 регистров из каталога в bugs.json;
 при правках кода — gen_bus_map.py --check → реген + коммит.
+
+## 2026-10-22 — Этап-5 аудита: боевые дефекты BUG-015/016/017 (волна 3)
+
+Приём дефектов от аудитора (этап 5: расчёт урона / применение повреждений /
+смерть / согласованность боевых событий; ранее найденные проблемы формаций,
+загрузки и учёта NPC повторно не считались новыми) + фиксы + регрессии +
+док-синхронизация. Порядок фиксов — по приоритету аудитора: 015 → 016 → 017.
+
+- **BUG-015 (P1, «ложная смерть»):** IsFatalHit (Head/Heart ≥ 50) объявлял
+  смерть ДО тела — 70/30-сплит оставлял голове 15/50 красной HP, CombatService
+  ставил Victory/Defeat/EnemyKilledEvent без трупа и NPCDeathEvent (домены
+  смерти проверяют фактическое тело — расхождение доменов). Фикс: единый
+  источник истины — состояние тела ПОСЛЕ урона; isFatal пересчитан в
+  DamageService ПОСЛЕ синхронного DamageAppliedEvent.Publish (= HasEntity &&
+  !IsEntityAlive); IsFatalHit + FATAL_DAMAGE_THRESHOLD удалены;
+  DamageTraceEvent.Fatal унифицирован с DamageResult.IsFatal.
+- **BUG-016 (P2, «сердце теряет 30%»):** сплит 70/30 был безусловен, а у
+  сердца нет структурной HP (CORE-C01) → 30% урона отбрасывалось в
+  TakeDamage. Фикс: SplitDamage(total, part) part-aware — MaxBlackHP≤0 →
+  весь урон в красную (зеркало BD-24-лечения); обычные части — 70/30.
+- **BUG-017 (P2, «DoT-килл не в квестах»):** EnemyKilledEvent публиковал
+  только CombatService (ветка прямого удара) → отравленный/горящий NPC/зверь
+  не двигал квесты; NPCDeathEvent.KillerId был фантомом «dot:{buffId}».
+  Фикс: зачёт перенесён в домены смерти NPCCombatAdapter/AnimalService
+  (единая точка: и прямой удар, и DoT-тик; ровно один EnemyKilledEvent при
+  killer-игроке); цепочка атрибуции ApplyBuff(sourceId) → ActiveBuff →
+  BuffTickedEvent.SourceId → DamageAppliedEvent.OriginalAttackerId (новое
+  поле; SourceId остаётся фантомом dot:… — threat-изоляция NPC-7 сохранена)
+  → NPCDeathEvent.KillerId + LastDamageSourceId (экран смерти игрока);
+  продюсеры DoT передают автора (PlayerTechniqueCaster/ElementalEffectService/
+  CombatConsequencesService); CombatService-паблишер удалён.
+- **QA:** новый сим Stage5CombatTruthSimDebug (GODOT_STAGE5_DEBUG, №23 в
+  qa_regression.sh) — 22 ассерта по дословным сценариям аудитора, полные
+  пути через реальный fan-out EventBus (тело → домены смерти → труп →
+  квест): удар-50-в-голову не убивает / повторный убивает с ровно одним
+  зачётом; сердце −10 полного урона / два удара-50 (80 HP) убивают;
+  IsFatal ⟺ !IsEntityAlive на каждом ударе (вкл. броневой final=1 и
+  овекилл-каскад 3000); реальный ExecuteAttack завершает бой; DoT-волк:
+  атрибуция «player_0», квест 1/3 → Completed 3/3 без двойного счёта;
+  игрок: голова-50 жив/сердце −10 полный/торс −7−3. VERDICT: PASS
+  (лог в qa_artifacts/). Полная регрессия — в статусе ниже (25 симов).
+- **Доки (директива «углублённый аудит документации и кода для обновления
+  карты проекта и схемы шины»):** COMBAT_SYSTEM §1.4 (правило смерти
+  переписано + новый пункт «Зачёт убийств — единая точка»), BODY_SYSTEM
+  §5.3 (part-aware сплит) + новый §5.3.1 (смерть организма), MODULE_STRUCTURE
+  §2.4, TESTING_RULES §0.1 (реестр 38, сим №23); bus_map.json регенерирован
+  (EnemyKilledEvent: Combat → NPC-домены, --check OK); bugs.json: реестр 34
+  (STAGE5-001/002/003, все verified, волна 3); status.json актуализирован.
+  Чекпоинт: checkpoints/10_22_audit_stage5_combat_truth.md.
+
+NEXT: аудитору — повторная проверка всего пути (урон → смерть → труп →
+зачёт → выбывание из боя) по свежему main; владельцу — триаж 68 событий
+каталога шины + 5 мёртвых DI-регистров (итерация 2 вкладки «Схема шины»).

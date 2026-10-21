@@ -195,14 +195,26 @@ Modules/Xxx/
 > _lastPlayerDefense); пустые подписки CombatStarted/DamageApplied удалены.
 >
 > 2026-09-11 (аудит боя с животными, «сущности неубиваемы»): смерть
-> защитника-не-игрока — ЕДИНОЕ правило тел (BODY_SYSTEM): IsFatalHit
-> (Head/Heart ≥ 50 урона) ИЛИ реальное состояние тела после удара —
-> жизненно важная часть уничтожена (`IBodyDataProvider.IsEntityAlive`) ИЛИ
-> полный дренаж HP. Инъекция IBodyDataProvider в CombatService. Раньше
-> домены смерти ждали «суммарный HP ≤ 0» — при per-part floor (урон в
-> мёртвую часть теряется) сумма практически не обнуляется → волк/NPC
-> «бессмертны» в честном бою, труп не создавался. Тот же фикс — в
+> защитника-не-игрока — ЕДИНОЕ правило тел (BODY_SYSTEM): реальное
+> состояние тела после удара — жизненно важная часть уничтожена
+> (`IBodyDataProvider.IsEntityAlive`) ИЛИ полный дренаж HP. Инъекция
+> IBodyDataProvider в CombatService. Раньше домены смерти ждали
+> «суммарный HP ≤ 0» — при per-part floor (урон в мёртвую часть
+> теряется) сумма практически не обнуляется → волк/NPC «бессмертны»
+> в честном бою, труп не создавался. Тот же фикс — в
 > NPCCombatAdapter.OnDamageApplied и AnimalService.OnDamageApplied.
+>
+> Этап-5 аудита (2026-10-22, BUG-015/017): предикат IsFatalHit
+> (Head/Heart ≥ 50) УДАЛЁН вместе с FATAL_DAMAGE_THRESHOLD — он
+> объявлял смерть ДО фактического разрушения части (70/30-сплит
+> оставлял голове 15/50 HP). `DamageResult.IsFatal` теперь пересчитывается
+> DamageService ПОСЛЕ синхронного применения урона и равен !IsEntityAlive;
+> CombatService решает смерть только по телу. `EnemyKilledEvent` (зачёт
+> квестов/killfeed) перенесён из CombatService в домены смерти
+> NPCCombatAdapter/AnimalService — единая точка, работающая и для DoT-тика
+> (атрибуция автора через DamageAppliedEvent.OriginalAttackerId:
+> ApplyBuff(sourceId) → BuffTickedEvent.SourceId → фантом dot:… в SourceId
+> для threat-изоляции).
 
 **Особенности:**
 - Полная реализация 11-слойного пайплайна урона (см. `09_workflow/ALGORITHMS.md` §5).

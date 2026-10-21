@@ -71,7 +71,9 @@
   выбору, NPC-NPC — свою цель).
 - **Смерть не-участника UI-пары — тихая:** труп/месть по событиям
   (per-target), UI-бой завершается только если погиб участник UI-пары
-  (или игрок). EnemyKilledEvent — по-прежнему «убил игрок».
+  (или игрок). EnemyKilledEvent — по-прежнему «убил игрок», но публикует
+  его домен смерти (NPCCombatAdapter/AnimalService), не CombatService
+  (Этап-5, BUG-017: работает и для тихих смертей от DoT).
 - QA: COMBAT_SIM 3g — (a) тихий NPC-NPC без UI-сессии + месть (Threats),
   (b) сессия пары с игроком, (b2) **CMB-2-регресс: не-участник бьёт
   игрока в активном UI-бое** (Accepted + урон).
@@ -123,14 +125,35 @@
   `CombatEndedEvent` (синхронизация с `_lastPlayerDefense` CombatService —
   иначе G-цикл нового боя шёл от «призрачной» стойки).
 - **Смерть защитника-не-игрока = ЕДИНОЕ правило тел (2026-09-11, аудит
-  боя с животными):** IsFatalHit (Head/Heart ≥ 50 урона) ИЛИ реальное
-  состояние тела после удара — жизненно важная часть уничтожена
-  (`IBodyDataProvider.IsEntityAlive`: Head/Heart RedHP ≤ 0) ИЛИ полный
-  дренаж HP → Victory/EndCombat. Раньше домены смерти (NPC/AnimalService)
-  ждали «суммарный HP ≤ 0» — при per-part floor (урон в уже мёртвую часть
-  теряется) сумма практически не обнуляется → сущности «бессмертны» в
-  честном бою. Тот же фикс в NPCCombatAdapter/AnimalService.OnDamageApplied
-  → NPCDeathEvent (труп/killfeed).
+  боя с животными; Этап-5 аудита 2026-10-22, BUG-015 — IsFatalHit УДАЛЁН):**
+  ТОЛЬКО реальное состояние тела после удара — жизненно важная часть
+  уничтожена (`IBodyDataProvider.IsEntityAlive`: Head/Heart RedHP ≤ 0) ИЛИ
+  полный дренаж HP → Victory/EndCombat. Прежний предикат IsFatalHit
+  (Head/Heart ≥ 50 урона за удар) объявлял смерть ДО тела: 70/30-сплит
+  оставлял голове 15/50 красной HP при живом организме, а бой уже ставил
+  Victory/Defeat/EnemyKilledEvent без трупа и NPCDeathEvent (домены
+  смерти проверяют реальное тело — состояние расходились). Теперь
+  `DamageResult.IsFatal` пересчитывается DamageService ПОСЛЕ синхронного
+  применения урона (EventBus fan-out → BodyService.ApplyDamage, включая
+  овекилл-перенос R41-1) и равен `!IsEntityAlive`; константа
+  FATAL_DAMAGE_THRESHOLD удалена. Раньше (2026-09-11) домены смерти
+  (NPC/AnimalService) ждали «суммарный HP ≤ 0» — при per-part floor
+  (урон в уже мёртвую часть теряется) сумма практически не обнуляется →
+  сущности «бессмертны» в честном бою. Тот же фикс в
+  NPCCombatAdapter/AnimalService.OnDamageApplied → NPCDeathEvent
+  (труп/killfeed).
+- **Зачёт убийств — ЕДИНАЯ точка (Этап-5 аудита 2026-10-22, BUG-017):**
+  `EnemyKilledEvent` (квесты/killfeed) публикуют домены смерти
+  NPCCombatAdapter/AnimalService при подтверждении гибели по телу — и
+  для прямого удара, и для смерти от DoT-тика (яд/горение/кровотечение).
+  Атрибуция автора: `IBuffService.ApplyBuff(sourceId)` →
+  `ActiveBuff.SourceId` → `BuffTickedEvent.SourceId` →
+  `DamageAppliedEvent.OriginalAttackerId` (поверх технического фантома
+  `dot:{buffId}` в SourceId — threat-таблицы NPC от яда не мстят) →
+  `NPCDeathEvent.KillerId` (реальный убийца, не «dot:…») и
+  `BodyService.LastDamageSourceId` (экран смерти игрока). CombatService
+  зачёт больше не публикует — ровно один EnemyKilledEvent на убийство
+  игроком; квесты («Охота на волков») видят и отравленную цель.
 - **Животные — легитимные участники боя (2026-09-11):** Space-таргетинг
   игрока видит волка/оленя/кроля (NPC ∪ животные, IAnimalService); статы
   вида (SpeciesRegistry), Quadruped-морфология (таблица попаданий);

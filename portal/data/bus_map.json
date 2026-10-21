@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "updated": "2026-10-21T08:15:49Z",
+  "updated": "2026-10-21T14:22:11Z",
   "generated_by": "tools/gen_bus_map.py",
   "update_policy": "по требованию: правки кода → python3 tools/gen_bus_map.py → коммит",
-  "source_head": "8497ae2",
+  "source_head": "af56edc",
   "hub": {
     "id": "Core",
     "title": "Центральная шина (Core)",
@@ -1060,7 +1060,6 @@
         "CombatStartedEvent",
         "DamageAppliedEvent",
         "DamageTraceEvent",
-        "EnemyKilledEvent",
         "ProjectileSpawnedEvent",
         "QiAddRequestEvent",
         "QiBufferActivateRequestEvent",
@@ -1108,9 +1107,6 @@
         ],
         "DamageTraceEvent": [
           "DamageService.cs"
-        ],
-        "EnemyKilledEvent": [
-          "CombatService.cs"
         ],
         "ProjectileSpawnedEvent": [
           "CombatService.cs"
@@ -1526,6 +1522,7 @@
         "CorpseCreatedEvent",
         "CorpseLootedEvent",
         "CorpseRemovedEvent",
+        "EnemyKilledEvent",
         "ItemAddRequestEvent",
         "NPCAIStateChangedEvent",
         "NPCDamagedEvent",
@@ -1568,6 +1565,10 @@
         ],
         "CorpseRemovedEvent": [
           "CorpseService.cs"
+        ],
+        "EnemyKilledEvent": [
+          "AnimalService.cs",
+          "NPCCombatAdapter.cs"
         ],
         "ItemAddRequestEvent": [
           "CorpseService.cs"
@@ -4427,7 +4428,7 @@
       "order": 120,
       "description": "QA-харнессы (*SimDebug) — вне продакшн-потребления",
       "debug": true,
-      "files": 31,
+      "files": 32,
       "publishes": [
         "AttackIntentEvent",
         "Audit1020MsgA",
@@ -4461,6 +4462,7 @@
         "CombatStartedEvent",
         "DamageAppliedEvent",
         "DayChangedEvent",
+        "EnemyKilledEvent",
         "EquipmentBlockedEvent",
         "HeldTechniqueChangedEvent",
         "ItemDroppedEvent",
@@ -4468,6 +4470,7 @@
         "NPCDeathEvent",
         "OtherMsg",
         "PingMsg",
+        "PlayerDeathEvent",
         "PlayerTargetChangedEvent",
         "ProjectileSpawnedEvent",
         "SaveCompletedEvent",
@@ -4588,6 +4591,9 @@
         "DayChangedEvent": [
           "Audit0922SimDebug.cs"
         ],
+        "EnemyKilledEvent": [
+          "Stage5CombatTruthSimDebug.cs"
+        ],
         "EquipmentBlockedEvent": [
           "CheatEquipSimDebug.cs"
         ],
@@ -4602,13 +4608,17 @@
           "Audit0922SimDebug.cs"
         ],
         "NPCDeathEvent": [
-          "L500SimDebug.cs"
+          "L500SimDebug.cs",
+          "Stage5CombatTruthSimDebug.cs"
         ],
         "OtherMsg": [
           "Audit0922SimDebug.cs"
         ],
         "PingMsg": [
           "Audit0922SimDebug.cs"
+        ],
+        "PlayerDeathEvent": [
+          "Stage5CombatTruthSimDebug.cs"
         ],
         "PlayerTargetChangedEvent": [
           "CombatSimDebug.cs"
@@ -5652,7 +5662,7 @@
     "events_published": 130,
     "events_subscribed": 101,
     "publish_edges": 176,
-    "subscribe_edges": 189,
+    "subscribe_edges": 191,
     "provide_edges": 213,
     "require_edges": 293,
     "services_provided": 160,
