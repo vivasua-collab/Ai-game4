@@ -119,6 +119,14 @@ public class BodyModule : IModule
                 // Броня/Ци-буфер НЕ применяются: DoT-значение уже «финальный» урон
                 // периода (тип — метаданные: Poison/Burn — Qi-природа, Bleed/Freeze —
                 // Physical); Torso — системный эффект для всего тела.
+                //
+                // BUG-017 (Этап-5 аудита боя): SourceId остаётся техническим
+                // фантомом "dot:{buffId}" (threat-таблицы NPC не должны
+                // провоцировать месть от яда — AUDIT-0911 NPC-7), а
+                // OriginalAttackerId несёт реального автора наложения баффа
+                // (e.SourceId от ApplyBuff через BuffTickedEvent) — домены
+                // смерти атрибутируют убийство и зачитывают его квестам
+                // (EnemyKilledEvent), раньше DoT-убийство терялось.
                 int dotDamage = Math.Max(1, (int)e.TickValue);
                 DamageType dotType = e.Type == BuffType.Poison || e.Type == BuffType.Burn
                     ? DamageType.Qi
@@ -126,7 +134,7 @@ public class BodyModule : IModule
                 _damageAppliedPub.Publish(new DamageAppliedEvent(
                     $"dot:{e.BuffId}", e.EntityId, dotDamage, dotType,
                     Element.Neutral, BodyPartType.Torso, CombatAttackResult.Hit,
-                    CombatSubtype.None));
+                    CombatSubtype.None, e.SourceId));
                 Console.WriteLine(
                     $"[BodyModule] DoT тик: {e.BuffId} → {e.EntityId}, урон={dotDamage} ({dotType})");
                 break;

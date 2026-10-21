@@ -121,7 +121,10 @@ namespace CultivationGame.Modules.Combat
             int potency = maxHP * BLEED_TICK_PERCENT / 100;
             // Duration = 3 тика × 3 сек/тик (ЗАПРЕТ 3.9: тики × константа, float только на границе Unity)
             float duration = BLEED_DURATION_TICKS * TICK_SECONDS;
-            _buffService.ApplyBuff(e.TargetId, "combat_bleed", duration, potency);
+            // BUG-017 (Этап-5): атрибуция — автор удара, вскрывшего кровь
+            // (смерть цели от кровотечения зачитывается его квесту/killfeed).
+            _buffService.ApplyBuff(e.TargetId, "combat_bleed", duration, potency,
+                sourceId: e.OriginalAttackerId ?? e.SourceId);
         }
 
         /// <summary>

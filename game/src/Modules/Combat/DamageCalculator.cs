@@ -243,14 +243,18 @@ namespace CultivationGame.Modules.Combat
         }
 
         /// <summary>
-        /// Проверить, является ли удар смертельным.
-        /// Смертельный удар = цель в жизненно важную часть с уроном > FATAL_DAMAGE_THRESHOLD.
+        /// BUG-015 (Этап-5 аудита боя): метод IsFatalHit(hitPart, finalDamage)
+        /// (Head/Heart + урон ≥ FATAL_DAMAGE_THRESHOLD=50) УДАЛЁН — «смертельный
+        /// удар» объявлял смерть ДО фактического разрушения жизненно важной
+        /// части: 70/30-сплит оставлял голове 15/50 красной HP при уроне 50,
+        /// организм был жив, а бой уже считал цель поверженной (ложные Victory/
+        /// Defeat/EnemyKilledEvent без NPCDeathEvent и трупа — домены смерти
+        /// проверяют реальное тело). Единый источник истины смерти — состояние
+        /// тела после применения урона: BodyDamageCalculator.IsAlive /
+        /// IBodyDataProvider.IsEntityAlive (Head|Heart RedHP ≤ 0).
+        /// DamageResult.IsFatal пересчитывается DamageService.CalculateDamage
+        /// ПОСЛЕ синхронного применения урона (см. комментарий там).
         /// </summary>
-        public static bool IsFatalHit(BodyPartType hitPart, int finalDamage)
-        {
-            bool isVital = hitPart == BodyPartType.Head || hitPart == BodyPartType.Heart;
-            return isVital && finalDamage >= GameConstants.FATAL_DAMAGE_THRESHOLD;
-        }
 
         // === Вспомогательные методы ===
 

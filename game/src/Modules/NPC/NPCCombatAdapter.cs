@@ -39,6 +39,11 @@ namespace CultivationGame.Modules.NPC
         // === MessagePipe: паблишеры ===
         private readonly IPublisher<NPCDamagedEvent> _npcDamagedPub;
         private readonly IPublisher<NPCDeathEvent> _npcDeathPub;
+        // BUG-017 (Этап-5 аудита боя): зачёт убийства (квесты/killfeed) —
+        // из ЕДИНОГО домена смерти NPC (эта точка работает и для прямого
+        // удара, и для DoT-тика; раньше CombatService зачитывал только
+        // прямые удары — смерть от яда/горения не продвигала квесты).
+        private readonly IPublisher<EnemyKilledEvent> _enemyKilledPub;
 
         // === MessagePipe: подписки ===
         private readonly ISubscriber<CombatStartedEvent> _combatStartedSub;
@@ -58,6 +63,7 @@ namespace CultivationGame.Modules.NPC
             IBodyDataProvider bodyDataProvider,
             IPublisher<NPCDamagedEvent> npcDamagedPub,
             IPublisher<NPCDeathEvent> npcDeathPub,
+            IPublisher<EnemyKilledEvent> enemyKilledPub,
             ISubscriber<CombatStartedEvent> combatStartedSub,
             ISubscriber<CombatEndedEvent> combatEndedSub,
             ISubscriber<DamageAppliedEvent> damageAppliedSub,
@@ -69,6 +75,7 @@ namespace CultivationGame.Modules.NPC
             _bodyDataProvider = bodyDataProvider;
             _npcDamagedPub = npcDamagedPub;
             _npcDeathPub = npcDeathPub;
+            _enemyKilledPub = enemyKilledPub;
             _combatStartedSub = combatStartedSub;
             _combatEndedSub = combatEndedSub;
             _damageAppliedSub = damageAppliedSub;
@@ -252,7 +259,24 @@ namespace CultivationGame.Modules.NPC
                 state.IsAlive = false;
                 state.IsInCombat = false;
                 state.AIState = NPCAIState.Idle;
-                _npcDeathPub.Publish(new NPCDeathEvent(e.TargetId, e.SourceId));
+
+                // BUG-017 (Этап-5 аудита боя): атрибуция убийцы. DoT-тики
+                // приходят с техническим SourceId="dot:{buffId}" (фантом для
+                // threat-таблиц) — реальный автор наложения лежит в
+                // OriginalAttackerId (ApplyBuff → BuffTicked → DamageApplied).
+                // Прямые удары: OriginalAttackerId == SourceId (атакующий).
+                string killerId = e.OriginalAttackerId ?? e.SourceId;
+                _npcDeathPub.Publish(new NPCDeathEvent(e.TargetId, killerId));
+
+                // BUG-017 (Этап-5): зачёт убийства публикуется ЗДЕСЬ — в
+                // единой точке подтверждения смерти NPC (по фактическому
+                // телу), а не в CombatService (который не резолвит DoT-тики
+                // и зачитывал только прямые удары). Публикуется РОВНО один
+                // раз: killer — игрок (квесты/killfeed), NPC-убийца — без
+                // зачёта (как и прежде: EnemyKilledEvent считал только
+                // победы игрока).
+                if (Core.Helpers.PlayerIdResolver.IsPlayer(killerId))
+                    _enemyKilledPub.Publish(new EnemyKilledEvent(e.TargetId));
             }
         }
 

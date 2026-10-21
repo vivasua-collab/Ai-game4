@@ -75,12 +75,17 @@ namespace CultivationGame.Modules.Combat
         private readonly IPublisher<CombatStartedEvent> _combatStartedPub;
         private readonly IPublisher<CombatEndedEvent> _combatEndedPub;
         private readonly IPublisher<TechniqueUsedEvent> _techniqueUsedPub;
-        private readonly IPublisher<EnemyKilledEvent> _enemyKilledPub;
+        // BUG-017 (Этап-5 аудита): паблишер EnemyKilledEvent перенесён из
+        // CombatService в домены смерти NPCCombatAdapter/AnimalService —
+        // единая точка зачёта убийства, работающая и для прямого удара, и для
+        // DoT-тика (раньше квесты/killfeed не видели смерть от яда/горения).
         private readonly IPublisher<AttackRejectedEvent> _attackRejectedPub; // C-5 (аудит-3): событие отклонения атаки
         private readonly ISubscriber<QiDepletedEvent> _qiDepletedSub;
         private readonly IQiDataProvider _qiDataProvider; // Фаза 3 (3.I): уровни NPC
-        // 2026-09-11 (аудит боя): смерть защитника-не-игрока по правилам тел
-        // (vital-разрушение/полный дренаж — IsEntityAlive), а не только IsFatalHit.
+        // BUG-015 (Этап-5 аудита): смерть защитника — ТОЛЬКО фактическое
+        // состояние тела (DamageResult.IsFatal пересчитывается DamageService
+        // ПОСЛЕ применения урона; раньше IsFatalHit(head/heart ≥ 50) объявлял
+        // смерть до разрушения части).
         private readonly IBodyDataProvider? _bodyDataProvider;
         // R25 (2026-09-21): резолвер целей площадного залпа + событие для VFX-фазы
         // (паблишер nullable: без него событие просто не публикуется — headless-сборки)
@@ -217,7 +222,6 @@ namespace CultivationGame.Modules.Combat
             IPublisher<CombatStartedEvent> combatStartedPub,
             IPublisher<CombatEndedEvent> combatEndedPub,
             IPublisher<TechniqueUsedEvent> techniqueUsedPub,
-            IPublisher<EnemyKilledEvent> enemyKilledPub,
             IPublisher<AttackRejectedEvent> attackRejectedPub, // C-5 (аудит-3): отклонение при _isCasting
             ISubscriber<QiDepletedEvent> qiDepletedSub,
             ISubscriber<QiChangedEvent> qiChangedSub,
@@ -239,7 +243,6 @@ namespace CultivationGame.Modules.Combat
             _combatStartedPub = combatStartedPub;
             _combatEndedPub = combatEndedPub;
             _techniqueUsedPub = techniqueUsedPub;
-            _enemyKilledPub = enemyKilledPub;
             _attackRejectedPub = attackRejectedPub; // C-5 (аудит-3)
             _qiDepletedSub = qiDepletedSub;
             _qiChangedSub = qiChangedSub;
@@ -1427,19 +1430,18 @@ namespace CultivationGame.Modules.Combat
                 _techniqueUsedPub.Publish(new TechniqueUsedEvent(attackerId, techniqueId, qiCost));
 
             // Проверяем результат боя
-            // 2026-09-11 (аудит боя, «сущности неубиваемы»): смерть
-            // защитника — не только IsFatalHit (Head/Heart ≥ 50 урона за
-            // удар), но и РЕАЛЬНОЕ состояние тела после удара: жизненно
-            // важная часть уничтожена (BODY_SYSTEM: RedHP ≤ 0 —
-            // IsEntityAlive) либо полный дренаж HP. Раньше домены смерти
-            // (NPCCombatAdapter/AnimalService) ждали «суммарный HP ≤ 0» —
-            // при per-part floor (урон в мёртвую часть теряется) это
-            // практически недостижимо → волк/NPC «бессмертны» в бою.
-            // AUDIT-0911 PLR-1/BOD-2 FIX: правило тел теперь покрывает И
-            // ИГРОКА (раньше !isPlayerTarget исключал игрока → разрушение
-            // Head не завершало бой за игрока). Алиас-безопасность
-            // BodyService (BOD-10) обеспечивает корректный резолв
-            // "player_0" → ветка игрока (не «не найден = мёртв»).
+            // BUG-015 FIX (Этап-5 аудита боя): смерть защитника — ТОЛЬКО
+            // фактическое состояние тела. result.IsFatal теперь пересчитывается
+            // DamageService ПОСЛЕ синхронного применения урона (EventBus fan-out
+            // внутри CalculateDamage → BodyService.ApplyDamage, включая
+            // овекилл-перенос R41-1) — прежний предикат IsFatalHit (Head/Heart
+            // ≥ 50 урона за удар) объявлял смерть ДО тела: 70/30-сплит оставлял
+            // голове 15/50 красной HP → ложные Victory/Defeat/EnemyKilledEvent
+            // при живом организме (NPCCombatAdapter/AnimalService труп и
+            // NPCDeathEvent не создавали — домены расходились).
+            // Дублирующая проверка провайдера — гейт-страховка (идентичное
+            // тело-правило, AUDIT-0911 PLR-1/BOD-2; алиас-безопасность BOD-10
+            // резолвит "player_0" в ветку игрока).
             bool defenderDead = result.IsFatal
                 || (_bodyDataProvider != null
                     && _bodyDataProvider.HasEntity(defenderId)
@@ -1452,15 +1454,20 @@ namespace CultivationGame.Modules.Combat
                 // (лут/квесты дропались НА игрока) и ставил Victory.
                 if (isPlayerTarget)
                 {
-                    // Игрок погиб — поражение, EnemyKilledEvent НЕ публикуется.
+                    // Игрок погиб — поражение. EnemyKilledEvent о игроке НЕ
+                    // публикуется (за счёт убийства отвечает домен смерти
+                    // NPCCombatAdapter — квесты считают только NPC/зверей).
                     _currentStage = CombatStage.Defeat;
                     EndCombat();
                     return;
                 }
 
-                // Жертва — NPC: если убил игрок — EnemyKilledEvent (лут/квесты).
-                if (isPlayerAttacker)
-                    _enemyKilledPub.Publish(new EnemyKilledEvent(defenderId));
+                // Жертва — NPC/зверь: зачёт убийства (лут/квесты/killfeed)
+                // публикуЕТСЯ ДОМЕНОМ СМЕРТИ (NPCCombatAdapter/AnimalService
+                // слушают тот же DamageAppliedEvent и подтверждают гибель по
+                // телу) — BUG-017 (Этап-5): единая точка, ровно один
+                // EnemyKilledEvent и для прямого удара, и для DoT-тика.
+                // CombatService здесь управляет только стадиями боя.
 
                 // R24-C: смерть не-участника UI-пары (NPC-vs-NPC «тихий» бой,
                 // толпа) — завершается ТИХО: труп по NPCDeathEvent (NPCCombat

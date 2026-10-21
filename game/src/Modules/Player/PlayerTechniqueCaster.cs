@@ -499,8 +499,11 @@ public sealed class PlayerTechniqueCaster : IDisposable
                 }
                 // Тик-урон: BaseDamage делится на число тиков (суммарно ≈ удар
                 // техники, разнесённый во времени и игнорирующий броню).
+                // BUG-017 (Этап-5): атрибуция — автор наложения = игрок-кастер
+                // (смерть цели от тика яда зачитывается квесту игрока).
                 int tickDamage = Math.Max(1, tech.BaseDamage * potencyPermil / 1000 / PoisonDotTicks);
-                if (!_buffs.ApplyBuff(dotTarget, PoisonBuffId, PoisonDurationSec, tickDamage))
+                if (!_buffs.ApplyBuff(dotTarget, PoisonBuffId, PoisonDurationSec, tickDamage,
+                        sourceId: _player.PlayerId))
                 {
                     _techniques.RefundUse(tech.TechniqueId);
                     PublishFail(tech.TechniqueId, "Цель не принимает яд");

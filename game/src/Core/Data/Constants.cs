@@ -570,10 +570,15 @@ namespace CultivationGame.Core.Data
         public const float MAX_DAMAGE_REDUCTION = 0.8f;
 
         /// <summary>
-        /// Порог урона для смертельного удара по жизненно важной части (fallback)
-        /// ЗАПРЕТ 3.9: int вместо float (сравнивается с int finalDamage)
+        /// BUG-015 (Этап-5 аудита боя, 2026-10-22): константа
+        /// FATAL_DAMAGE_THRESHOLD = 50 УДАЛЕНА вместе с единственным
+        /// потребителем DamageCalculator.IsFatalHit — «порог смертельного
+        /// удара» объявлял смерть ДО фактического разрушения жизненно
+        /// важной части (голова 50 красной HP + удар 50 → 70/30-сплит
+        /// оставлял 15 HP — организм жив, а бой считал цель мёртвой).
+        /// Единственный источник истины смерти — состояние тела:
+        /// Head|Heart RedHP ≤ 0 (IBodyDataProvider.IsEntityAlive).
         /// </summary>
-        public const int FATAL_DAMAGE_THRESHOLD = 50;
 
         /// <summary>
         /// Снижение урона по материалу тела

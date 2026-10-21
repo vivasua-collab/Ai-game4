@@ -250,8 +250,10 @@ namespace CultivationGame.Modules.Body
             // Scaled: ×0.7×0.7=×0.49 вместо ×0.7; Chitin: двойное снижение.
             // Теперь передаём totalDamage напрямую в SplitDamage.
 
-            // Split 70/30 — единственная точка разделения (R-04/R-06)
-            var (finalRedDmg, finalBlackDmg) = BodyDamageCalculator.SplitDamage(totalDamage);
+            // Split 70/30 — единственная точка разделения (R-04/R-06).
+            // BUG-016 (Этап-5): сплит part-aware — сердце (MaxBlackHP == 0)
+            // получает весь урон в красную HP (см. BodyDamageCalculator.SplitDamage).
+            var (finalRedDmg, finalBlackDmg) = BodyDamageCalculator.SplitDamage(totalDamage, part);
 
             // Запоминаем предыдущее состояние
             BodyPartState previousState = part.State;
@@ -518,7 +520,11 @@ namespace CultivationGame.Modules.Body
                 // BodyService кэширует его ДО применения урона, и killing blow
                 // из боевого пайплайна детерминированно известен к моменту
                 // BodyCriticalEvent (смерть внутри этого же вызова).
-                ApplyDamage(e.HitPart, e.Damage, e.SourceId);
+                // BUG-017 (Этап-5): для DoT-тика SourceId — фантом "dot:…",
+                // реальный автор (кто наложил яд/горение) — в
+                // OriginalAttackerId; кэшируем его, чтобы экран смерти игрока
+                // показывал убийцу, а не «причину неизвестна».
+                ApplyDamage(e.HitPart, e.Damage, e.OriginalAttackerId ?? e.SourceId);
                 return;
             }
 
@@ -544,7 +550,9 @@ namespace CultivationGame.Modules.Body
             if (part == null) return;
 
             // Split 70/30
-            var (finalRedDmg, finalBlackDmg) = BodyDamageCalculator.SplitDamage(totalDamage);
+            // BUG-016 (Этап-5): сплит part-aware — сердце NPC-сущности получает
+            // весь урон в красную HP (см. BodyDamageCalculator.SplitDamage).
+            var (finalRedDmg, finalBlackDmg) = BodyDamageCalculator.SplitDamage(totalDamage, part);
 
             BodyPartState previousState = part.State;
             // R41-1: HP части до удара — для расчёта овекилл-остатка

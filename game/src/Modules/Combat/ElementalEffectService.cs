@@ -120,6 +120,8 @@ namespace CultivationGame.Modules.Combat
         /// <summary>
         /// Fire → Burn (DoT, 3 тика по 5% от начального урона).
         /// ЗАПРЕТ 3.9: potency = integer.
+        /// BUG-017 (Этап-5): sourceId — автор удара, вызвавшего горение
+        /// (атрибуция смерти от DoT-тика — квесты/killfeed).
         /// </summary>
         private void ApplyBurn(DamageAppliedEvent e)
         {
@@ -128,7 +130,8 @@ namespace CultivationGame.Modules.Combat
             // Не накладывать, если уже есть горение
             if (_buffService.HasBuff(e.TargetId, "elemental_burn")) return;
             float duration = BURN_DURATION_TICKS * 3.0f;
-            _buffService.ApplyBuff(e.TargetId, "elemental_burn", duration, tickDamage);
+            _buffService.ApplyBuff(e.TargetId, "elemental_burn", duration, tickDamage,
+                sourceId: e.OriginalAttackerId ?? e.SourceId);
         }
 
         /// <summary>
@@ -216,7 +219,9 @@ namespace CultivationGame.Modules.Combat
 
             if (_buffService.HasBuff(e.TargetId, "elemental_poison")) return;
             float duration = POISON_DURATION_TICKS * 3.0f;
-            _buffService.ApplyBuff(e.TargetId, "elemental_poison", duration, tickDamage);
+            // BUG-017 (Этап-5): атрибуция — автор удара, наложившего яд
+            _buffService.ApplyBuff(e.TargetId, "elemental_poison", duration, tickDamage,
+                sourceId: e.OriginalAttackerId ?? e.SourceId);
         }
     }
 }

@@ -18,8 +18,14 @@ namespace CultivationGame.Core.Interfaces
     {
         // === Управление баффами ===
 
-        /// <summary>Наложить бафф на сущность. duration=-1 — использовать длительность из BuffData.</summary>
-        bool ApplyBuff(string entityId, string buffId, float duration = -1f, float potency = 1f);
+        /// <summary>
+        /// Наложить бафф на сущность. duration=-1 — использовать длительность из BuffData.
+        /// BUG-017 (Этап-5 аудита боя): sourceId — автор наложения (для DoT:
+        /// атрибуция смерти от тика — квесты/killfeed/NPCDeathEvent.KillerId).
+        /// null — без атрибуции (легаси-поведение).
+        /// </summary>
+        bool ApplyBuff(string entityId, string buffId, float duration = -1f, float potency = 1f,
+            string? sourceId = null);
 
         /// <summary>Снять бафф с сущности.</summary>
         bool RemoveBuff(string entityId, string buffId);

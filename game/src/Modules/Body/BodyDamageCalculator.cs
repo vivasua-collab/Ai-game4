@@ -3,6 +3,9 @@
 // Редактировано: 2026-05-09 12:00:00 UTC — аудит: BD-01 добавлен using System
 // Редактировано: 2026-05-19 — P1-03 FIX: SplitDamage гарантированный минимум 1 в redDmg
 // Редактировано: 2026-05-22 07:55:00 UTC — Аудит LOW-1: удалён мёртвый код ApplyMaterialReduction
+// Редактировано: 2026-10-22 — BUG-016 (Этап-5 аудита): SplitDamage учитывает
+//   способности части тела — части без структурной HP (сердце, CORE-C01)
+//   получают ВЕСЬ урон в красную HP (зеркало BD-24 для HealPart).
 // Migrated from Ai-game3 (Unity) to Ai-game4 (Godot).
 // Статическая утилита расчёта урона для тела.
 // НЕ сервис, НЕ регистрируется в DI.
@@ -27,10 +30,24 @@ namespace CultivationGame.Modules.Body
         /// P1-03 FIX: При totalDamage=1, (int)(1×0.7)=0 → весь урон шёл в BlackHP.
         /// Гарантируем redDmg ≥ 1, чтобы при малом уроне функциональный урон не
         /// обнулялся. Остаток (blackDmg) может быть 0.
+        ///
+        /// BUG-016 FIX (Этап-5 аудита боя): сплит зависит от способностей части
+        /// тела. У части без структурной HP (сердце, CORE-C01: MaxBlackHP == 0)
+        /// ВЕСЬ урон идёт в красную HP — прежний безусловный 70/30 отправлял 30%
+        /// в несуществующий структурный слой, где BodyPart.TakeDamage их
+        /// отбрасывал: удар 50 оставлял сердцу 45/80 красной HP вместо честных
+        /// 30/80 (30% урона терялось, бой затягивался, а порог смертельного
+        /// удара FATAL_DAMAGE_THRESHOLD=50 сравнивался с «фантомным» уроном).
+        /// Обычные части (MaxBlackHP &gt; 0) сохраняют сплит 70/30. Зеркально
+        /// правилу лечения BD-24 (Heart: 100% лечения в RedHP).
         /// </summary>
-        public static (int redDmg, int blackDmg) SplitDamage(int totalDamage)
+        public static (int redDmg, int blackDmg) SplitDamage(int totalDamage, BodyPart? targetPart = null)
         {
             if (totalDamage <= 0) return (0, 0);
+
+            // BUG-016: у части нет структурной HP → весь урон в функциональную
+            if (targetPart != null && targetPart.MaxBlackHP <= 0)
+                return (totalDamage, 0);
 
             int redDmg = (int)(totalDamage * GameConstants.RED_HP_RATIO);
             // P1-03 FIX: гарантированный минимум 1 в RedHP

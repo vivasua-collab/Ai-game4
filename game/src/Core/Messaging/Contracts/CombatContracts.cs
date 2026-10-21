@@ -40,6 +40,19 @@ public readonly struct DamageAppliedEvent
     public readonly CombatSubtype AttackSubtype; // P2-7.3 FIX: подтип атаки (для кровотечения: slashing/piercing vs blunt)
 
     /// <summary>
+    /// BUG-017 (Этап-5 аудита боя): первоначальный атакующий за источником
+    /// урона. Для прямого удара == SourceId. Для DoT-тика SourceId —
+    /// технический фантом "dot:{buffId}" (threat-таблицы NPC не должны
+    /// провоцировать месть от яда), а здесь — реальный автор эффекта
+    /// (кто наложил бафф: игрок-кастер / атакующий, чей удар поджёг).
+    /// Потребители атрибуции смерти: NPCCombatAdapter/AnimalService
+    /// (NPCDeathEvent.KillerId, EnemyKilledEvent — квесты/killfeed),
+    /// BodyService.LastDamageSourceId (экран смерти игрока).
+    /// null — источник неизвестен (легаси-наложения без атрибуции).
+    /// </summary>
+    public readonly string? OriginalAttackerId;
+
+    /// <summary>
     /// Обратная совместимость — без Element.
     /// </summary>
     public DamageAppliedEvent(string sourceId, string targetId, int damage, DamageType type,
@@ -54,12 +67,23 @@ public readonly struct DamageAppliedEvent
         : this(sourceId, targetId, damage, type, element, hitPart, result, CombatSubtype.None) { }
 
     /// <summary>
-    /// Полный конструктор с Element и AttackSubtype.
-    /// Спринт 7 C8: Element для стихийных эффектов.
-    /// P2-7.3 FIX: AttackSubtype для различения slashing/piercing от blunt.
+    /// Обратная совместимость — без OriginalAttackerId (прямой удар:
+    /// атрибуция == SourceId).
     /// </summary>
     public DamageAppliedEvent(string sourceId, string targetId, int damage, DamageType type,
         Element element, BodyPartType hitPart, CombatAttackResult result, CombatSubtype attackSubtype)
+        : this(sourceId, targetId, damage, type, element, hitPart, result, attackSubtype, sourceId) { }
+
+    /// <summary>
+    /// Полный конструктор с Element, AttackSubtype и OriginalAttackerId.
+    /// Спринт 7 C8: Element для стихийных эффектов.
+    /// P2-7.3 FIX: AttackSubtype для различения slashing/piercing от blunt.
+    /// BUG-017: OriginalAttackerId — атрибуция автора урона поверх
+    /// технического SourceId (DoT: фантом "dot:…" + настоящий атакующий).
+    /// </summary>
+    public DamageAppliedEvent(string sourceId, string targetId, int damage, DamageType type,
+        Element element, BodyPartType hitPart, CombatAttackResult result, CombatSubtype attackSubtype,
+        string? originalAttackerId)
     {
         SourceId = sourceId;
         TargetId = targetId;
@@ -69,6 +93,7 @@ public readonly struct DamageAppliedEvent
         HitPart = hitPart;
         Result = result;
         AttackSubtype = attackSubtype;
+        OriginalAttackerId = originalAttackerId;
     }
 }
 

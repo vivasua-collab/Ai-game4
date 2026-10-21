@@ -66,6 +66,11 @@ namespace CultivationGame.Modules.NPC
         // не должен «висеть» вечно, когда зверь отстал).
         private readonly IPublisher<NPCDeathEvent> _npcDeathPub;
         private readonly IPublisher<CombatDisengageEvent> _combatDisengagePub;
+        // BUG-017 (Этап-5 аудита боя): зачёт убийства зверя (квесты/killfeed
+        // «охота на волков» и пр.) — из ЕДИНОЙ точки смерти зверя, работает
+        // и для прямого удара, и для DoT-тика (раньше только CombatService
+        // зачитывал прямые удары — отравленный волк не двигал квест).
+        private readonly IPublisher<EnemyKilledEvent> _enemyKilledPub;
         private readonly IPlayerService _playerService;
         // R21-2: ICombatService НЕ инъектируется в конструктор — цикл DI
         // (CombatService → StatProviderAdapter → IAnimalService → сюда →
@@ -150,6 +155,7 @@ namespace CultivationGame.Modules.NPC
             IPublisher<AttackIntentEvent> attackIntentPub,
             IPublisher<NPCDeathEvent> npcDeathPub,
             IPublisher<CombatDisengageEvent> combatDisengagePub,
+            IPublisher<EnemyKilledEvent> enemyKilledPub,
             IPlayerService playerService)
         {
             _bodyDataProvider = bodyDataProvider ?? throw new ArgumentNullException(nameof(bodyDataProvider));
@@ -160,6 +166,7 @@ namespace CultivationGame.Modules.NPC
             _attackIntentPub = attackIntentPub ?? throw new ArgumentNullException(nameof(attackIntentPub));
             _npcDeathPub = npcDeathPub ?? throw new ArgumentNullException(nameof(npcDeathPub));
             _combatDisengagePub = combatDisengagePub ?? throw new ArgumentNullException(nameof(combatDisengagePub));
+            _enemyKilledPub = enemyKilledPub ?? throw new ArgumentNullException(nameof(enemyKilledPub));
             _playerService = playerService ?? throw new ArgumentNullException(nameof(playerService));
         }
 
@@ -619,8 +626,24 @@ namespace CultivationGame.Modules.NPC
                 animal.IsAlive = false;
                 _hostileAnimals.Remove(animal.EntityId);
                 animal.Target = null;
-                _npcDeathPub.Publish(new NPCDeathEvent(animal.EntityId, sourceId));
-                Console.WriteLine($"[AnimalService] {animal.Species}#{animal.EntityId} погиб от {sourceId} → NPCDeathEvent (труп через CorpseService)");
+
+                // BUG-017 (Этап-5 аудита боя): атрибуция убийцы — DoT-тик
+                // приходит с техническим SourceId="dot:{buffId}" (фантом для
+                // threat-таблиц), реальный автор наложения — в
+                // OriginalAttackerId (ApplyBuff → BuffTicked → DamageApplied).
+                string killerId = e.OriginalAttackerId ?? sourceId;
+                _npcDeathPub.Publish(new NPCDeathEvent(animal.EntityId, killerId));
+
+                // BUG-017: зачёт убийства — ЗДЕСЬ, в единой точке смерти
+                // зверя (по фактическому телу): РОВНО один EnemyKilledEvent
+                // и для прямого удара, и для DoT-тика (раньше CombatService
+                // зачитывал только прямые удары — отравленный волк не
+                // двигал квест «Охота на волков»; QuestProgressTracker
+                // нормализует animal_wolf_N → "wolf").
+                if (CultivationGame.Core.Helpers.PlayerIdResolver.IsPlayer(killerId))
+                    _enemyKilledPub.Publish(new EnemyKilledEvent(animal.EntityId));
+
+                Console.WriteLine($"[AnimalService] {animal.Species}#{animal.EntityId} погиб от {killerId} → NPCDeathEvent (труп через CorpseService)");
                 return;
             }
 

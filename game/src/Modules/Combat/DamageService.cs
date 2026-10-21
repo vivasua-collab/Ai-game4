@@ -444,16 +444,9 @@ namespace CultivationGame.Modules.Combat
                 absorbedByArmor = 0;
             }
 
-            // === Определение фатальности ===
-            bool isFatal = DamageCalculator.IsFatalHit(hitPart, postArmorDamage);
-
             // === Публикация DamageAppliedEvent ===
             // BodyService автоматически применит урон через подписку на это событие
             int finalDamage = postArmorDamage;
-
-            var damageResult = new DamageResult(
-                finalDamage, absorbedByQi, absorbedByArmor,
-                hitPart, attackResult, isFatal);
 
             // Публикуем событие — BodyService.ApplyDamage() сработает автоматически
             // Спринт 7 C8: передаём Element для стихийных эффектов
@@ -467,11 +460,32 @@ namespace CultivationGame.Modules.Combat
                 finalDamage, request.Type, request.Element,
                 hitPart, attackResult, attackSubtype));
 
+            // === Определение фатальности ===
+            // BUG-015 FIX (Этап-5 аудита боя): единый источник истины смерти —
+            // ФАКТИЧЕСКОЕ состояние тела ПОСЛЕ синхронного применения урона
+            // (fan-out Publish выше уже прогнал BodyService.ApplyDamage,
+            // включая овекилл-перенос R41-1). Прежний предикат IsFatalHit
+            // (Head/Heart + урон ≥ FATAL_DAMAGE_THRESHOLD=50) объявлял смерть
+            // ДО тела: 70/30-сплит оставлял голове 15/50 красной HP, организм
+            // был жив, а бой уже считал цель поверженной — ложные Victory/
+            // Defeat/EnemyKilledEvent без NPCDeathEvent и трупа (домены
+            // смерти NPCCombatAdapter/AnimalService проверяют реальное тело и
+            // с IsFatal не сходились). Незарегистрированная в провайдере тела
+            // сущность (HasEntity == false) смертью не считается: урона в
+            // тело не применялось — BodyService его игнорирует.
+            // DamageTraceEvent.Fatal использует то же значение (было !IsEntityAlive
+            // без HasEntity-гейта — расходилось с результатом при неизвестной цели).
+            int hpAfter = _bodyDataProvider.GetCurrentHealth(request.TargetId);
+            bool isFatal = _bodyDataProvider.HasEntity(request.TargetId)
+                && !_bodyDataProvider.IsEntityAlive(request.TargetId);
+
+            var damageResult = new DamageResult(
+                finalDamage, absorbedByQi, absorbedByArmor,
+                hitPart, attackResult, isFatal);
+
             // R40-5b/R41-1: полный трейс удара — одна строка в консоль
             // (Adapter-подписчик, env GODOT_DAMAGE_TRACE=1). Все числа уже
             // посчитаны выше; HP после — пост-фактум синхронного применения.
-            int hpAfter = _bodyDataProvider.GetCurrentHealth(request.TargetId);
-            bool aliveAfter = _bodyDataProvider.IsEntityAlive(request.TargetId);
             _damageTracePub.Publish(new DamageTraceEvent(
                 request.AttackerId, request.TargetId, request.Type, request.Element,
                 attackSubtype, request.AttackerLevel, request.DefenderLevel,
@@ -480,7 +494,7 @@ namespace CultivationGame.Modules.Combat
                 attackResult, hitPart, defensePermil, postDefenseActionDamage,
                 bufferActive, targetCurrentQi, absorbedByQi,
                 armorValue, armorCoverage, armorCoversHit, buffReductionPermil + (armorCoversHit ? equipDrPermil : 0), absorbedByArmor,
-                finalDamage, !aliveAfter, hpBefore, hpAfter));
+                finalDamage, isFatal, hpBefore, hpAfter));
 
             return damageResult;
         }

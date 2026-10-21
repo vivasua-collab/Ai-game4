@@ -76,7 +76,8 @@ namespace CultivationGame.Modules.Buff
 
         // === IBuffService: Управление баффами ===
 
-        public bool ApplyBuff(string entityId, string buffId, float duration = -1f, float potency = 1f)
+        public bool ApplyBuff(string entityId, string buffId, float duration = -1f, float potency = 1f,
+            string? sourceId = null)
         {
             // BF-I05: Если не настроен — используем конфиг по умолчанию
             if (!_isConfigured)
@@ -103,6 +104,11 @@ namespace CultivationGame.Modules.Buff
                         break;
                     case BuffStacking.Refresh:
                         existing.RemainingDuration = duration > 0 ? duration : existing.Duration;
+                        // BUG-017 (Этап-5): обновлённая атрибуция — повторное
+                        // наложение тем же/другим автором перезаписывает источник
+                        // (последнее наложение владеет эффектом).
+                        if (sourceId != null)
+                            existing.SourceId = sourceId;
                         _appliedPub.Publish(new BuffAppliedEvent(entityId, buffId, existing.Type, existing.RemainingDuration, potency));
                         return true;
                     case BuffStacking.Stack:
@@ -134,7 +140,7 @@ namespace CultivationGame.Modules.Buff
             }
 
             // Создаём новый бафф
-            var newBuff = CreateBuffFromId(buffId, entityId, duration, potency);
+            var newBuff = CreateBuffFromId(buffId, entityId, duration, potency, sourceId);
             if (newBuff == null) return false;
 
             // BF-A07: Мгновенные баффы применяются сразу и не добавляются в активный список
@@ -430,7 +436,8 @@ namespace CultivationGame.Modules.Buff
         /// Теперь маппинг вбирает producer-potency в Value/TickDamage,
         /// а buff.Potency = 1 (множитель нейтрален; стеки умножают отдельно).
         /// </summary>
-        private ActiveBuff CreateBuffFromId(string buffId, string entityId, float duration, float potency)
+        private ActiveBuff CreateBuffFromId(string buffId, string entityId, float duration, float potency,
+            string? sourceId = null)
         {
             // Определяем тип баффа по ID (эвристика для прототипа)
             // В продакшене — загрузка из BuffData SO / JSON базы
@@ -443,7 +450,9 @@ namespace CultivationGame.Modules.Buff
                 MaxStacks = 1,
                 CurrentStacks = 1,
                 IsDebuff = false,
-                Element = Element.Neutral
+                Element = Element.Neutral,
+                // BUG-017 (Этап-5): автор наложения — атрибуция DoT-смерти
+                SourceId = sourceId
             };
 
             // Устанавливаем длительность.

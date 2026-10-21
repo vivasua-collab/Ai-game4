@@ -51,8 +51,11 @@ namespace CultivationGame.Modules.Buff
 
                 if (tickValue != 0f)
                 {
+                    // BUG-017 (Этап-5 аудита боя): SourceId — автор наложения
+                    // баффа (атрибуция DoT-смерти, прокидывается дальше в
+                    // BodyModule → DamageAppliedEvent.OriginalAttackerId).
                     _tickedPub.Publish(new BuffTickedEvent(
-                        buff.EntityId, buff.BuffId, buff.Type, tickValue));
+                        buff.EntityId, buff.BuffId, buff.Type, tickValue, buff.SourceId));
                 }
 
                 return true;

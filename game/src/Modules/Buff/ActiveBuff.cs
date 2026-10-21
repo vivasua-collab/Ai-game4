@@ -2,6 +2,8 @@
 // Создано: 2026-05-09 05:15:31 UTC
 // Редактировано: 2026-05-09 — BF-A02: добавлено поле Potency, исправлен ToData()
 // Редактировано: 2026-05-10 11:05:00 UTC — B5-E01 FIX: TotalValue учитывает Potency
+// Редактировано: 2026-10-22 — BUG-017 (Этап-5 аудита боя): +SourceId — автор
+//   наложения (атрибуция DoT-смерти: кто отравил/поджёг — квесты/killfeed).
 // Runtime-состояние активного баффа.
 using CultivationGame.Core;
 using CultivationGame.Core.Data;
@@ -45,6 +47,14 @@ namespace CultivationGame.Modules.Buff
 
         // === Цель ===
         public string EntityId;
+
+        // === Атрибуция (BUG-017, Этап-5) ===
+        // Кто наложил бафф (игрок-кастер / атакующий, чей удар вызвал эффект).
+        // Прокидывается в BuffTickedEvent.SourceId → DamageAppliedEvent.
+        // OriginalAttackerId → NPCDeathEvent.KillerId / EnemyKilledEvent.
+        // null — легаси-наложение без атрибуции (смерть от DoT = «причина
+        // неизвестна», зачёт квеста не начисляется).
+        public string? SourceId;
 
         // === Свойства ===
 

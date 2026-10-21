@@ -48,6 +48,12 @@ public readonly struct BuffExpiredEvent
 
 /// <summary>
 /// Событие: тик периодического эффекта (DoT/HoT).
+/// BUG-017 (Этап-5 аудита боя): +SourceId — автор наложения баффа
+/// (кто применил яд/горение: игрок-кастер, атакующий ударом и т.п.).
+/// Прокидывается IBuffService.ApplyBuff → ActiveBuff.SourceId →
+/// BuffTickProcessor → BodyModule → DamageAppliedEvent.OriginalAttackerId —
+/// для атрибуции смерти от DoT (NPCDeathEvent.KillerId, EnemyKilledEvent,
+/// квесты). null — легаси-наложение без атрибуции.
 /// </summary>
 public readonly struct BuffTickedEvent
 {
@@ -55,8 +61,13 @@ public readonly struct BuffTickedEvent
     public readonly string BuffId;
     public readonly BuffType Type;
     public readonly float TickValue;
-    public BuffTickedEvent(string entityId, string buffId, BuffType type, float tickValue)
-        { EntityId = entityId; BuffId = buffId; Type = type; TickValue = tickValue; }
+    public readonly string? SourceId;
+    public BuffTickedEvent(string entityId, string buffId, BuffType type, float tickValue,
+        string? sourceId = null)
+    {
+        EntityId = entityId; BuffId = buffId; Type = type; TickValue = tickValue;
+        SourceId = sourceId;
+    }
 }
 
 /// <summary>
