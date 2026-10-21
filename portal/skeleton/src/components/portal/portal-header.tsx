@@ -25,7 +25,10 @@ export function PortalHeader({ data, loading }: PortalHeaderProps) {
   return (
     <header className="sticky top-0 z-40 border-b border-stone-800/70 bg-zinc-950/90 backdrop-blur-sm">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-1 px-4 py-2.5 sm:px-6 sm:py-3">
-        <div className="flex min-h-8 items-center gap-2.5 sm:gap-3">
+        {/* flex-wrap: на узких экранах правый кластер (бейдж сборки + метка
+            обновления) переносится на вторую линию вместо выхода за вьюпорт
+            (390px: иконка + заголовок + shrink-0-кластер не помещались в одну) */}
+        <div className="flex min-h-8 flex-wrap items-center gap-2.5 sm:gap-3">
           <Flame
             aria-hidden="true"
             className="size-5 shrink-0 text-amber-400 sm:size-6"
