@@ -7,7 +7,7 @@
     "window": "по готовности владельца"
   },
   "build": {
-    "head": "af56edc+",
+    "head": "7750288",
     "last_verified": "2026-10-22",
     "result": "dotnet build 0 errors/0 warnings; headless-старт OK",
     "qa": "Полная регрессия 25/25 PASS (23 qa_regression + FORM + RESPAWN) — Этап-5, 22.10; новый сим STAGE5 (22 ассерта аудитора)"
