@@ -139,6 +139,91 @@ export interface StatusFile {
   };
 }
 
+/* ── Карта центральной шины (portal/data/bus_map.json) ─────────────────── */
+
+/** Публикация события в шину (EventBus) с указанием файлов-источников. */
+export interface BusEventRef {
+  event: string;
+  publishers: string[];
+  debug_only?: boolean;
+}
+
+/** Узел карты шины: модуль / Entry / Adapter-слой. */
+export interface BusNode {
+  id: string;
+  kind: 'module' | 'entry' | 'adapter' | (string & {});
+  layer: string;
+  order: number;
+  description: string;
+  debug: boolean;
+  files: number;
+  publishes: string[];
+  subscribes: string[];
+  publishes_files?: Record<string, string[]>;
+  subscribes_files?: Record<string, string[]>;
+  provides: Array<{
+    service: string;
+    impl: string;
+    kind: 'service' | 'self' | 'instance' | 'config' | (string & {});
+    note?: string;
+  }>;
+  requires: Array<{
+    service: string;
+    via: string[];
+    kind: 'service' | 'config' | (string & {});
+  }>;
+}
+
+export interface BusChecks {
+  /** События публикуются, но продакшн-подписчиков нет. */
+  events_no_subscriber: Array<{ event: string; publishers: string[]; debug_only: boolean }>;
+  /** События подписаны, но никто не публикует. */
+  events_no_publisher: Array<{ event: string; subscribers: string[] }>;
+  /** Контракты, не используемые ни в publish, ни в subscribe. */
+  contracts_unused: string[];
+  /** Структуры-сообщения вне Core/Messaging/Contracts. */
+  contracts_local_unscoped: Array<{ event: string; origin: string }>;
+  /** Требования без регистрации (не резолвится). */
+  services_unresolved: Array<{ service: string; required_by: string[]; kind?: string }>;
+  /** Регистрации без потребителей (кладут в шину, никто не забирает). */
+  services_unconsumed: Array<{ service: string; provided_by: string }>;
+}
+
+export interface BusMapFile {
+  schema_version?: number;
+  updated?: string;
+  generated_by?: string;
+  update_policy?: string;
+  source_head?: string;
+  hub?: {
+    id: string;
+    title: string;
+    channels: Array<{
+      id: string;
+      title: string;
+      role: string;
+      contracts_total?: number;
+      services_total?: number;
+      groups?: Array<{ file: string; count: number }>;
+    }>;
+  };
+  nodes: BusNode[];
+  checks: BusChecks;
+  totals: {
+    modules: number;
+    nodes: number;
+    contracts_defined: number;
+    events_published: number;
+    events_subscribed: number;
+    publish_edges: number;
+    subscribe_edges: number;
+    provide_edges: number;
+    require_edges: number;
+    services_provided: number;
+    services_required: number;
+  };
+}
+
 /* ── Ответ API /api/portal ──────────────────────────────────────────────── */
 
 export interface PortalData {
@@ -148,5 +233,6 @@ export interface PortalData {
   tracks: Track[];
   bugs: BugsFile | null;
   status: StatusFile | null;
+  busMap: BusMapFile | null;
   errors: string[];
 }

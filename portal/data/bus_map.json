@@ -1,0 +1,5661 @@
+{
+  "schema_version": 1,
+  "updated": "2026-10-21T08:15:49Z",
+  "generated_by": "tools/gen_bus_map.py",
+  "update_policy": "по требованию: правки кода → python3 tools/gen_bus_map.py → коммит",
+  "source_head": "8497ae2",
+  "hub": {
+    "id": "Core",
+    "title": "Центральная шина (Core)",
+    "channels": [
+      {
+        "id": "events",
+        "title": "EventBus — IPublisher<T> / ISubscriber<T>",
+        "role": "события: Publish → Subscribe (readonly struct, zero-GC)",
+        "contracts_total": 163,
+        "groups": [
+          {
+            "file": "Belt",
+            "count": 2
+          },
+          {
+            "file": "Body",
+            "count": 5
+          },
+          {
+            "file": "Buff",
+            "count": 5
+          },
+          {
+            "file": "Charger",
+            "count": 5
+          },
+          {
+            "file": "Combat",
+            "count": 17
+          },
+          {
+            "file": "Corpse",
+            "count": 3
+          },
+          {
+            "file": "Crafting",
+            "count": 2
+          },
+          {
+            "file": "Dialogue",
+            "count": 4
+          },
+          {
+            "file": "Formation",
+            "count": 5
+          },
+          {
+            "file": "Game",
+            "count": 7
+          },
+          {
+            "file": "GroundItem",
+            "count": 2
+          },
+          {
+            "file": "Hotbar",
+            "count": 2
+          },
+          {
+            "file": "Input",
+            "count": 6
+          },
+          {
+            "file": "Inventory",
+            "count": 5
+          },
+          {
+            "file": "NPC",
+            "count": 7
+          },
+          {
+            "file": "Player",
+            "count": 8
+          },
+          {
+            "file": "Qi",
+            "count": 14
+          },
+          {
+            "file": "Quest",
+            "count": 7
+          },
+          {
+            "file": "Save",
+            "count": 8
+          },
+          {
+            "file": "Scene",
+            "count": 6
+          },
+          {
+            "file": "Stat",
+            "count": 1
+          },
+          {
+            "file": "TechniqueCharge",
+            "count": 5
+          },
+          {
+            "file": "Tile",
+            "count": 6
+          },
+          {
+            "file": "Trade",
+            "count": 5
+          },
+          {
+            "file": "UI",
+            "count": 13
+          },
+          {
+            "file": "World",
+            "count": 13
+          }
+        ]
+      },
+      {
+        "id": "services",
+        "title": "DI-контейнер — ContainerBuilder / IResolver",
+        "role": "сервисы: Register → Resolve / [Inject] / ResolveAll",
+        "services_total": 160
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "World",
+      "kind": "module",
+      "layer": "Modules",
+      "order": 1,
+      "description": "Локации, фракции, время, события мира",
+      "debug": false,
+      "files": 3,
+      "publishes": [
+        "DayChangedEvent",
+        "LocationChangedEvent",
+        "MonthChangedEvent",
+        "TimeChangedEvent",
+        "TimeHitchedEvent",
+        "TimeSpeedChangedEvent",
+        "TimeTickEvent",
+        "YearChangedEvent"
+      ],
+      "subscribes": [
+        "SaveRequestedEvent"
+      ],
+      "publishes_files": {
+        "DayChangedEvent": [
+          "WorldModule.cs"
+        ],
+        "LocationChangedEvent": [
+          "WorldService.cs"
+        ],
+        "MonthChangedEvent": [
+          "WorldModule.cs"
+        ],
+        "TimeChangedEvent": [
+          "WorldModule.cs"
+        ],
+        "TimeHitchedEvent": [
+          "WorldService.cs"
+        ],
+        "TimeSpeedChangedEvent": [
+          "WorldService.cs"
+        ],
+        "TimeTickEvent": [
+          "WorldModule.cs"
+        ],
+        "YearChangedEvent": [
+          "WorldModule.cs"
+        ]
+      },
+      "subscribes_files": {
+        "SaveRequestedEvent": [
+          "WorldModule.cs"
+        ]
+      },
+      "provides": [
+        {
+          "service": "ITimeService",
+          "impl": "TimeService",
+          "kind": "service"
+        },
+        {
+          "service": "IWorldService",
+          "impl": "WorldService",
+          "kind": "service"
+        },
+        {
+          "service": "TimeService",
+          "impl": "TimeService",
+          "kind": "self"
+        },
+        {
+          "service": "WorldService",
+          "impl": "WorldService",
+          "kind": "self"
+        },
+        {
+          "service": "WorldModule",
+          "impl": "WorldModule",
+          "kind": "self"
+        }
+      ],
+      "requires": [
+        {
+          "service": "ITimeService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IWorldService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        }
+      ]
+    },
+    {
+      "id": "Tile",
+      "kind": "module",
+      "layer": "Modules",
+      "order": 2,
+      "description": "Тайловая карта, ресурсы",
+      "debug": false,
+      "files": 4,
+      "publishes": [
+        "ItemAddRequestEvent",
+        "ResourceDepletedEvent",
+        "ResourceHarvestedEvent",
+        "ResourceRespawnedEvent",
+        "TileChangedEvent",
+        "TileMapGeneratedEvent"
+      ],
+      "subscribes": [
+        "DayChangedEvent",
+        "LocationChangedEvent",
+        "ResourceRespawnedEvent"
+      ],
+      "publishes_files": {
+        "ItemAddRequestEvent": [
+          "ResourceService.cs"
+        ],
+        "ResourceDepletedEvent": [
+          "TileService.cs"
+        ],
+        "ResourceHarvestedEvent": [
+          "TileService.cs"
+        ],
+        "ResourceRespawnedEvent": [
+          "ResourceService.cs"
+        ],
+        "TileChangedEvent": [
+          "TileService.cs"
+        ],
+        "TileMapGeneratedEvent": [
+          "TileModule.cs"
+        ]
+      },
+      "subscribes_files": {
+        "DayChangedEvent": [
+          "ResourceService.cs"
+        ],
+        "LocationChangedEvent": [
+          "TileModule.cs"
+        ],
+        "ResourceRespawnedEvent": [
+          "TileService.cs"
+        ]
+      },
+      "provides": [
+        {
+          "service": "ITileService",
+          "impl": "TileService",
+          "kind": "service"
+        },
+        {
+          "service": "IResourceService",
+          "impl": "ResourceService",
+          "kind": "service"
+        },
+        {
+          "service": "TileConfig",
+          "impl": "TileConfig",
+          "kind": "self"
+        },
+        {
+          "service": "TileService",
+          "impl": "TileService",
+          "kind": "self"
+        },
+        {
+          "service": "ResourceService",
+          "impl": "ResourceService",
+          "kind": "self"
+        },
+        {
+          "service": "TileModule",
+          "impl": "TileModule",
+          "kind": "self"
+        }
+      ],
+      "requires": [
+        {
+          "service": "IResourceService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ITileService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ITimeService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IWorldService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        }
+      ]
+    },
+    {
+      "id": "Body",
+      "kind": "module",
+      "layer": "Modules",
+      "order": 3,
+      "description": "Части тела, двойная HP, ампутации",
+      "debug": false,
+      "files": 11,
+      "publishes": [
+        "BodyCriticalEvent",
+        "BodyPartDamagedEvent",
+        "BodyPartHealedEvent",
+        "BodyPartReattachedEvent",
+        "BodyPartSeveredEvent",
+        "DamageAppliedEvent"
+      ],
+      "subscribes": [
+        "BodyPartReattachedEvent",
+        "BodyPartSeveredEvent",
+        "BuffTickedEvent",
+        "CultivationLevelChangedEvent",
+        "DamageAppliedEvent",
+        "QiChangedEvent",
+        "StatChangedEvent"
+      ],
+      "publishes_files": {
+        "BodyCriticalEvent": [
+          "BodyService.cs"
+        ],
+        "BodyPartDamagedEvent": [
+          "BodyService.cs"
+        ],
+        "BodyPartHealedEvent": [
+          "BodyService.cs"
+        ],
+        "BodyPartReattachedEvent": [
+          "BodyService.cs"
+        ],
+        "BodyPartSeveredEvent": [
+          "BodyService.cs"
+        ],
+        "DamageAppliedEvent": [
+          "BodyModule.cs"
+        ]
+      },
+      "subscribes_files": {
+        "BodyPartReattachedEvent": [
+          "SeveredDebuffSystem.cs"
+        ],
+        "BodyPartSeveredEvent": [
+          "SeveredDebuffSystem.cs"
+        ],
+        "BuffTickedEvent": [
+          "BodyModule.cs"
+        ],
+        "CultivationLevelChangedEvent": [
+          "BodyService.cs"
+        ],
+        "DamageAppliedEvent": [
+          "BodyService.cs"
+        ],
+        "QiChangedEvent": [
+          "BodyService.cs"
+        ],
+        "StatChangedEvent": [
+          "BodyModule.cs"
+        ]
+      },
+      "provides": [
+        {
+          "service": "IBodyService",
+          "impl": "BodyService",
+          "kind": "service"
+        },
+        {
+          "service": "IBodyDataProvider",
+          "impl": "BodyService",
+          "kind": "service"
+        },
+        {
+          "service": "ISaveable",
+          "impl": "BodyService",
+          "kind": "service"
+        },
+        {
+          "service": "IBodyFactory",
+          "impl": "BodyFactory",
+          "kind": "service"
+        },
+        {
+          "service": "BodyModule",
+          "impl": "BodyModule",
+          "kind": "self"
+        },
+        {
+          "service": "SeveredDebuffSystem",
+          "impl": "SeveredDebuffSystem",
+          "kind": "self"
+        },
+        {
+          "service": "BodyTemplateProvider",
+          "impl": "BodyTemplateProvider",
+          "kind": "self"
+        },
+        {
+          "service": "SpeciesRegistry",
+          "impl": "SpeciesRegistry",
+          "kind": "self"
+        },
+        {
+          "service": "BodyEnhancementSystem",
+          "impl": "BodyEnhancementSystem",
+          "kind": "self"
+        },
+        {
+          "service": "BodyConfig",
+          "impl": "BodyConfig",
+          "kind": "config"
+        }
+      ],
+      "requires": [
+        {
+          "service": "BodyConfig",
+          "via": [
+            "inject"
+          ],
+          "kind": "config"
+        },
+        {
+          "service": "BodyTemplateProvider",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IBodyFactory",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IBodyService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IBuffService",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ITimeService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        }
+      ]
+    },
+    {
+      "id": "Qi",
+      "kind": "module",
+      "layer": "Modules",
+      "order": 4,
+      "description": "Ци, ядро, проводимость, прорывы",
+      "debug": false,
+      "files": 8,
+      "publishes": [
+        "CultivationBreakthroughEvent",
+        "CultivationLevelChangedEvent",
+        "MeditationStateChangedEvent",
+        "QiBufferActivatedEvent",
+        "QiBufferDeactivatedEvent",
+        "QiBufferStateChangedEvent",
+        "QiChangedEvent",
+        "QiDepletedEvent",
+        "QiFullEvent",
+        "ToastShownEvent"
+      ],
+      "subscribes": [
+        "BodyPartSeveredEvent",
+        "CombatStartedEvent",
+        "FormationActivatedEvent",
+        "FormationDeactivatedEvent",
+        "MeditationToggleRequestedEvent",
+        "QiAddRequestEvent",
+        "QiBufferActivateRequestEvent",
+        "QiBufferDeactivateRequestEvent",
+        "QiConsumeRequestEvent"
+      ],
+      "publishes_files": {
+        "CultivationBreakthroughEvent": [
+          "QiService.cs"
+        ],
+        "CultivationLevelChangedEvent": [
+          "QiService.cs"
+        ],
+        "MeditationStateChangedEvent": [
+          "QiModule.cs"
+        ],
+        "QiBufferActivatedEvent": [
+          "QiBufferService.cs"
+        ],
+        "QiBufferDeactivatedEvent": [
+          "QiBufferService.cs"
+        ],
+        "QiBufferStateChangedEvent": [
+          "QiBufferService.cs"
+        ],
+        "QiChangedEvent": [
+          "QiService.cs"
+        ],
+        "QiDepletedEvent": [
+          "QiService.cs"
+        ],
+        "QiFullEvent": [
+          "QiService.cs"
+        ],
+        "ToastShownEvent": [
+          "QiModule.cs"
+        ]
+      },
+      "subscribes_files": {
+        "BodyPartSeveredEvent": [
+          "QiService.cs"
+        ],
+        "CombatStartedEvent": [
+          "QiModule.cs"
+        ],
+        "FormationActivatedEvent": [
+          "QiModule.cs"
+        ],
+        "FormationDeactivatedEvent": [
+          "QiModule.cs"
+        ],
+        "MeditationToggleRequestedEvent": [
+          "QiModule.cs"
+        ],
+        "QiAddRequestEvent": [
+          "QiService.cs"
+        ],
+        "QiBufferActivateRequestEvent": [
+          "QiBufferService.cs"
+        ],
+        "QiBufferDeactivateRequestEvent": [
+          "QiBufferService.cs"
+        ],
+        "QiConsumeRequestEvent": [
+          "QiService.cs"
+        ]
+      },
+      "provides": [
+        {
+          "service": "IQiService",
+          "impl": "QiService",
+          "kind": "service"
+        },
+        {
+          "service": "IQiBufferService",
+          "impl": "QiBufferService",
+          "kind": "service"
+        },
+        {
+          "service": "IQiDataProvider",
+          "impl": "QiDataProvider",
+          "kind": "service"
+        },
+        {
+          "service": "QiModule",
+          "impl": "QiModule",
+          "kind": "self"
+        },
+        {
+          "service": "QiConfig",
+          "impl": "QiConfig",
+          "kind": "config"
+        }
+      ],
+      "requires": [
+        {
+          "service": "IQiBufferService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IQiService",
+          "via": [
+            "ctor",
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ITimeService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "QiConfig",
+          "via": [
+            "inject"
+          ],
+          "kind": "config"
+        },
+        {
+          "service": "QiService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        }
+      ]
+    },
+    {
+      "id": "Buff",
+      "kind": "module",
+      "layer": "Modules",
+      "order": 5,
+      "description": "Баффы, мягкие капы, иммунитеты",
+      "debug": false,
+      "files": 7,
+      "publishes": [
+        "BuffAppliedEvent",
+        "BuffExpiredEvent",
+        "BuffRemovedEvent",
+        "BuffTickedEvent",
+        "StatModifierChangedEvent"
+      ],
+      "subscribes": [],
+      "publishes_files": {
+        "BuffAppliedEvent": [
+          "BuffService.cs"
+        ],
+        "BuffExpiredEvent": [
+          "BuffService.cs"
+        ],
+        "BuffRemovedEvent": [
+          "BuffService.cs"
+        ],
+        "BuffTickedEvent": [
+          "BuffTickProcessor.cs"
+        ],
+        "StatModifierChangedEvent": [
+          "BuffService.cs"
+        ]
+      },
+      "subscribes_files": {},
+      "provides": [
+        {
+          "service": "IBuffService",
+          "impl": "BuffService",
+          "kind": "service"
+        },
+        {
+          "service": "BuffTickProcessor",
+          "impl": "BuffTickProcessor",
+          "kind": "self"
+        },
+        {
+          "service": "BuffModule",
+          "impl": "BuffModule",
+          "kind": "self"
+        },
+        {
+          "service": "BuffConfig",
+          "impl": "BuffConfig",
+          "kind": "config"
+        }
+      ],
+      "requires": [
+        {
+          "service": "BuffConfig",
+          "via": [
+            "inject"
+          ],
+          "kind": "config"
+        },
+        {
+          "service": "BuffService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "BuffTickProcessor",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IBuffService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ITimeService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        }
+      ]
+    },
+    {
+      "id": "Inventory",
+      "kind": "module",
+      "layer": "Modules",
+      "order": 6,
+      "description": "Инвентарь, экипировка, крафт, лут",
+      "debug": false,
+      "files": 18,
+      "publishes": [
+        "BeltSlotsChangedEvent",
+        "ConsumableUsedEvent",
+        "CraftCompletedEvent",
+        "CraftFailedEvent",
+        "EquipmentBlockedEvent",
+        "EquipmentChangedEvent",
+        "ItemAddRequestEvent",
+        "ItemAddedEvent",
+        "ItemDroppedEvent",
+        "ItemPickedUpEvent",
+        "ItemRemovedEvent",
+        "ToastShownEvent"
+      ],
+      "subscribes": [
+        "BodyPartSeveredEvent",
+        "CraftCompletedEvent",
+        "EquipmentChangedEvent",
+        "ItemAddRequestEvent",
+        "ResourceHarvestedEvent"
+      ],
+      "publishes_files": {
+        "BeltSlotsChangedEvent": [
+          "BeltService.cs"
+        ],
+        "ConsumableUsedEvent": [
+          "BeltService.cs",
+          "ItemUseService.cs"
+        ],
+        "CraftCompletedEvent": [
+          "CraftingService.cs"
+        ],
+        "CraftFailedEvent": [
+          "CraftingService.cs"
+        ],
+        "EquipmentBlockedEvent": [
+          "EquipmentService.cs"
+        ],
+        "EquipmentChangedEvent": [
+          "EquipmentService.cs"
+        ],
+        "ItemAddRequestEvent": [
+          "GroundItemService.cs"
+        ],
+        "ItemAddedEvent": [
+          "InventoryService.cs",
+          "SpiritStorageService.cs"
+        ],
+        "ItemDroppedEvent": [
+          "GroundItemService.cs"
+        ],
+        "ItemPickedUpEvent": [
+          "GroundItemService.cs"
+        ],
+        "ItemRemovedEvent": [
+          "InventoryService.cs",
+          "SpiritStorageService.cs"
+        ],
+        "ToastShownEvent": [
+          "BeltService.cs",
+          "ItemUseService.cs"
+        ]
+      },
+      "subscribes_files": {
+        "BodyPartSeveredEvent": [
+          "EquipmentService.cs"
+        ],
+        "CraftCompletedEvent": [
+          "InventoryModule.cs"
+        ],
+        "EquipmentChangedEvent": [
+          "BackpackService.cs",
+          "BeltService.cs",
+          "InventoryModule.cs",
+          "StorageRingService.cs"
+        ],
+        "ItemAddRequestEvent": [
+          "InventoryModule.cs"
+        ],
+        "ResourceHarvestedEvent": [
+          "InventoryModule.cs"
+        ]
+      },
+      "provides": [
+        {
+          "service": "IInventoryService",
+          "impl": "InventoryService",
+          "kind": "service"
+        },
+        {
+          "service": "ISaveable",
+          "impl": "InventoryService",
+          "kind": "service"
+        },
+        {
+          "service": "IEquipmentService",
+          "impl": "EquipmentService",
+          "kind": "service"
+        },
+        {
+          "service": "IEquipmentDataProvider",
+          "impl": "EquipmentDataProvider",
+          "kind": "service"
+        },
+        {
+          "service": "ICraftingService",
+          "impl": "CraftingService",
+          "kind": "service"
+        },
+        {
+          "service": "IStorageRingService",
+          "impl": "StorageRingService",
+          "kind": "service"
+        },
+        {
+          "service": "ISaveable",
+          "impl": "StorageRingService",
+          "kind": "service"
+        },
+        {
+          "service": "IGroundItemService",
+          "impl": "GroundItemService",
+          "kind": "service"
+        },
+        {
+          "service": "ISpiritStorageService",
+          "impl": "SpiritStorageService",
+          "kind": "service"
+        },
+        {
+          "service": "IItemUseService",
+          "impl": "ItemUseService",
+          "kind": "service"
+        },
+        {
+          "service": "MaterialService",
+          "impl": "MaterialService",
+          "kind": "self"
+        },
+        {
+          "service": "BackpackService",
+          "impl": "BackpackService",
+          "kind": "self"
+        },
+        {
+          "service": "BeltService",
+          "impl": "BeltService",
+          "kind": "self"
+        },
+        {
+          "service": "InventoryModule",
+          "impl": "InventoryModule",
+          "kind": "self"
+        },
+        {
+          "service": "InventoryConfig",
+          "impl": "InventoryConfig",
+          "kind": "config"
+        }
+      ],
+      "requires": [
+        {
+          "service": "BackpackService",
+          "via": [
+            "ctor",
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "BeltService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "CraftingService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "EquipmentService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IBodyService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IEquipmentService",
+          "via": [
+            "ctor",
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IGroundItemService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IInventoryService",
+          "via": [
+            "ctor",
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IItemDatabaseService",
+          "via": [
+            "ctor",
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IItemUseService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IPlayerService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IQiService",
+          "via": [
+            "ctor",
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "InventoryConfig",
+          "via": [
+            "inject"
+          ],
+          "kind": "config"
+        },
+        {
+          "service": "InventoryService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "MaterialService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "StorageRingService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        }
+      ]
+    },
+    {
+      "id": "Combat",
+      "kind": "module",
+      "layer": "Modules",
+      "order": 7,
+      "description": "Бой: 11-слойный пайплайн урона",
+      "debug": false,
+      "files": 21,
+      "publishes": [
+        "AoeImpactEvent",
+        "AttackRejectedEvent",
+        "CombatEndedEvent",
+        "CombatStartedEvent",
+        "DamageAppliedEvent",
+        "DamageTraceEvent",
+        "EnemyKilledEvent",
+        "ProjectileSpawnedEvent",
+        "QiAddRequestEvent",
+        "QiBufferActivateRequestEvent",
+        "QiBufferDeactivateRequestEvent",
+        "QiConsumeRequestEvent",
+        "TechniqueChargeCancelledEvent",
+        "TechniqueChargeCompletedEvent",
+        "TechniqueChargeProgressEvent",
+        "TechniqueChargeStartedEvent",
+        "TechniqueForgottenEvent",
+        "TechniqueLearnedEvent",
+        "TechniqueSelectionChangedEvent",
+        "TechniqueUsedEvent"
+      ],
+      "subscribes": [
+        "AttackIntentEvent",
+        "BuffAppliedEvent",
+        "BuffRemovedEvent",
+        "CombatDisengageEvent",
+        "CombatEndedEvent",
+        "DamageAppliedEvent",
+        "DefenseIntentEvent",
+        "EquipmentChangedEvent",
+        "QiBufferStateChangedEvent",
+        "QiChangedEvent",
+        "QiDepletedEvent",
+        "SaveStartedEvent"
+      ],
+      "publishes_files": {
+        "AoeImpactEvent": [
+          "CombatService.cs"
+        ],
+        "AttackRejectedEvent": [
+          "CombatModule.cs",
+          "CombatService.cs"
+        ],
+        "CombatEndedEvent": [
+          "CombatService.cs"
+        ],
+        "CombatStartedEvent": [
+          "CombatService.cs"
+        ],
+        "DamageAppliedEvent": [
+          "DamageService.cs"
+        ],
+        "DamageTraceEvent": [
+          "DamageService.cs"
+        ],
+        "EnemyKilledEvent": [
+          "CombatService.cs"
+        ],
+        "ProjectileSpawnedEvent": [
+          "CombatService.cs"
+        ],
+        "QiAddRequestEvent": [
+          "TechniqueChargeService.cs"
+        ],
+        "QiBufferActivateRequestEvent": [
+          "CombatService.cs"
+        ],
+        "QiBufferDeactivateRequestEvent": [
+          "CombatService.cs"
+        ],
+        "QiConsumeRequestEvent": [
+          "DamageService.cs",
+          "TechniqueChargeService.cs",
+          "TechniqueService.cs"
+        ],
+        "TechniqueChargeCancelledEvent": [
+          "TechniqueChargeService.cs"
+        ],
+        "TechniqueChargeCompletedEvent": [
+          "TechniqueChargeService.cs"
+        ],
+        "TechniqueChargeProgressEvent": [
+          "TechniqueChargeService.cs"
+        ],
+        "TechniqueChargeStartedEvent": [
+          "TechniqueChargeService.cs"
+        ],
+        "TechniqueForgottenEvent": [
+          "TechniqueService.cs"
+        ],
+        "TechniqueLearnedEvent": [
+          "TechniqueService.cs"
+        ],
+        "TechniqueSelectionChangedEvent": [
+          "TechniqueService.cs"
+        ],
+        "TechniqueUsedEvent": [
+          "CombatService.cs",
+          "TechniqueService.cs"
+        ]
+      },
+      "subscribes_files": {
+        "AttackIntentEvent": [
+          "CombatModule.cs"
+        ],
+        "BuffAppliedEvent": [
+          "CombatModule.cs"
+        ],
+        "BuffRemovedEvent": [
+          "CombatModule.cs"
+        ],
+        "CombatDisengageEvent": [
+          "CombatModule.cs"
+        ],
+        "CombatEndedEvent": [
+          "CombatModule.cs"
+        ],
+        "DamageAppliedEvent": [
+          "CombatConsequencesService.cs",
+          "CombatService.cs",
+          "ElementalEffectService.cs"
+        ],
+        "DefenseIntentEvent": [
+          "CombatModule.cs"
+        ],
+        "EquipmentChangedEvent": [
+          "CombatModule.cs"
+        ],
+        "QiBufferStateChangedEvent": [
+          "CombatService.cs",
+          "DamageService.cs"
+        ],
+        "QiChangedEvent": [
+          "CombatService.cs",
+          "DamageService.cs",
+          "TechniqueChargeService.cs",
+          "TechniqueService.cs"
+        ],
+        "QiDepletedEvent": [
+          "CombatService.cs"
+        ],
+        "SaveStartedEvent": [
+          "TechniqueChargeService.cs"
+        ]
+      },
+      "provides": [
+        {
+          "service": "ICombatService",
+          "impl": "CombatService",
+          "kind": "service"
+        },
+        {
+          "service": "IDamageService",
+          "impl": "DamageService",
+          "kind": "service"
+        },
+        {
+          "service": "IStatProvider",
+          "impl": "StatProviderAdapter",
+          "kind": "service"
+        },
+        {
+          "service": "ISaveable",
+          "impl": "TechniqueService",
+          "kind": "service"
+        },
+        {
+          "service": "TechniqueService",
+          "impl": "TechniqueService",
+          "kind": "self"
+        },
+        {
+          "service": "TechniqueChargeService",
+          "impl": "TechniqueChargeService",
+          "kind": "self"
+        },
+        {
+          "service": "CombatConsequencesService",
+          "impl": "CombatConsequencesService",
+          "kind": "self"
+        },
+        {
+          "service": "ElementalEffectService",
+          "impl": "ElementalEffectService",
+          "kind": "self"
+        },
+        {
+          "service": "CombatRangeGateService",
+          "impl": "CombatRangeGateService",
+          "kind": "self"
+        },
+        {
+          "service": "AoEResolver",
+          "impl": "AoEResolver",
+          "kind": "self"
+        },
+        {
+          "service": "CombatModule",
+          "impl": "CombatModule",
+          "kind": "self"
+        },
+        {
+          "service": "ICombatRng",
+          "impl": "ICombatRng",
+          "kind": "instance"
+        },
+        {
+          "service": "CombatConfig",
+          "impl": "CombatConfig",
+          "kind": "config"
+        }
+      ],
+      "requires": [
+        {
+          "service": "CombatConfig",
+          "via": [
+            "inject"
+          ],
+          "kind": "config"
+        },
+        {
+          "service": "CombatRangeGateService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "CombatService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IBodyDataProvider",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IBuffService",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ICombatRng",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ICombatService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IDamageService",
+          "via": [
+            "ctor",
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IEquipmentDataProvider",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IFormationService",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "INPCService",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IQiDataProvider",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IStatProvider",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IStatService",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ITimeService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "TechniqueChargeService",
+          "via": [
+            "ctor",
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "TechniqueService",
+          "via": [
+            "ctor",
+            "inject"
+          ],
+          "kind": "service"
+        }
+      ]
+    },
+    {
+      "id": "Formation",
+      "kind": "module",
+      "layer": "Modules",
+      "order": 8,
+      "description": "Магические массивы, контур, пул Ци",
+      "debug": false,
+      "files": 9,
+      "publishes": [
+        "FormationActivatedEvent",
+        "FormationDeactivatedEvent",
+        "FormationQiPoolChangedEvent",
+        "FormationStageChangedEvent",
+        "QiAddRequestEvent",
+        "QiConsumeRequestEvent",
+        "ToastShownEvent"
+      ],
+      "subscribes": [
+        "CombatEndedEvent",
+        "FormationContributeQiRequestEvent",
+        "PlayerPositionChangedEvent",
+        "QiChangedEvent"
+      ],
+      "publishes_files": {
+        "FormationActivatedEvent": [
+          "FormationService.cs"
+        ],
+        "FormationDeactivatedEvent": [
+          "FormationService.cs"
+        ],
+        "FormationQiPoolChangedEvent": [
+          "FormationQiPool.cs"
+        ],
+        "FormationStageChangedEvent": [
+          "FormationService.cs"
+        ],
+        "QiAddRequestEvent": [
+          "FormationModule.cs"
+        ],
+        "QiConsumeRequestEvent": [
+          "FormationService.cs"
+        ],
+        "ToastShownEvent": [
+          "FormationService.cs"
+        ]
+      },
+      "subscribes_files": {
+        "CombatEndedEvent": [
+          "FormationService.cs"
+        ],
+        "FormationContributeQiRequestEvent": [
+          "FormationService.cs"
+        ],
+        "PlayerPositionChangedEvent": [
+          "FormationService.cs"
+        ],
+        "QiChangedEvent": [
+          "FormationService.cs"
+        ]
+      },
+      "provides": [
+        {
+          "service": "IFormationService",
+          "impl": "FormationService",
+          "kind": "service"
+        },
+        {
+          "service": "FormationModule",
+          "impl": "FormationModule",
+          "kind": "self"
+        },
+        {
+          "service": "FormationRegistry",
+          "impl": "FormationRegistry",
+          "kind": "self"
+        },
+        {
+          "service": "FormationConfig",
+          "impl": "FormationConfig",
+          "kind": "config"
+        }
+      ],
+      "requires": [
+        {
+          "service": "FormationConfig",
+          "via": [
+            "inject"
+          ],
+          "kind": "config"
+        },
+        {
+          "service": "FormationService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IFormationService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IQiDataProvider",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ITimeService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        }
+      ]
+    },
+    {
+      "id": "NPC",
+      "kind": "module",
+      "layer": "Modules",
+      "order": 9,
+      "description": "Спавн, AI, группы, отношения, трупы",
+      "debug": false,
+      "files": 24,
+      "publishes": [
+        "AttackIntentEvent",
+        "AttitudeChangedEvent",
+        "CombatDisengageEvent",
+        "CorpseCreatedEvent",
+        "CorpseLootedEvent",
+        "CorpseRemovedEvent",
+        "ItemAddRequestEvent",
+        "NPCAIStateChangedEvent",
+        "NPCDamagedEvent",
+        "NPCDeathEvent",
+        "NPCDespawnedEvent",
+        "NPCInteractedEvent",
+        "NPCSpawnedEvent"
+      ],
+      "subscribes": [
+        "BodyPartSeveredEvent",
+        "CombatDisengageEvent",
+        "CombatEndedEvent",
+        "CombatStartedEvent",
+        "DamageAppliedEvent",
+        "DayChangedEvent",
+        "LocationChangedEvent",
+        "NPCAIStateChangedEvent",
+        "NPCDeathEvent",
+        "PlayerPositionChangedEvent",
+        "QiChangedEvent",
+        "YearChangedEvent"
+      ],
+      "publishes_files": {
+        "AttackIntentEvent": [
+          "AnimalService.cs",
+          "NPCModule.cs"
+        ],
+        "AttitudeChangedEvent": [
+          "NPCService.cs"
+        ],
+        "CombatDisengageEvent": [
+          "AnimalService.cs",
+          "NPCAIService.cs"
+        ],
+        "CorpseCreatedEvent": [
+          "CorpseService.cs"
+        ],
+        "CorpseLootedEvent": [
+          "CorpseService.cs"
+        ],
+        "CorpseRemovedEvent": [
+          "CorpseService.cs"
+        ],
+        "ItemAddRequestEvent": [
+          "CorpseService.cs"
+        ],
+        "NPCAIStateChangedEvent": [
+          "NPCService.cs"
+        ],
+        "NPCDamagedEvent": [
+          "NPCCombatAdapter.cs"
+        ],
+        "NPCDeathEvent": [
+          "AnimalService.cs",
+          "NPCCombatAdapter.cs"
+        ],
+        "NPCDespawnedEvent": [
+          "NPCSpawnerService.cs"
+        ],
+        "NPCInteractedEvent": [
+          "NPCService.cs"
+        ],
+        "NPCSpawnedEvent": [
+          "NPCSpawnerService.cs"
+        ]
+      },
+      "subscribes_files": {
+        "BodyPartSeveredEvent": [
+          "NPCAIService.cs"
+        ],
+        "CombatDisengageEvent": [
+          "NPCCombatAdapter.cs"
+        ],
+        "CombatEndedEvent": [
+          "NPCCombatAdapter.cs"
+        ],
+        "CombatStartedEvent": [
+          "NPCAIService.cs",
+          "NPCCombatAdapter.cs"
+        ],
+        "DamageAppliedEvent": [
+          "AnimalService.cs",
+          "NPCAIService.cs",
+          "NPCCombatAdapter.cs"
+        ],
+        "DayChangedEvent": [
+          "NPCQiRegenService.cs",
+          "NPCRelationshipService.cs"
+        ],
+        "LocationChangedEvent": [
+          "NPCSpawnerService.cs"
+        ],
+        "NPCAIStateChangedEvent": [
+          "NPCModule.cs"
+        ],
+        "NPCDeathEvent": [
+          "CorpseService.cs"
+        ],
+        "PlayerPositionChangedEvent": [
+          "NPCAIService.cs",
+          "NPCModule.cs",
+          "NPCMovementService.cs"
+        ],
+        "QiChangedEvent": [
+          "NPCService.cs"
+        ],
+        "YearChangedEvent": [
+          "NPCModule.cs"
+        ]
+      },
+      "provides": [
+        {
+          "service": "INPCService",
+          "impl": "NPCService",
+          "kind": "service"
+        },
+        {
+          "service": "ISaveable",
+          "impl": "NPCService",
+          "kind": "service"
+        },
+        {
+          "service": "INPCSpawnerService",
+          "impl": "NPCSpawnerService",
+          "kind": "service"
+        },
+        {
+          "service": "IPerkService",
+          "impl": "PerkService",
+          "kind": "service"
+        },
+        {
+          "service": "IAnimalService",
+          "impl": "AnimalService",
+          "kind": "service"
+        },
+        {
+          "service": "INPCGroupService",
+          "impl": "NPCGroupService",
+          "kind": "service"
+        },
+        {
+          "service": "ISaveable",
+          "impl": "NPCGroupService",
+          "kind": "service"
+        },
+        {
+          "service": "ICorpseService",
+          "impl": "CorpseService",
+          "kind": "service"
+        },
+        {
+          "service": "SoulGenerator",
+          "impl": "SoulGenerator",
+          "kind": "self"
+        },
+        {
+          "service": "NPCSpeciesSelector",
+          "impl": "NPCSpeciesSelector",
+          "kind": "self"
+        },
+        {
+          "service": "NPCAssemblyService",
+          "impl": "NPCAssemblyService",
+          "kind": "self"
+        },
+        {
+          "service": "NPCNameGenerator",
+          "impl": "NPCNameGenerator",
+          "kind": "self"
+        },
+        {
+          "service": "QiDataProvider",
+          "impl": "QiDataProvider",
+          "kind": "self"
+        },
+        {
+          "service": "EquipmentDataProvider",
+          "impl": "EquipmentDataProvider",
+          "kind": "self"
+        },
+        {
+          "service": "NPCRelationshipService",
+          "impl": "NPCRelationshipService",
+          "kind": "self"
+        },
+        {
+          "service": "NPCAIService",
+          "impl": "NPCAIService",
+          "kind": "self"
+        },
+        {
+          "service": "NPCCombatAdapter",
+          "impl": "NPCCombatAdapter",
+          "kind": "self"
+        },
+        {
+          "service": "NPCQiRegenService",
+          "impl": "NPCQiRegenService",
+          "kind": "self"
+        },
+        {
+          "service": "NPCMovementService",
+          "impl": "NPCMovementService",
+          "kind": "self"
+        },
+        {
+          "service": "NPCVisualService",
+          "impl": "NPCVisualService",
+          "kind": "self"
+        },
+        {
+          "service": "AnimalService",
+          "impl": "AnimalService",
+          "kind": "self"
+        },
+        {
+          "service": "NPCSpawnCompositionService",
+          "impl": "NPCSpawnCompositionService",
+          "kind": "self"
+        },
+        {
+          "service": "NPCModule",
+          "impl": "NPCModule",
+          "kind": "self"
+        },
+        {
+          "service": "NPCConfig",
+          "impl": "NPCConfig",
+          "kind": "config"
+        }
+      ],
+      "requires": [
+        {
+          "service": "BodyEnhancementSystem",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "CorpseService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IAnimalService",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IBodyDataProvider",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IBodyFactory",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IBuffService",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IEquipmentDataProvider",
+          "via": [
+            "ctor",
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IEquipmentGenerator",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IItemGeneratorService",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "INPCGroupService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "INPCService",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "INPCSpawnerService",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IPlayerService",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IQiDataProvider",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ITechniqueGeneratorService",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ITileService",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ITimeService",
+          "via": [
+            "ctor",
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IWorldService",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "NPCAIService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "NPCAssemblyService",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "NPCCombatAdapter",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "NPCConfig",
+          "via": [
+            "ctor",
+            "inject"
+          ],
+          "kind": "config"
+        },
+        {
+          "service": "NPCMovementService",
+          "via": [
+            "ctor",
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "NPCNameGenerator",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "NPCQiRegenService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "NPCRelationshipService",
+          "via": [
+            "ctor",
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "NPCService",
+          "via": [
+            "ctor",
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "NPCSpawnCompositionService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "NPCSpawnerService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "NPCVisualService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "SoulGenerator",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "SpeciesRegistry",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        }
+      ]
+    },
+    {
+      "id": "Player",
+      "kind": "module",
+      "layer": "Modules",
+      "order": 10,
+      "description": "Игрок, ввод, техники, таргетинг",
+      "debug": false,
+      "files": 11,
+      "publishes": [
+        "AttackIntentEvent",
+        "AttackRejectedEvent",
+        "DefenseIntentEvent",
+        "HeldTechniqueChangedEvent",
+        "PlayerDeathEvent",
+        "PlayerMovedEvent",
+        "PlayerPositionChangedEvent",
+        "PlayerReviveEvent",
+        "PlayerTargetChangedEvent",
+        "QiAddRequestEvent",
+        "QiBufferActivateRequestEvent",
+        "StatChangedEvent",
+        "TechniqueCastResultEvent",
+        "TechniqueSlotAssignedEvent",
+        "TechniqueSlotClearedEvent"
+      ],
+      "subscribes": [
+        "AttackRejectedEvent",
+        "BodyCriticalEvent",
+        "CombatEndedEvent",
+        "DamageAppliedEvent",
+        "FormationActivatedEvent",
+        "MeditationStateChangedEvent",
+        "QiChangedEvent",
+        "SaveStartedEvent",
+        "TechniqueCastRequestedEvent",
+        "TechniqueChargeCompletedEvent",
+        "TechniqueForgottenEvent",
+        "TechniqueUsedEvent"
+      ],
+      "publishes_files": {
+        "AttackIntentEvent": [
+          "PlayerCombatAdapter.cs",
+          "PlayerTechniqueCaster.cs"
+        ],
+        "AttackRejectedEvent": [
+          "PlayerCombatAdapter.cs"
+        ],
+        "DefenseIntentEvent": [
+          "PlayerCombatAdapter.cs"
+        ],
+        "HeldTechniqueChangedEvent": [
+          "AuraHoldService.cs"
+        ],
+        "PlayerDeathEvent": [
+          "PlayerService.cs"
+        ],
+        "PlayerMovedEvent": [
+          "PlayerModule.cs"
+        ],
+        "PlayerPositionChangedEvent": [
+          "PlayerService.cs"
+        ],
+        "PlayerReviveEvent": [
+          "PlayerService.cs"
+        ],
+        "PlayerTargetChangedEvent": [
+          "TargetingService.cs"
+        ],
+        "QiAddRequestEvent": [
+          "AuraHoldService.cs"
+        ],
+        "QiBufferActivateRequestEvent": [
+          "PlayerTechniqueCaster.cs"
+        ],
+        "StatChangedEvent": [
+          "StatService.cs"
+        ],
+        "TechniqueCastResultEvent": [
+          "PlayerTechniqueCaster.cs"
+        ],
+        "TechniqueSlotAssignedEvent": [
+          "TechniqueSlotService.cs"
+        ],
+        "TechniqueSlotClearedEvent": [
+          "TechniqueSlotService.cs"
+        ]
+      },
+      "subscribes_files": {
+        "AttackRejectedEvent": [
+          "PlayerCombatAdapter.cs",
+          "PlayerTechniqueCaster.cs"
+        ],
+        "BodyCriticalEvent": [
+          "PlayerService.cs"
+        ],
+        "CombatEndedEvent": [
+          "PlayerCombatAdapter.cs"
+        ],
+        "DamageAppliedEvent": [
+          "StatProgressProducer.cs"
+        ],
+        "FormationActivatedEvent": [
+          "PlayerTechniqueCaster.cs"
+        ],
+        "MeditationStateChangedEvent": [
+          "StatProgressProducer.cs"
+        ],
+        "QiChangedEvent": [
+          "PlayerService.cs"
+        ],
+        "SaveStartedEvent": [
+          "AuraHoldService.cs"
+        ],
+        "TechniqueCastRequestedEvent": [
+          "PlayerTechniqueCaster.cs"
+        ],
+        "TechniqueChargeCompletedEvent": [
+          "PlayerTechniqueCaster.cs"
+        ],
+        "TechniqueForgottenEvent": [
+          "TechniqueSlotService.cs"
+        ],
+        "TechniqueUsedEvent": [
+          "StatProgressProducer.cs"
+        ]
+      },
+      "provides": [
+        {
+          "service": "IPlayerService",
+          "impl": "PlayerService",
+          "kind": "service"
+        },
+        {
+          "service": "IPlayerInputService",
+          "impl": "PlayerInputService",
+          "kind": "service"
+        },
+        {
+          "service": "ISaveable",
+          "impl": "TechniqueSlotService",
+          "kind": "service"
+        },
+        {
+          "service": "IStatService",
+          "impl": "StatService",
+          "kind": "service"
+        },
+        {
+          "service": "PlayerConfig",
+          "impl": "PlayerConfig",
+          "kind": "self"
+        },
+        {
+          "service": "PlayerService",
+          "impl": "PlayerService",
+          "kind": "self"
+        },
+        {
+          "service": "PlayerInputService",
+          "impl": "PlayerInputService",
+          "kind": "self"
+        },
+        {
+          "service": "StatService",
+          "impl": "StatService",
+          "kind": "self"
+        },
+        {
+          "service": "PlayerCombatAdapter",
+          "impl": "PlayerCombatAdapter",
+          "kind": "self"
+        },
+        {
+          "service": "TargetingService",
+          "impl": "TargetingService",
+          "kind": "self"
+        },
+        {
+          "service": "PlayerTechniqueCaster",
+          "impl": "PlayerTechniqueCaster",
+          "kind": "self"
+        },
+        {
+          "service": "StatProgressProducer",
+          "impl": "StatProgressProducer",
+          "kind": "self"
+        },
+        {
+          "service": "AuraHoldService",
+          "impl": "AuraHoldService",
+          "kind": "self"
+        },
+        {
+          "service": "PlayerModule",
+          "impl": "PlayerModule",
+          "kind": "self"
+        }
+      ],
+      "requires": [
+        {
+          "service": "AuraHoldService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IBodyService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IBuffService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IEquipmentDataProvider",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IFormationGeneratorService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IFormationService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "INPCService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IPlayerInputService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IPlayerService",
+          "via": [
+            "ctor",
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IStatProvider",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IStatService",
+          "via": [
+            "ctor",
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ITileService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ITimeService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "TechniqueChargeService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "TechniqueService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "TechniqueSlotService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        }
+      ]
+    },
+    {
+      "id": "Quest",
+      "kind": "module",
+      "layer": "Modules",
+      "order": 11,
+      "description": "Квесты, прогресс, награды",
+      "debug": false,
+      "files": 8,
+      "publishes": [
+        "ItemAddRequestEvent",
+        "QiAddRequestEvent",
+        "QuestAbandonedEvent",
+        "QuestCompletedEvent",
+        "QuestFailedEvent",
+        "QuestObjectiveUpdatedEvent",
+        "QuestRewardGrantedEvent",
+        "QuestStartedEvent",
+        "ToastShownEvent"
+      ],
+      "subscribes": [
+        "CultivationBreakthroughEvent",
+        "DayChangedEvent",
+        "EnemyKilledEvent",
+        "ItemAddedEvent",
+        "LocationChangedEvent",
+        "NPCInteractedEvent",
+        "QiChangedEvent",
+        "QuestCompletedEvent",
+        "QuestStartRequestedEvent"
+      ],
+      "publishes_files": {
+        "ItemAddRequestEvent": [
+          "QuestRewardService.cs"
+        ],
+        "QiAddRequestEvent": [
+          "QuestRewardService.cs"
+        ],
+        "QuestAbandonedEvent": [
+          "QuestService.cs"
+        ],
+        "QuestCompletedEvent": [
+          "QuestService.cs"
+        ],
+        "QuestFailedEvent": [
+          "QuestService.cs"
+        ],
+        "QuestObjectiveUpdatedEvent": [
+          "QuestService.cs"
+        ],
+        "QuestRewardGrantedEvent": [
+          "QuestRewardService.cs"
+        ],
+        "QuestStartedEvent": [
+          "QuestService.cs"
+        ],
+        "ToastShownEvent": [
+          "QuestRewardService.cs",
+          "QuestService.cs"
+        ]
+      },
+      "subscribes_files": {
+        "CultivationBreakthroughEvent": [
+          "QuestProgressTracker.cs"
+        ],
+        "DayChangedEvent": [
+          "QuestProgressTracker.cs"
+        ],
+        "EnemyKilledEvent": [
+          "QuestProgressTracker.cs"
+        ],
+        "ItemAddedEvent": [
+          "QuestProgressTracker.cs"
+        ],
+        "LocationChangedEvent": [
+          "QuestProgressTracker.cs"
+        ],
+        "NPCInteractedEvent": [
+          "QuestProgressTracker.cs"
+        ],
+        "QiChangedEvent": [
+          "QuestService.cs"
+        ],
+        "QuestCompletedEvent": [
+          "QuestRewardService.cs"
+        ],
+        "QuestStartRequestedEvent": [
+          "QuestService.cs"
+        ]
+      },
+      "provides": [
+        {
+          "service": "IQuestService",
+          "impl": "QuestService",
+          "kind": "service"
+        },
+        {
+          "service": "IQuestRewardService",
+          "impl": "QuestRewardService",
+          "kind": "service"
+        },
+        {
+          "service": "QuestConfig",
+          "impl": "QuestConfig",
+          "kind": "self"
+        },
+        {
+          "service": "QuestProgressTracker",
+          "impl": "QuestProgressTracker",
+          "kind": "self"
+        },
+        {
+          "service": "QuestService",
+          "impl": "QuestService",
+          "kind": "self"
+        },
+        {
+          "service": "QuestRewardService",
+          "impl": "QuestRewardService",
+          "kind": "self"
+        },
+        {
+          "service": "QuestModule",
+          "impl": "QuestModule",
+          "kind": "self"
+        }
+      ],
+      "requires": [
+        {
+          "service": "IQuestRewardService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IQuestService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "QuestConfig",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "QuestRewardService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "QuestService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        }
+      ]
+    },
+    {
+      "id": "Interaction",
+      "kind": "module",
+      "layer": "Modules",
+      "order": 12,
+      "description": "Взаимодействия, диалоги",
+      "debug": false,
+      "files": 9,
+      "publishes": [
+        "DialogueChoiceSelectedEvent",
+        "DialogueEndedEvent",
+        "DialogueStartedEvent",
+        "InteractionCompletedEvent",
+        "QuestStartRequestedEvent",
+        "TradeRequestedEvent",
+        "UIAdvanceDialogueRequestEvent",
+        "UISelectChoiceRequestEvent"
+      ],
+      "subscribes": [
+        "DialogueChoiceSelectedEvent",
+        "DialogueEndedEvent",
+        "DialogueStartedEvent",
+        "InteractionCompletedEvent",
+        "NPCInteractedEvent",
+        "PlayerPositionChangedEvent",
+        "UIAdvanceDialogueRequestEvent",
+        "UIInteractRequestEvent",
+        "UISelectChoiceRequestEvent"
+      ],
+      "publishes_files": {
+        "DialogueChoiceSelectedEvent": [
+          "DialogueService.cs"
+        ],
+        "DialogueEndedEvent": [
+          "DialogueService.cs"
+        ],
+        "DialogueStartedEvent": [
+          "DialogueService.cs"
+        ],
+        "InteractionCompletedEvent": [
+          "InteractionService.cs"
+        ],
+        "QuestStartRequestedEvent": [
+          "DialogueService.cs"
+        ],
+        "TradeRequestedEvent": [
+          "DialogueService.cs"
+        ],
+        "UIAdvanceDialogueRequestEvent": [
+          "DialoguePresenter.cs"
+        ],
+        "UISelectChoiceRequestEvent": [
+          "DialoguePresenter.cs"
+        ]
+      },
+      "subscribes_files": {
+        "DialogueChoiceSelectedEvent": [
+          "DialoguePresenter.cs"
+        ],
+        "DialogueEndedEvent": [
+          "DialoguePresenter.cs"
+        ],
+        "DialogueStartedEvent": [
+          "DialoguePresenter.cs"
+        ],
+        "InteractionCompletedEvent": [
+          "DialogueService.cs"
+        ],
+        "NPCInteractedEvent": [
+          "DialogueService.cs"
+        ],
+        "PlayerPositionChangedEvent": [
+          "InteractionService.cs"
+        ],
+        "UIAdvanceDialogueRequestEvent": [
+          "DialogueService.cs"
+        ],
+        "UIInteractRequestEvent": [
+          "InteractionService.cs"
+        ],
+        "UISelectChoiceRequestEvent": [
+          "DialogueService.cs"
+        ]
+      },
+      "provides": [
+        {
+          "service": "IInteractionService",
+          "impl": "InteractionService",
+          "kind": "service"
+        },
+        {
+          "service": "IDialogueService",
+          "impl": "DialogueService",
+          "kind": "service"
+        },
+        {
+          "service": "DialogueTypewriter",
+          "impl": "DialogueTypewriter",
+          "kind": "self"
+        },
+        {
+          "service": "InteractionModule",
+          "impl": "InteractionModule",
+          "kind": "self"
+        },
+        {
+          "service": "InteractionConfig",
+          "impl": "InteractionConfig",
+          "kind": "config"
+        }
+      ],
+      "requires": [
+        {
+          "service": "DialogueService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "DialogueTypewriter",
+          "via": [
+            "ctor",
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ITimeService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "InteractionConfig",
+          "via": [
+            "inject"
+          ],
+          "kind": "config"
+        },
+        {
+          "service": "InteractionService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        }
+      ]
+    },
+    {
+      "id": "Trade",
+      "kind": "module",
+      "layer": "Modules",
+      "order": 13,
+      "description": "Торговля, духовные камни",
+      "debug": false,
+      "files": 6,
+      "publishes": [
+        "CurrencyChangedEvent",
+        "TradeClosedEvent",
+        "TradeCompletedEvent",
+        "TradeFailedEvent",
+        "TradeOpenedEvent"
+      ],
+      "subscribes": [
+        "TradeRequestedEvent"
+      ],
+      "publishes_files": {
+        "CurrencyChangedEvent": [
+          "CurrencyService.cs"
+        ],
+        "TradeClosedEvent": [
+          "TradeService.cs"
+        ],
+        "TradeCompletedEvent": [
+          "TradeService.cs"
+        ],
+        "TradeFailedEvent": [
+          "TradeService.cs"
+        ],
+        "TradeOpenedEvent": [
+          "TradeService.cs"
+        ]
+      },
+      "subscribes_files": {
+        "TradeRequestedEvent": [
+          "TradeModule.cs"
+        ]
+      },
+      "provides": [
+        {
+          "service": "ICurrencyService",
+          "impl": "CurrencyService",
+          "kind": "service"
+        },
+        {
+          "service": "ITradeService",
+          "impl": "TradeService",
+          "kind": "service"
+        },
+        {
+          "service": "ICurrencyExchangeService",
+          "impl": "CurrencyExchangeService",
+          "kind": "service"
+        },
+        {
+          "service": "TradeModule",
+          "impl": "TradeModule",
+          "kind": "self"
+        },
+        {
+          "service": "TradeConfig",
+          "impl": "TradeConfig",
+          "kind": "config"
+        }
+      ],
+      "requires": [
+        {
+          "service": "ICurrencyService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IEquipmentGenerator",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IInventoryService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IItemDatabaseService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IItemGeneratorService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "INPCService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ITradeService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "TradeConfig",
+          "via": [
+            "inject"
+          ],
+          "kind": "config"
+        }
+      ]
+    },
+    {
+      "id": "UI",
+      "kind": "module",
+      "layer": "Modules",
+      "order": 14,
+      "description": "HUD, тосты, модалки (engine-agnostic слой)",
+      "debug": false,
+      "files": 5,
+      "publishes": [
+        "GamePausedEvent",
+        "GameResumedEvent",
+        "GameStateChangedEvent",
+        "ModalShownEvent",
+        "ToastShownEvent"
+      ],
+      "subscribes": [
+        "GameStateChangedEvent",
+        "InputActionEvent",
+        "InputKeyEvent",
+        "ToastShownEvent",
+        "UIPauseRequestEvent",
+        "UIResumeRequestEvent",
+        "UIStateChangeRequestEvent"
+      ],
+      "publishes_files": {
+        "GamePausedEvent": [
+          "UIService.cs"
+        ],
+        "GameResumedEvent": [
+          "UIService.cs"
+        ],
+        "GameStateChangedEvent": [
+          "UIService.cs"
+        ],
+        "ModalShownEvent": [
+          "UIService.cs"
+        ],
+        "ToastShownEvent": [
+          "UIService.cs"
+        ]
+      },
+      "subscribes_files": {
+        "GameStateChangedEvent": [
+          "UIService.cs"
+        ],
+        "InputActionEvent": [
+          "InputLogService.cs"
+        ],
+        "InputKeyEvent": [
+          "InputLogService.cs"
+        ],
+        "ToastShownEvent": [
+          "ToastService.cs"
+        ],
+        "UIPauseRequestEvent": [
+          "UIService.cs"
+        ],
+        "UIResumeRequestEvent": [
+          "UIService.cs"
+        ],
+        "UIStateChangeRequestEvent": [
+          "UIService.cs"
+        ]
+      },
+      "provides": [
+        {
+          "service": "IUIService",
+          "impl": "UIService",
+          "kind": "service"
+        },
+        {
+          "service": "IInputLogService",
+          "impl": "InputLogService",
+          "kind": "service"
+        },
+        {
+          "service": "UIConfig",
+          "impl": "UIConfig",
+          "kind": "self"
+        },
+        {
+          "service": "UIService",
+          "impl": "UIService",
+          "kind": "self"
+        },
+        {
+          "service": "ToastService",
+          "impl": "ToastService",
+          "kind": "self"
+        },
+        {
+          "service": "InputLogService",
+          "impl": "InputLogService",
+          "kind": "self"
+        },
+        {
+          "service": "UIModule",
+          "impl": "UIModule",
+          "kind": "self"
+        }
+      ],
+      "requires": [
+        {
+          "service": "ITimeService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IUIService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "InputLogService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ToastService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "UIService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        }
+      ]
+    },
+    {
+      "id": "Charger",
+      "kind": "module",
+      "layer": "Modules",
+      "order": 15,
+      "description": "Зарядники Ци: слоты, буфер, тепло",
+      "debug": false,
+      "files": 8,
+      "publishes": [
+        "ChargerBufferChangedEvent",
+        "ChargerCooledDownEvent",
+        "ChargerHeatChangedEvent",
+        "ChargerOverheatedEvent",
+        "ChargerStateChangedEvent",
+        "FormationContributeQiRequestEvent",
+        "QiAddRequestEvent",
+        "QiConsumeRequestEvent",
+        "ToastShownEvent"
+      ],
+      "subscribes": [
+        "EquipmentChangedEvent",
+        "QiChangedEvent"
+      ],
+      "publishes_files": {
+        "ChargerBufferChangedEvent": [
+          "ChargerBuffer.cs"
+        ],
+        "ChargerCooledDownEvent": [
+          "ChargerHeat.cs"
+        ],
+        "ChargerHeatChangedEvent": [
+          "ChargerHeat.cs"
+        ],
+        "ChargerOverheatedEvent": [
+          "ChargerHeat.cs"
+        ],
+        "ChargerStateChangedEvent": [
+          "ChargerService.cs"
+        ],
+        "FormationContributeQiRequestEvent": [
+          "ChargerService.cs"
+        ],
+        "QiAddRequestEvent": [
+          "ChargerService.cs"
+        ],
+        "QiConsumeRequestEvent": [
+          "ChargerService.cs"
+        ],
+        "ToastShownEvent": [
+          "ChargerItemBridge.cs"
+        ]
+      },
+      "subscribes_files": {
+        "EquipmentChangedEvent": [
+          "ChargerItemBridge.cs"
+        ],
+        "QiChangedEvent": [
+          "ChargerService.cs"
+        ]
+      },
+      "provides": [
+        {
+          "service": "IChargerService",
+          "impl": "ChargerService",
+          "kind": "service"
+        },
+        {
+          "service": "ISaveable",
+          "impl": "ChargerService",
+          "kind": "service"
+        },
+        {
+          "service": "ChargerModule",
+          "impl": "ChargerModule",
+          "kind": "self"
+        },
+        {
+          "service": "ChargerItemBridge",
+          "impl": "ChargerItemBridge",
+          "kind": "self"
+        },
+        {
+          "service": "ChargerBufferConfig",
+          "impl": "ChargerBufferConfig",
+          "kind": "config"
+        },
+        {
+          "service": "List<ChargerSlotConfig>",
+          "impl": "List<ChargerSlotConfig>",
+          "kind": "instance"
+        }
+      ],
+      "requires": [
+        {
+          "service": "ChargerBufferConfig",
+          "via": [
+            "inject"
+          ],
+          "kind": "config"
+        },
+        {
+          "service": "ChargerItemBridge",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ChargerService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IChargerService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IEquipmentService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IInventoryService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IItemDatabaseService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ITimeService",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "List<ChargerSlotConfig>",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        }
+      ]
+    },
+    {
+      "id": "Save",
+      "kind": "module",
+      "layer": "Modules",
+      "order": 16,
+      "description": "Сохранения, агрегация ISaveable",
+      "debug": false,
+      "files": 6,
+      "publishes": [
+        "LoadCompletedEvent",
+        "SaveCompletedEvent",
+        "SaveStartedEvent"
+      ],
+      "subscribes": [
+        "LoadRequestedEvent",
+        "SaveRequestedEvent"
+      ],
+      "publishes_files": {
+        "LoadCompletedEvent": [
+          "SaveModule.cs"
+        ],
+        "SaveCompletedEvent": [
+          "SaveModule.cs"
+        ],
+        "SaveStartedEvent": [
+          "SaveService.cs"
+        ]
+      },
+      "subscribes_files": {
+        "LoadRequestedEvent": [
+          "SaveModule.cs"
+        ],
+        "SaveRequestedEvent": [
+          "SaveModule.cs"
+        ]
+      },
+      "provides": [
+        {
+          "service": "ISaveFileHandler",
+          "impl": "SaveFileHandler",
+          "kind": "service"
+        },
+        {
+          "service": "ISaveService",
+          "impl": "SaveService",
+          "kind": "service"
+        },
+        {
+          "service": "ISaveable",
+          "impl": "SaveService",
+          "kind": "service"
+        },
+        {
+          "service": "IWorldResettable",
+          "impl": "SaveModule",
+          "kind": "service"
+        },
+        {
+          "service": "SaveConfig",
+          "impl": "SaveConfig",
+          "kind": "self"
+        },
+        {
+          "service": "SaveFileHandler",
+          "impl": "SaveFileHandler",
+          "kind": "self"
+        },
+        {
+          "service": "SaveDataAggregator",
+          "impl": "SaveDataAggregator",
+          "kind": "self"
+        },
+        {
+          "service": "SaveService",
+          "impl": "SaveService",
+          "kind": "self"
+        },
+        {
+          "service": "SaveModule",
+          "impl": "SaveModule",
+          "kind": "self"
+        }
+      ],
+      "requires": [
+        {
+          "service": "IGameSession",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IResolver",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ISaveFileHandler",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ISaveService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ISaveable",
+          "via": [
+            "resolve-all"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ITimeService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "SaveConfig",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "SaveDataAggregator",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        }
+      ]
+    },
+    {
+      "id": "Generator",
+      "kind": "module",
+      "layer": "Modules",
+      "order": 17,
+      "description": "Генерация предметов/техник/формаций",
+      "debug": false,
+      "files": 13,
+      "publishes": [],
+      "subscribes": [],
+      "publishes_files": {},
+      "subscribes_files": {},
+      "provides": [
+        {
+          "service": "IItemDatabaseService",
+          "impl": "ItemDatabaseService",
+          "kind": "service"
+        },
+        {
+          "service": "IItemGeneratorService",
+          "impl": "ItemGeneratorService",
+          "kind": "service"
+        },
+        {
+          "service": "IEquipmentGenerator",
+          "impl": "EquipmentGenerator",
+          "kind": "service"
+        },
+        {
+          "service": "ITechniqueGeneratorService",
+          "impl": "TechniqueGeneratorService",
+          "kind": "service"
+        },
+        {
+          "service": "IFormationGeneratorService",
+          "impl": "FormationGeneratorService",
+          "kind": "service"
+        },
+        {
+          "service": "IVerificationService",
+          "impl": "VerificationService",
+          "kind": "service"
+        },
+        {
+          "service": "TechniqueRegistry",
+          "impl": "TechniqueRegistry",
+          "kind": "self"
+        },
+        {
+          "service": "DeduplicationService",
+          "impl": "DeduplicationService",
+          "kind": "self"
+        },
+        {
+          "service": "GeneratorModule",
+          "impl": "GeneratorModule",
+          "kind": "self"
+        }
+      ],
+      "requires": [
+        {
+          "service": "FormationRegistry",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IEquipmentGenerator",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IItemDatabaseService",
+          "via": [
+            "ctor",
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IItemGeneratorService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ITechniqueGeneratorService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "TechniqueRegistry",
+          "via": [
+            "ctor"
+          ],
+          "kind": "service"
+        }
+      ]
+    },
+    {
+      "id": "Entry",
+      "kind": "entry",
+      "layer": "Entry",
+      "order": 117,
+      "description": "GameSession, SceneOrchestrator, фазы сборки",
+      "debug": false,
+      "files": 24,
+      "publishes": [
+        "GamePausedEvent",
+        "GameResumedEvent",
+        "SceneAssemblyFailedEvent",
+        "SceneInitializingEvent",
+        "ScenePhaseCompletedEvent",
+        "ScenePhaseStartedEvent",
+        "SceneReadyEvent",
+        "ToastShownEvent"
+      ],
+      "subscribes": [],
+      "publishes_files": {
+        "GamePausedEvent": [
+          "GameSession.cs"
+        ],
+        "GameResumedEvent": [
+          "GameSession.cs"
+        ],
+        "SceneAssemblyFailedEvent": [
+          "SceneOrchestrator.cs"
+        ],
+        "SceneInitializingEvent": [
+          "SceneOrchestrator.cs"
+        ],
+        "ScenePhaseCompletedEvent": [
+          "SceneOrchestrator.cs"
+        ],
+        "ScenePhaseStartedEvent": [
+          "SceneOrchestrator.cs"
+        ],
+        "SceneReadyEvent": [
+          "SceneOrchestrator.cs"
+        ],
+        "ToastShownEvent": [
+          "GameSession.cs"
+        ]
+      },
+      "subscribes_files": {},
+      "provides": [
+        {
+          "service": "IGameSession",
+          "impl": "GameSession",
+          "kind": "service"
+        },
+        {
+          "service": "GameEntryPoint",
+          "impl": "GameEntryPoint",
+          "kind": "self"
+        },
+        {
+          "service": "EventBus",
+          "impl": "EventBus",
+          "kind": "instance",
+          "note": "сама шина событий (хаб)"
+        },
+        {
+          "service": "SceneOrchestrator",
+          "impl": "SceneOrchestrator",
+          "kind": "self"
+        },
+        {
+          "service": "WorldDomainResetPhase",
+          "impl": "WorldDomainResetPhase",
+          "kind": "self"
+        },
+        {
+          "service": "CoreValidationPhase",
+          "impl": "CoreValidationPhase",
+          "kind": "self"
+        },
+        {
+          "service": "TileMapGenPhase",
+          "impl": "TileMapGenPhase",
+          "kind": "self"
+        },
+        {
+          "service": "WorldInitPhase",
+          "impl": "WorldInitPhase",
+          "kind": "self"
+        },
+        {
+          "service": "PlayerSpawnPhase",
+          "impl": "PlayerSpawnPhase",
+          "kind": "self"
+        },
+        {
+          "service": "StartingGearPhase",
+          "impl": "StartingGearPhase",
+          "kind": "self"
+        },
+        {
+          "service": "TechniqueGrantPhase",
+          "impl": "TechniqueGrantPhase",
+          "kind": "self"
+        },
+        {
+          "service": "PreGenTechniquePhase",
+          "impl": "PreGenTechniquePhase",
+          "kind": "self"
+        },
+        {
+          "service": "AnimalSpawnPhase",
+          "impl": "AnimalSpawnPhase",
+          "kind": "self"
+        },
+        {
+          "service": "HumanNPCSpawnPhase",
+          "impl": "HumanNPCSpawnPhase",
+          "kind": "self"
+        },
+        {
+          "service": "GroupSpawnPhase",
+          "impl": "GroupSpawnPhase",
+          "kind": "self"
+        },
+        {
+          "service": "FormationInitPhase",
+          "impl": "FormationInitPhase",
+          "kind": "self"
+        },
+        {
+          "service": "ChargerInitPhase",
+          "impl": "ChargerInitPhase",
+          "kind": "self"
+        },
+        {
+          "service": "QuestInitPhase",
+          "impl": "QuestInitPhase",
+          "kind": "self"
+        },
+        {
+          "service": "UIInitPhase",
+          "impl": "UIInitPhase",
+          "kind": "self"
+        },
+        {
+          "service": "FinalizePhase",
+          "impl": "FinalizePhase",
+          "kind": "self"
+        }
+      ],
+      "requires": [
+        {
+          "service": "AnimalService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "DeduplicationService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "DialogueService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IEquipmentGenerator",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IEquipmentService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IFormationGeneratorService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IFormationService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IGameSession",
+          "via": [
+            "inject",
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IInventoryService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IItemDatabaseService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "INPCGroupService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "INPCSpawnerService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IPlayerService",
+          "via": [
+            "inject",
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IPostLoadSync",
+          "via": [
+            "resolve-all"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IQiService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IResolver",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ISaveService",
+          "via": [
+            "inject",
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ISceneAssemblyPhase",
+          "via": [
+            "resolve-all"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IStartable",
+          "via": [
+            "resolve-all"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ITechniqueGeneratorService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ITickable",
+          "via": [
+            "resolve-all"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ITileService",
+          "via": [
+            "inject",
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ITimeService",
+          "via": [
+            "inject",
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IUIService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IVerificationService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IWorldResettable",
+          "via": [
+            "resolve-all"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IWorldService",
+          "via": [
+            "inject",
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "NPCNameGenerator",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "NPCSpawnCompositionService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "SceneOrchestrator",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "TechniqueRegistry",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "TechniqueService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "WorldService",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        }
+      ]
+    },
+    {
+      "id": "Adapter.UI",
+      "kind": "adapter",
+      "layer": "Adapter",
+      "order": 118,
+      "description": "Godot-окна: инвентарь, персонаж, торговля…",
+      "debug": false,
+      "files": 25,
+      "publishes": [
+        "MeditationToggleRequestedEvent",
+        "TechniqueCastRequestedEvent",
+        "TechniqueSlotAssignedEvent",
+        "TechniqueSlotClearedEvent",
+        "ToastShownEvent"
+      ],
+      "subscribes": [
+        "BeltSlotsChangedEvent",
+        "BodyPartDamagedEvent",
+        "BodyPartHealedEvent",
+        "BodyPartSeveredEvent",
+        "ChargerBufferChangedEvent",
+        "ChargerHeatChangedEvent",
+        "ChargerStateChangedEvent",
+        "CombatEndedEvent",
+        "CombatStartedEvent",
+        "CorpseCreatedEvent",
+        "CorpseLootedEvent",
+        "CultivationLevelChangedEvent",
+        "CultivationWindowToggleRequestedEvent",
+        "CurrencyChangedEvent",
+        "DamageAppliedEvent",
+        "EnemyKilledEvent",
+        "EquipmentChangedEvent",
+        "HeldTechniqueChangedEvent",
+        "ItemAddedEvent",
+        "ItemPickedUpEvent",
+        "MeditationStateChangedEvent",
+        "NPCDeathEvent",
+        "PlayerReviveEvent",
+        "QiChangedEvent",
+        "ResourceHarvestedEvent",
+        "TechniqueChargeCancelledEvent",
+        "TechniqueChargeCompletedEvent",
+        "TechniqueChargeProgressEvent",
+        "TechniqueChargeStartedEvent",
+        "TechniqueForgottenEvent",
+        "TechniqueLearnedEvent",
+        "TechniqueSelectionChangedEvent",
+        "TechniqueSlotAssignedEvent",
+        "TechniqueSlotClearedEvent",
+        "TradeClosedEvent",
+        "TradeCompletedEvent",
+        "TradeFailedEvent",
+        "TradeOpenedEvent"
+      ],
+      "publishes_files": {
+        "MeditationToggleRequestedEvent": [
+          "HotbarPanel.cs"
+        ],
+        "TechniqueCastRequestedEvent": [
+          "HotbarPanel.cs"
+        ],
+        "TechniqueSlotAssignedEvent": [],
+        "TechniqueSlotClearedEvent": [],
+        "ToastShownEvent": [
+          "CheatPanel.cs",
+          "CultivationWindow.cs",
+          "InventoryWindow.cs",
+          "LootWindow.cs",
+          "TechniqueBookWindow.cs",
+          "TradeWindow.cs"
+        ]
+      },
+      "subscribes_files": {
+        "BeltSlotsChangedEvent": [
+          "BeltSlotRow.cs",
+          "HotbarPanel.cs"
+        ],
+        "BodyPartDamagedEvent": [
+          "BodyStatusPanel.cs"
+        ],
+        "BodyPartHealedEvent": [
+          "BodyStatusPanel.cs"
+        ],
+        "BodyPartSeveredEvent": [
+          "BodyStatusPanel.cs"
+        ],
+        "ChargerBufferChangedEvent": [
+          "ChargerWindow.cs"
+        ],
+        "ChargerHeatChangedEvent": [
+          "ChargerWindow.cs"
+        ],
+        "ChargerStateChangedEvent": [
+          "ChargerWindow.cs"
+        ],
+        "CombatEndedEvent": [
+          "EventLogWindow.cs"
+        ],
+        "CombatStartedEvent": [
+          "EventLogWindow.cs"
+        ],
+        "CorpseCreatedEvent": [
+          "EventLogWindow.cs"
+        ],
+        "CorpseLootedEvent": [
+          "EventLogWindow.cs",
+          "LootWindow.cs"
+        ],
+        "CultivationLevelChangedEvent": [
+          "EventLogWindow.cs"
+        ],
+        "CultivationWindowToggleRequestedEvent": [
+          "CultivationWindow.cs"
+        ],
+        "CurrencyChangedEvent": [
+          "TradeWindow.cs"
+        ],
+        "DamageAppliedEvent": [
+          "DeathScreenOverlay.cs",
+          "EventLogWindow.cs"
+        ],
+        "EnemyKilledEvent": [
+          "EventLogWindow.cs"
+        ],
+        "EquipmentChangedEvent": [
+          "BeltSlotRow.cs",
+          "ChargerWindow.cs",
+          "HotbarPanel.cs"
+        ],
+        "HeldTechniqueChangedEvent": [
+          "HotbarPanel.cs"
+        ],
+        "ItemAddedEvent": [
+          "LootWindow.cs"
+        ],
+        "ItemPickedUpEvent": [
+          "EventLogWindow.cs"
+        ],
+        "MeditationStateChangedEvent": [
+          "HotbarPanel.cs"
+        ],
+        "NPCDeathEvent": [
+          "EventLogWindow.cs"
+        ],
+        "PlayerReviveEvent": [
+          "DeathScreenOverlay.cs"
+        ],
+        "QiChangedEvent": [
+          "CultivationWindow.cs",
+          "TechniqueBookWindow.cs"
+        ],
+        "ResourceHarvestedEvent": [
+          "EventLogWindow.cs"
+        ],
+        "TechniqueChargeCancelledEvent": [
+          "HotbarPanel.cs"
+        ],
+        "TechniqueChargeCompletedEvent": [
+          "HotbarPanel.cs"
+        ],
+        "TechniqueChargeProgressEvent": [
+          "HotbarPanel.cs"
+        ],
+        "TechniqueChargeStartedEvent": [
+          "HotbarPanel.cs"
+        ],
+        "TechniqueForgottenEvent": [
+          "TechniqueBookWindow.cs"
+        ],
+        "TechniqueLearnedEvent": [
+          "HotbarPanel.cs",
+          "TechniqueBookWindow.cs"
+        ],
+        "TechniqueSelectionChangedEvent": [
+          "TechniqueBookWindow.cs"
+        ],
+        "TechniqueSlotAssignedEvent": [
+          "CultivationWindow.cs",
+          "HotbarPanel.cs",
+          "TechniqueBookWindow.cs"
+        ],
+        "TechniqueSlotClearedEvent": [
+          "CultivationWindow.cs",
+          "HotbarPanel.cs",
+          "TechniqueBookWindow.cs"
+        ],
+        "TradeClosedEvent": [
+          "TradeWindow.cs"
+        ],
+        "TradeCompletedEvent": [
+          "TradeWindow.cs"
+        ],
+        "TradeFailedEvent": [
+          "TradeWindow.cs"
+        ],
+        "TradeOpenedEvent": [
+          "TradeWindow.cs"
+        ]
+      },
+      "provides": [],
+      "requires": [
+        {
+          "service": "BeltService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ChargerItemBridge",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "DeduplicationService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "DialogueService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "FormationConfig",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IBodyService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IChargerService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ICorpseService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ICurrencyService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IEquipmentGenerator",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IEquipmentService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IFormationGeneratorService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IFormationService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IGameSession",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IGroundItemService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IInventoryService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IItemDatabaseService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IItemGeneratorService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IItemUseService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "INPCService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IPlayerService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IQiService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ISaveService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ITechniqueGeneratorService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ITimeService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ITradeService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IVerificationService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "NPCSpawnerService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "PlayerCombatAdapter",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "TechniqueRegistry",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "TechniqueService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "TechniqueSlotService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        }
+      ]
+    },
+    {
+      "id": "Adapter.Scene",
+      "kind": "adapter",
+      "layer": "Adapter",
+      "order": 119,
+      "description": "Godot-сцена: GameBoot, рендеры, контроллер",
+      "debug": false,
+      "files": 27,
+      "publishes": [
+        "MeditationToggleRequestedEvent",
+        "TechniqueCastRequestedEvent",
+        "ToastShownEvent"
+      ],
+      "subscribes": [
+        "AoeImpactEvent",
+        "AttackIntentEvent",
+        "AttackRejectedEvent",
+        "CorpseRemovedEvent",
+        "DamageAppliedEvent",
+        "DamageTraceEvent",
+        "DefenseIntentEvent",
+        "DialogueEndedEvent",
+        "EquipmentBlockedEvent",
+        "EquipmentChangedEvent",
+        "FormationActivatedEvent",
+        "FormationQiPoolChangedEvent",
+        "FormationStageChangedEvent",
+        "HeldTechniqueChangedEvent",
+        "ItemDroppedEvent",
+        "ItemPickedUpEvent",
+        "MeditationStateChangedEvent",
+        "NPCDeathEvent",
+        "PlayerDeathEvent",
+        "PlayerTargetChangedEvent",
+        "ProjectileSpawnedEvent",
+        "QiBufferStateChangedEvent",
+        "TechniqueCastResultEvent",
+        "ToastShownEvent",
+        "TradeClosedEvent",
+        "TradeOpenedEvent"
+      ],
+      "publishes_files": {
+        "MeditationToggleRequestedEvent": [
+          "GameWorldController.cs"
+        ],
+        "TechniqueCastRequestedEvent": [
+          "GameWorldController.cs"
+        ],
+        "ToastShownEvent": [
+          "GameWorldController.cs"
+        ]
+      },
+      "subscribes_files": {
+        "AoeImpactEvent": [
+          "AoeFxRenderer.cs"
+        ],
+        "AttackIntentEvent": [
+          "GameWorldController.cs",
+          "NPCSpriteRenderer.cs",
+          "StrikeFxRenderer.cs"
+        ],
+        "AttackRejectedEvent": [
+          "GameWorldController.cs"
+        ],
+        "CorpseRemovedEvent": [
+          "GameWorldController.cs"
+        ],
+        "DamageAppliedEvent": [
+          "DamageNumberRenderer.cs",
+          "GameWorldController.cs",
+          "ProjectileRenderer.cs",
+          "StrikeFxRenderer.cs"
+        ],
+        "DamageTraceEvent": [
+          "GameWorldController.cs"
+        ],
+        "DefenseIntentEvent": [
+          "GameWorldController.cs"
+        ],
+        "DialogueEndedEvent": [
+          "GameWorldController.cs"
+        ],
+        "EquipmentBlockedEvent": [
+          "GameWorldController.cs"
+        ],
+        "EquipmentChangedEvent": [
+          "GameWorldController.cs"
+        ],
+        "FormationActivatedEvent": [
+          "FormationVisualRenderer.cs",
+          "GameWorldController.cs"
+        ],
+        "FormationQiPoolChangedEvent": [
+          "FormationVisualRenderer.cs"
+        ],
+        "FormationStageChangedEvent": [
+          "FormationVisualRenderer.cs",
+          "GameWorldController.cs"
+        ],
+        "HeldTechniqueChangedEvent": [
+          "TechniqueEffectRenderer.cs"
+        ],
+        "ItemDroppedEvent": [
+          "GroundItemRenderer.cs"
+        ],
+        "ItemPickedUpEvent": [
+          "GroundItemRenderer.cs"
+        ],
+        "MeditationStateChangedEvent": [
+          "GameWorldController.cs",
+          "TechniqueEffectRenderer.cs"
+        ],
+        "NPCDeathEvent": [
+          "GameWorldController.cs"
+        ],
+        "PlayerDeathEvent": [
+          "GameWorldController.cs"
+        ],
+        "PlayerTargetChangedEvent": [
+          "AnimalSpriteRenderer.cs",
+          "NPCSpriteRenderer.cs"
+        ],
+        "ProjectileSpawnedEvent": [
+          "HomingProjectileRenderer.cs"
+        ],
+        "QiBufferStateChangedEvent": [
+          "TechniqueEffectRenderer.cs"
+        ],
+        "TechniqueCastResultEvent": [
+          "GameWorldController.cs",
+          "TechniqueEffectRenderer.cs"
+        ],
+        "ToastShownEvent": [
+          "GameWorldController.cs"
+        ],
+        "TradeClosedEvent": [
+          "GameWorldController.cs"
+        ],
+        "TradeOpenedEvent": [
+          "GameWorldController.cs"
+        ]
+      },
+      "provides": [
+        {
+          "service": "ISaveFileHandler",
+          "impl": "ISaveFileHandler",
+          "kind": "instance"
+        },
+        {
+          "service": "SaveFileHandler",
+          "impl": "SaveFileHandler",
+          "kind": "instance"
+        }
+      ],
+      "requires": [
+        {
+          "service": "BeltService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "DialogueService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "FormationService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "GameEntryPoint",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IBodyService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ICorpseService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IEquipmentService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IGameSession",
+          "via": [
+            "inject",
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IGroundItemService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IInventoryService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IItemDatabaseService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "INPCService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IPlayerInputService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IPlayerService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IQiService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ISaveService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ITileService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ITimeService",
+          "via": [
+            "inject",
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "PlayerCombatAdapter",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "PlayerTechniqueCaster",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "TechniqueService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "TechniqueSlotService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        }
+      ]
+    },
+    {
+      "id": "Adapter.Scene.Debug",
+      "kind": "adapter",
+      "layer": "Adapter",
+      "order": 120,
+      "description": "QA-харнессы (*SimDebug) — вне продакшн-потребления",
+      "debug": true,
+      "files": 31,
+      "publishes": [
+        "AttackIntentEvent",
+        "Audit1020MsgA",
+        "Audit1020MsgB",
+        "BuffTickedEvent",
+        "CraftCompletedEvent",
+        "DamageAppliedEvent",
+        "DefenseIntentEvent",
+        "EnemyKilledEvent",
+        "ItemAddedEvent",
+        "MeditationStateChangedEvent",
+        "NPCDeathEvent",
+        "OtherMsg",
+        "PingMsg",
+        "QiChangedEvent",
+        "TechniqueCastRequestedEvent",
+        "TechniqueUsedEvent",
+        "ToastShownEvent",
+        "TradeClosedEvent",
+        "TradeOpenedEvent"
+      ],
+      "subscribes": [
+        "AoeImpactEvent",
+        "AttackIntentEvent",
+        "AttackRejectedEvent",
+        "Audit1020MsgA",
+        "Audit1020MsgB",
+        "BootProbeMsg",
+        "CombatDisengageEvent",
+        "CombatEndedEvent",
+        "CombatStartedEvent",
+        "DamageAppliedEvent",
+        "DayChangedEvent",
+        "EquipmentBlockedEvent",
+        "HeldTechniqueChangedEvent",
+        "ItemDroppedEvent",
+        "MonthChangedEvent",
+        "NPCDeathEvent",
+        "OtherMsg",
+        "PingMsg",
+        "PlayerTargetChangedEvent",
+        "ProjectileSpawnedEvent",
+        "SaveCompletedEvent",
+        "TechniqueCastResultEvent",
+        "TechniqueChargeCancelledEvent",
+        "TechniqueChargeCompletedEvent",
+        "TechniqueChargeProgressEvent",
+        "TechniqueChargeStartedEvent",
+        "TechniqueSlotAssignedEvent",
+        "TileChangedEvent",
+        "TimeChangedEvent",
+        "YearChangedEvent"
+      ],
+      "publishes_files": {
+        "AttackIntentEvent": [
+          "AnimalCombatSimDebug.cs",
+          "CombatAISimDebug.cs",
+          "CombatSimDebug.cs"
+        ],
+        "Audit1020MsgA": [
+          "Audit0922SimDebug.cs"
+        ],
+        "Audit1020MsgB": [
+          "Audit0922SimDebug.cs"
+        ],
+        "BuffTickedEvent": [
+          "DotSimDebug.cs"
+        ],
+        "CraftCompletedEvent": [
+          "StorageSimDebug.cs"
+        ],
+        "DamageAppliedEvent": [
+          "AnimalCombatSimDebug.cs",
+          "Audit0922SimDebug.cs",
+          "CombatSimDebug.cs",
+          "RespawnSimDebug.cs"
+        ],
+        "DefenseIntentEvent": [
+          "CombatAISimDebug.cs"
+        ],
+        "EnemyKilledEvent": [
+          "QuestSimDebug.cs"
+        ],
+        "ItemAddedEvent": [
+          "QuestSimDebug.cs"
+        ],
+        "MeditationStateChangedEvent": [
+          "Audit0922SimDebug.cs"
+        ],
+        "NPCDeathEvent": [
+          "KillFeedSimDebug.cs",
+          "LootSimDebug.cs",
+          "ReAssemblySimDebug.cs"
+        ],
+        "OtherMsg": [
+          "Audit0922SimDebug.cs"
+        ],
+        "PingMsg": [
+          "Audit0922SimDebug.cs"
+        ],
+        "QiChangedEvent": [
+          "DotSimDebug.cs"
+        ],
+        "TechniqueCastRequestedEvent": [
+          "ChargeSimDebug.cs",
+          "CombatSimDebug.cs"
+        ],
+        "TechniqueUsedEvent": [
+          "Audit0922SimDebug.cs"
+        ],
+        "ToastShownEvent": [
+          "ToastSimDebug.cs"
+        ],
+        "TradeClosedEvent": [
+          "ModalSimDebug.cs"
+        ],
+        "TradeOpenedEvent": [
+          "ModalSimDebug.cs"
+        ]
+      },
+      "subscribes_files": {
+        "AoeImpactEvent": [
+          "CombatSimDebug.cs"
+        ],
+        "AttackIntentEvent": [
+          "ChargeSimDebug.cs",
+          "CombatSimDebug.cs"
+        ],
+        "AttackRejectedEvent": [
+          "CombatSimDebug.cs"
+        ],
+        "Audit1020MsgA": [
+          "Audit0922SimDebug.cs"
+        ],
+        "Audit1020MsgB": [
+          "Audit0922SimDebug.cs"
+        ],
+        "BootProbeMsg": [
+          "Audit0922SimDebug.cs"
+        ],
+        "CombatDisengageEvent": [
+          "CombatAISimDebug.cs"
+        ],
+        "CombatEndedEvent": [
+          "AnimalCombatSimDebug.cs"
+        ],
+        "CombatStartedEvent": [
+          "AnimalCombatSimDebug.cs",
+          "CombatAISimDebug.cs"
+        ],
+        "DamageAppliedEvent": [
+          "AnimalCombatSimDebug.cs",
+          "ChargeSimDebug.cs",
+          "CombatAISimDebug.cs",
+          "CombatSimDebug.cs",
+          "DotSimDebug.cs"
+        ],
+        "DayChangedEvent": [
+          "Audit0922SimDebug.cs"
+        ],
+        "EquipmentBlockedEvent": [
+          "CheatEquipSimDebug.cs"
+        ],
+        "HeldTechniqueChangedEvent": [
+          "ChargeSimDebug.cs"
+        ],
+        "ItemDroppedEvent": [
+          "StorageSimDebug.cs",
+          "TrashDropSimDebug.cs"
+        ],
+        "MonthChangedEvent": [
+          "Audit0922SimDebug.cs"
+        ],
+        "NPCDeathEvent": [
+          "L500SimDebug.cs"
+        ],
+        "OtherMsg": [
+          "Audit0922SimDebug.cs"
+        ],
+        "PingMsg": [
+          "Audit0922SimDebug.cs"
+        ],
+        "PlayerTargetChangedEvent": [
+          "CombatSimDebug.cs"
+        ],
+        "ProjectileSpawnedEvent": [
+          "CombatSimDebug.cs"
+        ],
+        "SaveCompletedEvent": [
+          "SaveLoadSimDebug.cs"
+        ],
+        "TechniqueCastResultEvent": [
+          "CombatSimDebug.cs"
+        ],
+        "TechniqueChargeCancelledEvent": [
+          "ChargeSimDebug.cs"
+        ],
+        "TechniqueChargeCompletedEvent": [
+          "ChargeSimDebug.cs"
+        ],
+        "TechniqueChargeProgressEvent": [
+          "ChargeSimDebug.cs"
+        ],
+        "TechniqueChargeStartedEvent": [
+          "ChargeSimDebug.cs"
+        ],
+        "TechniqueSlotAssignedEvent": [
+          "HotbarSimDebug.cs"
+        ],
+        "TileChangedEvent": [
+          "RespawnSimDebug.cs"
+        ],
+        "TimeChangedEvent": [
+          "RespawnSimDebug.cs"
+        ],
+        "YearChangedEvent": [
+          "Audit0922SimDebug.cs"
+        ]
+      },
+      "provides": [
+        {
+          "service": "ISaveFileHandler",
+          "impl": "SaveFileHandler",
+          "kind": "service"
+        },
+        {
+          "service": "IDummySvc",
+          "impl": "DummyImplA",
+          "kind": "service"
+        },
+        {
+          "service": "IOtherSvc",
+          "impl": "DummyImplA",
+          "kind": "service"
+        },
+        {
+          "service": "IDummySvc",
+          "impl": "DummyImplB",
+          "kind": "service"
+        },
+        {
+          "service": "IOtherSvc",
+          "impl": "DummyImplB",
+          "kind": "service"
+        },
+        {
+          "service": "IOrderProbe",
+          "impl": "OrderProbeB",
+          "kind": "service"
+        },
+        {
+          "service": "IOrderProbe",
+          "impl": "OrderProbeC",
+          "kind": "service"
+        },
+        {
+          "service": "IOrderProbe",
+          "impl": "OrderProbeA",
+          "kind": "service"
+        },
+        {
+          "service": "IResetProbeDomain",
+          "impl": "ResetOkProbeA",
+          "kind": "service"
+        },
+        {
+          "service": "IResetProbeDomain",
+          "impl": "ResetThrowProbe",
+          "kind": "service"
+        },
+        {
+          "service": "IResetProbeDomain",
+          "impl": "ResetOkProbeB",
+          "kind": "service"
+        },
+        {
+          "service": "ITradeService",
+          "impl": "TradeService",
+          "kind": "service"
+        },
+        {
+          "service": "SaveFileHandler",
+          "impl": "SaveFileHandler",
+          "kind": "self"
+        },
+        {
+          "service": "GameEntryPoint",
+          "impl": "GameEntryPoint",
+          "kind": "self"
+        },
+        {
+          "service": "CycA",
+          "impl": "CycA",
+          "kind": "self"
+        },
+        {
+          "service": "CycB",
+          "impl": "CycB",
+          "kind": "self"
+        },
+        {
+          "service": "SelfCyc",
+          "impl": "SelfCyc",
+          "kind": "self"
+        },
+        {
+          "service": "Dep1",
+          "impl": "Dep1",
+          "kind": "self"
+        },
+        {
+          "service": "Dep2",
+          "impl": "Dep2",
+          "kind": "self"
+        },
+        {
+          "service": "Dep3",
+          "impl": "Dep3",
+          "kind": "self"
+        },
+        {
+          "service": "CurrencyService",
+          "impl": "CurrencyService",
+          "kind": "self"
+        },
+        {
+          "service": "SaveModule",
+          "impl": "SaveModule",
+          "kind": "self"
+        },
+        {
+          "service": "CtorPick_A",
+          "impl": "CtorPick_A",
+          "kind": "self"
+        },
+        {
+          "service": "CtorPick_SingleCtor",
+          "impl": "CtorPick_SingleCtor",
+          "kind": "self"
+        },
+        {
+          "service": "CtorPick_Greedy",
+          "impl": "CtorPick_Greedy",
+          "kind": "self"
+        },
+        {
+          "service": "ISaveFileHandler",
+          "impl": "ISaveFileHandler",
+          "kind": "instance"
+        },
+        {
+          "service": "IGameSession",
+          "impl": "IGameSession",
+          "kind": "instance"
+        },
+        {
+          "service": "IInventoryService",
+          "impl": "IInventoryService",
+          "kind": "instance"
+        },
+        {
+          "service": "IItemDatabaseService",
+          "impl": "IItemDatabaseService",
+          "kind": "instance"
+        },
+        {
+          "service": "IEquipmentGenerator",
+          "impl": "IEquipmentGenerator",
+          "kind": "instance"
+        },
+        {
+          "service": "IItemGeneratorService",
+          "impl": "IItemGeneratorService",
+          "kind": "instance"
+        },
+        {
+          "service": "INPCService",
+          "impl": "INPCService",
+          "kind": "instance"
+        },
+        {
+          "service": "ICurrencyService",
+          "impl": "ICurrencyService",
+          "kind": "instance"
+        },
+        {
+          "service": "ITimeService",
+          "impl": "ITimeService",
+          "kind": "instance"
+        },
+        {
+          "service": "ISaveService",
+          "impl": "ISaveService",
+          "kind": "instance"
+        },
+        {
+          "service": "IDummySvc",
+          "impl": "IDummySvc",
+          "kind": "instance"
+        },
+        {
+          "service": "SaveDataAggregator",
+          "impl": "SaveDataAggregator",
+          "kind": "instance"
+        },
+        {
+          "service": "EventBus",
+          "impl": "EventBus",
+          "kind": "instance"
+        },
+        {
+          "service": "TradeConfig",
+          "impl": "TradeConfig",
+          "kind": "config"
+        },
+        {
+          "service": "SaveConfig",
+          "impl": "SaveConfig",
+          "kind": "config"
+        },
+        {
+          "service": "ItemData",
+          "impl": "ItemData",
+          "kind": "instance"
+        },
+        {
+          "service": "SubscribingStartable",
+          "impl": "SubscribingStartable",
+          "kind": "instance"
+        },
+        {
+          "service": "CountingStartable",
+          "impl": "CountingStartable",
+          "kind": "instance"
+        }
+      ],
+      "requires": [
+        {
+          "service": "AnimalService",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "CtorPick_A",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "CtorPick_Greedy",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "CtorPick_SingleCtor",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "CurrencyService",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "CycA",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "Dep3",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "DummyImplA",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "FormationService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "GameEntryPoint",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IBodyService",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ICorpseService",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IDamageService",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IDummySvc",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IEquipmentDataProvider",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IEquipmentGenerator",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IEquipmentService",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IFormationGeneratorService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IGameSession",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IInventoryService",
+          "via": [
+            "inject",
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IItemDatabaseService",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "INPCGroupService",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "INPCService",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IOrderProbe",
+          "via": [
+            "resolve-all"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IOtherSvc",
+          "via": [
+            "resolve",
+            "resolve-all"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IPlayerService",
+          "via": [
+            "inject",
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IQiDataProvider",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IQiService",
+          "via": [
+            "inject",
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IResolver",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ISaveFileHandler",
+          "via": [
+            "resolve",
+            "resolve-all"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ISaveable",
+          "via": [
+            "resolve-all"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ISceneAssemblyPhase",
+          "via": [
+            "resolve-all"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "IStatService",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ITimeService",
+          "via": [
+            "inject",
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ITradeService",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "NPCRelationshipService",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "NPCService",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "PlayerModule",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "PlayerService",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ResetOkProbeA",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ResetOkProbeB",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "ResetThrowProbe",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "SaveFileHandler",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "SaveModule",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "SceneOrchestrator",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "SelfCyc",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "TechniqueRegistry",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "TechniqueService",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "TechniqueSlotService",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "TimeService",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        },
+        {
+          "service": "WorldModule",
+          "via": [
+            "resolve"
+          ],
+          "kind": "service"
+        }
+      ]
+    },
+    {
+      "id": "Adapter.Input",
+      "kind": "adapter",
+      "layer": "Adapter",
+      "order": 121,
+      "description": "Слой ввода Godot",
+      "debug": false,
+      "files": 2,
+      "publishes": [],
+      "subscribes": [],
+      "publishes_files": {},
+      "subscribes_files": {},
+      "provides": [],
+      "requires": [
+        {
+          "service": "IPlayerInputService",
+          "via": [
+            "inject"
+          ],
+          "kind": "service"
+        }
+      ]
+    },
+    {
+      "id": "Adapter.Persistence",
+      "kind": "adapter",
+      "layer": "Adapter",
+      "order": 122,
+      "description": "Файловый слой сохранений (ISaveFileHandler)",
+      "debug": false,
+      "files": 2,
+      "publishes": [],
+      "subscribes": [],
+      "publishes_files": {},
+      "subscribes_files": {},
+      "provides": [],
+      "requires": []
+    }
+  ],
+  "checks": {
+    "events_no_subscriber": [
+      {
+        "event": "AttitudeChangedEvent",
+        "publishers": [
+          "NPC"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "BuffExpiredEvent",
+        "publishers": [
+          "Buff"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "ChargerCooledDownEvent",
+        "publishers": [
+          "Charger"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "ChargerOverheatedEvent",
+        "publishers": [
+          "Charger"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "ConsumableUsedEvent",
+        "publishers": [
+          "Inventory"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "CraftFailedEvent",
+        "publishers": [
+          "Inventory"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "GamePausedEvent",
+        "publishers": [
+          "Entry",
+          "UI"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "GameResumedEvent",
+        "publishers": [
+          "Entry",
+          "UI"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "ItemRemovedEvent",
+        "publishers": [
+          "Inventory"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "LoadCompletedEvent",
+        "publishers": [
+          "Save"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "ModalShownEvent",
+        "publishers": [
+          "UI"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "MonthChangedEvent",
+        "publishers": [
+          "World"
+        ],
+        "debug_only": true
+      },
+      {
+        "event": "NPCDamagedEvent",
+        "publishers": [
+          "NPC"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "NPCDespawnedEvent",
+        "publishers": [
+          "NPC"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "NPCSpawnedEvent",
+        "publishers": [
+          "NPC"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "PlayerMovedEvent",
+        "publishers": [
+          "Player"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "QiBufferActivatedEvent",
+        "publishers": [
+          "Qi"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "QiBufferDeactivatedEvent",
+        "publishers": [
+          "Qi"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "QiFullEvent",
+        "publishers": [
+          "Qi"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "QuestAbandonedEvent",
+        "publishers": [
+          "Quest"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "QuestFailedEvent",
+        "publishers": [
+          "Quest"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "QuestObjectiveUpdatedEvent",
+        "publishers": [
+          "Quest"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "QuestRewardGrantedEvent",
+        "publishers": [
+          "Quest"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "QuestStartedEvent",
+        "publishers": [
+          "Quest"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "ResourceDepletedEvent",
+        "publishers": [
+          "Tile"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "SaveCompletedEvent",
+        "publishers": [
+          "Save"
+        ],
+        "debug_only": true
+      },
+      {
+        "event": "SceneAssemblyFailedEvent",
+        "publishers": [
+          "Entry"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "SceneInitializingEvent",
+        "publishers": [
+          "Entry"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "ScenePhaseCompletedEvent",
+        "publishers": [
+          "Entry"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "ScenePhaseStartedEvent",
+        "publishers": [
+          "Entry"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "SceneReadyEvent",
+        "publishers": [
+          "Entry"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "StatModifierChangedEvent",
+        "publishers": [
+          "Buff"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "TileChangedEvent",
+        "publishers": [
+          "Tile"
+        ],
+        "debug_only": true
+      },
+      {
+        "event": "TileMapGeneratedEvent",
+        "publishers": [
+          "Tile"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "TimeChangedEvent",
+        "publishers": [
+          "World"
+        ],
+        "debug_only": true
+      },
+      {
+        "event": "TimeHitchedEvent",
+        "publishers": [
+          "World"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "TimeSpeedChangedEvent",
+        "publishers": [
+          "World"
+        ],
+        "debug_only": false
+      },
+      {
+        "event": "TimeTickEvent",
+        "publishers": [
+          "World"
+        ],
+        "debug_only": false
+      }
+    ],
+    "events_no_publisher": [
+      {
+        "event": "CultivationWindowToggleRequestedEvent",
+        "subscribers": [
+          "Adapter.UI"
+        ]
+      },
+      {
+        "event": "InputActionEvent",
+        "subscribers": [
+          "UI"
+        ]
+      },
+      {
+        "event": "InputKeyEvent",
+        "subscribers": [
+          "UI"
+        ]
+      },
+      {
+        "event": "LoadRequestedEvent",
+        "subscribers": [
+          "Save"
+        ]
+      },
+      {
+        "event": "SaveRequestedEvent",
+        "subscribers": [
+          "Save",
+          "World"
+        ]
+      },
+      {
+        "event": "UIInteractRequestEvent",
+        "subscribers": [
+          "Interaction"
+        ]
+      },
+      {
+        "event": "UIPauseRequestEvent",
+        "subscribers": [
+          "UI"
+        ]
+      },
+      {
+        "event": "UIResumeRequestEvent",
+        "subscribers": [
+          "UI"
+        ]
+      },
+      {
+        "event": "UIStateChangeRequestEvent",
+        "subscribers": [
+          "UI"
+        ]
+      }
+    ],
+    "contracts_unused": [
+      "AutoSaveTriggeredEvent",
+      "ClickToMoveEvent",
+      "ContextMenuRequestedEvent",
+      "HotbarSlotChangedEvent",
+      "LoadGameRequestedEvent",
+      "MouseInputEvent",
+      "NewGameRequestedEvent",
+      "PlayerSleepEvent",
+      "QuitGameRequestedEvent",
+      "SaveDeletedEvent",
+      "SceneAssemblyCompletedWithErrorsEvent",
+      "SceneLoadedEvent",
+      "SessionStartedEvent",
+      "StaminaChangedEvent",
+      "TechniqueSlotSelectedEvent",
+      "TrackingTargetEvent",
+      "TravelStartedEvent",
+      "UILoadRequestEvent",
+      "UISaveRequestEvent",
+      "WorldEventEndedEvent",
+      "WorldEventTriggeredEvent"
+    ],
+    "contracts_local_unscoped": [],
+    "services_unresolved": [],
+    "services_unconsumed": [
+      {
+        "service": "ICraftingService",
+        "provided_by": "Inventory"
+      },
+      {
+        "service": "ICurrencyExchangeService",
+        "provided_by": "Trade"
+      },
+      {
+        "service": "IInputLogService",
+        "provided_by": "UI"
+      },
+      {
+        "service": "IInteractionService",
+        "provided_by": "Interaction"
+      },
+      {
+        "service": "ISpiritStorageService",
+        "provided_by": "Inventory"
+      }
+    ]
+  },
+  "totals": {
+    "modules": 17,
+    "nodes": 23,
+    "contracts_defined": 163,
+    "events_published": 130,
+    "events_subscribed": 101,
+    "publish_edges": 176,
+    "subscribe_edges": 189,
+    "provide_edges": 213,
+    "require_edges": 293,
+    "services_provided": 160,
+    "services_required": 117
+  }
+}

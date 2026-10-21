@@ -10,13 +10,22 @@
 import fs from 'fs';
 import { NextResponse } from 'next/server';
 
-import type { BugsFile, Milestone, ProjectInfo, StatusFile, Track } from '@/lib/portal/types';
+import type {
+  BugsFile,
+  BusMapFile,
+  Milestone,
+  ProjectInfo,
+  StatusFile,
+  Track,
+} from '@/lib/portal/types';
 
 /** Абсолютные пути источников (переживают любой cwd dev-сервера). */
 const PROJECT_MAP_PATH =
   '/home/z/my-project/aigame4/docs/docs_v2/00_overview/project_map.json';
 const BUGS_PATH = '/home/z/my-project/aigame4/portal/data/bugs.json';
 const STATUS_PATH = '/home/z/my-project/aigame4/portal/data/status.json';
+/** Карта шины — снимок «по требованию» (gen_bus_map.py); отсутствие не ломает портал. */
+const BUS_MAP_PATH = '/home/z/my-project/aigame4/portal/data/bus_map.json';
 
 /** Чтение JSON с изоляцией ошибок. null → источник недоступен. */
 function readJson<T>(path: string, errors: string[]): T | null {
@@ -43,6 +52,7 @@ export async function GET() {
   const map = readJson<ProjectMapFile>(PROJECT_MAP_PATH, errors);
   const bugs = readJson<BugsFile>(BUGS_PATH, errors);
   const status = readJson<StatusFile>(STATUS_PATH, errors);
+  const busMap = readJson<BusMapFile>(BUS_MAP_PATH, errors);
 
   const ok = map !== null && bugs !== null && status !== null;
 
@@ -54,6 +64,7 @@ export async function GET() {
       tracks: map?.tracks ?? [],
       bugs,
       status,
+      busMap,
       errors,
     },
     { headers: { 'Cache-Control': 'no-store' } },

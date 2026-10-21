@@ -9,11 +9,13 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Activity, AudioLines, ClipboardList } from 'lucide-react';
+import { Activity, AudioLines, ClipboardList, Waypoints } from 'lucide-react';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { PortalData } from '@/lib/portal/types';
+import { thinScrollClass } from '@/lib/portal/helpers';
 import { BugsTab } from './bugs-tab';
+import { BusTab } from './bus-tab';
 import { KpiRow } from './kpi-row';
 import { MilestoneStrip } from './milestone-strip';
 import { PortalError } from './portal-error';
@@ -77,7 +79,9 @@ export function PortalApp() {
             <MilestoneStrip milestones={data.milestones} />
 
             <Tabs defaultValue="tracks" className="mt-8">
-              <TabsList className="h-10 rounded-lg border border-stone-800 bg-zinc-900/70 p-1">
+              <TabsList
+                className={`h-10 max-w-full overflow-x-auto rounded-lg border border-stone-800 bg-zinc-900/70 p-1 ${thinScrollClass}`}
+              >
                 <TabsTrigger
                   value="tracks"
                   className="min-h-8 gap-1.5 rounded-md px-3 text-xs font-medium text-stone-400 data-[state=active]:border-stone-700 data-[state=active]:bg-zinc-800 data-[state=active]:text-stone-50 sm:text-sm"
@@ -99,6 +103,18 @@ export function PortalApp() {
                   </span>
                 </TabsTrigger>
                 <TabsTrigger
+                  value="bus"
+                  className="min-h-8 gap-1.5 rounded-md px-3 text-xs font-medium text-stone-400 data-[state=active]:border-stone-700 data-[state=active]:bg-zinc-800 data-[state=active]:text-stone-50 sm:text-sm"
+                >
+                  <Waypoints aria-hidden="true" className="size-4 text-amber-400" />
+                  Схема шины
+                  {data.busMap ? (
+                    <span className="hidden font-mono text-[10px] text-stone-500 sm:inline">
+                      {data.busMap.totals.modules}м
+                    </span>
+                  ) : null}
+                </TabsTrigger>
+                <TabsTrigger
                   value="status"
                   className="min-h-8 gap-1.5 rounded-md px-3 text-xs font-medium text-stone-400 data-[state=active]:border-stone-700 data-[state=active]:bg-zinc-800 data-[state=active]:text-stone-50 sm:text-sm"
                 >
@@ -116,6 +132,17 @@ export function PortalApp() {
                 ) : (
                   <p className="pt-4 text-sm text-stone-500">
                     Реестр находок недоступен.
+                  </p>
+                )}
+              </TabsContent>
+              <TabsContent value="bus">
+                {data.busMap ? (
+                  <BusTab busMap={data.busMap} />
+                ) : (
+                  <p className="pt-4 text-sm text-stone-500">
+                    Карта шины недоступна — снимок portal/data/bus_map.json не
+                    найден в репозитории (обновляется по требованию:
+                    python3 tools/gen_bus_map.py).
                   </p>
                 )}
               </TabsContent>
