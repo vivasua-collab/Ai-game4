@@ -51,5 +51,15 @@ namespace CultivationGame.Core.Interfaces
         void DespawnNPC(string npcId);
         IReadOnlyList<string> GetSpawnedNPCIds();
         int ActiveNPCCount { get; }
+
+        /// <summary>
+        /// Этап-4 (BUG-013): идемпотентная синхронизация трекера спавнера с
+        /// реестром NPCService. После загрузки сейва реестр наполняется
+        /// RestoreState-ом напрямую (минуя SpawnNPC) — без синхронизации
+        /// ActiveNPCCount/лимит MaxActiveNPCs/DespawnNPC работали только для
+        /// заново заспавненных. GameSession зовёт это через IPostLoadSync;
+        /// в интерфейсе — для диагностики/QA.
+        /// </summary>
+        void SyncWithRegistry();
     }
 }

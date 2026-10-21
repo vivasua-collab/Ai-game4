@@ -25,6 +25,9 @@ ALL_SIMS=(
   "LOOT:GODOT_LOOT_DEBUG"
   "DOT:GODOT_DOT_DEBUG"
   "SAVELOAD:GODOT_SAVELOAD_DEBUG"
+  # Этап-4 аудита (20.10): полный GameSession.LoadGame-путь — pre-flight,
+  # транзакционный откат, полнота v2, BUG-013 спавнер, GAP-014 группы.
+  "STAGE4:GODOT_STAGE4_DEBUG"
   "KILLFEED:GODOT_KILLFEED_DEBUG"
   "QUEST:GODOT_QUEST_DEBUG"
   "STORAGE:GODOT_STORAGE_DEBUG"

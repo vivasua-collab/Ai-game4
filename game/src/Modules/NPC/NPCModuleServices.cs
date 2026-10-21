@@ -66,6 +66,11 @@ public static class NPCModuleServices
         // _groupService.Tick(tickCount) после _aiService.Tick(). NPCMovementService
         // читает CurrentGroupTarget как overlay над индивидуальным AI.
         builder.Register<INPCGroupService, NPCGroupService>(Lifetime.Singleton);
+        // Этап-4 (GAP-014, 20.10.2026): + ISaveable — блок "npc_groups"
+        // (состав/лидер/маршрут/тип задачи групп переживают сейв-лоад-цикл).
+        // Форвард-регистрация интерфейсного ключа — тот же singleton, что и
+        // INPCGroupService (контракт DI: оба ключа указывают на один impl).
+        builder.Register<ISaveable, NPCGroupService>(Lifetime.Singleton);
 
         // === R13 FULL-LOOT (2026-09-10): трупы NPC — контейнеры лута ===
         // CorpseService подписан на NPCDeathEvent (Initialize из NPCModule.Start):

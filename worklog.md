@@ -190,3 +190,46 @@ fail-closed сброс через FakeResolver). Регрессия **23/23 PASS
 
 NEXT: плейтест владельца UX меню сейвов; реестр bugs.json + 4 этапа-3
 записи + находки вне зоны; волна 3 — дизайн.
+
+## 2026-10-20 — Этап 4 аудита: неудачная загрузка/полнота формата/NPC (4/4 fixed+verified)
+
+Вход: внешний аудит Этапа 4 — 2 остаточных P1 Этапа-3 + BUG-013 (P2,
+спавнер не видит восстановленных NPC) + GAP-014 (P2, группы не
+переживают сейв); порядок работы из аудита.
+
+- **P1 «неудачная загрузка уничтожает сессию» → fixed**: pre-flight
+  ISaveService.Validate ДО сброса (RejectedByPrecheck — мир не тронут);
+  транзакционная загрузка из игры — in-memory снимок CaptureBackup,
+  сбой после сброса → повторный сброс + RestoreBackup → RolledBack
+  (сессия ВОЗВРАЩАЕТСЯ В ИГРУ); IGameSession.LastLoadOutcome маршрутизирует
+  GWC/MainMenu (reject — без пересборки сцены, причина в меню сейвов).
+- **P1 «полнота формата» → fixed**: CurrentFormatVersion 1→2; v2 — ВСЕ
+  23 блока обязательные (вкл. новый npc_groups); v1 — 17 ядра + ЯВНОЕ
+  правило совместимости OptionalBlocksV1 (formation/item_db/corpses/
+  storage_rings/charger/npc_groups: «отсутствует = домен в дефолте»).
+- **BUG-013 → fixed**: контракт IPostLoadSync (симметричен
+  IWorldResettable; GameSession зовёт после RestoreState и после
+  отката); NPCSpawnerService.SyncWithRegistry (реестр = источник
+  истины); DespawnNPC — гейт «трекер ИЛИ реестр» (полный путь очистки
+  восстановленных).
+- **GAP-014 → fixed (решение: группы — мировое состояние)**:
+  NPCGroupService : ISaveable, блок npc_groups (состав/лидер/маршрут/
+  тип задачи/NextGroupId-антиколлизии); RestoreOrder — npc_groups после
+  npc И animals; участники валидируются по ОБЕИМ реестрам (косяк первой
+  ревизии — волчья стая с animal_* участниками ронялась валидацией
+  только по NPC — пойман SAVELOAD-регрессией, исправлен).
+- **QA**: новый сим STAGE4 (GODOT_STAGE4_DEBUG, №22 в qa_regression.sh)
+  — ПОЛНЫЙ GameSession.LoadGame-путь (требование аудита): три битых
+  слота → reject без касания мира; порча npc-блока → RolledBack с
+  до-загрузочным миром; успех + QA-группа восстановлена; спавнер==реестр;
+  деспавн/спавн восстановленных. Итог: 22/22 qa_regression + FORM +
+  RESPAWN = 24/24; build 0 err. Пруфы: qa_artifacts/stage4_sim_20261020.log,
+  qa_artifacts/qa_regression_stage4_20261020.log.
+- **Доки/портал**: SAVE_SYSTEM.md §4.5/§4.7/§7.2/§8.0; TESTING_RULES —
+  строка SAVELOAD дополнена (шаги 9-12 Этапа-3) + строка STAGE4;
+  portal/data/bugs.json v1.6 (STAGE4-001..004 verified, 31 запись);
+  чекпоинт checkpoints/10_20_audit_stage4_saveload_npc.md.
+
+NEXT: (1) плейтест владельца — F5-загрузка на живом мире (битый слот →
+остаться в игре); (2) ответ аудитору: Этап-4 закрыт 4/4, остатки
+Этапа-3 сняты; (3) волна 2 портала (GAP-002/003/004) — по директиве.

@@ -61,6 +61,7 @@ game/saves/*
 # (2026-10-19: пути обновлены — checkpoints/ теперь плоский, без подпапок)
 !checkpoints/09_22_*.log
 !checkpoints/09_23_*.log
+!checkpoints/10_20_*.log
 *.tmp
 *.bak
 *.swp

@@ -1,0 +1,30 @@
+  ✅ [ChargerSim] VERDICT: PASS — камни Ци вставляются в зарядник (окно H/меню/дроп), анти-дюп жив, пояс ≠ зарядник, домен гейтируется экипировкой
+─── QA: ANIMQA (GODOT_ANIMQA_DEBUG) ─────────────────────────────
+  ✅ [AnimQA] VERDICT: PASS — cache/fallback/loader/animator(one-shot,death)/weapon-keys/npc/animals готовы к доставке PNG
+
+══════════ QA-РЕГРЕССИЯ: ИТОГ ══════════
+  PASS  COMBAT_SIM
+  PASS  COMBATAI
+  PASS  ANIMALQA
+  PASS  LOOT
+  PASS  DOT
+  PASS  SAVELOAD
+  PASS  STAGE4
+  PASS  KILLFEED
+  PASS  QUEST
+  PASS  STORAGE
+  PASS  HOTBAR
+  PASS  TRASHDROP
+  PASS  CONTEXT
+  PASS  MODALQA
+  PASS  MODAL2
+  PASS  L500
+  PASS  WEAPONVIS
+  PASS  REASSEMBLY
+  PASS  CHARGE
+  PASS  AUDIT0922
+  PASS  CHARGERQA
+  PASS  ANIMQA
+────────────────────────────────────────
+  22/22 PASS
+  ВСЕ СИМЫ ЗЕЛЁНЫЕ

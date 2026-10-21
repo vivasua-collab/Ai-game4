@@ -321,18 +321,19 @@ public partial class MainMenuController : Control
                     GD.PrintErr($"[MainMenu] LoadGame('{slotName}') failed: {ex}");
                 }
                 var state = Session?.State ?? SessionState.MainMenu;
+                var outcome = Session?.LastLoadOutcome ?? LoadGameOutcome.Failed;
                 if (state == SessionState.Playing)
                 {
                     GetTree().ChangeSceneToFile(GameWorldScenePath);
                 }
                 else
                 {
-                    // Битый/неполный сейв: сессия вернулась в MainMenu —
-                    // остаёмся в меню, причина — в статусе SaveLoadMenu
-                    // (LastError можно показать).
-                    GD.PrintErr($"[MainMenu] LoadGame('{slotName}') — сессия не Playing (state={state})");
+                    // Битый/неполный/неподдерживаемый сейв: pre-flight (Этап-4)
+                    // отверг слот ДО сброса — миров и так нет, остаёмся в меню
+                    // с ПРИЧИНОЙ в статусе SaveLoadMenu (LastError сервиса).
+                    GD.PrintErr($"[MainMenu] LoadGame('{slotName}') — outcome={outcome}, state={state}");
                     _loadWorldMenu?.ShowLoadError(
-                        $"Загрузка «{slotName}» не удалась (состояние: {state}). Подробности — в логе.");
+                        $"Слот «{slotName}» не загружен: {SaveService?.LastError ?? $"состояние сессии: {state}"}");
                 }
             };
         }

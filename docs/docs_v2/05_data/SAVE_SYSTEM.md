@@ -242,15 +242,21 @@ public class SaveDataAggregator
 
 ```
 world → world_time → item_db → player → stats → body → qi →
-inventory → equipment → belt → techniques → technique_slots →
-formation → npc → animals → quests → currency → charger → save_meta
+inventory → equipment → storage_rings → belt → techniques → technique_slots →
+formation → npc → npc_relationships → corpses → animals → npc_groups →
+quests → currency → charger → save_meta
 ```
 
 Ключевые зависимости:
 - `item_db` ДО `equipment`/`belt`/`npc` — они резолвят itemId через каталог;
 - `world`/`world_time` первыми — GameSession читает локацию/время после Load;
+- `npc` И `animals` ДО `npc_groups` (Этап-4, GAP-014) — восстановление
+  групп валидирует участников по ОБОИМ реестрам: группы наполняются и NPC
+  (патруль стражи), и зверями (волчья стая/стадо — AnimalService);
+  отсутствующие в обоих реестрах отбрасываются с логом;
 - блоки вне списка (будущие модули) — после, в порядке регистраций;
-- отсутствующие в сейве ключи пропускаются (форвард-совместимость).
+- отсутствующие в сейве ключи пропускаются ДЛЯ НЕОБЯЗАТЕЛЬНЫХ блоков —
+  обязательность определена ЯВНО каталогом версий (§8.0), а не молчаливо.
 
 Плюс сброс world-scoped доменов ДО RestoreState (IWorldResettable —
 см. §4.6): GameSession.LoadGame резолвит все домены и сбрасывает —
@@ -271,6 +277,21 @@ StatService, QuestService, CurrencyService, InventoryService,
 EquipmentService, BeltService, GroundItemService, WorldService,
 TimeService. Процесс-scoped контент (ItemDatabaseService — каталог,
 реестр локаций) НЕ сбрасывается.
+
+### 4.7 IPostLoadSync — производные трекеры после RestoreState (Этап-4)
+
+Симметрично IWorldResettable (сброс ДО восстановления): сервисы, чьё
+состояние ПРОИЗВОДНО от восстановленных реестров (не сериализуется
+само), реализуют `Core.Interfaces.IPostLoadSync.OnAfterLoad()`
+(идемпотентен). GameSession вызывает `ResolveAll<IPostLoadSync>()`
+после успешного RestoreState И после отката транзакционной загрузки.
+
+- **NPCSpawnerService (BUG-013):** `_spawnedIds` синхронизируется с
+  реестром NPCService — RestoreState наполняет реестр напрямую, минуя
+  SpawnNPC (спавн-фазы SkipOnLoad=true). Без синхронизации ломались
+  ActiveNPCCount, лимит MaxActiveNPCs (обходился) и DespawnNPC
+  восстановленных NPC (no-op при гейте по трекеру; теперь гейт —
+  «трекер ИЛИ реестр»).
 
 ---
 
@@ -481,8 +502,34 @@ fallback-мира меню, без чистки).
 > • отказ ДО RestoreState — домены остаются нетронутыми (сессия
 > честно возвращает игрока в меню, а не запускает «пустой мир»);
 > • некритические блоки по-прежнему опциональны (форвард-совместимость).
-> Прежде файл «{}» проходил как успешная загрузка — мир собирался
+> Прежде файл «{}» проходил как успешную загрузка — мир собирался
 > с несуществующим состоянием (см. QA SaveLoadSimDebug шаг 9).
+
+> **Этап-4 (20.10.2026, P1 ×2) — полнота формата + транзакционная загрузка:**
+> • перечень критических блоков v1 {world, world_time, player, body} был
+>   НЕПОЛОН: сейв без инвентаря/Ци/квестов/NPC/отношений проходил
+>   валидацию, а после сброса доменов эти состояния терялись молча.
+>   Теперь: полный каталог обязательных блоков на каждую версию (§8.0),
+>   необязательные — только ДОКУМЕНТИРОВАННОЕ правило совместимости;
+> • `ISaveService.Validate(slot)` — pre-flight БЕЗ побочных эффектов:
+>   GameSession.LoadGame проверяет слот ДО сброса активного мира
+>   (outcome `RejectedByPrecheck` — битый/неполный/неподдерживаемый
+>   слот не трогает текущий мир);
+> • при загрузке ИЗ ИГРЫ (state=Playing) — in-memory снимок ВСЕХ доменов
+>   (`ISaveService.CaptureBackup`: тот же CaptureState, без файла и без
+>   SaveStartedEvent — снимок неразрушающий); сбой ПОСЛЕ сброса →
+>   повторный сброс (вычистить частично-восстановленное) +
+>   `RestoreBackup()` → игрок ВОЗВРАЩАЕТСЯ В СВОЙ МИР (outcome
+>   `RolledBack`, state=Playing), а не в главное меню;
+> • `IGameSession.LastLoadOutcome` — исход для маршрутизации UI:
+>   None / Success / RejectedByPrecheck / RolledBack / Failed;
+> • после RestoreState (и после отката) — `ResolveAll<IPostLoadSync>()`:
+>   производные трекеры пересобираются по восстановленным реестрам
+>   (BUG-013: спавнер ↔ реестр NPC — §4.7).
+> QA: Stage4SaveLoadSimDebug (GODOT_STAGE4_DEBUG=1) — полный
+> GameSession-путь: reject трёх битых слотов (мир не тронут), откат при
+> падении RestoreState (до-загрузочный мир восстановлен), успех, деспавн/
+> спавн восстановленных NPC, группы с лидером/маршрутом.
 
 ```
 1. Чтение metadata.sav (карта мира, индекс чанков)
@@ -517,16 +564,32 @@ fallback-мира меню, без чистки).
 Фактический механизм (не семантический, а целочисленный формат-код):
 
 - Пишется в `save_meta.version` (int, camelCase) при каждом Save —
-  `SaveDataAggregator.CurrentFormatVersion` (сейчас **1**).
-- Проверяется при каждом Load ДО восстановления (см. §7.2):
-  неизвестная/отсутствующая версия — отказ; новее игры — отказ;
-  для каждой известной версии задана таблица критических блоков
-  (`CriticalBlocksForVersion`).
-- Миграции: при появлении формата v2 — добавить case в таблицу
-  версий + (при необходимости) migrate-хук, преобразующий данные
-  v1-файла до v2-формы ДО RestoreState. Ниже (§8.1–8.2) — прежний
-  дизайн-план семантических версий, к которому этот механизм
-  подключается при переходе на чанковый формат.
+  `SaveDataAggregator.CurrentFormatVersion` (сейчас **2**; Этап-4:
+  1 → 2 — новый блок `npc_groups` (GAP-014) + полный mandatory-каталог).
+- Проверяется при каждом Load И в pre-flight Validate ДО сброса
+  (см. §7.2): неизвестная/отсутствующая версия — отказ; новее игры —
+  отказ; для каждой известной версии — таблица обязательных блоков
+  (`MandatoryBlocksForVersion`).
+- **Каталог v2 (текущий писатель, 23 блока — ВСЕ обязательные):**
+  world, world_time, item_db, player, stats, body, qi, inventory,
+  equipment, storage_rings, belt, techniques, technique_slots,
+  formation, npc, npc_groups, npc_relationships, corpses, animals,
+  quests, currency, charger, save_meta. Отсутствие ЛЮБОГО блока в
+  v2-файле = файл писался не этим конвейером (обрезан/подделан) → отказ.
+- **Каталог v1 (легаси) + ЯВНОЕ правило совместимости:** ядро
+  (17 обязательных): world, world_time, player, stats, body, qi,
+  inventory, equipment, belt, techniques, technique_slots, npc,
+  npc_relationships, animals, quests, currency, save_meta.
+  Опциональные в v1 (добавлены позже стабилизации ядра; «отсутствует =
+  домен в дефолте после сброса»): formation (R15), item_db (R17),
+  corpses (R13), storage_rings, charger (R37), npc_groups (Этап-4 —
+  в v1 групп не было; после загрузки легаси-сейва группы пусты,
+  состав мира задают восстановленные NPC).
+- Миграции: при появлении формата v3 — добавить case в таблицу версий,
+  зафиксировать опциональные блоки v2 (если появятся) + (при
+  необходимости) migrate-хук, преобразующий данные ДО RestoreState.
+  Ниже (§8.1–8.2) — прежний дизайн-план семантических версий, к
+  которому этот механизм подключается при переходе на чанковый формат.
 
 ### 8.1 Версия сохранения
 

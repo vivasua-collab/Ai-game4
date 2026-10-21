@@ -38,7 +38,9 @@ public sealed class SaveService : ISaveService, ISaveable
 
     public object CaptureState()
     {
-        return new SaveMetaState { SavedAt = DateTime.UtcNow.Ticks, Version = 1 };
+        // Этап-4 (P1 «полнота формата»): версия формата — из ЕДИНОГО
+        // источника правды (каталог версий агрегатора), не хардкод.
+        return new SaveMetaState { SavedAt = DateTime.UtcNow.Ticks, Version = SaveDataAggregator.CurrentFormatVersion };
     }
 
     public void RestoreState(object state)
@@ -71,6 +73,59 @@ public sealed class SaveService : ISaveService, ISaveable
         Console.WriteLine($"[SaveService] Load('{slot}') → {(ok ? "OK" : "FAILED")}{(ok ? "" : $" — {LastError}")}");
         return ok;
     }
+
+    // ── Этап-4 (P1, 20.10.2026): pre-flight + транзакционная загрузка ──
+
+    /// <summary>In-memory снимок доменов для отката неудачной загрузки.</summary>
+    private Dictionary<string, object>? _loadBackup;
+
+    public bool Validate(SaveSlot slot)
+    {
+        bool ok = _aggregator.Validate(slot.Name);
+        LastError = ok ? null : DescribeErrors("Validate", slot);
+        Console.WriteLine($"[SaveService] Validate('{slot}') → {(ok ? "OK (формат поддерживается)" : $"REJECTED — {LastError}")}");
+        return ok;
+    }
+
+    public bool CaptureBackup()
+    {
+        _loadBackup = null;
+        var snapshot = _aggregator.CaptureSnapshot();
+        if (snapshot == null)
+        {
+            LastError = "backup capture failed (см. SaveDataAggregator.LastErrors)";
+            Console.WriteLine($"[SaveService] CaptureBackup → FAILED — {_lastCaptureBackupError()}");
+            return false;
+        }
+        _loadBackup = snapshot;
+        Console.WriteLine($"[SaveService] CaptureBackup → OK ({snapshot.Count} блоков в памяти)");
+        return true;
+    }
+
+    public bool RestoreBackup()
+    {
+        if (_loadBackup == null)
+        {
+            Console.WriteLine("[SaveService] RestoreBackup → FAILED — снимка нет (CaptureBackup не звался или уже израсходован)");
+            return false;
+        }
+        var backup = _loadBackup;
+        _loadBackup = null; // одноразовый: частичный откат хуже честного отказа
+        bool ok = _aggregator.RestoreSnapshot(backup);
+        LastError = ok ? null : DescribeErrors("RestoreBackup", new SaveSlot("backup", SaveSlotType.Manual));
+        Console.WriteLine($"[SaveService] RestoreBackup → {(ok ? "OK" : $"FAILED — {LastError}")}");
+        return ok;
+    }
+
+    public void DiscardBackup()
+    {
+        if (_loadBackup != null)
+            Console.WriteLine($"[SaveService] DiscardBackup — снимок ({_loadBackup.Count} блоков) освобождён без восстановления");
+        _loadBackup = null;
+    }
+
+    private string? _lastCaptureBackupError()
+        => _aggregator.LastErrors.Count > 0 ? string.Join("; ", _aggregator.LastErrors) : null;
 
     /// <summary>R11 P1-Save: детализованное описание ошибки для событий/UI.</summary>
     public string? LastError { get; private set; }

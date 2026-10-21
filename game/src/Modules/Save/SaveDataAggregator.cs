@@ -65,7 +65,10 @@ public sealed class SaveDataAggregator
         "player", "stats", "body", "qi",
         "inventory", "equipment", "storage_rings", "belt",
         "techniques", "technique_slots", "formation",
-        "npc", "npc_relationships", "corpses", "animals", "quests",
+        // Этап-4 (GAP-014): группы — ПОСЛЕ npc И animals: состав группы
+        // валидируется по ОБЕИМ реестрам (HumanNPCSpawnPhase наполняет группы
+        // NPC, GroupSpawnPhase — зверями: волчья стая/стадо оленей).
+        "npc", "npc_relationships", "corpses", "animals", "npc_groups", "quests",
         "currency", "charger", "save_meta",
     };
 
@@ -78,35 +81,94 @@ public sealed class SaveDataAggregator
     // перегенерации, домены пусты). Версия формата писалась в save_meta,
     // но никогда не проверялась.
     //
+    // Этап-4 аудит (20.10.2026, P1 «полнота формата»): перечень критических
+    // блоков v1 {world, world_time, player, body} был НЕПОЛОН — сейв с
+    // корректной метой, но без инвентаря/Ци/квестов/NPC/отношений проходил
+    // валидацию, а после сброса доменов эти состояния терялись без ошибки.
     // Новый контракт:
-    //  • save_meta.Version — ОБЯЗАТЕЛЕН: без него формат неизвестен → отказ
-    //    (в проекте не существовало формата без меты — SaveService пишет
-    //    save_meta с самой первой записи);
-    //  • версия новее текущей → отказ («обновите игру»);
-    //  • версия известна → её критические блоки ОБЯЗАНЫ присутствовать;
-    //  • неизвестная версия → отказ (не «считать все блоки необязательными»);
-    //  • некритические блоки по-прежнему опциональны (форвард-
-    //    совместимость: сейв v1 без formation/charger корректен);
-    //  • при провале формата RestoreState НЕ вызывается — домены остаются
-    //    нетронутыми (вызывающий честно вернёт сессию в меню).
+    //  • полный ЯВНЫЙ каталог обязательных блоков на каждую версию;
+    //  • необязательные блоки — только как ДОКУМЕНТИРОВАННОЕ правило
+    //    совместимости конкретной версии (список OptionalBlocksV1),
+    //    а не молчаливый пропуск любого отсутствующего ключа;
+    //  • v2 — текущий формат писателя (все 23 блока, включая новый
+    //    npc_groups); v1 — легаси-сейвы (meta.Version=1 писался всегда,
+    //    с R11): поздние блоки в v1 опциональны с семантикой «отсутствует =
+    //    домен в дефолте после сброса».
     //
-    // Миграции: при появлении v2 — добавить case в CriticalBlocksForVersion
-    // и (при необходимости) migrate-хук, преобразующий v1-данные до v2-формы.
+    // Полный контракт версий:
+    //  • save_meta.Version — ОБЯЗАТЕЛЕН: без него формат неизвестен → отказ;
+    //  • версия новее текущей → отказ («обновите игру»);
+    //  • версия известна → её обязательные блоки ОБЯЗАНЫ присутствовать
+    //    (проверка ДО вызова любого RestoreState);
+    //  • неизвестная версия → отказ (не «считать все блоки необязательными»);
+    //  • при провале формата RestoreState НЕ вызывается — домены остаются
+    //    нетронутыми (вызывающий честно вернёт сессию в меню/в игру).
+    //
+    // Миграции: при появлении v3 — добавить case в MandatoryBlocksForVersion,
+    // зафиксировать опциональные блоки v2 (если появятся) и (при
+    // необходимости) migrate-хук, преобразующий данные до текущей формы.
     // ──────────────────────────────────────────────────────────────────
 
-    /// <summary>Текущая версия формата сейва (пишется в save_meta.Version).</summary>
-    public const int CurrentFormatVersion = 1;
+    /// <summary>
+    /// Текущая версия формата сейва (пишется в save_meta.Version).
+    /// Этап-4: 1 → 2 — новый блок npc_groups (GAP-014) + полный mandatory-
+    /// каталог. Легаси-сейвы v1 читаются по правилам v1 (OptionalBlocksV1).
+    /// </summary>
+    public const int CurrentFormatVersion = 2;
 
-    /// <summary>Критические блоки формата v1: без них мир нецелостен.</summary>
-    private static readonly string[] CriticalBlocksV1 = { "world", "world_time", "player", "body" };
+    // ── v2 (текущий писатель) ──
+    // ВСЕ блоки, которые пишет агрегатор в полной production-сборке
+    // (23 шт.: 22 сервиса + npc_groups). Отсутствие ЛЮБОГО из них в v2-файле
+    // = файл писался не этим конвейером (обрезан/подделан) → отказ.
+    private static readonly string[] MandatoryBlocksV2 =
+    {
+        "world", "world_time", "item_db",
+        "player", "stats", "body", "qi",
+        "inventory", "equipment", "storage_rings", "belt",
+        "techniques", "technique_slots", "formation",
+        "npc", "npc_groups", "npc_relationships", "corpses", "animals", "quests",
+        "currency", "charger", "save_meta",
+    };
+
+    // ── v1 (легаси, meta.Version=1 писался с R11) ──
+    // Ядро, присутствовавшее в каждом v1-сейве со стабилизации контракта
+    // RestoreOrder (R17, 09.11). Без любого из них мир нецелостен → отказ.
+    private static readonly string[] MandatoryBlocksV1 =
+    {
+        "world", "world_time",
+        "player", "stats", "body", "qi",
+        "inventory", "equipment", "belt",
+        "techniques", "technique_slots",
+        "npc", "npc_relationships", "animals", "quests",
+        "currency", "save_meta",
+    };
+
+    // ЯВНОЕ правило совместимости v1 (аудит Этап-4: «необязательные блоки
+    // должны быть явно определены правилами совместимости»): блоки,
+    // добавленные в схему ПОЗЖЕ стабилизации v1-ядра, в старых сейвах
+    // отсутствуют — это НЕ ошибка файла: семантика «отсутствует = домен
+    // остаётся в дефолте после сброса». Присутствуют — восстанавливаются.
+    //   formation      — FormationService (R15)
+    //   item_db        — ItemDatabaseService (R17, 09.11)
+    //   corpses        — CorpseService (R13, 09.10)
+    //   storage_rings  — StorageRingService
+    //   charger        — ChargerService (R37, 09.23)
+    //   npc_groups     — NPCGroupService (Этап-4: в v1 групп не было — после
+    //                    загрузки легаси-сейва группы пусты, состав мира
+    //                    задают восстановленные NPC)
+    private static readonly string[] OptionalBlocksV1 =
+    {
+        "formation", "item_db", "corpses", "storage_rings", "charger", "npc_groups",
+    };
 
     /// <summary>
-    /// Критические блоки для конкретной версии сейва. null — версия
+    /// Обязательные блоки для конкретной версии сейва. null — версия
     /// неизвестна (нет правил совместимости) → отказ загрузки.
     /// </summary>
-    private static string[]? CriticalBlocksForVersion(int version) => version switch
+    private static string[]? MandatoryBlocksForVersion(int version) => version switch
     {
-        1 => CriticalBlocksV1,
+        1 => MandatoryBlocksV1,
+        2 => MandatoryBlocksV2,
         _ => null,
     };
 
@@ -184,6 +246,100 @@ public sealed class SaveDataAggregator
                 Console.WriteLine($"[SaveDataAggregator] Load REJECTED (format) — {e}");
             return false;
         }
+
+        RestoreAllFrom(dict, errors);
+        LastErrors = errors;
+
+        // Честный результат: false, если ХОТЬ ОДИН обязательный блок не
+        // восстановился (раньше исключения глотались и Load всегда был true).
+        if (errors.Count > 0)
+        {
+            foreach (var e in errors)
+                Console.WriteLine($"[SaveDataAggregator] Load PARTIAL — {e}");
+            return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Этап-4 (P1 «неудачная загрузка убивает сессию»): pre-flight проверка
+    /// слота БЕЗ побочных эффектов — файл читается и валидируется по формату
+    /// (мета/версия/обязательные блоки), но RestoreState НЕ вызывается, домены
+    /// не трогаются. Вызывается GameSession.LoadGame ДО сброса активного мира:
+    /// повреждённый/неполный/неподдерживаемый слот должен отвергаться, пока
+    /// текущий мир ещё цел.
+    /// </summary>
+    public bool Validate(string slotName)
+    {
+        var dict = _fileHandler.Load(slotName);
+        var errors = new List<string>();
+        if (dict == null)
+        {
+            errors.Add("file missing, unreadable or invalid JSON");
+            LastErrors = errors;
+            return false;
+        }
+        if (!ValidateFormat(dict, errors))
+        {
+            LastErrors = errors;
+            foreach (var e in errors)
+                Console.WriteLine($"[SaveDataAggregator] Validate('{slotName}') REJECTED — {e}");
+            return false;
+        }
+        LastErrors = Array.Empty<string>();
+        return true;
+    }
+
+    /// <summary>
+    /// Этап-4 (P1, транзакционная загрузка): in-memory снимок ВСЕХ доменов
+    /// (тот же конвейер CaptureState, что у Save, но БЕЗ записи файла и БЕЗ
+    /// SaveStartedEvent — снимок неразрушающий для transient-систем).
+    /// null — любой CaptureState упал (снимок недостоверен, откат невозможен).
+    /// </summary>
+    public Dictionary<string, object>? CaptureSnapshot()
+    {
+        var dict = new Dictionary<string, object>(_saveables.Count);
+        foreach (var s in _saveables)
+        {
+            try
+            {
+                dict[s.SaveKey] = s.CaptureState() ?? new object();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[SaveDataAggregator] CaptureSnapshot ABORTED — capture[{s.SaveKey}]: {ex.GetType().Name}: {ex.Message}");
+                LastErrors = new[] { $"capture[{s.SaveKey}]: {ex.GetType().Name}: {ex.Message}" };
+                return null;
+            }
+        }
+        LastErrors = Array.Empty<string>();
+        return dict;
+    }
+
+    /// <summary>
+    /// Этап-4 (P1): восстановление ВСЕХ доменов из in-memory снимка
+    /// (ветка отката транзакционной загрузки). Контракт вызывающего: домены
+    /// УЖЕ сброшены (WorldDomainResetCoordinator.ResetAll) — RestoreState
+    /// делает merge, не чистит. Снимок снят тем же составом сервисов, потому
+    /// формат-валидация здесь избыточна; используется тот же walk RestoreOrder.
+    /// </summary>
+    public bool RestoreSnapshot(Dictionary<string, object> snapshot)
+    {
+        var errors = new List<string>();
+        RestoreAllFrom(snapshot, errors);
+        LastErrors = errors;
+        if (errors.Count > 0)
+        {
+            foreach (var e in errors)
+                Console.WriteLine($"[SaveDataAggregator] RestoreSnapshot PARTIAL — {e}");
+            return false;
+        }
+        return true;
+    }
+
+    /// <summary>Общий walk восстановления: RestoreOrder → хвост регистраций.</summary>
+    private void RestoreAllFrom(Dictionary<string, object> dict, List<string> errors)
+    {
         var restored = new HashSet<ISaveable>(
             System.Collections.Generic.ReferenceEqualityComparer.Instance);
         foreach (var key in RestoreOrder)
@@ -203,17 +359,6 @@ public sealed class SaveDataAggregator
             restored.Add(s);
             RestoreOne(s, dict, errors);
         }
-        LastErrors = errors;
-
-        // Честный результат: false, если ХОТЬ ОДИН обязательный блок не
-        // восстановился (раньше исключения глотались и Load всегда был true).
-        if (errors.Count > 0)
-        {
-            foreach (var e in errors)
-                Console.WriteLine($"[SaveDataAggregator] Load PARTIAL — {e}");
-            return false;
-        }
-        return true;
     }
 
     /// <summary>
@@ -246,21 +391,32 @@ public sealed class SaveDataAggregator
             return false;
         }
 
-        var critical = CriticalBlocksForVersion(version);
-        if (critical == null)
+        var mandatory = MandatoryBlocksForVersion(version);
+        if (mandatory == null)
         {
             errors.Add($"format: версия сейва {version} не поддерживается (правила совместимости не определены)");
             return false;
         }
 
         bool ok = true;
-        foreach (var key in critical)
+        foreach (var key in mandatory)
         {
             if (!dict.ContainsKey(key))
             {
-                errors.Add($"format: отсутствует критический блок '{key}' (обязателен для версии {version})");
+                errors.Add($"format: отсутствует обязательный блок '{key}' (обязателен для версии {version})");
                 ok = false;
             }
+        }
+        // Диагностика для v1: каких опциональных блоков нет (правило
+        // совместимости — домен останется в дефолте; информативно, не ошибка).
+        if (ok && version < CurrentFormatVersion)
+        {
+            var absent = new List<string>();
+            foreach (var key in OptionalBlocksV1)
+                if (!dict.ContainsKey(key)) absent.Add(key);
+            if (absent.Count > 0)
+                Console.WriteLine($"[SaveDataAggregator] v{version}-legаси: опциональные блоки отсутствуют " +
+                    $"[{string.Join(", ", absent)}] — домены останутся в дефолте (правило совместимости v1)");
         }
         return ok;
     }

@@ -51,6 +51,9 @@ public sealed class GameSession : IGameSession
     /// <inheritdoc />
     public GameSessionData Data { get; private set; } = new();
 
+    /// <summary>Этап-4: исход последнего LoadGame (маршрутизация UI).</summary>
+    public LoadGameOutcome LastLoadOutcome { get; private set; } = LoadGameOutcome.None;
+
     /// <inheritdoc />
     public event Action<SessionState>? OnStateChanged;
 
@@ -132,11 +135,22 @@ public sealed class GameSession : IGameSession
     public void LoadGame(SaveSlot slot)
     {
         // Этап-3 (меню сейвов, 2026-10-20): + Playing — внутриигровая загрузка
-        // из меню сохранения/загрузки (F5). Пайплайн идентичен менюшному
-        // (сброс → restore → RunAssembly(LoadGame)); вызывающий UI (GWC)
-        // после успешной загрузки пересоздаёт сцену GameWorld — рендеры
-        // строятся под восстановленную сетку/локацию. Провал возвращает
-        // сессию в MainMenu — GWC честно уводит игрока в главное меню.
+        // из меню сохранения/загрузки (F5). Этап-4 (P1, 20.10.2026): пайплайн
+        // стал ТРАНЗАКЦИОННЫМ — неудачная загрузка больше не уничтожает
+        // текущий мир:
+        //   1. pre-flight Validate (формат/мета/обязательные блоки) БЕЗ
+        //      побочных эффектов — повреждённый слот отвергается ДО сброса;
+        //   2. если игрок в мире (Playing) — in-memory снимок ВСЕХ доменов
+        //      (CaptureBackup: тот же CaptureState, без файла/SaveStarted);
+        //   3. сброс (единый fail-closed координатор) → RestoreState →
+        //      пост-загрузочная синхронизация (IPostLoadSync, BUG-013) →
+        //      RunAssembly(LoadGame);
+        //   4. сбой ПОСЛЕ сброса → повторный сброс (вычистить частично-
+        //      восстановленное) + откат из снимка → сессия ВОЗВРАЩАЕТСЯ В ИГРУ,
+        //      игрок видит тост с причиной;
+        //   5. откат невозможен (снимка нет/не снялся/провалился) — честный
+        //      fail-closed в MainMenu (прежнее поведение, теперь — последний
+        //      рубеж, а не правило).
         if (State != SessionState.MainMenu && State != SessionState.Quitting
             && State != SessionState.Playing)
         {
@@ -145,8 +159,30 @@ public sealed class GameSession : IGameSession
         }
 
         string slotName = slot.Name;
+        bool wasPlaying = State == SessionState.Playing;
+        var prevData = Data;
+
+        // ── 1. Pre-flight: формат проверяется ДО любого сброса. ────────
+        // Аудит Этап-4 (P1): прежний порядок «сброс → Load» уничтожал текущий
+        // мир ДО первой проверки сейва: битый/чужой/несуществующий слот =
+        // потеря несохранённого прогресса. Теперь домены не трогаются вовсе.
+        if (!_save.Validate(slot))
+        {
+            Console.WriteLine($"[GameSession] LoadGame PRE-REJECTED — slot='{slot}': {_save.LastError ?? "формат не поддерживается"}; " +
+                $"текущий мир НЕ тронут (state={State})");
+            _toastPub?.Publish(new Core.Messaging.Contracts.ToastShownEvent(
+                $"Слот «{slotName}» не прошёл проверку: {_save.LastError ?? "формат не поддерживается"}", 5f));
+            LastLoadOutcome = LoadGameOutcome.RejectedByPrecheck;
+            return; // состояние сессии НЕ менялось
+        }
+
+        // ── 2. Страховочный снимок текущего мира (только из Playing). ───
+        bool hasBackup = wasPlaying && _save.CaptureBackup();
+        if (wasPlaying && !hasBackup)
+            Console.WriteLine("[GameSession] LoadGame WARN — снимок не снялся: при сбое ПОСЛЕ сброса откат невозможен (fail-closed в меню)");
+
         SetState(SessionState.Loading);
-        Console.WriteLine($"[GameSession] LoadGame slot='{slot}' — loading...");
+        Console.WriteLine($"[GameSession] LoadGame slot='{slot}' — loading... (backup={(hasBackup ? "yes" : "no")})");
         try
         {
             // R14-аудит (P2-1) → R17 (E-1): сброс ВСЕХ world-scoped доменов
@@ -155,32 +191,32 @@ public sealed class GameSession : IGameSession
             // быть пусты ДО того, как сейв наполнит их заново (RestoreState
             // делает merge, не чистит).
             //
-            // Этап-3 аудита (adit_10_20, дефект 4 / P2): сброс — через ЕДИНЫЙ
-            // координатор (WorldDomainResetCoordinator, тот же что и у фазы 0
-            // NewGame). Прежде: голый foreach прерывался на первом исключении
-            // — последующие домены оставались НЕ сброшенными, а LoadGame тихо
-            // терял диагностику. Теперь: ВСЕ домены получают ResetWorld()
-            // (попытки независимы), ошибки агрегируются → AggregateException
-            // → внешний catch возвращает сессию в MainMenu. Одна семантика
-            // fail-closed для всех world-transition.
+            // Этап-3 (дефект 4): сброс — через ЕДИНЫЙ координатор
+            // (WorldDomainResetCoordinator, тот же что у фазы 0 NewGame):
+            // ВСЕ домены получают ResetWorld() (попытки независимы), ошибки
+            // агрегируются → AggregateException → fail-closed ниже.
             int resetCount = WorldDomainResetCoordinator.ResetAll(_resolver);
             Console.WriteLine($"[GameSession] LoadGame: {resetCount} world-scoped доменов сброшено до RestoreState");
 
-            // ISaveService.Load triggers ISaveable.RestoreState on every
-            // registered saveable (порядок — контракт RestoreOrder в
-            // SaveDataAggregator: мир → время → каталог → …). GameSession.Data
-            // обновляется из ВОССТАНОВЛЕННОГО состояния ниже.
-            // Аудит-0915 A4 (SAV-P2-1): результат Load обязателен к проверке —
-            // false (файл отсутствует/битый JSON/упавший блок) раньше
-            // игнорировался: сессия строилась на СТЁРТЫХ (ResetWorld выше)
-            // и не восстановленных доменах, а первый автосейв затирал слот
-            // этим пустым состоянием. Теперь — честный отказ в меню.
+            // Аудит-0915 A4 (SAV-P2-1): результат Load обязателен к проверке.
+            // Pre-flight отсекает формато-уровневые проблемы; здесь остаются
+            // ошибки Restore (блок прошёл проверку наличия, но упал при
+            // десериализации/восстановлении) — их ловит откат ниже.
             if (!_save.Load(slot))
+                throw new InvalidOperationException($"restore failed: {_save.LastError ?? "см. SaveDataAggregator.LastErrors"}");
+
+            // Этап-4 (BUG-013): производные трекеры доменов — ПОСЛЕ
+            // восстановления (NPCSpawnerService.OnAfterLoad синхронизирует
+            // _spawnedIds с реестром NPCService: ActiveNPCCount, лимит
+            // MaxActiveNPCs и DespawnNPC работают для восстановленных NPC).
+            int synced = 0;
+            foreach (var sync in _resolver.ResolveAll<IPostLoadSync>())
             {
-                Console.WriteLine($"[GameSession] LoadGame FAILED — slot='{slot}' damaged or missing; returning to MainMenu");
-                SetState(SessionState.MainMenu);
-                return;
+                sync.OnAfterLoad();
+                synced++;
             }
+            if (synced > 0)
+                Console.WriteLine($"[GameSession] LoadGame: {synced} IPostLoadSync-доменов синхронизировано после RestoreState");
 
             // R17 (E-3): идентичность мира — из блока "world" (раньше
             // хардкод TestPolygon: сейв из large_world грузился на сетку
@@ -204,12 +240,49 @@ public sealed class GameSession : IGameSession
             _orchestrator.RunAssembly(CancellationToken.None, SceneAssemblyMode.LoadGame)
                 .GetAwaiter().GetResult();
             SetState(SessionState.Playing);
+            LastLoadOutcome = LoadGameOutcome.Success;
+            if (hasBackup) _save.DiscardBackup(); // мир заменён — снимок не нужен
             Console.WriteLine("[GameSession] LoadGame ready — state=Playing");
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[GameSession] LoadGame failed: {ex.GetType().Name}: {ex.Message}");
+
+            // ── 4. Транзакционный откат: предыдущий мир — из снимка. ────
+            if (hasBackup)
+            {
+                try
+                {
+                    // Повторный сброс вычищает частично-восстановленное
+                    // состояние провалившейся загрузки (RestoreState — merge).
+                    WorldDomainResetCoordinator.ResetAll(_resolver);
+                    if (_save.RestoreBackup())
+                    {
+                        // Производные трекеры — по восстановленному реестру
+                        // (тот же контракт, что и после основной загрузки).
+                        foreach (var sync in _resolver.ResolveAll<IPostLoadSync>())
+                            sync.OnAfterLoad();
+
+                        Data = prevData;
+                        SetState(SessionState.Playing);
+                        LastLoadOutcome = LoadGameOutcome.RolledBack;
+                        _toastPub?.Publish(new Core.Messaging.Contracts.ToastShownEvent(
+                            $"Загрузка «{slotName}» не удалась — текущий мир продолжается ({ex.Message})", 5f));
+                        Console.WriteLine("[GameSession] LoadGame ROLLED BACK — предыдущий мир восстановлен из снимка, state=Playing");
+                        return;
+                    }
+                    Console.WriteLine("[GameSession] LoadGame rollback FAILED — RestoreBackup провалился, fail-closed в меню");
+                }
+                catch (Exception rbEx)
+                {
+                    Console.WriteLine($"[GameSession] LoadGame rollback CRASHED: {rbEx.GetType().Name}: {rbEx.Message} — fail-closed в меню");
+                }
+                _save.DiscardBackup();
+            }
+
+            // ── 5. Fail-closed: мира нет/он недостоверен — честно в меню. ──
             SetState(SessionState.MainMenu);
+            LastLoadOutcome = LoadGameOutcome.Failed;
         }
     }
 

@@ -525,13 +525,16 @@ public partial class GameWorldController : Node2D
     /// <summary>
     /// Загрузка выбранного слота из внутриигрового меню сейвов
     /// (SaveLoadMenu.LoadRequested). Гейт GameSession.LoadGame разрешает
-    /// переход из Playing (Этап-3) — пайплайн идентичен менюшному: единый
-    /// fail-closed сброс доменов → RestoreState → RunAssembly(LoadGame).
-    /// Успех → пересоздание сцены GameWorld (рендеры/тайлы/HUD строятся
-    /// под восстановленную сетку и локацию — как при входе из меню).
-    /// Провал (сессия вернулась в MainMenu, домены сброшены/пусты) — сцена
-    /// больше не отражает играбельное состояние: честный уход в главное
-    /// меню с видимой причиной в логе и тосте.
+    /// переход из Playing (Этап-3) — Этап-4 (P1, 20.10.2026): маршрутизация
+    /// по LoadGameOutcome, а не только по State:
+    ///   • RejectedByPrecheck — сброса НЕ БЫЛО: текущий мир и сцена живы,
+    ///     пересборка сцены не нужна (GameSession уже показал тост с причиной);
+    ///   • Success / RolledBack — мир заменён/восстановлен ДО смены сцены
+    ///     (LoadGame синхронен): сцена умирает ЦЕЛИКОМ и пересоздаётся под
+    ///     актуальную сетку/локацию (rollback = прежний мир, но пересборка
+    ///     сцены безопасна — REASSEMBLY-контракт);
+    ///   • Failed — fail-closed: домены сброшены/недостоверны, сессия в
+    ///     MainMenu — честный уход в главное меню с тостом.
     /// </summary>
     private void HandleSaveMenuLoadRequested(string slotName)
     {
@@ -545,13 +548,25 @@ public partial class GameWorldController : Node2D
             GD.PrintErr($"[GameWorld] Save-menu load '{slotName}' crashed: {ex.GetType().Name}: {ex.Message}");
         }
 
+        var outcome = Session?.LastLoadOutcome ?? LoadGameOutcome.Failed;
         var state = Session?.State ?? SessionState.MainMenu;
+        if (outcome == LoadGameOutcome.RejectedByPrecheck)
+        {
+            // Pre-flight отказ: мир НЕ трогали — сцена продолжает отражать
+            // играбельное состояние, пересборка не нужна. Меню остаётся
+            // открытым с причиной в статусе: игрок видит, почему слот не
+            // годится, и может выбрать другой (тост дублирует причину).
+            var reason = SaveService?.LastError;
+            GD.Print($"[GameWorld] Save-menu load '{slotName}' PRE-REJECTED — мир не тронут, игра продолжается (меню открыто)");
+            _saveLoadMenu?.ShowLoadError(reason ?? "слот повреждён или формат не поддерживается");
+            return;
+        }
         if (state == SessionState.Playing)
         {
-            // Успех: мир восстановлен ДО смены сцены (LoadGame синхронен).
-            // Сцена умирает ЦЕЛИКОМ (HUD, окна, рендеры) — закрывать меню
-            // и снимать паузу вручную не нужно.
-            GD.Print("[GameWorld] Save-menu load OK — rebuilding GameWorld scene");
+            // Success / RolledBack: мир восстановлен ДО смены сцены
+            // (LoadGame синхронен). Сцена умирает ЦЕЛИКОМ (HUD, окна,
+            // рендеры) — закрывать меню и снимать паузу вручную не нужно.
+            GD.Print($"[GameWorld] Save-menu load OK (outcome={outcome}) — rebuilding GameWorld scene");
             GetTree().ChangeSceneToFile(GameWorldScenePath);
         }
         else
@@ -759,6 +774,15 @@ public partial class GameWorldController : Node2D
         {
             var saveLoadSim = new SaveLoadSimDebug { Name = "SaveLoadSimDebug" };
             AddChild(saveLoadSim);
+        }
+        // Этап-4 аудита (20.10.2026, GODOT_STAGE4_DEBUG=1): полный
+        // GameSession.LoadGame-путь — pre-flight до сброса, транзакционный
+        // откат, полнота v2, синхронизация спавнера (BUG-013), персистентность
+        // групп NPC (GAP-014).
+        if (System.Environment.GetEnvironmentVariable("GODOT_STAGE4_DEBUG") == "1")
+        {
+            var stage4Sim = new Stage4SaveLoadSimDebug { Name = "Stage4SaveLoadSimDebug" };
+            AddChild(stage4Sim);
         }
         // 2026-09-08 (баг-репорт пользователя): headless-верификация
         // инвентарного drag&drop в корзину (GODOT_TRASHDROP_DEBUG=1) —

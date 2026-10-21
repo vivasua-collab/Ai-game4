@@ -25,7 +25,7 @@ namespace CultivationGame.Modules.NPC
     /// Фаза 1: новый SpawnNPC делегирует _assemblyService.Assemble().
     /// Старый SpawnNPC(presetId, position) — [Obsolete], мапит preset→species+role.
     /// </summary>
-    public class NPCSpawnerService : INPCSpawnerService, IDisposable
+    public class NPCSpawnerService : INPCSpawnerService, IPostLoadSync, IDisposable
     {
         // === Зависимости ===
         private readonly NPCService _npcService;
@@ -203,11 +203,19 @@ namespace CultivationGame.Modules.NPC
 
         /// <summary>
         /// Деспавнить NPC. Удаляет из NPCService, публикует событие.
+        /// Этап-4 (BUG-013): гейт — «трэкинг ИЛИ реестр». Прежде только
+        /// _spawnedIds: NPC, восстановленные из сейва (RestoreState пишет их
+        /// в реестр напрямую, минуя SpawnNPC), имели пустой трекер — штатный
+        /// деспавн был no-op (запись и per-entity данные оставались в
+        /// сервисах). Теперь восстановленный NPC проходит полный путь очистки.
         /// </summary>
         public void DespawnNPC(string npcId)
         {
             if (string.IsNullOrEmpty(npcId)) return;
-            if (!_spawnedIds.Contains(npcId)) return;
+            // Этап-4 (BUG-013): проходим, если NPC трекается спавнером ИЛИ
+            // реально присутствует в реестре NPCService (восстановлен из сейва).
+            bool tracked = _spawnedIds.Contains(npcId);
+            if (!tracked && _npcService.GetNPCState(npcId) == null) return;
 
             // Волна 2.1: Очистка per-entity провайдеров при деспавне
             _bodyDataProvider.RemoveEntity(npcId);
@@ -282,8 +290,59 @@ namespace CultivationGame.Modules.NPC
 
         /// <summary>
         /// Количество активных NPC.
+        /// Этап-4 (BUG-013): после загрузки сейва число верно благодаря
+        /// <see cref="SyncWithRegistry"/> — раньше здесь был счётчик только
+        /// ЗАНОВО заспавненных (восстановленные из сейва не считались),
+        /// лимит MaxActiveNPCs обходился.
         /// </summary>
         public int ActiveNPCCount => _spawnedIds.Count;
+
+        // === IPostLoadSync (Этап-4, BUG-013) ===
+
+        /// <summary>
+        /// Этап-4 (BUG-013): трекер спавнера — ПРОИЗВОДНОЕ состояние реестра
+        /// NPCService. При обычной игре они синхронны (SpawnNPC пишет в оба;
+        /// DespawnNPC чистит оба). При загрузке сейва NPCService.RestoreState
+        /// наполняет реестр НАПРЯМУЮ (минуя SpawnNPC — спавн-фазы имеют
+        /// SkipOnLoad=true), и _spawnedIds оставался пустым:
+        ///   • ActiveNPCCount не отражал население мира;
+        ///   • лимит MaxActiveNPCs обходился (спавнер «не знал» о
+        ///     восстановленных и разрешал новые спавны поверх);
+        ///   • DespawnNPC восстановленного NPC — no-op (гейт по трекеру).
+        /// Синхронизация: реестр — источник истины; трекер = все ID из
+        /// реестра (живые + мёртвые: мёртвые остаются в реестре до деспавна
+        /// — тот же инвариант, что и при штатном спавне-смерти-деспавне).
+        /// Вызывается GameSession-ом через IPostLoadSync после успешного
+        /// RestoreState и после отката транзакционной загрузки.
+        /// </summary>
+        public void OnAfterLoad() => SyncWithRegistry();
+
+        /// <summary>
+        /// Идемпотентная синхронизация _spawnedIds с реестром NPCService:
+        /// добавить отсутствующих (восстановлены из сейва/снимка), убрать
+        /// мёртвые ссылки (рассинхрон от прошлых сессий — защита).
+        /// </summary>
+        public void SyncWithRegistry()
+        {
+            var registry = _npcService.GetAllStates();
+            int before = _spawnedIds.Count;
+
+            // Убрать ID, которых больше нет в реестре (несуществующий
+            // трекинг ломал бы инвариант Count == реестр).
+            var registryIds = new HashSet<string>();
+            foreach (var st in registry)
+                registryIds.Add(st.NpcId);
+            _spawnedIds.RemoveWhere(id => !registryIds.Contains(id));
+
+            // Добавить ID реестра, которых нет в трекере.
+            int added = 0;
+            foreach (var id in registryIds)
+                if (_spawnedIds.Add(id)) added++;
+
+            if (before != _spawnedIds.Count || added > 0)
+                Console.WriteLine($"[NPCSpawnerService] SyncWithRegistry: трекер {before} → {_spawnedIds.Count} " +
+                    $"(+{added} восстановленных, реестр={registry.Count})");
+        }
 
         // === Внутренние методы (legacy-маппинг) ===
 

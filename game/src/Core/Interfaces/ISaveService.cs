@@ -21,6 +21,34 @@ namespace CultivationGame.Core.Interfaces
         IReadOnlyList<SaveInfo> GetAllSaves();
 
         /// <summary>
+        /// Этап-4 (P1, 20.10.2026): pre-flight проверка слота БЕЗ побочных
+        /// эффектов — формат (мета/версия/обязательные блоки) проверяется
+        /// ДО сброса активного мира. false — слот повреждён/неполон/
+        /// неподдерживаем; причина — в <see cref="LastError"/>. Домены не
+        /// трогаются (RestoreState не вызывается).
+        /// </summary>
+        bool Validate(SaveSlot slot);
+
+        /// <summary>
+        /// Этап-4 (P1, транзакционная загрузка): снять in-memory резервную
+        /// копию ВСЕХ доменов (CaptureState без записи файла и без
+        /// SaveStartedEvent — снимок неразрушающий). Возвращает false, если
+        /// хоть один домен не снялся (откат будет невозможен).
+        /// </summary>
+        bool CaptureBackup();
+
+        /// <summary>
+        /// Этап-4 (P1): откат к снимку <see cref="CaptureBackup"/> — вызывается
+        /// В СПАРКЕ со сбросом доменов (WorldDomainResetCoordinator.ResetAll)
+        /// ПОСЛЕ неудачной загрузки: сброс вычищает частично-восстановленное,
+        /// RestoreBackup возвращает предыдущий мир. Снимок при этом очищается.
+        /// </summary>
+        bool RestoreBackup();
+
+        /// <summary>Этап-4 (P1): освободить снимок без восстановления.</summary>
+        void DiscardBackup();
+
+        /// <summary>
         /// R11 P1-Save (review): описание последней ошибки Save/Load
         /// (null = успех). SaveModule публикует ЭТО в SaveCompletedEvent /
         /// LoadCompletedEvent — раньше success=true писался безусловно,

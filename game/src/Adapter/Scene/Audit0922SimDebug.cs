@@ -222,6 +222,7 @@ public partial class Audit0922SimDebug : Node
     {
         public SessionState State => SessionState.MainMenu;
         public GameSessionData Data { get; } = new();
+        public LoadGameOutcome LastLoadOutcome => LoadGameOutcome.None; // Этап-4: член интерфейса
         public void NewGame(int startVariant) { }
         public void NewGame(int startVariant, string locationId) { }
         public void LoadGame(string slotName) { }
@@ -273,6 +274,11 @@ public partial class Audit0922SimDebug : Node
         public bool HasSave(SaveSlot slot) => false;
         public bool DeleteSave(SaveSlot slot) => true;
         public IReadOnlyList<SaveInfo> GetAllSaves() => Array.Empty<SaveInfo>();
+        // Этап-4 (P1): члены транзакционной загрузки — фейку достаточно заглушек.
+        public bool Validate(SaveSlot slot) => true;
+        public bool CaptureBackup() => false;
+        public bool RestoreBackup() => false;
+        public void DiscardBackup() { }
         public string? LastError => null;
     }
 
@@ -281,6 +287,7 @@ public partial class Audit0922SimDebug : Node
     {
         public SessionState State => SessionState.Playing;
         public GameSessionData Data { get; } = new();
+        public LoadGameOutcome LastLoadOutcome => LoadGameOutcome.None; // Этап-4: член интерфейса
         public void NewGame(int startVariant) { }
         public void NewGame(int startVariant, string locationId) { }
         public void LoadGame(string slotName) { }
