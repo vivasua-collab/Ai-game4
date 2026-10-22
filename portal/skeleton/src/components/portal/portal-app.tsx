@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Activity, AudioLines, ClipboardList, Waypoints } from 'lucide-react';
+import { Activity, AudioLines, ClipboardList, Gamepad2, Waypoints } from 'lucide-react';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { PortalData } from '@/lib/portal/types';
@@ -22,6 +22,7 @@ import { PortalError } from './portal-error';
 import { PortalFooter } from './portal-footer';
 import { PortalHeader } from './portal-header';
 import { PortalSkeleton } from './portal-skeleton';
+import { PlayTestTab } from './playtest-tab';
 import { StatusTab } from './status-tab';
 import { TracksTab } from './tracks-tab';
 
@@ -115,6 +116,23 @@ export function PortalApp() {
                   ) : null}
                 </TabsTrigger>
                 <TabsTrigger
+                  value="playtest"
+                  className="min-h-8 gap-1.5 rounded-md px-3 text-xs font-medium text-stone-400 data-[state=active]:border-stone-700 data-[state=active]:bg-zinc-800 data-[state=active]:text-stone-50 sm:text-sm"
+                >
+                  <Gamepad2 aria-hidden="true" className="size-4 text-amber-400" />
+                  Плейтест
+                  {data.playtest ? (
+                    <span className="hidden font-mono text-[10px] text-stone-500 sm:inline">
+                      {
+                        data.playtest.categories?.reduce(
+                          (n, c) => n + (c.items?.length ?? 0),
+                          0,
+                        ) ?? 0
+                      }
+                    </span>
+                  ) : null}
+                </TabsTrigger>
+                <TabsTrigger
                   value="status"
                   className="min-h-8 gap-1.5 rounded-md px-3 text-xs font-medium text-stone-400 data-[state=active]:border-stone-700 data-[state=active]:bg-zinc-800 data-[state=active]:text-stone-50 sm:text-sm"
                 >
@@ -143,6 +161,16 @@ export function PortalApp() {
                     Карта шины недоступна — снимок portal/data/bus_map.json не
                     найден в репозитории (обновляется по требованию:
                     python3 tools/gen_bus_map.py).
+                  </p>
+                )}
+              </TabsContent>
+              <TabsContent value="playtest">
+                {data.playtest ? (
+                  <PlayTestTab playtest={data.playtest} />
+                ) : (
+                  <p className="pt-4 text-sm text-stone-500">
+                    Чек-лист плейтеста недоступен — portal/data/playtest.json не
+                    найден в репозитории.
                   </p>
                 )}
               </TabsContent>

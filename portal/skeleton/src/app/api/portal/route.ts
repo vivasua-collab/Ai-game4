@@ -14,6 +14,7 @@ import type {
   BugsFile,
   BusMapFile,
   Milestone,
+  PlayTestFile,
   ProjectInfo,
   StatusFile,
   Track,
@@ -26,6 +27,8 @@ const BUGS_PATH = '/home/z/my-project/aigame4/portal/data/bugs.json';
 const STATUS_PATH = '/home/z/my-project/aigame4/portal/data/status.json';
 /** Карта шины — снимок «по требованию» (gen_bus_map.py); отсутствие не ломает портал. */
 const BUS_MAP_PATH = '/home/z/my-project/aigame4/portal/data/bus_map.json';
+/** Чек-лист физического плейтеста владельца (директива 22.10 — «помнить детали до 25.10»). */
+const PLAYTEST_PATH = '/home/z/my-project/aigame4/portal/data/playtest.json';
 
 /** Чтение JSON с изоляцией ошибок. null → источник недоступен. */
 function readJson<T>(path: string, errors: string[]): T | null {
@@ -53,6 +56,7 @@ export async function GET() {
   const bugs = readJson<BugsFile>(BUGS_PATH, errors);
   const status = readJson<StatusFile>(STATUS_PATH, errors);
   const busMap = readJson<BusMapFile>(BUS_MAP_PATH, errors);
+  const playtest = readJson<PlayTestFile>(PLAYTEST_PATH, errors);
 
   const ok = map !== null && bugs !== null && status !== null;
 
@@ -65,6 +69,7 @@ export async function GET() {
       bugs,
       status,
       busMap,
+      playtest,
       errors,
     },
     { headers: { 'Cache-Control': 'no-store' } },

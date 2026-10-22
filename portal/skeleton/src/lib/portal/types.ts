@@ -224,6 +224,41 @@ export interface BusMapFile {
   };
 }
 
+/* ── Чек-лист плейтеста (portal/data/playtest.json) ───────────────────── */
+
+export type PlayTestPriority = 'high' | 'normal' | 'optional' | (string & {});
+export type PlayTestStatus = 'planned' | 'passed' | 'failed' | 'skipped' | (string & {});
+
+export interface PlayTestItem {
+  id: string;
+  title: string;
+  priority: PlayTestPriority;
+  status: PlayTestStatus;
+  refs?: string[];
+  steps: string[];
+  expected: string[];
+  note?: string;
+}
+
+export interface PlayTestCategory {
+  id: string;
+  title: string;
+  items: PlayTestItem[];
+}
+
+export interface PlayTestFile {
+  version?: string;
+  updated?: string;
+  format?: {
+    purpose?: string;
+    item_status?: Record<string, string>;
+    priority?: Record<string, string>;
+  };
+  window?: { note?: string; target?: string };
+  how?: string[];
+  categories: PlayTestCategory[];
+}
+
 /* ── Ответ API /api/portal ──────────────────────────────────────────────── */
 
 export interface PortalData {
@@ -234,5 +269,6 @@ export interface PortalData {
   bugs: BugsFile | null;
   status: StatusFile | null;
   busMap: BusMapFile | null;
+  playtest: PlayTestFile | null;
   errors: string[];
 }
