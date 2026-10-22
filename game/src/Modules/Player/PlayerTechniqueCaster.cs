@@ -5,9 +5,20 @@
 //   entity-aware сервис; ранний гейт Support/Healing до StartCharge;
 //   модульный гейт «мёртвый не кастует» (UI-гейты — GWC/fix-d).
 //
+// Редактировано: 2026-10-22 — Этап-8 аудита (ST8-01/02/03/05):
+//   ST8-01: запрет вырожденного направления AoE (прицел в свою клетку
+//     для Cone/Semicircle/Line — отказ с понятной причиной);
+//   ST8-02: FireTechnique → bool; отказ выпуска удержанной техники
+//     БОЛЬШЕ не растворяет её из ауры — удержание живёт, выпуск повторим;
+//   ST8-03: CompleteUse(publishUsedEvent) — Combat-путь молчит, событие
+//     использования публикует CombatService ровно один раз на пуск;
+//   ST8-05: Defense-гейт по MIN_QI_FOR_BUFFER до CompleteUse — щит без
+//     резерва Ци честно отказывает; резервный режим — с пометкой в reason.
+//
 // Поток:
 //   1. TechniqueCastRequestedEvent (Z / клик в панели T):
-//      - если аура удерживает технику → Release + FireTechnique (второе нажатие)
+//      - если аура удерживает технику → FireTechnique + Release ТОЛЬКО при успехе
+//        (ST8-02: отказ — удержание живёт, выпуск можно повторить)
 //      - иначе → валидация + TechniqueChargeService.StartCharge (первое нажатие)
 //   2. TechniqueChargeService.UpdateCharges (тик CombatModule) дренирует Ци по
 //      проводимости (chargeRate = conductivity × COMBAT_CHANNEL_MULT × masteryBonus).
@@ -181,8 +192,21 @@ public sealed class PlayerTechniqueCaster : IDisposable
             var heldTech = _techniques.GetTechnique(held.TechniqueId);
             if (heldTech != null)
             {
-                FireTechnique(heldTech, held.PotencyPermil, mouseX, mouseY);
-                _aura.Release(); // снимаем с ауры (fire уже применил эффект)
+                // ST8-02 (Этап-8 аудита, 22.10): Release — ТОЛЬКО при фактическом
+                // выпуске. Прежде аура освобождалась безусловно, а FireTechnique
+                // мог штатно отказать ДО CompleteUse (цель ушла из радиуса, тело
+                // уже не ранено, формация занята, Qi-гейт Defense) — техника
+                // бесследно исчезала: эффекта нет, кулдаун не потрачен, Ци
+                // зарядки сгорела. Теперь отказ = удержание живёт (Ци остаётся
+                // в ауре, декей §5.4 продолжает таять) — выпуск можно повторить.
+                bool fired = FireTechnique(heldTech, held.PotencyPermil, mouseX, mouseY);
+                if (fired)
+                {
+                    _aura.Release(); // снимаем с ауры (fire уже применил эффект)
+                    return;
+                }
+                // Отказ уже опубликован PublishFail внутри FireTechnique;
+                // удержание сохранено — игрок повторяет выпуск после устранения причины.
                 return;
             }
             // Техника больше не изучена — рассеять
@@ -257,9 +281,15 @@ public sealed class PlayerTechniqueCaster : IDisposable
         bool started = _chargeService.StartCharge(_player.PlayerId, e.TechniqueId, mouseX, mouseY);
         if (!started)
         {
+            // ST8-02 (Этап-8): честная причина отказа старта. Прежде цепочка
+            // не различала «уже заряжается» (StartCharge занят другой
+            // зарядкой) — игроку показывалось «Нет слота»/«Недостаточно Ци»,
+            // хотя реально шла зарядка другой техники.
             string reason = _techniques.GetCooldown(e.TechniqueId) > 0
                 ? "Перезарядка"
-                : (_techniques.FreeSlots(tech.Type) < 0 ? "Нет слота" : "Недостаточно Ци или проводимость");
+                : _chargeService.IsCharging(_player.PlayerId)
+                    ? "Уже заряжается другая техника"
+                    : (_techniques.FreeSlots(tech.Type) < 0 ? "Нет слота" : "Недостаточно Ци или проводимость");
             PublishFail(e.TechniqueId, reason);
         }
         // Успешный старт → дальнейшее происходит в OnChargeCompleted по тикум
@@ -313,8 +343,12 @@ public sealed class PlayerTechniqueCaster : IDisposable
     /// <summary>
     /// Выпустить технику: CompleteUse (кулдаун+мастерство) + эффект по типу.
     /// potencyPermil: 1000 базовая; >1000 — заряженная (пока всегда 1000 на Stage 0).
+    ///
+    /// ST8-02 (Этап-8): возвращает true ⇔ выпуск состоялся (эффект применён /
+    /// интент опубликован). false — штатный отказ (PublishFail уже отправлен):
+    /// удержанная техника ОСТАЕТСЯ в ауре, выпуск можно повторить.
     /// </summary>
-    private void FireTechnique(LearnedTechnique tech, int potencyPermil, int mouseX, int mouseY)
+    private bool FireTechnique(LearnedTechnique tech, int potencyPermil, int mouseX, int mouseY)
     {
         int playerX = _player.Position.X;
         int playerY = _player.Position.Y;
@@ -334,13 +368,13 @@ public sealed class PlayerTechniqueCaster : IDisposable
                     if (!IsAoeAimValid(tech, mouseX, mouseY, out string aimReason))
                     {
                         PublishFail(tech.TechniqueId, aimReason);
-                        return;
+                        return false;
                     }
                 }
                 else if (FindTargetInRange(tech) == null)
                 {
                     PublishFail(tech.TechniqueId, "Цель исчезла");
-                    return;
+                    return false;
                 }
                 break;
             case TechniqueType.Healing:
@@ -349,7 +383,7 @@ public sealed class PlayerTechniqueCaster : IDisposable
                 if (!_hasDamagedParts())
                 {
                     PublishFail(tech.TechniqueId, "Тело не ранено");
-                    return;
+                    return false;
                 }
                 break;
             // BUG-001: Poison/Curse — цель обязана быть жива в момент выпуска
@@ -359,25 +393,42 @@ public sealed class PlayerTechniqueCaster : IDisposable
                 if (FindTargetInRange(tech) == null)
                 {
                     PublishFail(tech.TechniqueId, "Цель исчезла");
-                    return;
+                    return false;
                 }
                 break;
             case TechniqueType.Formation:
                 if (_formations.CurrentStage != Core.Data.FormationStage.None)
                 {
                     PublishFail(tech.TechniqueId, "Формация уже создаётся");
-                    return;
+                    return false;
+                }
+                break;
+            // ST8-05 (Этап-8 аудита, 22.10): щит без резерва Ци — не «успех без
+            // эффекта». QiBufferService.Activate при пуле < MIN_QI_FOR_BUFFER
+            // теперь отказывает вовсе, а AbsorbDamage при таком остатке
+            // физически не поглощает ничего. Гейт ДО CompleteUse (R23-1: Ци
+            // зарядки не возвращается — как у отказов «Цель исчезла»):
+            // удержанная техника остаётся в ауре, выпуск повторим после регена.
+            case TechniqueType.Defense:
+                if (_techniques.CachedCurrentQi < GameConstants.MIN_QI_FOR_BUFFER)
+                {
+                    PublishFail(tech.TechniqueId, "Недостаточно Ци для щита");
+                    return false;
                 }
                 break;
         }
 
         // CompleteUse: кулдаун + мастерство + TechniqueUsedEvent (БЕЗ расхода Ци —
         // уже списано тиками в TechniqueChargeService).
-        if (!_techniques.CompleteUse(tech.TechniqueId))
+        // ST8-03: Combat-путь МОЛЧИТ (publishUsedEvent=false) — единственный
+        // издатель события для Combat = CombatService в момент фактического
+        // пуска; отказ гейтов тогда не создаёт ложный INT-прирост.
+        if (!_techniques.CompleteUse(tech.TechniqueId,
+                publishUsedEvent: tech.Type != TechniqueType.Combat))
         {
             PublishFail(tech.TechniqueId, _techniques.GetCooldown(tech.TechniqueId) > 0
                 ? "Перезарядка" : "Применение невозможно");
-            return;
+            return false;
         }
 
         // R23-1 (CMB-1): запоминаем выпуск — если CombatService отклонит
@@ -406,7 +457,7 @@ public sealed class PlayerTechniqueCaster : IDisposable
                         // (безопасная ветка — кадр тот же) → рефанд, техника не сгорает.
                         _techniques.RefundUse(tech.TechniqueId);
                         PublishFail(tech.TechniqueId, "Цель исчезла");
-                        return;
+                        return false;
                     }
                     // Ф3-2: для AoE цели может не быть — это НЕ ошибка; вместо
                     // неё финальная проверка прицела в момент выпуска.
@@ -414,7 +465,7 @@ public sealed class PlayerTechniqueCaster : IDisposable
                     {
                         _techniques.RefundUse(tech.TechniqueId);
                         PublishFail(tech.TechniqueId, aimReason);
-                        return;
+                        return false;
                     }
                 }
                 bool isRanged = tech.Subtype is CombatSubtype.RangedProjectile
@@ -438,7 +489,11 @@ public sealed class PlayerTechniqueCaster : IDisposable
                 // рефандом R23-1 как раньше — визуал уже честно показал ВЫПУСК.
                 if (_lastFiredTechniqueId != null)
                     PublishSuccess(tech, playerX, playerY, target);
-                return;
+                // ST8-02: синхронный отказ боевого пайплайна (гейты участника/каста
+                // успели прийти в этом же стеке — OnAttackRejected погасил
+                // _lastFiredTechniqueId и вернул кулдаун/мастерство) = несостоявшийся
+                // выпуск: false → удержание (если было) живёт, выпуск повторим.
+                return _lastFiredTechniqueId != null;
             }
 
             case TechniqueType.Healing:
@@ -446,14 +501,14 @@ public sealed class PlayerTechniqueCaster : IDisposable
                 if (!_hasDamagedParts())
                 {
                     PublishFail(tech.TechniqueId, "Тело не ранено");
-                    return;
+                    return false;
                 }
                 // potency применяется к лечению (Stage 0: 1000 = ×1.0)
                 int healAmount = tech.BaseDamage > 0 ? tech.BaseDamage : 10;
                 healAmount = healAmount * potencyPermil / 1000;
                 HealDamagedParts(healAmount);
                 PublishSuccess(tech, playerX, playerY, null, visualKind: 3);
-                return;
+                return true;
             }
 
             case TechniqueType.Defense:
@@ -462,8 +517,14 @@ public sealed class PlayerTechniqueCaster : IDisposable
                 long invest = Math.Max(50, tech.QiCost);
                 invest = invest * potencyPermil / 1000;
                 _qiBufferActivatePub.Publish(new QiBufferActivateRequestEvent(invest, QiBufferMode.Shield));
-                PublishSuccess(tech, playerX, playerY, null, visualKind: 4);
-                return;
+                // ST8-05: честный reason — резервный режим (инвестиция не
+                // списалась, буфер работает от текущего пула, QiInvested=0)
+                // отличается от полной инвестиции; отказ (пул < MIN_QI_FOR_BUFFER)
+                // сюда не доходит — гейт пре-валидации выше уже вернул false.
+                bool fallback = _techniques.CachedCurrentQi < invest;
+                PublishSuccess(tech, playerX, playerY, null, visualKind: 4,
+                    reason: fallback ? "Щит-резерв: без инвестиции Ци" : "");
+                return true;
             }
 
             case TechniqueType.Movement:
@@ -477,7 +538,7 @@ public sealed class PlayerTechniqueCaster : IDisposable
                 _player.SetPosition(ComputeDashTarget(playerX, playerY, dirX, dirY,
                     DashDistanceTiles, MaxTileX, MaxTileY));
                 PublishSuccess(tech, playerX, playerY, null, visualKind: 2);
-                return;
+                return true;
             }
 
             // BUG-001 (аудит 10-19, волна 1): 4 типа получили честные эффекты.
@@ -495,7 +556,7 @@ public sealed class PlayerTechniqueCaster : IDisposable
                 {
                     _techniques.RefundUse(tech.TechniqueId);
                     PublishFail(tech.TechniqueId, "Цель исчезла");
-                    return;
+                    return false;
                 }
                 // Тик-урон: BaseDamage делится на число тиков (суммарно ≈ удар
                 // техники, разнесённый во времени и игнорирующий броню).
@@ -507,10 +568,10 @@ public sealed class PlayerTechniqueCaster : IDisposable
                 {
                     _techniques.RefundUse(tech.TechniqueId);
                     PublishFail(tech.TechniqueId, "Цель не принимает яд");
-                    return;
+                    return false;
                 }
                 PublishSuccess(tech, playerX, playerY, dotTarget);
-                return;
+                return true;
             }
 
             case TechniqueType.Curse:
@@ -522,17 +583,17 @@ public sealed class PlayerTechniqueCaster : IDisposable
                 {
                     _techniques.RefundUse(tech.TechniqueId);
                     PublishFail(tech.TechniqueId, "Цель исчезла");
-                    return;
+                    return false;
                 }
                 int weakenPermil = Math.Max(50, CurseWeakenPermil * potencyPermil / 1000);
                 if (!_buffs.ApplyBuff(curseTarget, CurseBuffId, CurseDurationSec, weakenPermil))
                 {
                     _techniques.RefundUse(tech.TechniqueId);
                     PublishFail(tech.TechniqueId, "Проклятие не ложится");
-                    return;
+                    return false;
                 }
                 PublishSuccess(tech, playerX, playerY, curseTarget);
-                return;
+                return true;
             }
 
             case TechniqueType.Sensory:
@@ -545,10 +606,10 @@ public sealed class PlayerTechniqueCaster : IDisposable
                 {
                     _techniques.RefundUse(tech.TechniqueId);
                     PublishFail(tech.TechniqueId, "Применение невозможно");
-                    return;
+                    return false;
                 }
                 PublishSuccess(tech, playerX, playerY, null, visualKind: 2);
-                return;
+                return true;
             }
 
             case TechniqueType.Support:
@@ -558,7 +619,7 @@ public sealed class PlayerTechniqueCaster : IDisposable
                 int supportHeal = Math.Max(1, tech.BaseDamage * potencyPermil / 1000 / SupportHealDivisor);
                 HealDamagedParts(supportHeal);
                 PublishSuccess(tech, playerX, playerY, null, visualKind: 3);
-                return;
+                return true;
             }
 
             case TechniqueType.Formation:
@@ -566,7 +627,7 @@ public sealed class PlayerTechniqueCaster : IDisposable
                 if (_formations.CurrentStage != Core.Data.FormationStage.None)
                 {
                     PublishFail(tech.TechniqueId, "Формация уже создаётся");
-                    return;
+                    return false;
                 }
                 var type = FormationTypePool[_formationRng.Next(FormationTypePool.Length)];
                 var data = _formationGenerator.GenerateSpecified(
@@ -579,15 +640,15 @@ public sealed class PlayerTechniqueCaster : IDisposable
                     // рефанд кулдауна+мастерства (паттерн R23-1 RefundUse).
                     _techniques.RefundUse(tech.TechniqueId);
                     PublishFail(tech.TechniqueId, "Не хватает Ци на контур или уровень мал");
-                    return;
+                    return false;
                 }
                 PublishSuccess(tech, playerX, playerY, null, visualKind: 2);
-                return;
+                return true;
             }
 
             default:
                 PublishFail(tech.TechniqueId, "Тип техники не поддерживается");
-                return;
+                return false;
         }
     }
 
@@ -714,6 +775,20 @@ public sealed class PlayerTechniqueCaster : IDisposable
             reason = "Прицел вне радиуса техники";
             return false;
         }
+
+        // ST8-01 (Этап-8 аудита, 22.10): направленная форма (конус/полукруг/
+        // линия) с прицелом в СВОЮ клетку — вырожденное направление. Раньше
+        // такой прицел проходил валидацию, а AoEResolver разворачивал форму
+        // в круг (все цели в радиусе). Теперь: отказ с понятной причиной —
+        // целимся мимо себя. Круг (эпицентр = прицел) НЕ запрещён.
+        if (tech.Type == TechniqueType.Combat
+            && tech.Subtype == CombatSubtype.RangedAoe
+            && tech.AoeShape is AoeShape.Cone or AoeShape.Semicircle or AoeShape.Line
+            && aimTileX == p.X && aimTileY == p.Y)
+        {
+            reason = "Прицел в свою клетку — задайте направление";
+            return false;
+        }
         return true;
     }
 
@@ -747,7 +822,8 @@ public sealed class PlayerTechniqueCaster : IDisposable
         }
     }
 
-    private void PublishSuccess(LearnedTechnique tech, int px, int py, string? targetId, int visualKind = 0)
+    private void PublishSuccess(LearnedTechnique tech, int px, int py, string? targetId,
+        int visualKind = 0, string reason = "")
     {
         // R29 (план R23 §6.7): подавление дублей визуалов — у AoE-залпов и
         // хоуминг-снарядов теперь ТОЧНЫЕ рендеры по их собственным событиям:
@@ -770,7 +846,7 @@ public sealed class PlayerTechniqueCaster : IDisposable
             visualKind = tech.Subtype is CombatSubtype.RangedAoe ? 1 : 0;
 
         _castResultPub.Publish(new TechniqueCastResultEvent(
-            tech.TechniqueId, true, "",
+            tech.TechniqueId, true, reason,
             px * GameConstants.TILE_PIXELS * 1000, py * GameConstants.TILE_PIXELS * 1000,
             tx * GameConstants.TILE_PIXELS * 1000, ty * GameConstants.TILE_PIXELS * 1000,
             tech.Type, tech.Element, visualKind));

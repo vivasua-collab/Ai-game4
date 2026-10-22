@@ -34,7 +34,19 @@ namespace CultivationGame.Modules.Player
         private readonly IPlayerService _player;
         // B5 (2026-08-26): подписка на SaveStartedEvent для рассеивания удержания при сейве
         private readonly ISubscriber<SaveStartedEvent> _saveStartedSub;
+        // ST8-04 (Этап-8 аудита, 22.10): §5.4 документирует принудительное
+        // рассеивание при стюне/смерти/медитации — раньше контракт был
+        // задекларирован, но НИКТО не вызывал Dissipate по этим причинам.
+        private readonly ISubscriber<PlayerDeathEvent> _playerDeathSub;
+        private readonly ISubscriber<MeditationStateChangedEvent> _meditationSub;
+        private readonly ISubscriber<BuffAppliedEvent> _buffAppliedSub;
         private IDisposable? _saveStartedSubscription;
+        private IDisposable? _playerDeathSubscription;
+        private IDisposable? _meditationSubscription;
+        private IDisposable? _buffAppliedSubscription;
+
+        /// <summary>Ид баффа боевого оглушения (CombatConsequencesService).</summary>
+        public const string CombatStunBuffId = "combat_stun";
 
         /// <summary>Текущее удержание (null = аура пуста).</summary>
         private HeldTechnique? _held;
@@ -44,16 +56,41 @@ namespace CultivationGame.Modules.Player
             IPublisher<HeldTechniqueChangedEvent> heldPub,
             IPublisher<QiAddRequestEvent> qiAddPub,
             IPlayerService player,
-            ISubscriber<SaveStartedEvent> saveStartedSub)
+            ISubscriber<SaveStartedEvent> saveStartedSub,
+            ISubscriber<PlayerDeathEvent> playerDeathSub,
+            ISubscriber<MeditationStateChangedEvent> meditationSub,
+            ISubscriber<BuffAppliedEvent> buffAppliedSub)
         {
             _heldPub = heldPub;
             _qiAddPub = qiAddPub;
             _player = player;
             _saveStartedSub = saveStartedSub;
+            _playerDeathSub = playerDeathSub;
+            _meditationSub = meditationSub;
+            _buffAppliedSub = buffAppliedSub;
 
             // B5: рассеять удержание при начале сейва (возврат 50% ChargedQi).
             _saveStartedSubscription = _saveStartedSub.Subscribe((in SaveStartedEvent e) => {
                 Dissipate("save");
+            });
+
+            // ST8-04: смерть игрока — удержание рассеивается (возврат 50%
+            // остаточной Ци, §5.4), аура не переживает смерть владельца.
+            _playerDeathSubscription = _playerDeathSub.Subscribe((in PlayerDeathEvent e) => {
+                Dissipate("death");
+            });
+
+            // ST8-04: медитация — концентрация уходит внутрь, удержание
+            // внешней техники невозможно (§5.4 «стюн/смерть/медитация»).
+            _meditationSubscription = _meditationSub.Subscribe((in MeditationStateChangedEvent e) => {
+                if (e.IsActive) Dissipate("meditation");
+            });
+
+            // ST8-04: боевой стюн (бафф combat_stun) рвёт концентрацию.
+            _buffAppliedSubscription = _buffAppliedSub.Subscribe((in BuffAppliedEvent e) => {
+                if (e.BuffId != CombatStunBuffId) return;
+                if (!Core.Helpers.PlayerIdResolver.AreSameEntity(e.EntityId, _player.PlayerId)) return;
+                Dissipate("stun");
             });
         }
 
@@ -142,20 +179,24 @@ namespace CultivationGame.Modules.Player
             long decayPerTick = Math.Max(1L, (long)Math.Ceiling(decayPerTickRaw));
             long newCharged = h.ChargedQi - decayPerTick;
 
+            // ST8-06 (Этап-8 аудита, 22.10): декей СПЕРДА фиксируется, порог и
+            // возврат считают от ФАКТИЧЕСКОГО остатка на момент рассеивания.
+            // Прежде: порог проверял newCharged (post-decay), а возврат брал
+            // 50% от ChargedQi ДО дека́я — «остаточная Ци» расходилась с
+            // контрактом §5.4 на величину последнего шага.
+            h.ChargedQi = newCharged;
+
             if (newCharged <= h.QiCost / 2)
             {
-                // Рассеяние (декей превысил половину)
+                // Рассеяние (декей превысил половину) — 50% остаточной (post-decay)
                 _held = null;
-                long refund = h.ChargedQi * GameConstants.CHARGE_CANCEL_REFUND_PERMIL / 1000;
+                long refund = newCharged * GameConstants.CHARGE_CANCEL_REFUND_PERMIL / 1000;
                 if (refund > 0)
                     _qiAddPub.Publish(new QiAddRequestEvent(refund, "AuraHoldService:decay"));
                 _heldPub.Publish(new HeldTechniqueChangedEvent(
                     _player.PlayerId, "", GameConstants.POTENCY_BASE_PERMIL, Element.Neutral));
                 return;
             }
-
-            // Обновляем (class — мутируем поле)
-            h.ChargedQi = newCharged;
         }
 
         public void Dispose()
@@ -164,6 +205,12 @@ namespace CultivationGame.Modules.Player
             _held = null;
             _saveStartedSubscription?.Dispose();
             _saveStartedSubscription = null;
+            _playerDeathSubscription?.Dispose();
+            _playerDeathSubscription = null;
+            _meditationSubscription?.Dispose();
+            _meditationSubscription = null;
+            _buffAppliedSubscription?.Dispose();
+            _buffAppliedSubscription = null;
         }
 
         // === AUDIT-0921 B1: IWorldResettable =============================

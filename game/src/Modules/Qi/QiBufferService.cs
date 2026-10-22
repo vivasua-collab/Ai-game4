@@ -92,10 +92,27 @@ public class QiBufferService : IQiBufferService, IDisposable
         {
             _qiInvested = qiInvested;
         }
+        else if (_qiService.CurrentQi >= GameConstants.MIN_QI_FOR_BUFFER)
+        {
+            // ST8-05 (Этап-8 аудита, 22.10): инвестиция не списалась, но в ядре
+            // достаточно Ци для работы буфера (≥ MIN_QI_FOR_BUFFER) — ЧЕСТНЫЙ
+            // резервный режим: щит активен с QiInvested=0 и поглощает из
+            // текущего пула (AbsorbDamage/ProcessShieldDamage). QiBufferActivated
+            // .QiInvested=0 честно сообщает UI о резервном режиме.
+            _qiInvested = 0;
+        }
         else
         {
-            // Не хватило Ци — активируем без инвестиции (сырая защита)
+            // ST8-05: Ци ниже MIN_QI_FOR_BUFFER — буфер физически НЕ МОЖЕТ
+            // поглотить ничего (AbsorbDamage при currentQi < MIN_QI_FOR_BUFFER
+            // возвращает нулевое поглощение). Активация «для галочки» — ложный
+            // успех: отказ. QiBufferActivatedEvent НЕ публикуем (активации не
+            // было), QiBufferStateChangedEvent синхронизирует UI с фактом.
+            _isActive = false;
+            _mode = QiBufferMode.None;
             _qiInvested = 0;
+            _bufferStateChangedPub.Publish(new QiBufferStateChangedEvent(false, QiBufferMode.None, 0, _entityId));
+            return;
         }
 
         _mode = mode;

@@ -51,6 +51,14 @@ namespace CultivationGame.Modules.Combat
         private readonly TechniqueService _techniqueService;
         // B5 (2026-08-26): подписка на SaveStartedEvent для отмены зарядок при сейве
         private readonly ISubscriber<SaveStartedEvent> _saveStartedSub;
+        // ST8-04 (Этап-8 аудита, 22.10): §5.4-контракт прерываний. Зарядка —
+        // каналинг: смерть/боевой стюн/медитация обязаны срывать её с
+        // честным возвратом 50% ChargedQi (те же причины, что у Dissipate
+        // ауры; прежде были wired только save и world_reset — мёртвый
+        // игрок продолжал тратить Ци на зарядку до самого Completion).
+        private readonly ISubscriber<PlayerDeathEvent> _playerDeathSub;
+        private readonly ISubscriber<MeditationStateChangedEvent> _meditationSub;
+        private readonly ISubscriber<BuffAppliedEvent> _buffAppliedSub;
 
         // EVT-01: кэш состояния из событий (per-entity)
         private readonly Dictionary<string, QiCache> _qiCache = new();
@@ -58,6 +66,12 @@ namespace CultivationGame.Modules.Combat
         // IDisposable для подписок
         private IDisposable _qiChangedSubscription;
         private IDisposable _saveStartedSubscription;
+        private IDisposable _playerDeathSubscription;
+        private IDisposable _meditationSubscription;
+        private IDisposable _buffAppliedSubscription;
+
+        /// <summary>Ид баффа боевого оглушения (CombatConsequencesService).</summary>
+        public const string CombatStunBuffId = "combat_stun";
 
         // === Состояние ===
         // per-entity: одна активная зарядка на сущность (игрок/каждый NPC, если бы NPC юзал)
@@ -99,7 +113,10 @@ namespace CultivationGame.Modules.Combat
             IPublisher<TechniqueChargeCompletedEvent> completedPub,
             IPublisher<TechniqueChargeCancelledEvent> cancelledPub,
             TechniqueService techniqueService,
-            ISubscriber<SaveStartedEvent> saveStartedSub)
+            ISubscriber<SaveStartedEvent> saveStartedSub,
+            ISubscriber<PlayerDeathEvent> playerDeathSub,
+            ISubscriber<MeditationStateChangedEvent> meditationSub,
+            ISubscriber<BuffAppliedEvent> buffAppliedSub)
         {
             _qiChangedSub = qiChangedSub;
             _qiConsumeRequestPub = qiConsumeRequestPub;
@@ -110,6 +127,9 @@ namespace CultivationGame.Modules.Combat
             _cancelledPub = cancelledPub;
             _techniqueService = techniqueService;
             _saveStartedSub = saveStartedSub;
+            _playerDeathSub = playerDeathSub;
+            _meditationSub = meditationSub;
+            _buffAppliedSub = buffAppliedSub;
 
             // EVT-01: подписка на кэш состояния Ци (per-entity)
             // B1 (2026-08-26): нормализация ID игрока через PlayerIdResolver —
@@ -130,6 +150,24 @@ namespace CultivationGame.Modules.Combat
             // иначе активные зарядки теряются при сериализации (без возврата Ци).
             _saveStartedSubscription = _saveStartedSub.Subscribe((in SaveStartedEvent e) => {
                 CancelAllCharges("save");
+            });
+
+            // ST8-04: смерть — зарядка мёртвого невозможна; возврат 50%.
+            _playerDeathSubscription = _playerDeathSub.Subscribe((in PlayerDeathEvent e) => {
+                CancelCharge(Core.Helpers.PlayerIdResolver.PlayerCanonical, "death");
+            });
+
+            // ST8-04: медитация — концентрация уходит в себя, зарядка
+            // внешней техники срывается; возврат 50%.
+            _meditationSubscription = _meditationSub.Subscribe((in MeditationStateChangedEvent e) => {
+                if (!e.IsActive) return;
+                CancelCharge(Core.Helpers.PlayerIdResolver.PlayerCanonical, "meditation");
+            });
+
+            // ST8-04: боевой стюн (combat_stun) срывает каналинг; возврат 50%.
+            _buffAppliedSubscription = _buffAppliedSub.Subscribe((in BuffAppliedEvent e) => {
+                if (e.BuffId != CombatStunBuffId) return;
+                CancelCharge(Core.Helpers.PlayerIdResolver.Normalize(e.EntityId), "stun");
             });
         }
 
@@ -330,7 +368,11 @@ namespace CultivationGame.Modules.Combat
         /// </summary>
         public void CancelCharge(string entityId, string reason = "user_cancel")
         {
-            if (!_activeCharges.TryGetValue(entityId, out var state)) return;
+            // ST8-04: нормализация алиасов игрока — события смерти/медитации
+            // приходят без сущности, гейт вызывается с каноническим ID;
+            // алиас "player" (Qi-домен) не должен промахиваться мимо ключа.
+            string key = Core.Helpers.PlayerIdResolver.Normalize(entityId);
+            if (!_activeCharges.TryGetValue(key, out var state)) return;
             List<string>? cancelledIds = null;
             CancelChargeInternal(state, reason, ref cancelledIds);
             if (cancelledIds != null)
@@ -412,6 +454,12 @@ namespace CultivationGame.Modules.Combat
             _qiChangedSubscription = null;
             _saveStartedSubscription?.Dispose();
             _saveStartedSubscription = null;
+            _playerDeathSubscription?.Dispose();
+            _playerDeathSubscription = null;
+            _meditationSubscription?.Dispose();
+            _meditationSubscription = null;
+            _buffAppliedSubscription?.Dispose();
+            _buffAppliedSubscription = null;
         }
 
         // === AUDIT-0921 B1: IWorldResettable =============================

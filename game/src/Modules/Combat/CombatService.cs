@@ -914,8 +914,10 @@ namespace CultivationGame.Modules.Combat
             };
             _projectiles.Add(prj);
 
-            // Пуск = использование (Ци уже списана тиками зарядки/ CompleteUse
-            // до интента; TechniqueUsedEvent — информационный, 1× на пуск).
+            // Пуск = использование (Ци уже списана тиками зарядки;
+            // CompleteUse для Combat больше НЕ публикует событие — ST8-03:
+            // единственная публикация на пуск здесь, в момент фактического
+            // выпуска снаряда, после гейтов).
             _techniqueUsedPub.Publish(new TechniqueUsedEvent(
                 attackerId, techniqueId, GetTechniqueQiCost(techniqueId)));
 
@@ -1076,9 +1078,11 @@ namespace CultivationGame.Modules.Combat
                     tech.Element, ids));
             }
 
-            // Один TechniqueUsedEvent на ЗАЛП (не N per-target: кулдаун/
-            // мастерство уже начислены TechniqueService.CompleteUse ДО интента;
-            // Ци списана тиками зарядки — повторные события только шум).
+            // Один TechniqueUsedEvent на ЗАЛП (не N per-target). ST8-03
+            // (Этап-8): единственный издатель для Combat-каста — CombatService
+            // (здесь, до пер-target резолвов и после гейтов); CompleteUse
+            // игрока для Combat молчит — иначе StatProgressProducer дважды
+            // начислял бы INT за одно применение.
             _techniqueUsedPub.Publish(new TechniqueUsedEvent(
                 attackerId, techniqueId, GetTechniqueQiCost(techniqueId)));
 
@@ -1423,10 +1427,17 @@ namespace CultivationGame.Modules.Combat
             // C7-E01 FIX: QiCost = стоимость Ци техники, а не baseDamage
             // Фаза 9D: QiCost float→int (ЗАПРЕТ 3.9)
             // R25: per-target вызовы AoE-залпа публикуют ОДНО событие
-            // в ExecuteAoeVolley (кулдаун/мастерство/Ци уже списаны —
-            // повторные события только шум в killfeed/UI).
+            // в ExecuteAoeVolley. ST8-03 (Этап-8): CombatService — ЕДИНСТВЕННЫЙ
+            // издатель события для Combat-каста (CompleteUse игрока молчит) —
+            // «одно применение = один учёт прогресса», синхронный отказ гейтов
+            // события не публикует (ложного INT-прироста нет).
+            // ST8-03 (доп.): событие — ТОЛЬКО для реальных техник (tech != null):
+            // базовая атака ("basic_attack", Space) техникой не является —
+            // прежде StatProgressProducer начислял INT +0.001 за каждый
+            // удар кулаком/оружием, минуя контракт §5.1 «использование
+            // ТЕХНИКИ → INT» (поймано Stage8-симом: TECH USED 'basic_attack').
             int qiCost = GetTechniqueQiCost(techniqueId);
-            if (!suppressTechUsed)
+            if (!suppressTechUsed && tech != null)
                 _techniqueUsedPub.Publish(new TechniqueUsedEvent(attackerId, techniqueId, qiCost));
 
             // Проверяем результат боя

@@ -290,16 +290,29 @@ public sealed class AoEResolver
             }
 
             case AoeShape.Semicircle:
+            {
+                // ST8-01 (Этап-8 аудита, 22.10): вырожденное направление
+                // (прицел в клетку кастера) НЕ означает «круг» — направленная
+                // форма без направления не поражает ничего. Прежнее поведение:
+                // Dot(v, 0,0) = 0 ≥ 0 — пропускало ВСЕ цели в радиусе.
+                int dx = q.AimPos.X - q.CasterPos.X;
+                int dy = q.AimPos.Y - q.CasterPos.Y;
+                if (dx == 0 && dy == 0) return false;
                 // Полукруг = конус 90° (v·d ≥ 0): всё перед кастером
                 return Math.Max(Math.Abs(vx), Math.Abs(vy)) <= radius
-                    && Dot(vx, vy, q.AimPos.X - q.CasterPos.X, q.AimPos.Y - q.CasterPos.Y) >= 0;
+                    && Dot(vx, vy, dx, dy) >= 0;
+            }
 
             case AoeShape.Cone:
             {
                 if (Math.Max(Math.Abs(vx), Math.Abs(vy)) > radius) return false;
                 int dx = q.AimPos.X - q.CasterPos.X;
                 int dy = q.AimPos.Y - q.CasterPos.Y;
-                if (dx == 0 && dy == 0) return true; // прицел в кастер — форма «вырождена», берём всех в радиусе
+                // ST8-01 (Этап-8 аудита, 22.10): направленная форма без
+                // направления — НЕ круг. Конус с прицелом в клетку кастера
+                // не поражает ничего (прежний R25-выбор «берём всех в радиусе»
+                // отменён владельцем: вырожденный вектор — ошибка прицела).
+                if (dx == 0 && dy == 0) return false;
                 int dot = Dot(vx, vy, dx, dy);
                 // v·d ≥ 0 — цель хотя бы в полупространстве прицела
                 if (dot < 0) return false;
@@ -313,7 +326,9 @@ public sealed class AoEResolver
             {
                 int dx = q.AimPos.X - q.CasterPos.X;
                 int dy = q.AimPos.Y - q.CasterPos.Y;
-                if (dx == 0 && dy == 0) return Math.Max(Math.Abs(vx), Math.Abs(vy)) <= radius;
+                // ST8-01 (Этап-8 аудита, 22.10): луч без направления — ничто
+                // (прежде: вырожденный вектор поражал всех в радиусе).
+                if (dx == 0 && dy == 0) return false;
                 long dot = Dot(vx, vy, dx, dy);
                 if (dot < 0) return false;                       // позади кастера
                 long d2 = (long)dx * dx + (long)dy * dy;

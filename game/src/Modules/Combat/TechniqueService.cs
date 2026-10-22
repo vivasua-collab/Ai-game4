@@ -529,8 +529,17 @@ namespace CultivationGame.Modules.Combat
         /// TechniqueChargeService дренировал Ци тиками (расход уже учтён).
         /// Делает ТОЛЬКО: установку кулдауна, рост мастерства, публикацию TechniqueUsedEvent.
         /// НЕ списывает Ци (уже сделано сервисом зарядки).
+        ///
+        /// ST8-03 (Этап-8 аудита, 22.10): контракт «одно применение — одно
+        /// событие TechniqueUsedEvent». Боевой путь CombatService публикует
+        /// событие в момент ФАКТИЧЕСКОГО пуска (после гейтов участника/каста,
+        /// перед пайплайном урона) — для TechniqueType.Combat вызывающий
+        /// передаёт publishUsedEvent=false, иначе StatProgressProducer
+        /// засчитывал бы INT-прирост дважды (CompleteUse + CombatService),
+        /// а синхронный отказ атаки оставлял бы необратимый прирост от
+        /// несостоявшегося применения.
         /// </summary>
-        public bool CompleteUse(string techniqueId)
+        public bool CompleteUse(string techniqueId, bool publishUsedEvent = true)
         {
             if (!_learnedTechniques.TryGetValue(techniqueId, out var tech))
                 return false;
@@ -546,12 +555,23 @@ namespace CultivationGame.Modules.Combat
             // Рост мастерства (TECHNIQUE_SYSTEM.md §5.1 шаг 5)
             tech.Mastery = MathF.Min(100f, tech.Mastery + 0.01f);
 
-            // Публикация события
-            _techniqueUsedPub.Publish(new TechniqueUsedEvent(
-                _cachedEntityId, techniqueId, (int)tech.QiCost));
+            // Публикация события (ST8-03: Combat-путь молчит — публикует CombatService)
+            if (publishUsedEvent)
+            {
+                _techniqueUsedPub.Publish(new TechniqueUsedEvent(
+                    _cachedEntityId, techniqueId, (int)tech.QiCost));
+            }
 
             return true;
         }
+
+        /// <summary>
+        /// ST8-05 (Этап-8 аудита, 22.10): актуальный остаток Ци игрока из
+        /// EVT-01-кэша (QiChangedEvent). Гейт Defense-выпуска
+        /// (PlayerTechniqueCaster) сверяется с MIN_QI_FOR_BUFFER ДО
+        /// CompleteUse — щит без резерва Ци не должен сообщать об успехе.
+        /// </summary>
+        public long CachedCurrentQi => _cachedCurrentQi;
 
         /// <summary>
         /// R23-1 (аудит CMB-1): откат CompleteUse — кулдаун снят, мастерство

@@ -819,6 +819,22 @@ public partial class GameWorldController : Node2D
             var stage7Sim = new Stage7QuestTruthSimDebug { Name = "Stage7QuestTruthSimDebug" };
             AddChild(stage7Sim);
         }
+        // Этап-8 аудита (22.10, GODOT_STAGE8_DEBUG=1): техники/Ци/эффекты —
+        // ST8-01 (вырожденное направление AoE ≠ круг: конус/полукруг/линия
+        // с прицелом в клетку кастера не поражают никого + отказ каста
+        // «Прицел в свою клетку»), ST8-02 (отказ выпуска удержанной техники
+        // сохраняет удержание — выпуск повторим), ST8-03 (один
+        // TechniqueUsedEvent на применение: Combat — CombatService, прочие —
+        // CompleteUse; отказ гейтов не создаёт ложный INT-прирост),
+        // ST8-04 (§5.4: смерть/стюн/медитация срывают зарядку CancelCharge
+        // и рассеивают ауру Dissipate с возвратом 50%), ST8-05 (щит без
+        // резерва Ци честно отказывает; резервный режим реально поглощает),
+        // ST8-06 (возврат при decay-рассеивании = 50% post-decay остатка).
+        if (System.Environment.GetEnvironmentVariable("GODOT_STAGE8_DEBUG") == "1")
+        {
+            var stage8Sim = new Stage8TechniqueTruthSimDebug { Name = "Stage8TechniqueTruthSimDebug" };
+            AddChild(stage8Sim);
+        }
         // 2026-09-08 (баг-репорт пользователя): headless-верификация
         // инвентарного drag&drop в корзину (GODOT_TRASHDROP_DEBUG=1) —
         // материалы draggable, корзина выбрасывает, кукла отклоняет.
