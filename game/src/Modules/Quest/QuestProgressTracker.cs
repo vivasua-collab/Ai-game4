@@ -83,13 +83,39 @@ public class QuestProgressTracker : IDisposable
         => ProcessObjectiveUpdate(QuestObjectiveType.KillEnemy, NormalizeKillTargetId(e.EnemyId), 1);
 
     private void OnItemAdded(in ItemAddedEvent e)
-        => ProcessObjectiveUpdate(QuestObjectiveType.GatherItem, e.ItemId, e.Count);
+    {
+        // BUG-022 (Этап-7 аудита): цель GatherItem засчитывает только получение
+        // предмета ИЗ МИРА — добычу (harvest), подбор (pickup), обыск (loot),
+        // крафт (craft) и легаси-пути без явного источника (world).
+        // Покупка у торговца (merchant_buy) прежде закрывала квест «Собери 5
+        // железной руды» без единого удара по рудной жиле; награды квестов
+        // и переносы между собственными хранилищами (кольцо/пояс/экипировка)
+        // — тоже не сбор: предмет уже принадлежал игроку.
+        string source = string.IsNullOrEmpty(e.Source) ? ItemSources.World : e.Source;
+        bool fromWorld = source == ItemSources.World
+                      || source == ItemSources.Harvest
+                      || source == ItemSources.Pickup
+                      || source == ItemSources.Loot
+                      || source == ItemSources.Craft;
+        if (!fromWorld) return;
+
+        ProcessObjectiveUpdate(QuestObjectiveType.GatherItem, e.ItemId, e.Count);
+    }
 
     private void OnLocationChanged(in LocationChangedEvent e)
         => ProcessObjectiveUpdate(QuestObjectiveType.ReachLocation, e.NewLocationId, 1);
 
     private void OnNPCInteracted(in NPCInteractedEvent e)
     {
+        // GAP-025 (Этап-7 аудита): цель TalkToNPC засчитывается ТОЛЬКО
+        // разговором. Контракт NPCInteractedEvent допускает и другие типы
+        // взаимодействия ("trade", "attack", "gift") — без гейта они тоже
+        // двигали бы прогресс (атака могла бы закрыть квест «поговори со
+        // старейшиной»). Существующий E-путь публикует "talk" — поведение
+        // не меняется, гейт закрывает будущие издатели.
+        if (!string.Equals(e.InteractionType, "talk", StringComparison.Ordinal))
+            return;
+
         // Review этап 7 (P0-1): семантика TalkToNPC — ДВА измерения цели:
         // инстанс-ID (точное совпадение для конкретного NPC) и РОЛЬ
         // ("Elder" — квесты сравнивают по роли; инстанс-ID динамические).

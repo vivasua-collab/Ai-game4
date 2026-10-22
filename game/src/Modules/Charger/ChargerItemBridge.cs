@@ -213,7 +213,8 @@ namespace CultivationGame.Modules.Charger
             if (stone == null) { message = "⛔ Слот изменился"; return false; }
 
             var data = FromDomainStone(stone);
-            if (data == null || !_inventory.TryAddItem(data, 1))
+            // BUG-022 (Этап-7): извлечение из зарядника — не поступление из мира.
+            if (data == null || !_inventory.TryAddItem(data, 1, ItemSources.Charger))
             {
                 message = "⛔ Инвентарь полон — камень оставлен в слоте";
                 // Вернуть в слот (вставка обратно в тот же индекс).

@@ -8,6 +8,7 @@
 using System;
 using System.Collections.Generic;
 using CultivationGame.Core.Data;
+using CultivationGame.Core.Messaging.Contracts;
 
 using CultivationGame.Core;
 namespace CultivationGame.Core.Interfaces
@@ -18,7 +19,12 @@ namespace CultivationGame.Core.Interfaces
     /// </summary>
     public interface IInventoryService
     {
-        bool TryAddItem(ItemData item, int count = 1);
+        /// <summary>
+        /// BUG-022 (Этап-7 аудита): источник поступления (ItemSources) попадает
+        /// в ItemAddedEvent — цель GatherItem не считает покупку/награды/переносы.
+        /// Дефолт ItemSources.World — легаси-совместимость (считается сбором).
+        /// </summary>
+        bool TryAddItem(ItemData item, int count = 1, string source = ItemSources.World);
 
         /// <summary>
         /// AUDIT-0911 INV-3: транзакционная форма — сколько реально влезло при
@@ -26,8 +32,9 @@ namespace CultivationGame.Core.Interfaces
         /// НИЧЕГО; partial — true с addedCount &lt; count.
         /// Реализация — InventoryService (использовалась только внутри модуля;
         /// теперь и потребителям: BeltService/Trade — честный частичный возврат).
+        /// BUG-022: source — источник поступления (см. TryAddItem выше).
         /// </summary>
-        bool TryAddItem(ItemData item, int count, out int addedCount);
+        bool TryAddItem(ItemData item, int count, out int addedCount, string source = ItemSources.World);
         bool TryRemoveItem(string itemId, int count = 1);
         int GetItemCount(string itemId);
         IReadOnlyList<InventorySlot> GetAllSlots();

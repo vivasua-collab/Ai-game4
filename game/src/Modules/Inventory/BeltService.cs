@@ -157,7 +157,9 @@ public sealed class BeltService : ISaveable, IWorldResettable, IDisposable
         // (count − addedCount) расходников терялись бесследно. Теперь остаток
         // остаётся в слоте пояса (валидное хранилище), инвентарь получает
         // столько, сколько реально влезло.
-        if (!_inventory.TryAddItem(item, slot.Count, out int addedCount) || addedCount <= 0)
+        // BUG-022 (Этап-7): возврат из пояса — перенос между собственными
+        // хранилищами, не поступление из мира (GatherItem не считается).
+        if (!_inventory.TryAddItem(item, slot.Count, out int addedCount, ItemSources.BeltTransfer) || addedCount <= 0)
         {
             // Инвентарь ничего не принял — оставляем в слоте.
             return false;

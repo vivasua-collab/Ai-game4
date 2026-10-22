@@ -62,6 +62,12 @@ public class QuestRewardService : IQuestRewardService, IDisposable
     /// Review этап 7 (P1-2): item-награды валидируются через IItemDatabaseService
     /// ДО публикации — неизвестные базе предметы не «выдаются в пустоту»;
     /// квест НЕ помечается выданным (повторная попытка возможна после починки контента).
+    /// BUG-024 (Этап-7 аудита): превалидация ВСЕГО набора наград ДО выдачи —
+    /// неподдерживаемые типы (Experience/Technique/FactionRep: ветки без
+    /// реальной выдачи) ранее молча терялись, а квест ПОМЕЧАЛСЯ
+    /// награждённым (MarkRewardsGranted) — повторная выдача блокировалась.
+    /// Теперь: неподдерживаемый тип = явный отказ с диагностикой, квест
+    /// остаётся НЕ-награждённым до починки контента или реализации типа.
     /// </summary>
     public bool GrantRewards(string questId)
     {
@@ -71,10 +77,26 @@ public class QuestRewardService : IQuestRewardService, IDisposable
         if (quest == null) return false;
         if (quest.Status != QuestStatus.Completed) return false;
 
-        // Review этап 7 (P1-2): предварительная валидация всех item-наград.
+        // Review этап 7 (P1-2) + BUG-024 (Этап-7): предварительная валидация
+        // ВСЕХ наград: поддержанные типы (Item/Qi) + известность предмета.
         for (int i = 0; i < quest.Rewards.Count; i++)
         {
             var reward = quest.Rewards[i];
+
+            // BUG-024: реализованы только Item и Ци. Прежде Experience/
+            // Technique/FactionRep проходили в GrantSingleReward, там
+            // молча не выдавались — а весь набор помечался выданным.
+            if (reward.Type != QuestRewardType.Item && reward.Type != QuestRewardType.Qi)
+            {
+                Console.WriteLine($"[QuestRewardService] Награда '{reward.RewardId}' квеста '{questId}': " +
+                                  $"тип {reward.Type} не реализован — выдача отклонена ЦЕЛИКОМ " +
+                                  $"(квест останется непогашенным, повтор после реализации/починки контента)");
+                _toastPub?.Publish(new ToastShownEvent(
+                    $"⚠ Награда «{reward.Type}» не реализована: выдача отложена " +
+                    $"(квест не помечен награждённым)", 4.0f));
+                return false;
+            }
+
             if (reward.Type == QuestRewardType.Item
                 && _itemDb != null && !_itemDb.TryGetItem(reward.TargetId, out _))
             {
@@ -129,7 +151,11 @@ public class QuestRewardService : IQuestRewardService, IDisposable
             case QuestRewardType.Experience:
             case QuestRewardType.Technique:
             case QuestRewardType.FactionRep:
-                // Будущее расширение — не публикуем событие, пока не реализовано
+                // BUG-024: недостижимо — превалидация GrantRewards отклоняет
+                // выдачу целиком, пока тип не реализован. Ветка осталась как
+                // защита от новых точек входа (never-grant вместо was-granted).
+                Console.WriteLine($"[QuestRewardService] GrantSingleReward: тип {reward.Type} " +
+                                  $"не реализован — награда '{reward.RewardId}' НЕ выдана");
                 break;
         }
 

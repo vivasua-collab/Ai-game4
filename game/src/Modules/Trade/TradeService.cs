@@ -318,7 +318,10 @@ namespace CultivationGame.Modules.Trade
                 return false;
             }
 
-            if (!_inventory.TryAddItem(item, buyCount))
+            // BUG-022 (Этап-7 аудита): покупка помечается источником merchant_buy —
+            // цель GatherItem (квест «Собери N...») больше не засчитывается
+            // покупкой у торговца (прежде — любой ItemAddedEvent двигал прогресс).
+            if (!_inventory.TryAddItem(item, buyCount, ItemSources.MerchantBuy))
             {
                 // Редкий краевой случай (гонка с вместимостью) — полный возврат.
                 _currency.Add(total);
@@ -376,12 +379,25 @@ namespace CultivationGame.Modules.Trade
                                   $"насыщение до int.MaxValue (предметы уже изъяты)");
             }
             int total = totalLong > int.MaxValue ? int.MaxValue : (int)totalLong;
+
+            // BUG-019 (Этап-6 аудита): TradeCompletedEvent.Price — реально
+            // зачисленная сумма, а не номинал: при потолке баланса (насыщение
+            // CurrencyService.Add) часть сделки не зачисляется, и подписчики
+            // (UI/учёт) не должны видеть несуществующие камни. Разница —
+            // честное предупреждение в лог (частичная выплата).
+            int balanceBefore = _currency.SpiritStones;
             if (total > 0)
                 _currency.Add(total);
+            int credited = _currency.SpiritStones - balanceBefore;
+            if (credited < total)
+            {
+                Console.WriteLine($"[Trade] Sell-предупреждение: частичная выплата — " +
+                                  $"номинал {total}, зачислено {credited} (потолок баланса)");
+            }
 
-            Console.WriteLine($"[Trade] Sell: {itemId}×{sellCount} за {total} камней " +
+            Console.WriteLine($"[Trade] Sell: {itemId}×{sellCount} за {credited} камней " +
                               $"(баланс: {_currency.SpiritStones})");
-            _completedPub.Publish(new TradeCompletedEvent(npcId, itemId, sellCount, false, total));
+            _completedPub.Publish(new TradeCompletedEvent(npcId, itemId, sellCount, false, credited));
             return true;
         }
 

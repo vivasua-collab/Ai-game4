@@ -33,7 +33,10 @@ public class InventoryModule : IModule
     [Inject] private readonly IGroundItemService _groundItemService = null!;
     [Inject] private readonly IPlayerService _playerService = null!;
 
-    [Inject] private readonly ISubscriber<ResourceHarvestedEvent> _resourceHarvestedSub = null!;
+    // BUG-022/Этап-6: подписка на ResourceHarvestedEvent УДАЛЕНА — при
+    // подключённом ResourceService предметы добычи добавлялись дважды
+    // (command-событие от ResourceService.Harvest + факт-событие от
+    // TileService). См. комментарий в Start().
     [Inject] private readonly ISubscriber<ItemAddRequestEvent> _itemAddRequestSub = null!;
     [Inject] private readonly ISubscriber<EquipmentChangedEvent> _equipChangedSub = null!;
     [Inject] private readonly ISubscriber<CraftCompletedEvent> _craftCompletedSub = null!;
@@ -43,7 +46,6 @@ public class InventoryModule : IModule
 
     [Inject] private readonly BeltService _beltService = null!;
 
-    private IDisposable? _resourceHarvestedSubscription;
     private IDisposable? _itemAddRequestSubscription;
     private IDisposable? _equipChangedSubscription;
     private IDisposable? _craftCompletedSubscription;
@@ -71,7 +73,16 @@ public class InventoryModule : IModule
         _beltService.Initialize();
 
         // === Подписка на кросс-модульные события ===
-        _resourceHarvestedSubscription = _resourceHarvestedSub.Subscribe(OnResourceHarvested);
+        // BUG-022/Этап-6 (дабл-адд добычи): подписка на ResourceHarvestedEvent
+        // УДАЛЕНА. Прежне при подключённом ResourceService (прод-конфигурация)
+        // предметы добавлялись ДВАЖДЫ: ResourceService.Harvest публикует
+        // ItemAddRequestEvent("harvest") → OnItemAddRequest добавляет, а затем
+        // TileService публикует ResourceHarvestedEvent → OnResourceHarvested
+        // добавлял ЕЩЁ РАЗ тот же объём. Канонический путь поступления —
+        // command-событие ItemAddRequestEvent (EVT-01, Review этап-6 P2-5);
+        // ResourceHarvestedEvent — ФАКТ для UI/лога (EventLogWindow), а не
+        // команда. INV-17-защита (предмет не исчезает при volume-full) —
+        // идентичный overflow-паттерн живёт в OnItemAddRequest.
         _itemAddRequestSubscription = _itemAddRequestSub.Subscribe(OnItemAddRequest);
         _equipChangedSubscription = _equipChangedSub.Subscribe(OnEquipmentChanged);
         _craftCompletedSubscription = _craftCompletedSub.Subscribe(OnCraftCompleted);
@@ -84,31 +95,6 @@ public class InventoryModule : IModule
         // Inventory has no per-tick work
     }
 
-    private void OnResourceHarvested(in ResourceHarvestedEvent e)
-    {
-        if (string.IsNullOrEmpty(e.ItemId) || e.Amount <= 0) return;
-
-        if (_itemDatabase.TryGetItem(e.ItemId, out var itemData))
-        {
-            // AUDIT-0911 INV-17 FIX: раньше 2-arg TryAddItem — при volume-full
-            // ресурс ИСЧЕЗАЛ бесследно (тайл уже истощён до публикации —
-            // TileService исчерпывает ДО события, откатить нельзя). Тот же
-            // компенсирующий overflow-паттерн, что в OnItemAddRequest/
-            // OnCraftCompleted (Review этап 4 P1-4): остаток — на землю.
-            bool added = _inventoryServiceImpl.TryAddItem(itemData, e.Amount, out int addedCount);
-            int overflow = e.Amount - addedCount;
-            if (overflow > 0)
-            {
-                DropItemsNearPlayer(e.ItemId, overflow);
-                Console.WriteLine($"[InventoryModule] Harvest '{e.ItemId}': {addedCount} в инвентарь, {overflow} на землю (инвентарь полон)");
-            }
-        }
-        else
-        {
-            Console.WriteLine($"[InventoryModule] Предмет '{e.ItemId}' не найден в ItemDatabase (harvest)");
-        }
-    }
-
     private void OnItemAddRequest(in ItemAddRequestEvent e)
     {
         if (string.IsNullOrEmpty(e.ItemId) || e.Count <= 0) return;
@@ -116,7 +102,11 @@ public class InventoryModule : IModule
         if (_itemDatabase.TryGetItem(e.ItemId, out var itemData))
         {
             // Try to add to inventory. If volume full, drop overflow on ground.
-            bool added = _inventoryServiceImpl.TryAddItem(itemData, e.Count, out int addedCount);
+            // BUG-022 (Этап-7): источник запроса (harvest/loot/pickup/quest_reward...)
+            // пробрасывается в ItemAddedEvent — цель GatherItem отличает добычу
+            // от покупки/награды. Пустой источник = ItemSources.World (легаси).
+            string source = string.IsNullOrEmpty(e.Source) ? ItemSources.World : e.Source;
+            bool added = _inventoryServiceImpl.TryAddItem(itemData, e.Count, out int addedCount, source);
             int overflow = e.Count - addedCount;
             if (overflow > 0)
             {
@@ -166,7 +156,7 @@ public class InventoryModule : IModule
             // (комментарий CharacterDollPanel «дропнет излишек на землю» — ложь).
             // Теперь: сколько влезло — в инвентарь, остаток — на землю рядом
             // с игроком (снятое нельзя потерять).
-            bool added = _inventoryServiceImpl.TryAddItem(oldItem, 1, out int addedCount);
+            bool added = _inventoryServiceImpl.TryAddItem(oldItem, 1, out int addedCount, ItemSources.EquipReturn);
             if (addedCount < 1)
             {
                 DropItemsNearPlayer(e.OldItemId, 1);
@@ -189,7 +179,7 @@ public class InventoryModule : IModule
             // инвентаре — overflow выбрасывается на землю у игрока (тот же
             // компенсирующий путь, что и у pickup-overflow; раньше TryAddItem
             // игнорировался и предмет «исчезал» после списания ингредиентов).
-            bool added = _inventoryServiceImpl.TryAddItem(resultItem, e.Count, out int addedCount);
+            bool added = _inventoryServiceImpl.TryAddItem(resultItem, e.Count, out int addedCount, ItemSources.Craft);
             int overflow = e.Count - addedCount;
             if (overflow > 0)
             {
@@ -209,8 +199,6 @@ public class InventoryModule : IModule
 
     public void Dispose()
     {
-        _resourceHarvestedSubscription?.Dispose();
-        _resourceHarvestedSubscription = null;
         _itemAddRequestSubscription?.Dispose();
         _itemAddRequestSubscription = null;
         _equipChangedSubscription?.Dispose();

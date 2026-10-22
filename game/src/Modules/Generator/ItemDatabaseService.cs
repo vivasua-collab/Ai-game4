@@ -93,6 +93,17 @@ namespace CultivationGame.Modules.Generator
                 return;
             }
 
+            // BUG-018 (Этап-6 аудита): инварианты предмета проверяются при
+            // регистрации — стакающийся предмет обязан иметь MaxStack ≥ 1.
+            // Прежде некорректное определение молча попадало в каталог, а
+            // подбор предмета затем уходил в бесконечную рекурсию TryAddItem.
+            if (item.Stackable && item.MaxStack <= 0)
+            {
+                Console.WriteLine($"[ItemDatabase] Регистрация отклонена: '{item.ItemId}' " +
+                                  $"Stackable=true при MaxStack={item.MaxStack} (инвариант: MaxStack ≥ 1)");
+                return;
+            }
+
             if (_itemsById.TryGetValue(item.ItemId, out var oldItem))
             {
                 Console.WriteLine($"[ItemDatabase] Предмет с itemId={item.ItemId} уже зарегистрирован — замена");
@@ -296,6 +307,17 @@ namespace CultivationGame.Modules.Generator
                         if (JsonSerializer.Deserialize(entry.Json, itemType, SaveJson.Options) is ItemData item
                             && !string.IsNullOrEmpty(item.ItemId))
                         {
+                            // BUG-018 (Этап-6): битые определения (Stackable при
+                            // MaxStack ≤ 0 — например, ручная правка JSON) в каталог
+                            // не попадают: иначе подбор предмета зациклит TryAddItem.
+                            if (item.Stackable && item.MaxStack <= 0)
+                            {
+                                Console.WriteLine($"[ItemDatabase] RestoreState: '{item.ItemId}' отклонён " +
+                                                  $"(Stackable=true, MaxStack={item.MaxStack})");
+                                skipped++;
+                                continue;
+                            }
+
                             // Тихая регистрация: сотни строк лога на каталог не нужны.
                             // R35 (P2-31): заменяемая запись удаляется по СТАРОЙ
                             // категории (каталог только что очищен — ветка защитная).

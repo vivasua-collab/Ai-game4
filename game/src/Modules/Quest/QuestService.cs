@@ -276,14 +276,31 @@ public class QuestService : IQuestService, ISaveable, IWorldResettable, IDisposa
     }
 
     /// <summary>
-    /// Итерация по всем активным квестам с callback. Zero-allocation.
+    /// Итерация по всем активным квестам с callback.
+    /// BUG-023 (Этап-7 аудита): обход — по СНИМКУ списка активных ID.
+    /// Прежде индексный обход живого _activeQuestIds терял события:
+    /// callback (ProcessObjectiveUpdate) мог вызвать CompleteQuest(),
+    /// который УДАЛЯЛ завершённый квест из того же списка прямо во время
+    /// обхода — следующий квест сдвигался на предыдущий индекс и цикл
+    /// прыгал через него (событие убийства не засчитывалось второму
+    /// одновременному квесту с той же целью).
+    /// Снимок разрывает связь: завершение внутри callback мутирует только
+    /// живой список; следующее событие итерирует уже актуальный снимок.
+    /// События редкие (не тик-хотпас) — аллокация копии допустима.
     /// </summary>
     internal void ForEachActiveQuest(Action<QuestData> action)
     {
-        for (int i = 0; i < _activeQuestIds.Count; i++)
+        if (_activeQuestIds.Count == 0) return;
+        var snapshot = _activeQuestIds.ToArray();
+        for (int i = 0; i < snapshot.Length; i++)
         {
-            if (_allQuests.TryGetValue(_activeQuestIds[i], out var quest))
-                action(quest);
+            // Снимок может содержать уже НЕ-активные квесты (завершились
+            // предыдущими итерациями этого же callback-цикла) — фильтр по
+            // фактическому статусу Active, повторная обработка запрещена.
+            if (!_allQuests.TryGetValue(snapshot[i], out var quest)
+                || quest.Status != QuestStatus.Active)
+                continue;
+            action(quest);
         }
     }
 

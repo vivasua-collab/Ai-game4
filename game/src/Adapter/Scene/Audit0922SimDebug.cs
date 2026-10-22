@@ -340,11 +340,13 @@ public partial class Audit0922SimDebug : Node
     }
 
     // T2: инвентарь-заглушка (объём/вес не гейтят, sell_probe есть ×3).
+    // BUG-022 (Этап-7): сигнатуры TryAddItem расширены источником — зеркало.
     private sealed class FakeTradeInventory : IInventoryService
     {
         public int HaveSellProbe = 3;
-        public bool TryAddItem(ItemData item, int count = 1) => true;
-        public bool TryAddItem(ItemData item, int count, out int addedCount) { addedCount = count; return true; }
+        public bool TryAddItem(ItemData item, int count = 1, string source = ItemSources.World) => true;
+        public bool TryAddItem(ItemData item, int count, out int addedCount, string source = ItemSources.World)
+            { addedCount = count; return true; }
         public bool TryRemoveItem(string itemId, int count = 1) => true;
         public int GetItemCount(string itemId) => itemId == "sell_probe" ? HaveSellProbe : 0;
         public IReadOnlyList<InventorySlot> GetAllSlots() => Array.Empty<InventorySlot>();
@@ -1359,6 +1361,11 @@ public partial class Audit0922SimDebug : Node
         // Мир A: кольцо с предметом (сейв A).
         svc.ActivateRingWithVolume("qa_ring", 2, 15f);
         var probe = new ItemData { ItemId = "qa_p_probe", Category = ItemCategory.Consumable, Volume = 0.1f };
+        // BUG-021 (Этап-6): RestoreState колец валидирует слоты по каталогу —
+        // неизвестный каталогу предмет честно отклоняется при восстановлении.
+        // Фикстура обязана регистрировать зонду каталог: P4 проверяет
+        // «восстанавливается без потери», а не «фантом протаскивается».
+        itemDb.Register(probe);
         svc.TryStore("qa_ring", probe, out _);
         object saveA = saveableSvc.CaptureState();
 

@@ -31,6 +31,10 @@ ALL_SIMS=(
   # Этап-5 аудита (22.10): тело=истина смерти (BUG-015), сплит сердца
   # (BUG-016), DoT-зачёт квестов + атрибуция (BUG-017).
   "STAGE5:GODOT_STAGE5_DEBUG"
+  # Этап-6 аудита (22.10): инвентарь/торговля/экономика (BUG-018..021).
+  "STAGE6:GODOT_STAGE6_DEBUG"
+  # Этап-7 аудита (22.10): квесты/диалоги/NPC (BUG-022..024, GAP-025).
+  "STAGE7:GODOT_STAGE7_DEBUG"
   "KILLFEED:GODOT_KILLFEED_DEBUG"
   "QUEST:GODOT_QUEST_DEBUG"
   "STORAGE:GODOT_STORAGE_DEBUG"

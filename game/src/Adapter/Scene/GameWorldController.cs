@@ -797,6 +797,28 @@ public partial class GameWorldController : Node2D
             var stage5Sim = new Stage5CombatTruthSimDebug { Name = "Stage5CombatTruthSimDebug" };
             AddChild(stage5Sim);
         }
+        // Этап-6 аудита (22.10, GODOT_STAGE6_DEBUG=1): инвентарь/торговля/
+        // экономика — BUG-018 (контролируемый отказ при MaxStack ≤ 0,
+        // валидация каталога), BUG-019 (CurrencyChangedEvent.Delta = факт,
+        // TradeCompletedEvent.Price = зачисленное при потолке), BUG-020
+        // (long-котировки + IsRepresentable=false для непредставимых),
+        // BUG-021 (RestoreState колец отсекает битые слоты/кольца).
+        if (System.Environment.GetEnvironmentVariable("GODOT_STAGE6_DEBUG") == "1")
+        {
+            var stage6Sim = new Stage6TradeEconomySimDebug { Name = "Stage6TradeEconomySimDebug" };
+            AddChild(stage6Sim);
+        }
+        // Этап-7 аудита (22.10, GODOT_STAGE7_DEBUG=1): квесты/диалоги/NPC —
+        // BUG-022 (ItemAddedEvent.Source: покупка ≠ сбор, добыча = сбор,
+        // ровно один зачёт за добычу), BUG-023 (снимок в ForEachActiveQuest:
+        // одно событие закрывает оба квеста одной цели), BUG-024 (превалидация
+        // наград: неподдержанный тип = отказ, квест не помечен выданным),
+        // GAP-025 (TalkToNPC только при InteractionType="talk").
+        if (System.Environment.GetEnvironmentVariable("GODOT_STAGE7_DEBUG") == "1")
+        {
+            var stage7Sim = new Stage7QuestTruthSimDebug { Name = "Stage7QuestTruthSimDebug" };
+            AddChild(stage7Sim);
+        }
         // 2026-09-08 (баг-репорт пользователя): headless-верификация
         // инвентарного drag&drop в корзину (GODOT_TRASHDROP_DEBUG=1) —
         // материалы draggable, корзина выбрасывает, кукла отклоняет.

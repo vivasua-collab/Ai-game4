@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "updated": "2026-10-21T14:22:11Z",
+  "updated": "2026-10-22T09:50:06Z",
   "generated_by": "tools/gen_bus_map.py",
   "update_policy": "по требованию: правки кода → python3 tools/gen_bus_map.py → коммит",
-  "source_head": "af56edc",
+  "source_head": "163cc9b",
   "hub": {
     "id": "Core",
     "title": "Центральная шина (Core)",
@@ -783,8 +783,7 @@
         "BodyPartSeveredEvent",
         "CraftCompletedEvent",
         "EquipmentChangedEvent",
-        "ItemAddRequestEvent",
-        "ResourceHarvestedEvent"
+        "ItemAddRequestEvent"
       ],
       "publishes_files": {
         "BeltSlotsChangedEvent": [
@@ -842,9 +841,6 @@
           "StorageRingService.cs"
         ],
         "ItemAddRequestEvent": [
-          "InventoryModule.cs"
-        ],
-        "ResourceHarvestedEvent": [
           "InventoryModule.cs"
         ]
       },
@@ -4428,7 +4424,7 @@
       "order": 120,
       "description": "QA-харнессы (*SimDebug) — вне продакшн-потребления",
       "debug": true,
-      "files": 32,
+      "files": 34,
       "publishes": [
         "AttackIntentEvent",
         "Audit1020MsgA",
@@ -4438,9 +4434,11 @@
         "DamageAppliedEvent",
         "DefenseIntentEvent",
         "EnemyKilledEvent",
+        "ItemAddRequestEvent",
         "ItemAddedEvent",
         "MeditationStateChangedEvent",
         "NPCDeathEvent",
+        "NPCInteractedEvent",
         "OtherMsg",
         "PingMsg",
         "QiChangedEvent",
@@ -4460,11 +4458,13 @@
         "CombatDisengageEvent",
         "CombatEndedEvent",
         "CombatStartedEvent",
+        "CurrencyChangedEvent",
         "DamageAppliedEvent",
         "DayChangedEvent",
         "EnemyKilledEvent",
         "EquipmentBlockedEvent",
         "HeldTechniqueChangedEvent",
+        "ItemAddedEvent",
         "ItemDroppedEvent",
         "MonthChangedEvent",
         "NPCDeathEvent",
@@ -4482,6 +4482,7 @@
         "TechniqueSlotAssignedEvent",
         "TileChangedEvent",
         "TimeChangedEvent",
+        "TradeCompletedEvent",
         "YearChangedEvent"
       ],
       "publishes_files": {
@@ -4512,10 +4513,15 @@
           "CombatAISimDebug.cs"
         ],
         "EnemyKilledEvent": [
-          "QuestSimDebug.cs"
+          "QuestSimDebug.cs",
+          "Stage7QuestTruthSimDebug.cs"
+        ],
+        "ItemAddRequestEvent": [
+          "Stage7QuestTruthSimDebug.cs"
         ],
         "ItemAddedEvent": [
-          "QuestSimDebug.cs"
+          "QuestSimDebug.cs",
+          "Stage7QuestTruthSimDebug.cs"
         ],
         "MeditationStateChangedEvent": [
           "Audit0922SimDebug.cs"
@@ -4524,6 +4530,9 @@
           "KillFeedSimDebug.cs",
           "LootSimDebug.cs",
           "ReAssemblySimDebug.cs"
+        ],
+        "NPCInteractedEvent": [
+          "Stage7QuestTruthSimDebug.cs"
         ],
         "OtherMsg": [
           "Audit0922SimDebug.cs"
@@ -4581,6 +4590,9 @@
           "AnimalCombatSimDebug.cs",
           "CombatAISimDebug.cs"
         ],
+        "CurrencyChangedEvent": [
+          "Stage6TradeEconomySimDebug.cs"
+        ],
         "DamageAppliedEvent": [
           "AnimalCombatSimDebug.cs",
           "ChargeSimDebug.cs",
@@ -4599,6 +4611,10 @@
         ],
         "HeldTechniqueChangedEvent": [
           "ChargeSimDebug.cs"
+        ],
+        "ItemAddedEvent": [
+          "Stage6TradeEconomySimDebug.cs",
+          "Stage7QuestTruthSimDebug.cs"
         ],
         "ItemDroppedEvent": [
           "StorageSimDebug.cs",
@@ -4652,6 +4668,9 @@
         ],
         "TimeChangedEvent": [
           "RespawnSimDebug.cs"
+        ],
+        "TradeCompletedEvent": [
+          "Stage6TradeEconomySimDebug.cs"
         ],
         "YearChangedEvent": [
           "Audit0922SimDebug.cs"
@@ -5661,8 +5680,8 @@
     "contracts_defined": 163,
     "events_published": 130,
     "events_subscribed": 101,
-    "publish_edges": 176,
-    "subscribe_edges": 191,
+    "publish_edges": 178,
+    "subscribe_edges": 193,
     "provide_edges": 213,
     "require_edges": 293,
     "services_provided": 160,

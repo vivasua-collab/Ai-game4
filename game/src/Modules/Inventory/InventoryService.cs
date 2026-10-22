@@ -84,9 +84,9 @@ namespace CultivationGame.Modules.Inventory
 
         // === IInventoryService — базовые методы ===
 
-        public bool TryAddItem(ItemData item, int count = 1)
+        public bool TryAddItem(ItemData item, int count = 1, string source = ItemSources.World)
         {
-            return TryAddItem(item, count, out _);
+            return TryAddItem(item, count, out _, source);
         }
 
         /// <summary>
@@ -94,12 +94,25 @@ namespace CultivationGame.Modules.Inventory
         /// addedCount = actual number added (may be less than requested if volume full).
         /// Caller can drop (count - addedCount) on ground if > 0.
         /// </summary>
-        public bool TryAddItem(ItemData item, int count, out int addedCount)
+        public bool TryAddItem(ItemData item, int count, out int addedCount, string source = ItemSources.World)
         {
             addedCount = 0;
             if (item == null) return false;
             if (!_isConfigured) Configure(new InventoryConfig());
             if (count <= 0) return false;
+
+            // BUG-018 (Этап-6 аудита): Stackable-предмет с MaxStack ≤ 0 прежде
+            // уходил в бесконечную рекурсию — toAdd = Min(count, MaxStack) ≤ 0
+            // → remainder ≥ count → повторный вызов с тем же предметом до
+            // stack overflow; по пути плодились слоты с Count ≤ 0 и
+            // ItemAddedEvent с count ≤ 0. Инвариант предмета нарушен —
+            // контролируемый отказ (предмет не добавляется, причина в лог).
+            if (item.Stackable && item.MaxStack <= 0)
+            {
+                Console.WriteLine($"[Inventory] TryAddItem отказ: '{item.ItemId}' " +
+                                  $"Stackable=true при MaxStack={item.MaxStack} — инвариант предмета нарушен");
+                return false;
+            }
 
             // OVERFLOW POLICY: Items ALWAYS enter inventory (even if overweight).
             // This is intentional — player can exceed carry weight, but movement
@@ -149,17 +162,18 @@ namespace CultivationGame.Modules.Inventory
                             _slots[i] = _slots[i].WithCount(item.MaxStack);
                             _itemCountCache[item.ItemId] = _itemCountCache.TryGetValue(item.ItemId, out var cached)
                                 ? cached + canAdd : canAdd;
-                            _itemAddedPub.Publish(new ItemAddedEvent(item.ItemId, canAdd));
+                            _itemAddedPub.Publish(new ItemAddedEvent(item.ItemId, canAdd, source));
 
                             // Рекурсивно добавляем остаток.
                             // INV-A1 FIX (аудит-4): раньше вызывалась 2-arg перегрузка —
                             // уточнённый addedCount рекурсии отбрасывался, и при сплите
                             // стака + лимите объёма out-addedCount завышал фактическое
                             // число (влияет на дроп-на-землю). Аккумулируем.
+                            // BUG-022: источник передаётся вглубь без искажения.
                             int remaining = count - canAdd;
                             if (remaining > 0)
                             {
-                                TryAddItem(item, remaining, out int recAdded);
+                                TryAddItem(item, remaining, out int recAdded, source);
                                 addedCount = canAdd + recAdded;
                             }
                             else
@@ -178,7 +192,7 @@ namespace CultivationGame.Modules.Inventory
                         _slots[i] = _slots[i].WithCount(newCount);
                         _itemCountCache[item.ItemId] = _itemCountCache.TryGetValue(item.ItemId, out var cachedCount)
                             ? cachedCount + count : newCount;
-                        _itemAddedPub.Publish(new ItemAddedEvent(item.ItemId, count));
+                        _itemAddedPub.Publish(new ItemAddedEvent(item.ItemId, count, source));
                         return true;
                     }
                 }
@@ -192,15 +206,16 @@ namespace CultivationGame.Modules.Inventory
                 else
                     _itemCountCache[item.ItemId] = toAdd;
 
-                _itemAddedPub.Publish(new ItemAddedEvent(item.ItemId, toAdd));
+                _itemAddedPub.Publish(new ItemAddedEvent(item.ItemId, toAdd, source));
 
                 // Если не всё влезло — рекурсивно добавляем остаток.
                 // INV-A1 FIX (аудит-4): аккумулируем уточнённый addedCount
                 // рекурсии (раньше отбрасывался 2-arg перегрузкой).
+                // BUG-022: источник передаётся вглубь без искажения.
                 int remainder = count - toAdd;
                 if (remainder > 0)
                 {
-                    TryAddItem(item, remainder, out int recAdded);
+                    TryAddItem(item, remainder, out int recAdded, source);
                     addedCount = toAdd + recAdded;
                 }
                 return true;
@@ -216,7 +231,7 @@ namespace CultivationGame.Modules.Inventory
                 else
                     _itemCountCache[item.ItemId] = 1;
 
-                _itemAddedPub.Publish(new ItemAddedEvent(item.ItemId, 1));
+                _itemAddedPub.Publish(new ItemAddedEvent(item.ItemId, 1, source));
             }
             return true;
         }

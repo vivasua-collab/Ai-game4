@@ -503,20 +503,61 @@ namespace CultivationGame.Modules.Inventory
             _rings.Clear();
 
             int restored = 0;
+            int skippedRings = 0;
+            int skippedSlots = 0;
             if (data.Rings != null)
             {
                 foreach (var saved in data.Rings)
                 {
-                    if (saved == null || string.IsNullOrEmpty(saved.RingItemId)) continue;
+                    if (saved == null || string.IsNullOrEmpty(saved.RingItemId))
+                    {
+                        skippedRings++;
+                        continue;
+                    }
+
+                    // BUG-021 (Этап-6 аудита): параметры кольца валидируются —
+                    // отрицательный Tier / неположительный или нефинитный
+                    // MaxVolume не попадают в рабочее состояние.
+                    if (saved.Tier < 0
+                        || float.IsNaN(saved.MaxVolume) || float.IsInfinity(saved.MaxVolume)
+                        || saved.MaxVolume <= 0f)
+                    {
+                        Console.WriteLine($"[StorageRingService] RestoreState: кольцо '{saved.RingItemId}' " +
+                                          $"отклонено (Tier={saved.Tier}, MaxVolume={saved.MaxVolume} — недопустимые параметры)");
+                        skippedRings++;
+                        continue;
+                    }
+
                     var entry = new StorageRingEntry(saved.RingItemId, saved.Tier,
                         saved.MaxVolume, saved.Capacity)
                     {
                         IsActive = saved.IsActive,
                     };
                     if (saved.StoredItems != null)
+                    {
                         foreach (var slot in saved.StoredItems)
-                            if (slot is { IsEmpty: false })
-                                entry.StoredItems.Add(slot);
+                        {
+                            if (slot is not { IsEmpty: false }) continue;
+
+                            // BUG-021 (Этап-6 аудита): каждый слот валидируется
+                            // ДО попадания в рабочее состояние — зеркально паттерну
+                            // P2-35 восстановления инвентаря. Прежде битый/ручно
+                            // правленный JSON протаскивал неизвестные каталогу
+                            // предметы (недоступны для извлечения, но занимали объём)
+                            // и Count > MaxStack (TryRetrieve выдавал лишние единицы
+                            // из переполненного стака). Отклонённые записи — в
+                            // понятный журнал восстановления.
+                            string? reject = ValidateRestoredSlot(slot);
+                            if (reject != null)
+                            {
+                                Console.WriteLine($"[StorageRingService] RestoreState: слот «{slot.ItemId}×{slot.Count}» " +
+                                                  $"в кольце '{saved.RingItemId}' отклонён — {reject}");
+                                skippedSlots++;
+                                continue;
+                            }
+                            entry.StoredItems.Add(slot);
+                        }
+                    }
                     entry.RecalculateVolume(_itemDatabase);
                     _rings[saved.RingItemId] = entry;
                     restored++;
@@ -524,7 +565,41 @@ namespace CultivationGame.Modules.Inventory
             }
 
             Console.WriteLine($"[StorageRingService] RestoreState: {restored} колец восстановлено " +
-                              $"(предметов: {_rings.Values.Sum(r => r.StoredItems.Count)})");
+                              $"(предметов: {_rings.Values.Sum(r => r.StoredItems.Count)})" +
+                              (skippedRings > 0 || skippedSlots > 0
+                                  ? $"; ОТКЛОНЕНО: колец {skippedRings}, слотов {skippedSlots} (журнал выше)"
+                                  : string.Empty));
+        }
+
+        /// <summary>
+        /// BUG-021 (Этап-6 аудита): валидация восстановленного слота кольца.
+        /// Возвращает null для валидного слота или понятную причину отклонения.
+        /// Зеркало правил RestoreState инвентаря (P2-35): существование ItemId
+        /// в каталоге, положительный Count, граница MaxStack, живые enum-ы.
+        /// </summary>
+        private string? ValidateRestoredSlot(InventorySlot slot)
+        {
+            if (string.IsNullOrEmpty(slot.ItemId))
+                return "пустой ItemId";
+            if (slot.Count <= 0)
+                return $"Count={slot.Count} (должен быть ≥ 1)";
+            if (!Enum.IsDefined(typeof(ItemCategory), slot.Category))
+                return $"категория {(int)slot.Category} вне enum";
+            if (!Enum.IsDefined(typeof(ItemRarity), slot.Rarity))
+                return $"редкость {(int)slot.Rarity} вне enum";
+
+            if (_itemDatabase == null
+                || !_itemDatabase.TryGetItem(slot.ItemId, out var item)
+                || item == null)
+                return $"предмет '{slot.ItemId}' не найден в каталоге";
+
+            // Граница стака: MaxStack ≤ 0 трактуем как 1 (паттерн BeltService);
+            // нестакающийся предмет — ровно 1 в слоте.
+            int maxStack = item.Stackable && item.MaxStack > 0 ? item.MaxStack : 1;
+            if (slot.Count > maxStack)
+                return $"Count={slot.Count} > MaxStack={maxStack} предмета '{slot.ItemId}'";
+
+            return null;
         }
 
         // ── R35 (Фаза 12 / P1-19): IWorldResettable ───────────────────

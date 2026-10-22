@@ -5,6 +5,9 @@ using System.Collections.Generic;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Interfaces;
+// NB: полный using Contracts создаёт CS0104-конфликт MouseButton (Godot ↔
+// Contracts) — ItemSources импортируем точечным алиасом.
+using ItemSources = CultivationGame.Core.Messaging.Contracts.ItemSources;
 using CultivationGame.Adapter.Di;
 
 namespace CultivationGame.Adapter.UI;
@@ -262,7 +265,8 @@ public partial class CharacterDollPanel : Control
         if (!success)
         {
             // Rollback: put item back in inventory.
-            InventoryService.TryAddItem(eq, 1);
+            // BUG-022 (Этап-7): откат экипировки — возврат, не поступление из мира.
+            InventoryService.TryAddItem(eq, 1, ItemSources.EquipReturn);
             GD.Print($"[CharacterDoll] Equip failed for {eq.NameRu}");
             return false;
         }

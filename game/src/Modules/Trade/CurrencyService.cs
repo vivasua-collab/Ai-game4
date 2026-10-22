@@ -63,8 +63,15 @@ namespace CultivationGame.Modules.Trade
 
             // P2-33: long-промежуток + клэмп (saturating add).
             long candidate = (long)_spiritStones + amount;
-            _spiritStones = candidate > int.MaxValue ? int.MaxValue : (int)candidate;
-            _changedPub.Publish(new CurrencyChangedEvent(_spiritStones, amount));
+            int newBalance = candidate > int.MaxValue ? int.MaxValue : (int)candidate;
+
+            // BUG-019 (Этап-6 аудита): в событии — ФАКТИЧЕСКОЕ изменение баланса,
+            // а не запрошенная сумма. Прежде при балансе int.MaxValue − 3 и
+            // Add(10) зачислялось только 3, но CurrencyChangedEvent.Delta сообщал
+            // о +10 — кошелок, HUD и подписчики-учётники расходились с реальностью.
+            int actualDelta = newBalance - _spiritStones;
+            _spiritStones = newBalance;
+            _changedPub.Publish(new CurrencyChangedEvent(_spiritStones, actualDelta));
         }
 
         /// <summary>

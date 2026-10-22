@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.DI;
 using CultivationGame.Core.Interfaces;
+using CultivationGame.Core.Messaging.Contracts;
 using CultivationGame.Modules.Combat; // Phase 8 ч.3: CombatRangeGateService.ArrowItemId
 using CultivationGame.Modules.Generator;
 
@@ -89,7 +90,7 @@ public sealed class StartingGearPhase : AbstractSceneAssemblyPhase
             };
             _itemDb.Register(item);
             registered++;
-            if (_inventory.TryAddItem(item, 5)) granted++;
+            if (_inventory.TryAddItem(item, 5, ItemSources.StartingGear)) granted++;
         }
 
         // === 2. Канонические расходники (БД + игроку ×5) ===
@@ -131,7 +132,7 @@ public sealed class StartingGearPhase : AbstractSceneAssemblyPhase
             };
             _itemDb.Register(item);
             registered++;
-            if (_inventory.TryAddItem(item, 5)) granted++;
+            if (_inventory.TryAddItem(item, 5, ItemSources.StartingGear)) granted++;
         }
 
         // === 2b. Phase 8 ч.3: стрелы (боеприпас дальнего боя) ===
@@ -156,7 +157,7 @@ public sealed class StartingGearPhase : AbstractSceneAssemblyPhase
         };
         _itemDb.Register(arrow);
         registered++;
-        if (_inventory.TryAddItem(arrow, ArrowQuiverSize)) granted++;
+        if (_inventory.TryAddItem(arrow, ArrowQuiverSize, ItemSources.StartingGear)) granted++;
 
         // === 2c. Review этап 7 (P1-2): канонический стальной слиток ===
         // Награда quest_gather_iron («steel» не существовал в ItemDatabase —
@@ -185,13 +186,13 @@ public sealed class StartingGearPhase : AbstractSceneAssemblyPhase
         QiStoneSeeder.Seed(_itemDb);
         registered += 10; // 5 размеров × calm/chaotic
         if (_itemDb.TryGetItem("qistone_dust_calm", out var qDust))
-            { _inventory.TryAddItem(qDust, 3); granted++; }
+            { _inventory.TryAddItem(qDust, 3, ItemSources.StartingGear); granted++; }
         if (_itemDb.TryGetItem("qistone_pebble_calm", out var qPebble))
-            { _inventory.TryAddItem(qPebble, 2); granted++; }
+            { _inventory.TryAddItem(qPebble, 2, ItemSources.StartingGear); granted++; }
         if (_itemDb.TryGetItem("qistone_shard_calm", out var qShard))
-            { _inventory.TryAddItem(qShard, 1); granted++; }
+            { _inventory.TryAddItem(qShard, 1, ItemSources.StartingGear); granted++; }
         if (_itemDb.TryGetItem("qistone_dust_chaotic", out var qChaotic))
-            { _inventory.TryAddItem(qChaotic, 1); granted++; }
+            { _inventory.TryAddItem(qChaotic, 1, ItemSources.StartingGear); granted++; }
 
         // === 4. Экипировка («Матрёшка», детерминированный сид) ===
         int weapons = 0, armors = 0;
@@ -210,7 +211,7 @@ public sealed class StartingGearPhase : AbstractSceneAssemblyPhase
         if (bow != null)
         {
             _itemDb.Register(bow);
-            if (_inventory.TryAddItem(bow, 1)) weapons++;
+            if (_inventory.TryAddItem(bow, 1, ItemSources.StartingGear)) weapons++;
         }
 
         // 4c. 2 случайных оружия L1 (разнообразие классов для экспериментов/торговли).
@@ -224,7 +225,7 @@ public sealed class StartingGearPhase : AbstractSceneAssemblyPhase
             if (weapon != null)
             {
                 _itemDb.Register(weapon);
-                if (_inventory.TryAddItem(weapon, 1)) weapons++;
+                if (_inventory.TryAddItem(weapon, 1, ItemSources.StartingGear)) weapons++;
             }
         }
 
@@ -235,20 +236,20 @@ public sealed class StartingGearPhase : AbstractSceneAssemblyPhase
         if (torso != null)
         {
             _itemDb.Register(torso);
-            if (_inventory.TryAddItem(torso, 1)) armors++;
+            if (_inventory.TryAddItem(torso, 1, ItemSources.StartingGear)) armors++;
         }
         var armor = _equipmentGenerator.GenerateArmor(1, null, Seed + 101);
         if (armor != null)
         {
             _itemDb.Register(armor);
-            if (_inventory.TryAddItem(armor, 1)) armors++;
+            if (_inventory.TryAddItem(armor, 1, ItemSources.StartingGear)) armors++;
         }
 
         // 4e. 1 случайный предмет L1 (R38-1: было L2 — не надевался на старте).
         if (_equipmentGenerator.GenerateRandom(1, Seed + 200) is { } eq)
         {
             _itemDb.Register(eq);
-            _inventory.TryAddItem(eq, 1);
+            _inventory.TryAddItem(eq, 1, ItemSources.StartingGear);
         }
 
         bool daggerEquipped = _equipment.GetEquipped(EquipmentSlot.WeaponMain) != null;

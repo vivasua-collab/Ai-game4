@@ -256,7 +256,7 @@ Modules/Xxx/
 | Свойство | Значение |
 |----------|----------|
 | Главные интерфейсы | `IInventoryService`, `ISpiritStorageService`, `IStorageRingService`, `ICraftingService`, `IEquipmentService` |
-| Контракты | `InventoryContracts` (5) + `CraftingContracts` (2) |
+| Контракты | `InventoryContracts` (5 событий) + `ItemSources` (канонические источники поступления, Этап-6/7) + `CraftingContracts` (2) |
 | Tick | Нет (event-driven) |
 | Зависимости Core | IBodyService (косвенно, через события) |
 | Подписки на события | ResourceHarvested, BodyPartSevered |
@@ -282,6 +282,9 @@ Modules/Xxx/
 - 16 слотов экипировки (см. `GLOSSARY.md` §4).
 - EquipmentService НЕ ссылается на BodySlotMapping — использует `BodyPartSeveredEvent.BlockedSlots` (Hub-and-Spoke).
 - ItemAddRequestEvent — командное событие для добавления предметов из других модулей.
+- **BUG-022 (Этап-7 аудита):** каждый путь поступления предмета несёт источник — `ItemAddedEvent.Source` (константы `ItemSources`): world/harvest/pickup/loot/craft/merchant_buy/quest_reward/storage_transfer/belt_transfer/equip_return/starting_gear; `IInventoryService.TryAddItem(item, count, source)` — источник обязателен для не-мировых путей, пустая строка трактуется как world (легаси-совместимость).
+- **BUG-018 (Этап-6 аудита):** инварианты предметов — стакающийся предмет обязан иметь MaxStack ≥ 1 (валидация при регистрации в каталоге и при RestoreState каталога); TryAddItem при некорректном определении даёт контролируемый отказ (мусорных слотов и событий с count ≤ 0 нет).
+- **BUG-021 (Этап-6 аудита):** RestoreState колец валидирует слоты (ItemId в каталоге, Count ≥ 1, ≤ MaxStack, живые enum-ы) и параметры колец (Tier ≥ 0, MaxVolume > 0, финитен) — битые записи отклоняются с журналом, а не протаскиваются.
 
 ---
 
@@ -476,7 +479,7 @@ hand-спрайта к цели (sin-кривая 0.42с, инверсия dx п
 | Контракты | `QuestContracts` — QuestStarted/ObjectiveUpdated/Completed/Failed/Abandoned/RewardGranted |
 | Tick | Да |
 | Зависимости Core | — |
-| Подписки на события | EnemyKilled, ItemAdded, InteractionCompleted, DialogueChoiceSelected |
+| Подписки на события | EnemyKilled, ItemAdded, LocationChanged, NPCInteracted, CultivationBreakthrough, DayChanged |
 
 **Ключевые методы:**
 - IQuestService: `StartQuest`, `AbandonQuest`, `CompleteQuest`, `FailQuest`, `GetActiveQuestIds`, `IsQuestComplete`, `GetQuestStatus`, `QuestExists`, `GetQuestType`
@@ -491,6 +494,10 @@ hand-спрайта к цели (sin-кривая 0.42с, инверсия dx п
 - Квесты привязаны к NPC и локациям.
 - QuestProgressTracker отслеживает: убийства, сбор ресурсов, взаимодействие с NPC, посещение локаций, получение предметов, завершение боя.
 - `QuestRewardGrantedEvent` публикуется после выдачи наград — UI и SaveModule подписываются.
+- **BUG-022 (Этап-7 аудита):** цель GatherItem засчитывает только получение ИЗ МИРА — источники `ItemSources.World/Harvest/Pickup/Loot/Craft`; покупка (merchant_buy), награды квестов и переносы между собственными хранилищами (quest_reward/storage_transfer/belt_transfer/equip_return/starting_gear) сбором НЕ являются.
+- **BUG-023 (Этап-7 аудита):** `ForEachActiveQuest` итерирует по СНИМКУ списка активных ID с фильтром по фактическому статусу Active — завершение квеста внутри callback не сдвигает обход (одно событие закрывает ВСЕ квесты одной цели, каждый со своим зачётом и автонаградой).
+- **BUG-024 (Этап-7 аудита):** награды превалидируются ДО выдачи: реализованы только Item и Qi; неподдержанный тип (Experience/Technique/FactionRep) = явный отказ ЦЕЛИКОМ, квест НЕ помечается награждённым (повторная выдача возможна после починки контента или реализации типа).
+- **GAP-025 (Этап-7 аудита):** цель TalkToNPC засчитывается ТОЛЬКО при `NPCInteractedEvent.InteractionType == "talk"` — trade/attack/gift прогресс не двигают.
 
 ---
 
@@ -622,6 +629,8 @@ hand-спрайта к цели (sin-кривая 0.42с, инверсия dx п
 - Ассортимент мерчанта: детерминированный сид FNV-1a(npcId): 1–2 оружия + 1–2 брони «Матрёшка» L1–3, 3–4 расходника, 1 материал.
 - Цены: Permil 1200‰ (покупка) / 500‰ (продажа) от базовой стоимости предмета.
 - UI: TradeWindow «Лавка торговца» (900×600, Товары/Инвентарь, ЛКМ=1/Shift=5, Esc; S6: пометки «не хватает камней», тултипы имя+описание+редкость+цена, hover-подсветка).
+- **BUG-019 (Этап-6 аудита):** события честны относительно ФАКТА — `CurrencyChangedEvent.Delta` = фактически начисленное/списанное (при насыщении int.MaxValue — Delta меньше запрошенного), `TradeCompletedEvent.Price` = фактически зачисленное при потолке баланса.
+- **BUG-020 (Этап-6 аудита):** котировки обмена считаются в long — `ExchangeQuote.IsRepresentable=false` для непредставимых в int объёмов (явный отказ вместо молча отрицательного числа); завод `ExchangeQuote.Unrepresentable`.
 - Валюта — духовные камни (ЛОР §9.2: «твёрдое» Ци, расходник) — интеграция с экономикой камней Ци в планах.
 - Подробно — `06_player/TRADE_SYSTEM.md`.
 

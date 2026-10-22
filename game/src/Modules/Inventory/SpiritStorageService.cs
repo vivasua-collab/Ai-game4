@@ -80,7 +80,10 @@ namespace CultivationGame.Modules.Inventory
                         _storedItems[i] = new InventorySlot(item.ItemId, newCount, item.Category, item.Rarity);
                         RecalcCountCache(item.ItemId);
                         DeductQi();
-                        _itemAddedPub.Publish(new ItemAddedEvent(item.ItemId, 1));
+                        // BUG-022 (Этап-7): помещение в духовное хранилище — перенос
+                        // между собственными хранилищами, НЕ поступление из мира
+                        // (GatherItem-цели квестов это не засчитывают).
+                        _itemAddedPub.Publish(new ItemAddedEvent(item.ItemId, 1, ItemSources.StorageTransfer));
                         return true;
                     }
                 }
@@ -96,7 +99,8 @@ namespace CultivationGame.Modules.Inventory
             _storedItems.Add(new InventorySlot(item.ItemId, 1, item.Category, item.Rarity));
             RecalcCountCache(item.ItemId);
             DeductQi();
-            _itemAddedPub.Publish(new ItemAddedEvent(item.ItemId, 1));
+            // BUG-022 (Этап-7): перенос между собственными хранилищами (см. выше).
+            _itemAddedPub.Publish(new ItemAddedEvent(item.ItemId, 1, ItemSources.StorageTransfer));
             return true;
         }
 
