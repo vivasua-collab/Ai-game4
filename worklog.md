@@ -436,3 +436,71 @@ NEXT: (1) вкладка «Плейтест» портала (директива
 NEXT: владельцу — физический плейтест по вкладке «Плейтест» (окно ~25.10),
 отчёт по номерам PT-XX; аудитору — повторная проверка Этапов 6-7; триаж
 68 событий каталога шины.
+
+## 2026-10-22 (продолжение) — Этап-8 аудита: техники, Ци и боевые эффекты
+
+Принят аудит владельца «[STAGE 8 AUDIT] Techniques, Qi and effects» (Issue
+создать не удалось — 403 integration; запрос исполнен напрямую). Все 6
+находок верифицированы по коду ДО фиксов → исправлены → закрыты регрессией.
+
+- **Верификация ST8-01..06 по коду (все подтверждены):** AoEResolver
+  Cone:302/Line:316 «вырожден — берём всех» + Semicircle Dot≥0; кастер
+  Release→Fire безусловно; CompleteUse:550 + CombatService:919/1082/1430
+  (дубль события → INT ×2 в StatProgressProducer); §5.4:274 декларирует
+  стюн/смерть/медитацию, wiring отсутствовал; QiBufferService Activate
+  «успех» при QiInvested=0, AbsorbDamage ноль при pool<MIN_QI_FOR_BUFFER;
+  AuraHoldService.Tick — порог post-decay, возврат pre-decay.
+- **Фиксы (de5a8f4, функциональный коммит):** ST8-01 — направленная форма
+  без направления = НИЧТО + отказ каста «Прицел в свою клетку»; ST8-02 —
+  FireTechnique→bool, Release только при выпуске, удержание живёт при
+  отказе (цель ушла/тело цело/формация/AttackRejected) + честный reason
+  «Уже заряжается другая техника»; ST8-03 — CompleteUse(publishUsedEvent),
+  Combat молчит, единственный издатель CombatService после гейтов; отказ
+  не создаёт INT; НОВОЕ найдено симом: basic_attack публиковал событие →
+  INT за удар кулаком — закрыто фильтром tech!=null; ST8-04 — подписки
+  PlayerDeath/MeditationStateChanged/BuffApplied(combat_stun) в обоих
+  сервисах: зарядка CancelCharge(50%), аура Dissipate(50%); ST8-05 —
+  Activate отказ при pool<MIN (без ложного Activated-события), резервный
+  режим QiInvested=0 реально поглощает, Defense-гейт до CompleteUse;
+  ST8-06 — декей фиксируется до порога, возврат 50% post-decay остатка.
+- **Регрессия:** новый Stage8TechniqueTruthSimDebug (GODOT_STAGE8_DEBUG=1,
+  №26 в qa_regression.sh) — 30 ассертов по дословным сценариям A–F.
+  Первая итерация 21/30: инфраструктурные находки сима (конус из C1
+  загрязнял ауру следующих сценариев; AoE после зарядки паркуется в ауру —
+  нужен второй спуск; HealPart делит 70/30 — для полного red нужен
+  ceil(missing/0.7); readiness pending «удар не готов» на ретрае) +
+  настоящая находка в коде: TECH USED 'basic_attack' → INT-прирост за
+  Space-удар. После правок: **VERDICT PASS 30/30** (лог
+  checkpoints/10_22_stage8_technique.log).
+- **Полная регрессия: 28/28 PASS** — 26 qa_regression (батчи A–E
+  синхронно: фоновые процессы между вызовами песочницы не живут —
+  известный урок; +STAGE8 №26) + FORM + RESPAWN. CHARGE/DOT/STAGE5 —
+  зелёные (побочных регрессов нет). Build 0 errors.
+- **Инфраструктура:** Godot-бинарник dentry-ghost полностью (rm не берёт
+  dentry) — перекачан в НОВЫЙ путь /home/z/godot_new (GODOT_BIN override),
+  рабочий паттерн probe-циклов сохранён; git push восстановлен повторно
+  (протухший credential store, токен .auth живой, API 200).
+- **Доки/данные (607215b):** TESTING_RULES §0.1 реестр 40→41 (+STAGE8);
+  TECHNIQUE_SYSTEM §5.4 — контракт прерываний реализован (22.10), отказ
+  выпуска сохраняет удержание, decay-возврат post-decay; MODULE_STRUCTURE
+  §2.4/§2.8/§2.9 записи Этапа-8; bugs.json v1.7→v1.8: 42→48 (+STAGE8-001..006
+  verified, полные summary/analysis/fix/qa); bus_map.json реген (--check OK,
+  +ST8-04 wiring); playtest.json v1.0→v1.1: +категория «Техники/Ци/Ауры»
+  PT-T01..T07 (ST8-01..06 физически), всего 37 пунктов/9 категорий;
+  status.json v1.5 «Этап-8 закрыт 6/6, QA 28/28, реестр 48».
+- **Портал (agent-browser):** заголовок Этапа-8, реестр 48 (STAGE8-карточки
+  100% verified), плейтест-вкладка бейдж 37 + секция ST8 + PT-T01..T07 +
+  ST8-рефы; 390px без h-scroll, футер прижат на длинной странице, консоль
+  чистая; скриншоты qa_artifacts/stage8_playtest_{desktop,mobile}.png
+  (ad88ad0).
+- **Отчёт/лог:** checkpoints/10_22_stage8_technique_report.md (вердикты
+  по сценариям, SHA, команды, версии, риски) + checkpoints/10_22_stage8_
+  technique.log (206 строк, gitignore-исключение !checkpoints/10_22_*.log;
+  доступность на GitHub проверена — 200).
+- **Коммиты:** de5a8f4 (фиксы+сим), d49cbba (отчёт+лог), 607215b
+  (доки+реестр v1.8), ad88ad0 (скриншоты) — запушены bf3cdc8..ad88ad0.
+
+NEXT: аудитору — сверка вердиктов ST8-01..06 по de5a8f4 (лог/отчёт
+checkpoints/10_22_stage8_*) и Этап-9; владельцу — физический плейтест
+по вкладке «Плейтест» (37 пунктов, ~25.10), отчёт по номерам PT-XX;
+опционально — триаж 68 событий каталога шины + 5 мёртвых DI-регистров.
