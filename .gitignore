@@ -62,6 +62,7 @@ game/saves/*
 !checkpoints/09_22_*.log
 !checkpoints/09_23_*.log
 !checkpoints/10_20_*.log
+!checkpoints/10_22_*.log
 *.tmp
 *.bak
 *.swp

@@ -1,0 +1,206 @@
+=== Этап-8 аудита: фактический лог (headless Godot 4.7.2 mono, .NET 8/9) ===
+=== Команда: GODOT_NEWGAME=1 GODOT_STAGE8_DEBUG=1 $GODOT --headless --path . scenes/MainMenu.tscn ===
+=== Коммит фиксов: de5a8f4 (Этап-8: ST8-01..06) ===
+
+[TechniqueGrant] seed=6496598
+[TechniqueGrant] R25 AoE-набор: 2/3 форм (конус/полукруг/круг — площадные техники)
+[Stage8Sim] Ready — ST8-01..06 verification starts in 3s
+[Stage8Sim] EnsureTech: забыта 'tech_Combat_Void_Perfect_L1_2103' (освобождение слота Combat)
+[Stage8Sim] EnsureTech: изучена 'qa_st8_melee' (Combat/MeleeStrike) qi=20 cd=2
+[Stage8Sim] EnsureTech: забыта 'tech_Combat_Fire_Common_L1_2470' (освобождение библиотеки)
+[Stage8Sim] EnsureTech: изучена 'qa_st8_healing' (Healing/None) qi=20 cd=2
+[Stage8Sim] EnsureTech: забыта 'tech_Defense_Air_Refined_L1_2102' (освобождение слота Defense)
+[Stage8Sim] EnsureTech: изучена 'qa_st8_defense' (Defense/DefenseBlock) qi=72 cd=2
+[Stage8Sim] player@(25,25) npc=npc_0f506425e15548c7 qi=1000
+[Stage8Sim] ─── F. ST8-06: decay-порог, возврат 50% post-decay ───
+[Stage8Sim] AURA: qa_st8_f1
+[Stage8Sim] QI ADD req: +22 (AuraHoldService:decay)
+[Stage8Sim] AURA: EMPTY
+[Stage8Sim] F1: charged 60, decay 15 → остаток 45, ожид refund=22; факт gone=True refund=22 → PASS
+[Stage8Sim] AURA: qa_st8_f2
+[Stage8Sim] QI ADD req: +25 (AuraHoldService:decay)
+[Stage8Sim] AURA: EMPTY
+[Stage8Sim] F2: charged 51, decay 1 → 50 == QiCost/2, ожид refund=25; факт gone=True refund=25 → PASS
+[Stage8Sim] AURA: qa_st8_f3
+[Stage8Sim] QI ADD req: +25 (AuraHoldService:decay)
+[Stage8Sim] AURA: EMPTY
+[Stage8Sim] F3: 52→51 живёт, 51→50 рассеивается refund=25; факт aliveThen=True gone=True refund=25 → PASS
+[Stage8Sim] ─── A. ST8-01: вырожденное направление AoE ───
+[Stage8Sim] A1: Cone aim=клетка кастера, 3 цели в радиусе; ожид 0 целей, факт 0 → PASS (прежде — круг: 3)
+[Stage8Sim] A2: Semicircle aim=клетка кастера; ожид 0, факт 0 → PASS
+[Stage8Sim] A3: Line aim=клетка кастера; ожид 0, факт 0 → PASS
+[Stage8Sim] A4: Cone aim=(+5,0); ожид только передняя (npc_4a334a992ae24476), факт [npc_4a334a992ae24476] → PASS
+[Stage8Sim] A5: Semicircle aim=(+5,0); ожид front+side без behind, факт [npc_4a334a992ae24476,npc_ac01a7e3f1c043ec] → PASS
+[Stage8Sim] A6: Line aim=(+5,0); ожид только front, факт [npc_4a334a992ae24476] → PASS
+[Stage8Sim] CAST: tech_Combat_Light_Common_L1_2471 ok=False reason='Прицел в свою клетку — задайте направление'
+[Stage8Sim] PRESS: tech_Combat_Light_Common_L1_2471 → тайл (25,25)
+[Stage8Sim] A7: каст Cone в свою клетку; ожид FAIL 'Прицел в свою клетку' без залпа; факт refused=True impacts=0 → PASS
+[Stage8Sim] ─── B1. ST8-02: удержание живёт после отказа (Combat) ───
+[Stage8Sim] CHARGE START: qa_st8_melee cost=20
+[Stage8Sim] PRESS: qa_st8_melee → тайл (27,25)
+[Stage8Sim] AURA: qa_st8_melee
+[Stage8Sim] CAST: qa_st8_melee ok=True reason='В ауре'
+[Stage8Sim] CHARGE DONE: qa_st8_melee charged=20 potency=1000
+[Stage8Sim] B1: удержана 'qa_st8_melee' charged=19
+[Stage8Sim] CAST: qa_st8_melee ok=False reason='Цель исчезла'
+[Stage8Sim] PRESS: qa_st8_melee → тайл (27,25)
+[Stage8Sim] B1a: отказ='Цель исчезла'=True, удержание живо=True, событий=+0, кулдаун=0:True, мастерство нетронуто=True → PASS
+[Stage8Sim] TECH USED event: user=player_0 tech='qa_st8_melee' qi=20
+[Stage8Sim] CAST: qa_st8_melee ok=True reason=''
+[Stage8Sim] AURA: EMPTY
+[Stage8Sim] PRESS: qa_st8_melee → тайл (27,25)
+[Stage8Sim] B1b: повторный выпуск; аура освобождена=True, успех=True, событий на технику=1 (было 0, ожид +1) → PASS
+[Stage8Sim] B1c: INT-дельта за 1 успешный выпуск = 0.0010 (ожид 0.0010 ± допуск) → PASS
+[Stage8Sim] ─── C. ST8-03: один TechniqueUsedEvent на применение ───
+[Stage8Sim] CHARGE START: tech_Combat_Light_Common_L1_2471 cost=64
+[Stage8Sim] PRESS: tech_Combat_Light_Common_L1_2471 → тайл (28,25)
+[Stage8Sim] AURA: tech_Combat_Light_Common_L1_2471
+[Stage8Sim] CAST: tech_Combat_Light_Common_L1_2471 ok=True reason='В ауре'
+[Stage8Sim] CHARGE DONE: tech_Combat_Light_Common_L1_2471 charged=64 potency=1000
+[Stage8Sim] AOE IMPACT: tech_Combat_Light_Common_L1_2471 shape=Cone targets=[npc_0f506425e15548c7]
+[Stage8Sim] TECH USED event: user=player_0 tech='tech_Combat_Light_Common_L1_2471' qi=64
+[Stage8Sim] AURA: EMPTY
+[Stage8Sim] PRESS: tech_Combat_Light_Common_L1_2471 → тайл (28,25)
+[Stage8Sim] C1: AoE-залп impact=True, без отказов=True; событий техники=1 (ожид 1: только CombatService) → PASS
+[Stage8Sim] C2: AoeImpact.TargetIds=[npc_0f506425e15548c7] — только передняя цель → PASS
+[Stage8Sim] CHARGE START: qa_st8_melee cost=20
+[Stage8Sim] PRESS: qa_st8_melee → тайл (27,25)
+[Stage8Sim] AURA: qa_st8_melee
+[Stage8Sim] CAST: qa_st8_melee ok=True reason='В ауре'
+[Stage8Sim] CHARGE DONE: qa_st8_melee charged=20 potency=1000
+[Stage8Sim] CAST: qa_st8_melee ok=False reason='Цель исчезла'
+[Stage8Sim] PRESS: qa_st8_melee → тайл (27,25)
+[Stage8Sim] C3 (попытка 1): отклонён=False, кулдаун/мастерство возвращены=True, событий=+0, INT-дельта=0.000000, удержание живо=True → FAIL
+[Stage8Sim] ATTACK REJECTED: basic_attack reason='удар не готов (0‰ < 1000‰)'
+[Stage8Sim] ATTACK REJECTED: qa_st8_melee reason='Каст уже идёт: basic_attack'
+[Stage8Sim] PRESS: qa_st8_melee → тайл (27,25)
+[Stage8Sim] C3 (попытка 2): отклонён=True, кулдаун/мастерство возвращены=True, событий=+0, INT-дельта=0.000000, удержание живо=True → PASS
+[Stage8Sim] CAST: qa_st8_melee ok=False reason='Цель исчезла'
+[Stage8Sim] PRESS: qa_st8_melee → тайл (27,25)
+[Stage8Sim] QI ADD req: +5 (AuraHoldService:decay)
+[Stage8Sim] AURA: EMPTY
+[Stage8Sim] C4: повторный спуск после отказа → аура освобождена=True → PASS
+[Stage8Sim] ─── B2. ST8-02: удержание живёт после отказа (Healing) ───
+[Stage8Sim] CHARGE START: qa_st8_healing cost=20
+[Stage8Sim] PRESS: qa_st8_healing → тайл (25,25)
+[Stage8Sim] AURA: qa_st8_healing
+[Stage8Sim] CAST: qa_st8_healing ok=True reason='В ауре'
+[Stage8Sim] CHARGE DONE: qa_st8_healing charged=20 potency=1000
+[Stage8Sim] CAST: qa_st8_healing ok=False reason='Тело не ранено'
+[Stage8Sim] PRESS: qa_st8_healing → тайл (25,25)
+[Stage8Sim] B2a: тело цело → отказ=True, удержание живо=True, событий=+0 → PASS
+[Stage8Sim] TECH USED event: user=player tech='qa_st8_healing' qi=20
+[Stage8Sim] CAST: qa_st8_healing ok=True reason=''
+[Stage8Sim] AURA: EMPTY
+[Stage8Sim] PRESS: qa_st8_healing → тайл (25,25)
+[Stage8Sim] B2b: рана есть → выпуск success=True, аура свободна=True, INT-дельта=0.0010 → PASS
+[Stage8Sim] ─── E. ST8-05: щит без резерва Ци не врёт ───
+[Stage8Sim] qi drain → остаток 5
+[Stage8Sim] E1: пул=5 < MIN → отказ: не активен=True, события нет=True, поглощение=0/20 (ожид 0) → PASS
+[Stage8Sim] BUFFER ACTIVATED: mode=Shield invested=0
+[Stage8Sim] E2: пул=10 ≥ MIN → резерв: активен=True, invested=0, поглощение=5/5 (ожид 5) → PASS
+[Stage8Sim] CHARGE START: qa_st8_defense cost=72
+[Stage8Sim] PRESS: qa_st8_defense → тайл (25,25)
+[Stage8Sim] AURA: qa_st8_defense
+[Stage8Sim] CAST: qa_st8_defense ok=True reason='В ауре'
+[Stage8Sim] CHARGE DONE: qa_st8_defense charged=72 potency=1000
+[Stage8Sim] qi drain → остаток 5
+[Stage8Sim] CAST: qa_st8_defense ok=False reason='Недостаточно Ци для щита'
+[Stage8Sim] PRESS: qa_st8_defense → тайл (25,25)
+[Stage8Sim] E3: Defense при пул=5 → отказ='True', буфер-событий=0, удержание живо=True, кулдаун=0:True → PASS
+[Stage8Sim] TECH USED event: user=player tech='qa_st8_defense' qi=72
+[Stage8Sim] BUFFER ACTIVATED: mode=Shield invested=72
+[Stage8Sim] CAST: qa_st8_defense ok=True reason=''
+[Stage8Sim] AURA: EMPTY
+[Stage8Sim] PRESS: qa_st8_defense → тайл (25,25)
+[Stage8Sim] E4: после регена (пул=928) → успех=True, инвестировано=72 (ожид 72), буфер активен=True, аура свободна=True → PASS
+[Stage8Sim] ─── D. ST8-04: смерть/стюн/медитация/world-reset ───
+[Stage8Sim] EnsureTech: забыта 'tech_Combat_Lightning_Common_L1_2101' (освобождение слота Combat)
+[Stage8Sim] EnsureTech: изучена 'qa_st8_slow' (Combat/MeleeStrike) qi=6000 cd=0
+[Stage8Sim] CHARGE START: qa_st8_slow cost=6000
+[Stage8Sim] PRESS: qa_st8_slow → тайл (27,25)
+[Stage8Sim] QI ADD req: +17 (TechniqueChargeService)
+[Stage8Sim] CHARGE CANCEL: qa_st8_slow refund=17 reason='death'
+[Stage8Sim] D1: смерть в зарядке → зарядка снята=True, причина='death', возврат=17 (заряжено ~34) → PASS
+[Stage8Sim] respawn запрошен (GWC)
+[Stage8Sim] CHARGE START: qa_st8_melee cost=20
+[Stage8Sim] PRESS: qa_st8_melee → тайл (27,25)
+[Stage8Sim] AURA: qa_st8_melee
+[Stage8Sim] CAST: qa_st8_melee ok=True reason='В ауре'
+[Stage8Sim] CHARGE DONE: qa_st8_melee charged=20 potency=1000
+[Stage8Sim] QI ADD req: +9 (AuraHoldService:death)
+[Stage8Sim] AURA: EMPTY
+[Stage8Sim] D2: смерть при удержании → аура рассеяна=True, возврат=9 (ожид 9) → PASS
+[Stage8Sim] respawn запрошен (GWC)
+[Stage8Sim] CHARGE START: qa_st8_slow cost=6000
+[Stage8Sim] PRESS: qa_st8_slow → тайл (27,25)
+[Stage8Sim] QI ADD req: +17 (TechniqueChargeService)
+[Stage8Sim] CHARGE CANCEL: qa_st8_slow refund=17 reason='stun'
+[Stage8Sim] D3: combat_stun в зарядке → снята=True, причина='stun', возврат=17 → PASS
+[Stage8Sim] CHARGE START: qa_st8_melee cost=20
+[Stage8Sim] PRESS: qa_st8_melee → тайл (27,25)
+[Stage8Sim] AURA: qa_st8_melee
+[Stage8Sim] CAST: qa_st8_melee ok=True reason='В ауре'
+[Stage8Sim] CHARGE DONE: qa_st8_melee charged=20 potency=1000
+[Stage8Sim] QI ADD req: +9 (AuraHoldService:stun)
+[Stage8Sim] AURA: EMPTY
+[Stage8Sim] D4: combat_stun при удержании → рассеяна=True, возврат=9 → PASS
+[Stage8Sim] CHARGE START: qa_st8_melee cost=20
+[Stage8Sim] PRESS: qa_st8_melee → тайл (27,25)
+[Stage8Sim] AURA: qa_st8_melee
+[Stage8Sim] CAST: qa_st8_melee ok=True reason='В ауре'
+[Stage8Sim] CHARGE DONE: qa_st8_melee charged=20 potency=1000
+[Stage8Sim] QI ADD req: +9 (AuraHoldService:meditation)
+[Stage8Sim] AURA: EMPTY
+[Stage8Sim] D5: медитация при удержании → рассеяна=True, возврат=9 → PASS
+[Stage8Sim] CHARGE START: qa_st8_slow cost=6000
+[Stage8Sim] PRESS: qa_st8_slow → тайл (27,25)
+[Stage8Sim] CHARGE CANCEL: qa_st8_slow refund=0 reason='world_reset'
+[Stage8Sim] D6a: world-reset → зарядка снята=True (cancel world_reset=True) → PASS
+[Stage8Sim] CHARGE START: qa_st8_melee cost=20
+[Stage8Sim] PRESS: qa_st8_melee → тайл (27,25)
+[Stage8Sim] AURA: qa_st8_melee
+[Stage8Sim] CAST: qa_st8_melee ok=True reason='В ауре'
+[Stage8Sim] CHARGE DONE: qa_st8_melee charged=20 potency=1000
+[Stage8Sim] QI ADD req: +9 (AuraHoldService:world_reset)
+[Stage8Sim] AURA: EMPTY
+[Stage8Sim] D6b: world-reset → аура пуста=True, возврат=9 → PASS
+[Stage8Sim] ═══════ СВОДКА ЭТАПА-8 ═══════
+[Stage8Sim] F1   PASS       refund 22 (ожид 22), аура очищена=True
+[Stage8Sim] F2   PASS       refund 25 (ожид 25), аура очищена=True
+[Stage8Sim] F3   PASS       выше порога живёт=True, на пороге рассеялся=True, refund=25
+[Stage8Sim] A1   PASS       Cone degenerate: 0 целей (ожид 0)
+[Stage8Sim] A2   PASS       Semicircle degenerate: 0 (ожид 0)
+[Stage8Sim] A3   PASS       Line degenerate: 0 (ожид 0)
+[Stage8Sim] A4   PASS       направленный конус: [npc_4a334a992ae24476] (ожид [npc_4a334a992ae24476])
+[Stage8Sim] A5   PASS       полукруг: [npc_4a334a992ae24476,npc_ac01a7e3f1c043ec] (ожид front+side)
+[Stage8Sim] A6   PASS       линия: [npc_4a334a992ae24476] (ожид [npc_4a334a992ae24476])
+[Stage8Sim] A7   PASS       отказ=True, AoeImpact=0
+[Stage8Sim] B1a  PASS       отказ=True holdAlive=True used+0 cd0=True
+[Stage8Sim] B1b  PASS       release=True success=True used=1/1
+[Stage8Sim] B1c  PASS       INT-дельта 0.0010 (ожид ~0.0010)
+[Stage8Sim] C1   PASS       AoE used=1 (ожид 1), impact ok=True
+[Stage8Sim] C2   PASS       TargetIds=[npc_0f506425e15548c7] (ожид [npc_0f506425e15548c7])
+[Stage8Sim] C3   PASS       rejected=True refund=True used+0 INTΔ=0.000000 hold=True (попытка 2)
+[Stage8Sim] C4   PASS       повторный выпуск после rejection: True
+[Stage8Sim] B2a  PASS       отказ=True holdAlive=True used+0
+[Stage8Sim] B2b  PASS       release=True success=True INT~0.001=True
+[Stage8Sim] E1   PASS       refused=True event=0 absorbed=0
+[Stage8Sim] E2   PASS       fallback active=True invested=0 event=True absorbed=5
+[Stage8Sim] E3   PASS       refused=True noBufferEvent=True hold=True cd0=True
+[Stage8Sim] E4   PASS       success=True invested=72 active=True
+[Stage8Sim] D1   PASS       charge stopped=True reason=death refund=17/charged~34
+[Stage8Sim] D2   PASS       aura cleared=True refund=9/9
+[Stage8Sim] D3   PASS       charge stopped=True reason=stun refund=17
+[Stage8Sim] D4   PASS       aura cleared=True refund=9
+[Stage8Sim] D5   PASS       aura cleared=True refund=9
+[Stage8Sim] D6a  PASS       charge cleared=True/True
+[Stage8Sim] D6b  PASS       aura cleared=True refund=9
+[Stage8Sim] Итого: PASS=30 FAIL=0 NOT TESTED=0
+[Stage8Sim] VERDICT: PASS — ST8-01..06 закрыты
+
+=== Регрессионный контроль зоны воздействия (qa_regression.sh) ===
+CHARGE  → VERDICT: PASS (fill model + aura hold + release)
+DOT     → VERDICT: PASS (DoT Poison/Burn/Bleed/Freeze через единый пайплайн)
+STAGE5  → VERDICT: PASS (BUG-015/016/017: тело=истина смерти, сплит, DoT-зачёт)
+Итог Stage8: PASS=30 FAIL=0 NOT TESTED=0 → VERDICT: PASS
