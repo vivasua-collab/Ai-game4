@@ -1,6 +1,6 @@
 {
  "version": 1.8,
- "updated": "2026-10-22",
+ "updated": "2026-10-23",
  "format": {
   "purpose": "Реестр находок аудита и волн их исправления. Запуск процесса: директива владельца от 19.10.2026 — «по важным находкам аудита запустить анализ и исправление». Источник находок: аудит-вердикты итерации 2 карты проекта (коммит dfb98d0) + открытые верификации PROJECT_MAP.md §5. Ведёт main-агент Z.ai Code; веб-портал читает файл напрямую (runtime, no-store).",
   "type": {
@@ -26,7 +26,8 @@
    "1": "сессия 19.10.2026 — волна 1 аудита карты проекта (ЗАКРЫТА): BUG-001/VER-001/GAP-001, субагенты 10-19-fix-a/fix-b",
    "2": "сессия 20.10.2026 — волна 2: багфикс внешнего аудита upload/adit_10_20 (10 находок + доки), субагенты 10-20-fix-c..fix-h",
    "3": "дизайн-этап / контент-план M6+ — требует решения владельца",
-   "4": "малые фичи (бывш. волна 2): крафт-UI, зарядники, NPC-категории"
+   "4": "малые фичи (бывш. волна 2): крафт-UI, зарядники, NPC-категории",
+   "5": "Физплейтест владельца — раунд 1 (23.10): фиксы по PT-репортам (PT-C01/C02/C03 + PT-S00-варнинг), регрессия 27/27"
   }
  },
  "items": [
@@ -1274,6 +1275,101 @@
    "qa": "STAGE8 F1-F3: charged 60, decay 15 → остаток 45, возврат 22 (прежде 30); boundary: 51→50 == QiCost/2 → рассеивание с возвратом 25; 52→51 живёт, следующий тик рассеивает. Также C5-хвост удержания в B/D-сценариях согласован (refund=9 при charged 18-19).",
    "progress_pct": 100,
    "fix_note": "Этап-8 аудита, коммит de5a8f4; регрессия Stage8TechniqueTruthSimDebug 30/30 PASS; лог checkpoints/10_22_stage8_technique.log; отчёт checkpoints/10_22_stage8_technique_report.md"
+  },
+  {
+   "id": "PT-001",
+   "type": "bug",
+   "severity": "P1",
+   "title": "Агро NPC/зверей не сбрасывался на смерть игрока — погоня переживала респавн (PT-C02)",
+   "module": "NPC AI (NPCAIService / AnimalService / NPCModule)",
+   "track_ref": "playtest-r1",
+   "status": "verified",
+   "fix_wave": 5,
+   "assignee": "assistant",
+   "found": "2026-10-22",
+   "verified": "2026-10-23",
+   "summary": "Физплейтест: «Возродиться» работает, но после респавна в центре карты те же NPC из дальнего угла снова атакуют. Код: PlayerDeathEvent в NPC-домене никто не слушал; leash (AggroRadius×6=30 тайлов) покрывал только NPC с IsInCombat=true, а «битьё трупа» завершало сессию мгновенным Defeat, оставляя AIState=Attacking + Threats игрока → мгновенный пере-агр после таймаута; кэш позиции NPC прыгал за респавн-телепортом в центр.",
+   "analysis": "Полная цепочка смерти→респавна (GWC.RequestPlayerRespawn) не трогала НИ одного NPC-состояния: подписки PlayerDeathEvent — только экран смерти/сброс зарядки/рассеяние ауры. Плюс три смежных дефекта: proximity-угроза пинилась у трупа каждый тик; DoT-тик приходил с фантомом SourceId=\"dot:{buffId}\" и RetaliateOrFlee ставил TargetId=фантом (leash не покрывал — бесконечная погоня); каждый тик Attacking-NPC открывал НОВУЮ боевую сессию с мёртвым игроком (churn CombatStarted/Defeat). Фикс предписан ещё аудитом checkpoints/09_11_audit_npc.md (NPC-10).",
+   "fix": "NPCAIService: подписка PlayerDeathEvent → полный сброс агро по всем NPC (Threats/TargetId/IsInCombat через проверенный PublishDisengage-путь leash/flee + Wandering; хирургическое удаление только игроковых ключей угрозы у NPC в чужом бою); PlayerReviveEvent → возврат гейтов; гейт proximity-агро на мёртвого; DoT-атрибуция по OriginalAttackerId (паттерн BUG-017) + гейт месть-DoT от мёртвого игрока. AnimalService: PlayerDeathEvent → снятие мести со всех зверей (hostile-реестр, Target, CombatDisengageEvent). NPCModule: гейт «не бьём труп» в ProcessNpcAttacks (NPC-vs-NPC драки живут).",
+   "qa": "RESPAWN шаг 5 (новый): синтез агро NPC (Attacking+threat+inCombat) + DoT-атриб. + hostile-зверь → смерть игрока → сброс (не в бою, цель null, threats 0, не Attacking; зверь спокоен) → респавн → пере-агра нет. Регрессия 27/27: COMBATAI (месть/leash), ANIMALQA (месть/de-aggro), STAGE5 (DoT-зачёт), COMBAT_SIM — PASS. Вскрытые QA-долги симов закрыты: CombatSimDebug стабилизация смерти теперь РЕАЛЬНЫЙ RequestPlayerRespawn (прежде «вылеченный труп» без PlayerReviveEvent ломал событийные состояния), TargetingService.SelectTargetForQa — детерминизм bug001 (мститель-«ближайший» крал цель проклятия/яда).",
+   "progress_pct": 100,
+   "fix_note": "Плейтест-раунд 1 (PT-C02). Функциональный коммит + RESPAWN-шаг 5 в qa_regression (ранее сим в раннере отсутствовал). Доки: COMBAT_SYSTEM §1.4.1 (leash ×6 + смерть=сброс), DEATH_AND_LOOT §4 (переписан по коду: телепорт в центр, Ци/баффы не сбрасываются — долг), NPC_AI_SYSTEM (переход Attacking|цель-игрок мертва), MODULE_STRUCTURE. Владельцу перепроверить в раунде 2: умереть с агром → спокойный респавн."
+  },
+  {
+   "id": "PT-002",
+   "type": "bug",
+   "severity": "P1",
+   "title": "Журнал заданий (Q): карточки квестов высотой 0 — весь список печатался друг на друге (PT-C03)",
+   "module": "UI (QuestWindow)",
+   "track_ref": "playtest-r1",
+   "status": "verified",
+   "fix_wave": 5,
+   "assignee": "assistant",
+   "found": "2026-10-22",
+   "verified": "2026-10-23",
+   "summary": "Физплейтест: «Журнал заданий, нагромождение текста, нет разделителей» — все 3 квеста рендерились один поверх другого, «Принять» перекрывались.",
+   "analysis": "MakeQuestCard строил карточку на Panel (НЕ контейнер) + ребёнок-VBox без якорей → высота карточки 0, контент переливался, карточки ложились с шагом 8px. Класс дефекта, чиненный дважды ранее (TechniqueBookWindow R38-6: «всё свалено в куче», ItemContextMenu R19: «высота 0 → фон не рисовался»). Строки-«артефакты» скриншота («Единица измерения: руны» и пр.) — наложение реальных строк трёх карточек, НЕ утечка данных. Headless-репро: карта 736×0, vbox 369×161 наружу, BUTTON OVERLAPS на всех парах.",
+   "fix": "Panel → PanelContainer (высота по содержимому, ContentMargin стилбокса заработали) + HSeparator перед секцией наград (паттерн HotkeysWindow.MakeSeparator).",
+   "qa": "Headless-репро до/после (реплика MakeQuestCard на бинарнике 4.7.2): PanelContainer-вариант — карта 736×177, кнопки без перекрытий. REGRESS: QUEST PASS (квест-цикл цел). Окно не имело визуального QA (чекпоинт 09_04_s1 verified только Ready-лог). Владельцу: перепроверить Q в раунде 2 (скриншот).",
+   "progress_pct": 100,
+   "fix_note": "Плейтест-раунд 1 (PT-C03). Странные метки скриншота — артефакты перекрытия, не баг данных; переоткрыть окно после фикса."
+  },
+  {
+   "id": "PT-003",
+   "type": "bug",
+   "severity": "P2",
+   "title": "X листал ВСЕ изученные техники (вкл. пассивную Культивацию) — поведение владельцем не заказывалось (PT-C01)",
+   "module": "Input/Techniques (GWC / TechniqueService / HotbarPanel)",
+   "track_ref": "playtest-r1",
+   "status": "verified",
+   "fix_wave": 5,
+   "assignee": "assistant",
+   "found": "2026-10-22",
+   "verified": "2026-10-23",
+   "summary": "Физплейтест: «X — цикл, не понимаю логики, техники не добавлены в меню быстрого доступа — почему они идут циклически? Я когда запрашивал такое поведение?»",
+   "analysis": "CycleSelection (коммит 52e5277, 23.08; план 08_23_qi_impl_plan.md изначально предлагал Q, реализация переиспользовала свободный биндинг X) перебирал _orderedIds = ВСЕ изученные техники, включая некастуемую пассивную Культивацию. Слоты 3-9 (TechniqueSlotService) — отдельный механизм, который цикл вообще не читал. Выбор отражался только в тосте (HotbarPanel не был подписан на TechniqueSelectionChangedEvent) — листался невидимый в хотбаре набор. Ни одной директивы владельца на такой цикл в истории нет (документировано постфактум в HOTKEYS.md).",
+   "fix": "X-цикл в GWC: ТОЛЬКО назначенные слоты быстрого доступа 3-9 (порядок номера слота, wrap), тост «▣ Слот N: …», при пустых слотах — подсказка «назначьте в Книге Техник (T)». CycleSelection удалён из TechniqueService. HotbarPanel: золотая рамка выбранного слота (подписка TechniqueSelectionChangedEvent; заряд/удержание приоритетнее по рамке). F1-справка и HOTKEYS.md синхронизированы.",
+   "qa": "HOTBAR PASS (слоты/кулдауны/drag&drop целы), STAGE8/CHARGE PASS (каст-путь Z и 3-9 не тронуты). Перепроверка владельцем в раунде 2: X листает только назначенные, пусто → подсказка, выбранный подсвечен золотой рамкой.",
+   "progress_pct": 100,
+   "fix_note": "Плейтест-раунд 1 (PT-C01). Выбор из Книги (T) по-прежнему работает для Z; назначение слотов — кнопки-цифры + drag&drop (R41-8)."
+  },
+  {
+   "id": "PT-004",
+   "type": "bug",
+   "severity": "P2",
+   "title": "Одиночная техника отказывала голым «Нет цели в радиусе» — без радиуса и подсказки Tab (PT-C01)",
+   "module": "Techniques UX (PlayerTechniqueCaster)",
+   "track_ref": "playtest-r1",
+   "status": "verified",
+   "fix_wave": 5,
+   "assignee": "assistant",
+   "found": "2026-10-22",
+   "verified": "2026-10-23",
+   "summary": "Физплейтест: «техника молния, на цель, не заряжается, пишет нет цели» при том что конусные работают. Логики бага нет (Ци защищена ранним гейтом Stage-0), но сообщение не объясняло причину.",
+   "analysis": "«Молниевая …» — процедурная техника; одиночные подтипы (MeleeStrike/MeleeWeapon — радиус всего 2 кл., RangedProjectile 7.5, RangedBeam 10) требуют живую entity-цель в радиусе (Tab-выбор с приоритетом, иначе ближайший NPC∪зверь), а AoE-конусу цель не нужна — только прицел. Владелец получал отказ без радиуса и без способа понять, как назначить цель; подтип не виден в имени.",
+   "fix": "Отказ Combat (не-AoE) и Poison/Curse теперь называет радиус в клетках и подсказку: «Нет цели в радиусе N кл. — Tab выбирает цель, подойдите ближе» (радиус = max(2, Range/2 м) тайлов, как в гейте).",
+   "qa": "STAGE8 PASS (30/30 — логика гейта не тронута), CHARGE PASS; сообщение не участвует в ассертах. Перепроверка владельцем: у одиночной молнии отказ должен назвать радиус и Tab; после Tab-выбора в радиусе заряд идёт.",
+   "progress_pct": 100,
+   "fix_note": "Плейтест-раунд 1 (PT-C01). Радикальные варианты (подтип в имени/тултипе, рамка «цель вне радиуса») отложены — UX-полировка следующей волны."
+  },
+  {
+   "id": "PT-005",
+   "type": "bug",
+   "severity": "P3",
+   "title": "Raw-загрузка PNG спрайтов триггерила «will not work on export» и не переживала экспорт (PT-S00)",
+   "module": "Sprites (SpriteSheetCache / WeaponVisualCatalog)",
+   "track_ref": "playtest-r1",
+   "status": "verified",
+   "fix_wave": 5,
+   "assignee": "assistant",
+   "found": "2026-10-22",
+   "verified": "2026-10-23",
+   "summary": "Физплейтест (предупреждение отладчика): «Loaded resource as image file, this will not work on export: res://resources/sprites/characters/player/player_idle.png» из SpriteSheetCache.LoadPngTexture (Image.LoadFromFile).",
+   "analysis": "Raw-путь — осознанный G0-контракт «доставка = положить файл, без editor-импорта» (headless-QA, SPRITE_ANIMATION_PLAN §11 I-2), но у него два минуса: (1) предупреждение в editor-логе; (2) экспорт-сборка (PCK) включает только импортированные ресурсы — raw PNG молча выпадает → процедурный fallback. Экспорт пока не веха, но путь готовится.",
+   "fix": "Двойной путь: сначала штатный ИМПОРТИРОВАННЫЙ ресурс (ResourceLoader.Exists → Load<Texture2D> — editor-скан генерирует .import, экспорт включает .ctex, предупреждение исчезает), затем raw-фолбэк Image.LoadFromFile (headless/каталог без импорта — контракт G0 сохранён). TryLoadTexture → Texture2D (WeaponVisualCatalog синхронно). Доки: SPRITE_ANIMATION_PLAN I-2, SPRITE_DELIVERY §1.",
+   "qa": "ANIMQA PASS. Локально прогнан godot --headless --import (генерация .import/.ctex для спрайтов — player_idle/player_walk в .godot/imported, файлы gitignored, коммита не требуют): сим загрузил листы через ResourceLoader-путь; _qa-плейсхолдеры — по-прежнему raw. Отрицательный кэш и fallback целы (step1/2b ANIMQA). Владельцу: предупреждение в editor-логе должно исчезнуть (раунд 2).",
+   "progress_pct": 100,
+   "fix_note": "Плейтест-раунд 1 (PT-S00). Экспорт-пресет/include_filter — вне скоупа (экспорт не веха); при первом экспорте спрайты пойдут штатным путём."
   }
  ]
 }

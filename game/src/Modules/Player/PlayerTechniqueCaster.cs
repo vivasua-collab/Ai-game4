@@ -245,7 +245,15 @@ public sealed class PlayerTechniqueCaster : IDisposable
                 var target = FindTargetInRange(tech);
                 if (target == null)
                 {
-                    PublishFail(e.TechniqueId, "Нет цели в радиусе");
+                    // PT-004 (плейтест PT-C01, 23.10): отказ объясняет РАДИУС
+                    // техники и способ выбора цели. Прежде голое «Нет цели в
+                    // радиусе» не говорило, почему конус заряжается, а одиночная
+                    // техника нет (AoE не требует entity-цель, только прицел).
+                    // Радиус — в тайлах (2 м/тайл, минимум 2 кл.), как в гейте.
+                    int rangeTiles = (int)Math.Ceiling(Math.Max(
+                        MinAttackRangeTiles, tech.Range / GameConstants.TILE_SIZE_M));
+                    PublishFail(e.TechniqueId,
+                        $"Нет цели в радиусе {rangeTiles} кл. — Tab выбирает цель, подойдите ближе");
                     return;
                 }
             }
@@ -256,7 +264,12 @@ public sealed class PlayerTechniqueCaster : IDisposable
         {
             if (FindTargetInRange(tech) == null)
             {
-                PublishFail(e.TechniqueId, "Нет цели в радиусе");
+                // PT-004 (плейтест PT-C01): тот же информативный отказ, что и у
+                // Combat (радиус + подсказка Tab) — яд/проклятие целевые.
+                int rangeTiles = (int)Math.Ceiling(Math.Max(
+                    MinAttackRangeTiles, tech.Range / GameConstants.TILE_SIZE_M));
+                PublishFail(e.TechniqueId,
+                    $"Нет цели в радиусе {rangeTiles} кл. — Tab выбирает цель, подойдите ближе");
                 return;
             }
         }

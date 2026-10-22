@@ -21,6 +21,9 @@ cd /home/z/my-project/Ai-game4/game || exit 1
 ALL_SIMS=(
   "COMBAT_SIM:GODOT_COMBAT_SIM"
   "COMBATAI:GODOT_COMBATAI_DEBUG"
+  # Плейтест-раунд 1 (23.10, PT-001): экран смерти + сброс агро NPC/зверей
+  # на смерть игрока (шаг 5) — прежде в раннере отсутствовал.
+  "RESPAWN:GODOT_RESPAWN_DEBUG"
   "ANIMALQA:GODOT_ANIMALQA_DEBUG"
   "LOOT:GODOT_LOOT_DEBUG"
   "DOT:GODOT_DOT_DEBUG"

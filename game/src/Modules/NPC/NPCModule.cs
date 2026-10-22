@@ -73,6 +73,16 @@ public class NPCModule : IModule, IWorldResettable
     private IDisposable? _playerPosSubscription;
     private Vector2 _playerPosition = Vector2.Zero;
 
+    // PT-001 (плейтест PT-C02, 23.10): жив ли игрок — гейт «битья трупа».
+    // Прежде каждый тик Attacking-NPC открывал НОВУЮ боевую сессию с
+    // мёртвым игроком (CombatService мгновенно завершал её Defeat — churn
+    // событий). Мёртвый игрок не атакуется; NPC-vs-NPC драки живут.
+    [Inject] private readonly ISubscriber<Core.Messaging.Contracts.PlayerDeathEvent> _playerDeathSub = null!;
+    [Inject] private readonly ISubscriber<Core.Messaging.Contracts.PlayerReviveEvent> _playerReviveSub = null!;
+    private IDisposable? _playerDeathSubscription;
+    private IDisposable? _playerReviveSubscription;
+    private bool _playerAlive = true;
+
     // Phase 8 ч.2 (2026-09-03): дальнобойные NPC (лук/арбалет) бьют
     // с дистанции оружия вместо melee-гейта dist>2.
     [Inject] private readonly IEquipmentDataProvider _equipmentDataProvider = null!;
@@ -111,6 +121,9 @@ public class NPCModule : IModule, IWorldResettable
         _corpseService?.Initialize();
         // M2: позиция игрока → кэш (дистанция атаки NPC→игрок).
         _playerPosSubscription = _playerPosSub.Subscribe(OnPlayerPositionChanged);
+        // PT-001: жив ли игрок — гейт интентов по мёртвому игроку.
+        _playerDeathSubscription = _playerDeathSub.Subscribe(OnPlayerDeathForGate);
+        _playerReviveSubscription = _playerReviveSub.Subscribe(OnPlayerReviveForGate);
     
         _startCompleted = true;
     }
@@ -187,14 +200,19 @@ public class NPCModule : IModule, IWorldResettable
             // Attacking навсегда (удары по трупу отклонялись пайплайном,
             // AIState/TargetId никто не сбрасывал). Труп — не противник:
             // сброс цели + Wandering; новый выбор (месть/угрозы) — обычным
-            // путём EvaluateAndDecide. Игрок-цель не трогаем (его смерть —
-            // отдельный контур PlayerService).
+            // путём EvaluateAndDecide. Игрок-цель — контур PT-001 ниже
+            // (NPCAIService.OnPlayerDeath сбрасывает агро, здесь — гейт).
             if (target != null && !target.IsAlive)
             {
                 state.TargetId = null;
                 _npcServiceImpl.SetAIState(state.NpcId, NPCAIState.Wandering);
                 continue;
             }
+
+            // PT-001 (плейтест PT-C02, 23.10): цель — мёртвый игрок → интенты
+            // не идут (не бьём труп, не открываем сессии с мёртвым — churn
+            // CombatStarted/Defeat). Живой — как раньше.
+            if (target == null && !_playerAlive) continue;
 
             /// Цель — NPC или игрок: дистанция по тайлам (Position2D).
             int dx, dy;
@@ -255,6 +273,10 @@ public class NPCModule : IModule, IWorldResettable
         _yearChangedSubscription = null;
         _playerPosSubscription?.Dispose();
         _playerPosSubscription = null;
+        _playerDeathSubscription?.Dispose();
+        _playerDeathSubscription = null;
+        _playerReviveSubscription?.Dispose();
+        _playerReviveSubscription = null;
     }
 
     /// <summary>
@@ -290,6 +312,18 @@ public class NPCModule : IModule, IWorldResettable
     private void OnPlayerPositionChanged(in PlayerPositionChangedEvent e)
     {
         _playerPosition = new Vector2((int)e.X, (int)e.Y);
+    }
+
+    /// <summary>PT-001: флаг живости игрока для гейта ProcessNpcAttacks.</summary>
+    private void OnPlayerDeathForGate(in Core.Messaging.Contracts.PlayerDeathEvent e)
+    {
+        _playerAlive = false;
+    }
+
+    /// <summary>PT-001: игрок возрождён — атаки по игроку снова разрешены.</summary>
+    private void OnPlayerReviveForGate(in Core.Messaging.Contracts.PlayerReviveEvent e)
+    {
+        _playerAlive = true;
     }
 
     /// <summary>

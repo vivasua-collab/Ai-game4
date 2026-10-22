@@ -1794,9 +1794,50 @@ public partial class GameWorldController : Node2D
             }
             if (PlayerInput is { IsCycleTechniquePressed: true })
             {
-                TechniqueSvc?.CycleSelection();
-                var sel = TechniqueSvc?.SelectedTechnique;
-                if (sel != null) ShowToast($"▣ Выбрано: {sel.Name} L{sel.Level}");
+                // PT-003 (плейтест PT-C01, 23.10): X листает ТОЛЬКО назначенные
+                // слоты быстрого доступа 3-9 (в порядке номера слота; выбранный
+                // подсвечивается золотой рамкой хотбара). Прежний CycleSelection
+                // перебирал ВСЕ изученные техники — включая некастуемую пассивную
+                // Культивацию — набор, невидимый в хотбаре; поведение введено
+                // агентом 23.08 (52e5277, план 08_23_qi_impl_plan.md) и владельцем
+                // не заказывалось. Пусто → подсказка вместо листания в пустоту.
+                string? currentId = TechniqueSvc?.SelectedTechniqueId;
+                int currentSlot = -1;
+                if (currentId != null)
+                {
+                    for (int s = 3; s <= 9; s++)
+                        if (TechniqueSlots?.GetTechniqueAtSlot(s) == currentId) { currentSlot = s; break; }
+                }
+                int nextSlot = -1;
+                string? nextTech = null;
+                for (int s = 3; s <= 9; s++)
+                {
+                    if (s <= currentSlot) continue;
+                    var id = TechniqueSlots?.GetTechniqueAtSlot(s);
+                    if (string.IsNullOrEmpty(id)) continue;
+                    nextSlot = s; nextTech = id; break;
+                }
+                if (nextTech == null)
+                {
+                    // wrap: после последнего занятого → первый занятый
+                    // (currentSlot == -1 — выбор вне слотов → тоже первый).
+                    for (int s = 3; s <= 9; s++)
+                    {
+                        var id = TechniqueSlots?.GetTechniqueAtSlot(s);
+                        if (string.IsNullOrEmpty(id)) continue;
+                        nextSlot = s; nextTech = id; break;
+                    }
+                }
+                if (nextTech != null && nextSlot >= 3)
+                {
+                    TechniqueSvc?.SelectTechnique(nextTech);
+                    var sel = TechniqueSvc?.SelectedTechnique;
+                    if (sel != null) ShowToast($"▣ Слот {nextSlot}: {sel.Name} L{sel.Level}");
+                }
+                else
+                {
+                    ShowToast("Слоты 3-9 пусты — назначьте технику в Книге Техник (T)");
+                }
             }
             if (PlayerInput is { IsCastTechniquePressed: true } && TechniqueSvc != null)
             {
@@ -1809,7 +1850,7 @@ public partial class GameWorldController : Node2D
                 }
                 else
                 {
-                    ShowToast("✖ Нет выбранной техники (T — панель, X — выбор)");
+                    ShowToast("✖ Нет выбранной техники (T — книга, X — выбор из слотов 3-9)");
                 }
             }
 

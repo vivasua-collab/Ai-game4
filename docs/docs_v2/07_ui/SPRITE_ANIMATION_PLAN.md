@@ -442,7 +442,7 @@ NEAREST 64×64 → выравнивание базовой линии → виз
 | ID | Задача | Точка в коде | Статус |
 |---|---|---|---|
 | I-1 | Аниматор игрока: Hframes/Vframes/Frame по состоянию, множители скорости | блок `GWC._PhysicsProcess`; `PlayerAnimator.cs` | **G0 ГОТОВО** (fallback + триггеры death/melee/bow/hit/meditate/walk/run) |
-| I-2 | Лист-загрузчик PNG + fallback на процедурный | `SpriteSheetCache.cs` (реестр 24 анимации, `Image.LoadFromFile` без импорта) | **G0 ГОТОВО** |
+| I-2 | Лист-загрузчик PNG + fallback на процедурный | `SpriteSheetCache.cs` (реестр 24 анимации; PT-005 23.10: двойной путь — ResourceLoader для импортированных, raw `Image.LoadFromFile` как фолбэк для headless/без импорта) | **G0 ГОТОВО** |
 | I-3 | Октантный facing (D2): вектор → ряд 0..4 | `HandleFreeMovement` GWC | G5 (аниматор уже читает `Row` — D2-сетки лягут рядом side) |
 | I-4 | Визуализация дэша/сна | `PlayerTechniqueCaster`; `PlayerService.StartSleep` | G5 |
 | I-5 | Аниматор NPC: per-role листы + кадры в `_Draw` | `NPCSpriteRenderer.ResolveNpcAnim` | **G0 ГОТОВО** (idle/walk/melee; ключи npc_{role} → npc_base → процедурный) |

@@ -59,6 +59,9 @@ namespace CultivationGame.Modules.NPC
         private readonly ITileService _tileService;
         private readonly SpeciesRegistry _speciesRegistry;
         private readonly ISubscriber<DamageAppliedEvent> _damageAppliedSub;
+        // PT-001 (плейтест PT-C02, 23.10): смерть игрока — сброс мести зверей
+        // (аудит checkpoints/09_11_audit_npc.md NPC-10, прежде отсутствовал).
+        private readonly ISubscriber<PlayerDeathEvent> _playerDeathSub;
         private readonly IPublisher<AttackIntentEvent> _attackIntentPub;
         // 2026-09-11 (D2/D4): смерть животного → NPCDeathEvent (труп/killfeed);
         // позиция и канонический ID игрока для честной мести (чейз/смежность);
@@ -82,6 +85,7 @@ namespace CultivationGame.Modules.NPC
         // === State ===
         private readonly List<AnimalEntity> _animals = new();
         private IDisposable? _damageAppliedToken;
+        private IDisposable? _playerDeathToken;
 
         // Track which animals are hostile (attacked by player → retaliate).
         private readonly HashSet<string> _hostileAnimals = new();
@@ -156,7 +160,8 @@ namespace CultivationGame.Modules.NPC
             IPublisher<NPCDeathEvent> npcDeathPub,
             IPublisher<CombatDisengageEvent> combatDisengagePub,
             IPublisher<EnemyKilledEvent> enemyKilledPub,
-            IPlayerService playerService)
+            IPlayerService playerService,
+            ISubscriber<PlayerDeathEvent> playerDeathSub)
         {
             _bodyDataProvider = bodyDataProvider ?? throw new ArgumentNullException(nameof(bodyDataProvider));
             _bodyFactory = bodyFactory ?? throw new ArgumentNullException(nameof(bodyFactory));
@@ -168,6 +173,7 @@ namespace CultivationGame.Modules.NPC
             _combatDisengagePub = combatDisengagePub ?? throw new ArgumentNullException(nameof(combatDisengagePub));
             _enemyKilledPub = enemyKilledPub ?? throw new ArgumentNullException(nameof(enemyKilledPub));
             _playerService = playerService ?? throw new ArgumentNullException(nameof(playerService));
+            _playerDeathSub = playerDeathSub ?? throw new ArgumentNullException(nameof(playerDeathSub));
         }
 
         // === IStartable ===
@@ -213,6 +219,8 @@ namespace CultivationGame.Modules.NPC
 
             // Subscribe to damage events for animal retaliation.
             _damageAppliedToken = _damageAppliedSub.Subscribe(OnDamageApplied);
+            // PT-001: смерть игрока — сброс мести (hub-and-spoke, EVT-01).
+            _playerDeathToken = _playerDeathSub.Subscribe(OnPlayerDeath);
         
             _startCompleted = true;
         }
@@ -461,7 +469,9 @@ namespace CultivationGame.Modules.NPC
         public void Dispose()
         {
             _damageAppliedToken?.Dispose();
+            _playerDeathToken?.Dispose();
             _damageAppliedToken = null;
+            _playerDeathToken = null;
         }
 
         public void Tick(int tickCount)
@@ -663,6 +673,35 @@ namespace CultivationGame.Modules.NPC
             animal.ChaseLostTicks = 0; // R38-2: новый удар — grace-окно погони заново
 
             Console.WriteLine($"[AnimalService] {animal.Species}#{animal.EntityId} hit by {e.SourceId} → hostile, chase (range {ChaseRangeTiles} tiles, grace {ChaseGraceTicks} ticks)!");
+        }
+
+        /// <summary>
+        /// PT-001 (плейтест PT-C02, 23.10): смерть игрока — звери сбрасывают
+        /// месть. Прежде хвост _hostileAnimals переживал смерть: чейз следовал
+        /// за респавн-телепортом (кэш позиции игрока прыгает в центр карты),
+        /// и «те же волки из дальнего угла» атаковали заново. Финал — тот же,
+        /// что у de-aggro R38-2 (безопасный CombatDisengageEvent: AbandonCombat
+        /// игнорирует неучастников).
+        /// </summary>
+        private void OnPlayerDeath(in PlayerDeathEvent e)
+        {
+            if (_hostileAnimals.Count == 0) return;
+
+            string[] ids = new string[_hostileAnimals.Count];
+            _hostileAnimals.CopyTo(ids);
+            _hostileAnimals.Clear();
+
+            foreach (var id in ids)
+            {
+                var animal = _animals.Find(a => a.EntityId == id);
+                if (animal == null || !animal.IsAlive) continue;
+                animal.Target = null;
+                animal.ChaseLostTicks = 0;
+                animal.MoveCooldownTicks = 5; // ~5 тиков «успокаивается»
+                _combatDisengagePub.Publish(new CombatDisengageEvent(
+                    id, "смерть игрока: сброс мести зверя"));
+            }
+            Console.WriteLine($"[AnimalService] PT-001: смерть игрока — месть снята у {ids.Length} зверей");
         }
 
         // === Helpers ===

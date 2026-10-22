@@ -96,7 +96,7 @@ namespace CultivationGame.Modules.Combat
         // === Состояние ===
         private readonly Dictionary<string, LearnedTechnique> _learnedTechniques = new();
         private readonly Dictionary<string, float> _cooldowns = new();
-        private readonly List<string> _orderedIds = new(); // порядок изучения (для UI/цикла выбора)
+        private readonly List<string> _orderedIds = new(); // порядок изучения (для UI/сейва; X-цикл с 23.10 листает слоты 3-9 — PT-003)
         private string? _selectedTechniqueId;
 
         // Эхо мастерства: ключ "{(int)Type}:{(int)Element}" → накопленное осмысление.
@@ -145,7 +145,7 @@ namespace CultivationGame.Modules.Combat
         public LearnedTechnique? SelectedTechnique
             => _selectedTechniqueId != null && _learnedTechniques.TryGetValue(_selectedTechniqueId, out var t) ? t : null;
 
-        /// <summary>Выбрать активную технику (для каста по R/клику). null — сброс.</summary>
+        /// <summary>Выбрать активную технику (для каста по Z/3-9). null — сброс.</summary>
         public void SelectTechnique(string? techniqueId)
         {
             if (techniqueId != null && !_learnedTechniques.ContainsKey(techniqueId)) return;
@@ -153,14 +153,12 @@ namespace CultivationGame.Modules.Combat
             _techniqueSelectionPub.Publish(new TechniqueSelectionChangedEvent(techniqueId));
         }
 
-        /// <summary>Циклический выбор следующей кастуемой техники (Q).</summary>
-        public void CycleSelection()
-        {
-            if (_orderedIds.Count == 0) return;
-            int idx = _selectedTechniqueId != null ? _orderedIds.IndexOf(_selectedTechniqueId) : -1;
-            string next = _orderedIds[(idx + 1) % _orderedIds.Count];
-            SelectTechnique(next);
-        }
+        // PT-003 (плейтест PT-C01, 23.10): CycleSelection() УДАЛЁН — прежний
+        // цикл по ВСЕМ изученным техникам (включая пассивную Культивацию)
+        // владельцем не заказывался (введён агентом 23.08, 52e5277) и не
+        // показывался в хотбаре. X теперь листает только назначенные слоты
+        // 3-9 — логика в GameWorldController (X-обработчик), единый
+        // источник набора — TechniqueSlotService.
 
         // === Слоты (TECHNIQUE_SYSTEM.md §12) ===
 

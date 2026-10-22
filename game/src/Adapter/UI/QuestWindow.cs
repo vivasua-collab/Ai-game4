@@ -148,7 +148,15 @@ public partial class QuestWindow : Control
 
     private Control MakeQuestCard(QuestSummary q)
     {
-        var card = new Panel();
+        // PT-002 (плейтест PT-C03, 23.10): PanelContainer вместо Panel —
+        // тот же класс дефекта, что в TechniqueBookWindow (R38-6) и
+        // ItemContextMenu (R19): Panel — НЕ контейнер, ребёнок-VBox не
+        // раскладывается, высота карточки = 0 → все квесты печатались
+        // ДРУГ НА ДРУГЕ («нагромождение текста, нет разделителей»,
+        // физплейтест PT-C03; headless-репро: карта 736×0, vbox 369×161
+        // переливается наружу, «Принять» перекрывались). PanelContainer
+        // считает высоту по содержимому + даёт ContentMargin стилбокса.
+        var card = new PanelContainer();
         var cardStyle = new StyleBoxFlat { BgColor = new Godot.Color(0.15f, 0.12f, 0.08f, 0.9f) };
         cardStyle.SetBorderWidthAll(1);
         cardStyle.SetBorderColor(StatusColour(q.Status, false));
@@ -204,6 +212,12 @@ public partial class QuestWindow : Control
         // Награды.
         if (q.RewardTexts is { Length: > 0 })
         {
+            // PT-002: разделитель перед секцией наград (паттерн
+            // HotkeysWindow.MakeSeparator) — внутри карточки видны секции.
+            var sep = new HSeparator();
+            sep.AddThemeConstantOverride("separation", 4);
+            vbox.AddChild(sep);
+
             var rew = new Label { Text = "Награда: " + string.Join(", ", q.RewardTexts) };
             rew.AddThemeFontSizeOverride("font_size", 11);
             rew.AddThemeColorOverride("font_color", new Godot.Color(0.85f, 0.75f, 0.35f));

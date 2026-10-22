@@ -120,6 +120,26 @@ public sealed class TargetingService : IWorldResettable
         PublishChange(string.Empty, 0, 0, 0);
     }
 
+    /// <summary>
+    /// QA (CombatSimDebug bug001, плейтест-раунд 23.10): принудительный выбор
+    /// цели — Tab-приоритет для целевых техник (Poison/Curse) в тестах, где
+    /// «ближайший» недетерминирован (мстители ранних секций могут оказаться
+    /// ближе пинненной цели). Продакшн-код НЕ вызывает: выбор игрока живёт
+    /// в Tab-цикле (CycleTarget). Публикует PlayerTargetChangedEvent (рамка
+    /// подсветки ведёт себя как при Tab).
+    /// </summary>
+    public bool SelectTargetForQa(string targetId)
+    {
+        if (string.IsNullOrEmpty(targetId)) return false;
+        if (!TryResolveTarget(targetId, out var pos)) return false;
+        CurrentTargetId = targetId;
+        int dist = _player != null
+            ? Math.Max(Math.Abs(pos.X - _player.Position.X), Math.Abs(pos.Y - _player.Position.Y))
+            : 0;
+        PublishChange(targetId, pos.X, pos.Y, dist);
+        return true;
+    }
+
     private void PublishChange(string id, int x, int y, int dist)
         => _targetChangedPub?.Publish(new PlayerTargetChangedEvent(id, x, y, dist));
 

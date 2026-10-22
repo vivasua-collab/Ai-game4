@@ -45,6 +45,9 @@ public partial class RespawnSimDebug : Node
     // АУДИТ-1020 (BUG-010, шаг 4a): синтетический DamageAppliedEvent — прогон
     // реального пайплайна урона (BodyService.OnDamageApplied + кэш оверлея).
     [Inject] private IPublisher<DamageAppliedEvent>? _damagePub;
+    // PT-001 (плейтест PT-C02, шаг 5): сброс агро на смерть игрока.
+    [Inject] private INPCService? _npcService;
+    [Inject] private CultivationGame.Modules.NPC.AnimalService? _animalServiceImpl;
 
     private System.IDisposable? _timeChangedToken;
     private System.IDisposable? _tileChangedToken;
@@ -289,6 +292,130 @@ public partial class RespawnSimDebug : Node
                      $"позиция=({player.Position.X},{player.Position.Y}) (ожидали {cx},{cy})");
             pass &= deadAgain && orphanKeepsShown && orphanStillDead
                     && confirmedAlive && confirmedHidden && confirmedCenter;
+
+            // === 5. PT-001 (плейтест PT-C02, 23.10): смерть сбрасывает агро ===
+            // 5a. Синтез агро NPC на игрока (Threats + TargetId + IsInCombat
+            //     + Attacking — как оставлял бы реальный бой), NPC уводим
+            //     далеко от центра — чистая проверка сброса без proximity.
+            // 5a2. DoT-атtribution: тик яда (SourceId="dot:…", OriginalAttacker
+            //     = игрок) — угроза обязана лечь на игрока, НЕ на фантом.
+            // 5b. Зверь под удар игрока → месть (hostile).
+            // Убиваем игрока → агро NPC/зверей обязан обнулиться.
+            // Респавн → НЕ пере-агриться (тот же NPC, тот же зверь).
+            if (_npcService != null && _animalServiceImpl != null && _tiles != null)
+            {
+                string? aggroNpcId = null, dotNpcId = null;
+                string? firstAlive = null;
+                foreach (var id in _npcService.GetAllNPCIds())
+                {
+                    var st = _npcService.GetNPCState(id);
+                    if (st is not { IsAlive: true }) continue;
+                    firstAlive ??= id;
+                    // 5d проверяет «НЕ пере-агрился после респавна»: для чистоты
+                    // берём НЕ-Hostile NPC (Hostile у центра легитимно агрится
+                    // proximity-правилом на живого игрока — не дефект).
+                    if (aggroNpcId == null && st.Disposition != NPCDisposition.Hostile)
+                        aggroNpcId = id;
+                    if (dotNpcId == null && id != aggroNpcId)
+                        dotNpcId = id;
+                }
+                aggroNpcId ??= firstAlive; // все Hostile — берём первого живого
+                if (dotNpcId == aggroNpcId) dotNpcId = null;
+
+                var npcA = aggroNpcId != null ? _npcService.GetNPCState(aggroNpcId) : null;
+                var npcB = dotNpcId != null ? _npcService.GetNPCState(dotNpcId) : null;
+                bool hasTargets = npcA != null && (dotNpcId == null || npcB != null);
+
+                // Зверь: первый живой в радиусе (50×50 — вся карта).
+                string? animalId = null;
+                var animalsNear = _animalServiceImpl.GetAliveAnimalsInRange(player.Position, 50);
+                if (animalsNear != null)
+                    foreach (var an in animalsNear)
+                        if (an.SpeciesId != "rabbit") { animalId = an.EntityId; break; }
+
+                if (!hasTargets || animalId == null)
+                {
+                    GD.Print($"[RespawnSim] 5. SKIP — нет предпосылок (npcA={aggroNpcId != null}, npcB={dotNpcId != null}, animal={animalId != null}); шаг не влияет на вердикт (headless-лимитация мира)");
+                }
+                else
+                {
+                    // 5a. Агро-синтез + удаление NPC от центра.
+                    _npcService.UpdatePosition(aggroNpcId!, new Position2D(2, 2));
+                    npcA!.Threats[player.PlayerId] = 60f;
+                    npcA.TargetId = player.PlayerId;
+                    npcA.IsInCombat = true;
+                    _npcService.SetAIState(aggroNpcId!, NPCAIState.Attacking);
+
+                    // 5a2. DoT-атtribution (реальный пайплайн через шину):
+                    if (npcB != null)
+                    {
+                        damagePub.Publish(new DamageAppliedEvent(
+                            "dot:qa_buff", dotNpcId!, 30,
+                            DamageType.Physical, Element.Neutral, BodyPartType.Torso,
+                            CombatAttackResult.Hit, CombatSubtype.None, player.PlayerId));
+                    }
+
+                    // 5b. Зверь под удар → месть. (sourceId=player, targetId=animal —
+                    //     конструктор (source, target, …).) Урон щадящий 5: волк
+                    //     vitality 10,probe 30 рвал Torso → death-ветка вместо
+                    //     мести (зверь умирал, hostile снимался — не тот путь).
+                    damagePub.Publish(new DamageAppliedEvent(
+                        player.PlayerId, animalId, 5,
+                        DamageType.Physical, Element.Neutral, BodyPartType.Torso,
+                        CombatAttackResult.Hit, CombatSubtype.None));
+                    await ToSignal(GetTree().CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
+
+                    bool preAggro = npcA.AIState == NPCAIState.Attacking
+                                    && npcA.Threats.ContainsKey(player.PlayerId)
+                                    && npcA.TargetId == player.PlayerId
+                                    && npcA.IsInCombat;
+                    bool dotAttrOk = npcB == null
+                        || (npcB.Threats.ContainsKey(player.PlayerId)
+                            && !npcB.Threats.ContainsKey("dot:qa_buff"));
+                    bool animalHostile = _animalServiceImpl.IsHostile(animalId);
+                    GD.Print($"[RespawnSim] 5-пред: NPC {aggroNpcId} Attacking+threat+inCombat={preAggro}, " +
+                             $"dot-атрибуция на игрока={dotAttrOk} (фантома нет), зверь {animalId} hostile={animalHostile}");
+                    pass &= preAggro && dotAttrOk && animalHostile;
+
+                    // 5c. Смерть игрока → агро обнуляется.
+                    body.ApplyDamage(BodyPartType.Head, 10_000_000, "npc_qa_killer");
+                    await ToSignal(GetTree().CreateTimer(0.4), SceneTreeTimer.SignalName.Timeout);
+                    var stA = _npcService.GetNPCState(aggroNpcId!);
+                    bool npcCleared = stA != null
+                        && !stA.IsInCombat
+                        && string.IsNullOrEmpty(stA.TargetId)
+                        && !stA.Threats.ContainsKey(player.PlayerId)
+                        && stA.Threats.Count == 0
+                        && stA.AIState != NPCAIState.Attacking;
+                    bool dotCleared = npcB == null
+                        || (_npcService.GetNPCState(dotNpcId!) is { } stB2
+                            && !stB2.Threats.ContainsKey(player.PlayerId)
+                            && !stB2.Threats.ContainsKey("dot:qa_buff"));
+                    bool animalCalm = !_animalServiceImpl.IsHostile(animalId);
+                    GD.Print($"[RespawnSim] 5c. после смерти: NPC сброшен (не в бою, цель null, threats 0, не Attacking)={npcCleared}, " +
+                             $"dot-NPC чист={dotCleared}, зверь без мести={animalCalm} (ожидали true/true/true)");
+                    pass &= npcCleared && dotCleared && animalCalm;
+
+                    // 5d. Респавн → мгновенного пере-агра нет.
+                    overlay.SimulateRespawnPressForQa();
+                    await ToSignal(GetTree().CreateTimer(0.6), SceneTreeTimer.SignalName.Timeout);
+                    var stA2 = _npcService.GetNPCState(aggroNpcId!);
+                    bool noReaggro = stA2 != null
+                        && stA2.AIState != NPCAIState.Attacking
+                        && !stA2.Threats.ContainsKey(player.PlayerId)
+                        && stA2.TargetId != player.PlayerId;
+                    bool animalStillCalm = !_animalServiceImpl.IsHostile(animalId);
+                    bool playerBack = player.IsAlive && player.Position.X == cx && player.Position.Y == cy;
+                    GD.Print($"[RespawnSim] 5d. после респавна: пере-агра нет={noReaggro}, зверь спокоен={animalStillCalm}, " +
+                             $"игрок жив в центре={playerBack} (ожидали true/true/true)");
+                    pass &= noReaggro && animalStillCalm && playerBack;
+                }
+            }
+            else
+            {
+                GD.Print("[RespawnSim] 5. FAIL — INPCService/AnimalService не в DI (шаг PT-001)");
+                pass = false;
+            }
         }
         else if (overlay != null)
         {
@@ -301,6 +428,6 @@ public partial class RespawnSimDebug : Node
 
     private static void PrintVerdict(bool pass)
     {
-        GD.Print($"[RespawnSim] VERDICT: {(pass ? "PASS — resource respawn + honest travel + time delta + death screen (GAP-001 + АУДИТ-1020: BUG-009/010/011)" : "FAIL")}");
+        GD.Print($"[RespawnSim] VERDICT: {(pass ? "PASS — resource respawn + honest travel + time delta + death screen (GAP-001 + АУДИТ-1020: BUG-009/010/011) + агро-сброс на смерть (PT-001, плейтест PT-C02)" : "FAIL")}");
     }
 }

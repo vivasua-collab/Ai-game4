@@ -74,6 +74,9 @@ public partial class HotbarPanel : Panel
     [Inject] private IPublisher<Core.Messaging.Contracts.MeditationToggleRequestedEvent> _meditationTogglePub = null!;
     [Inject] private ISubscriber<Core.Messaging.Contracts.MeditationStateChangedEvent> _meditationStateSub = null!;
     [Inject] private ISubscriber<TechniqueLearnedEvent> _learnedSub = null!;
+    // PT-003 (плейтест PT-C01, 23.10): выбранная техника (X-цикл / Книга) —
+    // золотая рамка слота в хотбаре (до заряда/удержания: их пульс приоритетнее).
+    [Inject] private ISubscriber<TechniqueSelectionChangedEvent> SelectionChangedSub = null!;
 
     // === Layout constants ===
     private const float MainSlotSize = 52f;
@@ -112,6 +115,9 @@ public partial class HotbarPanel : Panel
     private Element _heldElement = Element.Neutral;
     private int _heldPotency;
 
+    // PT-003 (плейтест PT-C01): выбранная техника (X-цикл / Книга) — рамка.
+    private string? _selectedTechId;
+
     private float _pulseTime;       // фаза пульса рамки
     private readonly Color[] _baseBorders = new Color[9]; // дефолт рамок (возврат)
 
@@ -139,6 +145,8 @@ public partial class HotbarPanel : Panel
     private System.IDisposable? _chargeCompletedToken;
     private System.IDisposable? _chargeCancelledToken;
     private System.IDisposable? _heldChangedToken;
+    // PT-003: подписка выбора техники (рамка слота).
+    private System.IDisposable? _selectionChangedToken;
 
     // Кэш текста (чтобы не спамить Text-сеттер каждый кадр — грязный рендер).
     private readonly string?[] _nameCache = new string?[9];
@@ -167,6 +175,8 @@ public partial class HotbarPanel : Panel
         // П5 (репорт 21.09): спец-слот медитации — состояние + изучение техник.
         _meditationStateToken = _meditationStateSub?.Subscribe(OnMeditationStateChanged);
         _learnedToken = _learnedSub?.Subscribe(OnTechniqueLearned);
+        // PT-003: выбор техники (X-цикл / Книга) — индикация рамки.
+        _selectionChangedToken = SelectionChangedSub?.Subscribe(OnSelectionChanged);
 
         RefreshAll();
         GD.Print("[HotbarPanel] Ready (v2: techniques + cooldowns + belt row + charge/aura R26 + медитация-слот П5)");
@@ -185,6 +195,7 @@ public partial class HotbarPanel : Panel
         _heldChangedToken?.Dispose();
         _meditationStateToken?.Dispose();
         _learnedToken?.Dispose();
+        _selectionChangedToken?.Dispose();
     }
 
     private void BuildUI()
@@ -704,7 +715,11 @@ public partial class HotbarPanel : Panel
         // --- Сброс рамки к дефолту (нет заряда/удержания) ---
         if (!charging && !held)
         {
-            style.BorderColor = _baseBorders[i];
+            // PT-003: выбранная техника — устойчивая золотая рамка (заряд —
+            // изумрудный пульс, удержание — пульс стихии: оба приоритетнее).
+            style.BorderColor = techId != null && techId == _selectedTechId
+                ? new Color(0.95f, 0.80f, 0.45f, 0.95f)
+                : _baseBorders[i];
         }
     }
 
@@ -758,6 +773,16 @@ public partial class HotbarPanel : Panel
             _heldElement = e.Element;
             _heldPotency = e.PotencyPermil;
         }
+    }
+
+    /// <summary>
+    /// PT-003 (плейтест PT-C01, 23.10): смена выбранной техники (X-цикл по
+    /// слотам 3-9 / клик в Книге Техник) — рамку обновит UpdateChargeVisuals
+    /// в ближайшем кадре (кэш-гварды не трогаем, просто запоминаем id).
+    /// </summary>
+    private void OnSelectionChanged(in TechniqueSelectionChangedEvent e)
+    {
+        _selectedTechId = string.IsNullOrEmpty(e.TechniqueId) ? null : e.TechniqueId;
     }
 
     // === П5 (репорт 21.09): спец-слот медитации ======================

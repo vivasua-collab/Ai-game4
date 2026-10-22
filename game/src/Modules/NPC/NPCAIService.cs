@@ -39,7 +39,9 @@ namespace CultivationGame.Modules.NPC
     /// - месть: удар/начало боя → Attacking (или Fleeing по личности);
     /// - бегство: HP ≤ FleeHealthRatio работает и В БОЮ (NPC_AI_SYSTEM §4.2)
     ///   с публикацией CombatDisengageEvent (бой завершается стадией Flee);
-    /// - leash: цель-игрок дальше AggroRadius×3 → выход из боя (aggro-drop).
+    /// - leash: цель-игрок дальше AggroRadius×6 (R20) → выход из боя (aggro-drop);
+    /// - PT-001 (плейтест PT-C02, 23.10): смерть игрока → полный сброс агро
+    ///   по всем NPC (OnPlayerDeath) + гейты proximity/DoT-мести на труп.
     /// </summary>
     public class NPCAIService : IDisposable
     {
@@ -56,10 +58,20 @@ namespace CultivationGame.Modules.NPC
         private readonly ISubscriber<CombatStartedEvent> _combatStartedSub;
         // R16: публикация выхода NPC из боя (бегство/leash).
         private readonly IPublisher<CombatDisengageEvent> _combatDisengagePub;
+        // PT-001 (плейтест PT-C02, 23.10): жизненный цикл игрока — сброс агро.
+        // Hub-and-spoke: никаких инъекций чужих сервисов, только события.
+        private readonly ISubscriber<PlayerDeathEvent> _playerDeathSub;
+        private readonly ISubscriber<PlayerReviveEvent> _playerReviveSub;
         private IDisposable _damageAppliedSubscription;
         private IDisposable _bodyPartSeveredSubscription;
         private IDisposable _playerPosChangedSubscription;
         private IDisposable _combatStartedSubscription;
+        private IDisposable _playerDeathSubscription;
+        private IDisposable _playerReviveSubscription;
+
+        // PT-001: жив ли игрок. Гейтит proximity-агро (труп не провоцирует)
+        // и месть-DoT (яды, наложенные до смерти, не пере-агрят на респавн).
+        private bool _playerAlive = true;
 
         // === Состояние ===
         private Vector2 _playerPosition;
@@ -90,7 +102,10 @@ namespace CultivationGame.Modules.NPC
             ISubscriber<PlayerPositionChangedEvent> playerPosChangedSub,
             // R16: месть на старт боя + публикация disengage.
             ISubscriber<CombatStartedEvent> combatStartedSub,
-            IPublisher<CombatDisengageEvent> combatDisengagePub)
+            IPublisher<CombatDisengageEvent> combatDisengagePub,
+            // PT-001: смерть/возрождение игрока — сброс агро.
+            ISubscriber<PlayerDeathEvent> playerDeathSub,
+            ISubscriber<PlayerReviveEvent> playerReviveSub)
         {
             _npcService = npcService;
             _config = config;
@@ -100,6 +115,8 @@ namespace CultivationGame.Modules.NPC
             _playerPosChangedSub = playerPosChangedSub;
             _combatStartedSub = combatStartedSub;
             _combatDisengagePub = combatDisengagePub;
+            _playerDeathSub = playerDeathSub;
+            _playerReviveSub = playerReviveSub;
         }
 
         /// <summary>
@@ -112,6 +129,9 @@ namespace CultivationGame.Modules.NPC
             _playerPosChangedSubscription = _playerPosChangedSub.Subscribe(OnPlayerPositionChanged);
             // R16: старт боя → участник-NPC отвечает (Attacking/Fleeing).
             _combatStartedSubscription = _combatStartedSub.Subscribe(OnCombatStartedForRetaliation);
+            // PT-001: смерть/возрождение игрока — сброс/возврат агро-гейтов.
+            _playerDeathSubscription = _playerDeathSub.Subscribe(OnPlayerDeath);
+            _playerReviveSubscription = _playerReviveSub.Subscribe(OnPlayerRevive);
         }
 
         // P1-3 (аудит 09.22): zero-GC hot path — персистентные буферы снапшота
@@ -169,6 +189,11 @@ namespace CultivationGame.Modules.NPC
             {
                 case NPCDisposition.Hostile:
                 {
+                    // PT-001 (плейтест PT-C02): мёртвый игрок (экран смерти) не
+                    // провоцирует proximity-агро — иначе угроза «пинилась» бы
+                    // каждый тик у трупа, и респавн мгновенно пере-агривался.
+                    if (!_playerAlive) break;
+
                     float distToPlayer = Vector2.Distance(state.Position, _playerPosition);
                     if (distToPlayer <= _config.AggroRadius)
                     {
@@ -545,16 +570,34 @@ namespace CultivationGame.Modules.NPC
             var state = _npcService.GetNPCState(e.TargetId);
             if (state == null || !state.IsAlive) return;
 
+            // PT-001 (23.10): DoT-тик приходит с фантомным SourceId="dot:{buffId}"
+            // (паттерн атрибуции BUG-017) — угроза и месть обязаны адресовать
+            // РЕАЛЬНОГО автора (OriginalAttackerId). Преже RetaliateOrFlee
+            // получал фантом: NPC входил в Attacking с TargetId="dot:…",
+            // leash его не покрывал (цель не игрок) → бесконечная погоня за
+            // «неизвестно кем» с фолбэком движения на игрока.
+            string sourceId = e.SourceId;
+            if (sourceId.StartsWith("dot:", StringComparison.Ordinal)
+                && !string.IsNullOrEmpty(e.OriginalAttackerId))
+            {
+                sourceId = e.OriginalAttackerId;
+            }
+
+            // PT-001: урон «из рук» мёртвого игрока (DoT наложенных до смерти
+            // ядов) месть не провоцирует — цель мертва, погоня шла бы за
+            // точкой респавна (плейтест PT-C02).
+            if (!_playerAlive && Core.Helpers.PlayerIdResolver.IsPlayer(sourceId)) return;
+
             // Добавляем угрозу от источника урона
             float threatLevel = e.Damage * 2f; // Урон конвертируется в угрозу
-            if (state.Threats.ContainsKey(e.SourceId))
-                state.Threats[e.SourceId] += threatLevel;
+            if (state.Threats.ContainsKey(sourceId))
+                state.Threats[sourceId] += threatLevel;
             else
-                state.Threats[e.SourceId] = threatLevel;
+                state.Threats[sourceId] = threatLevel;
 
             // R16: месть — удар по NPC = мгновенный ответ (Attacking) или
             // бегство (миролюбивый). Порог угроз не нужен: сам факт удара.
-            RetaliateOrFlee(state, e.SourceId);
+            RetaliateOrFlee(state, sourceId);
         }
 
         // === R16: боевые переходы (месть/бегство/leash) ===
@@ -682,6 +725,64 @@ namespace CultivationGame.Modules.NPC
             _playerPosition = new Vector2((int)e.X, (int)e.Y);
         }
 
+        /// <summary>
+        /// PT-001 (плейтест PT-C02, 23.10): смерть игрока — полный сброс агро
+        /// по ВСЕМ NPC. Преже смерть игрока не трогала NPC-состояния: погоня
+        /// переживала смерть (кэш позиции прыгает за респавн-телепортом в
+        /// центр), а NPC с угрозой игрока вне IsInCombat не покрывались
+        /// leash и мгновенно пере-агривались после таймаута Attacking.
+        /// Фикс предписан аудитом checkpoints/09_11_audit_npc.md (NPC-10),
+        /// подтверждён физплейтестом. Путь сброса — тот же, что у leash/flee
+        /// (PublishDisengage): Threats очищаются, CombatDisengageEvent
+        /// завершает висящую сессию (AbandonCombat), NPCCombatAdapter
+        /// чистит IsInCombat/TargetId, состояние → Wandering.
+        /// </summary>
+        private void OnPlayerDeath(in PlayerDeathEvent e)
+        {
+            _playerAlive = false;
+
+            int reset = 0;
+            foreach (var state in _npcService.GetAllStates())
+            {
+                if (!state.IsAlive) continue;
+
+                bool targetsPlayer = !string.IsNullOrEmpty(state.TargetId)
+                    && Core.Helpers.PlayerIdResolver.IsPlayer(state.TargetId);
+
+                bool hasPlayerThreat = false;
+                foreach (var kvp in state.Threats)
+                {
+                    if (Core.Helpers.PlayerIdResolver.IsPlayer(kvp.Key)) { hasPlayerThreat = true; break; }
+                }
+
+                if (targetsPlayer)
+                {
+                    // Полный сброс: тот же финал, что у leash/flee (R16, QA-путь).
+                    PublishDisengage(state, "смерть игрока: сброс агра");
+                    _npcService.SetAIState(state.NpcId, NPCAIState.Wandering);
+                    reset++;
+                }
+                else if (hasPlayerThreat)
+                {
+                    // NPC дерётся с другим NPC, но держал угрозу от игрока —
+                    // удаляем ТОЛЬКО ключи игрока (его собственный бой живёт).
+                    _threatKeysBuffer.Clear();
+                    foreach (var kvp in state.Threats) _threatKeysBuffer.Add(kvp.Key);
+                    for (int i = 0; i < _threatKeysBuffer.Count; i++)
+                        if (Core.Helpers.PlayerIdResolver.IsPlayer(_threatKeysBuffer[i]))
+                            state.Threats.Remove(_threatKeysBuffer[i]);
+                    reset++;
+                }
+            }
+            Console.WriteLine($"[NPCAIService] PT-001: смерть игрока — агро сброшен у {reset} NPC");
+        }
+
+        /// <summary>PT-001: возрождение — proximity-агро снова разрешён.</summary>
+        private void OnPlayerRevive(in PlayerReviveEvent e)
+        {
+            _playerAlive = true;
+        }
+
         public void Dispose()
         {
             _damageAppliedSubscription?.Dispose();
@@ -692,6 +793,10 @@ namespace CultivationGame.Modules.NPC
             _playerPosChangedSubscription = null;
             _combatStartedSubscription?.Dispose();
             _combatStartedSubscription = null;
+            _playerDeathSubscription?.Dispose();
+            _playerDeathSubscription = null;
+            _playerReviveSubscription?.Dispose();
+            _playerReviveSubscription = null;
         }
     }
 }

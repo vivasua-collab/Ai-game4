@@ -10,10 +10,16 @@
 > реализованы в `NPCAIService` (упрощённый BT): месть/ответ на агрессию
 > (§4.2 Attacking/Fleeing по личности), бегство при HP≤20% **в активном
 > бою** (CombatDisengageEvent → бой завершается Flee-стадией), leash
-> (aggro-drop при AggroRadius×3), активная защита NPC в пайплайне урона
+> (aggro-drop при AggroRadius×6, R20), активная защита NPC в пайплайне урона
 > (`NPCDefenseSelector`: §5 Dodge/Parry/Block по статам/экипировке),
 > kiting дальнобойных NPC (§6.3). Спинальный уровень (рефлексы) и
 > Neural Router — будущие фазы; Brain Controller — заглушка.
+>
+> **PT-001 (плейтест PT-C02, 23.10):** «цель мертва → сброс» теперь
+> покрывает и цель-ИГРОКА: `PlayerDeathEvent` → полный сброс агро
+> (Threats/TargetId/IsInCombat, состояние → Wandering) + звери теряют
+> месть + гейт «битья трупа» (см. DEATH_AND_LOOT §4.2, COMBAT_SYSTEM
+> §1.4.1).
 >
 > Аудит (2026-09-10): R14 — NPC-домен НЕ переживает пересборку мира
 > (NpcDomainResetPhase/GameSession.LoadGame → ResetWorld: реестр/трупы/
@@ -242,7 +248,7 @@ Selector
 | `Idle`    | Точка патруля | `Patrolling` |
 | `Patrol`  | Игрок в радиусе агрессии | `Attacking` (или `Fleeing`) |
 | `Attacking` | HP < 20% | `Fleeing` |
-| `Attacking` | Цель мертва | `Patrolling` |
+| `Attacking` | Цель мертва | `Patrolling` (цель-NPC) / сброс агро + `Wandering` (цель-игрок умер — PT-001: PlayerDeathEvent → PublishDisengage, состояние → Wandering) |
 | `Fleeing` | В безопасности | `Patrolling` |
 | `Fleeing` | HP = 0 | `Dead` (внешнее состояние) |
 

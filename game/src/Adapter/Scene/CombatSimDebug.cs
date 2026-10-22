@@ -734,8 +734,9 @@ public partial class CombatSimDebug : Node
                 // UI-сессию, а не выживание (дизайн-следствие фикса овекилла:
                 // ранее урон «исчезал» в разрушенном торсе — игрок был
                 // фактически бессмертен после торс-0, сим на этом молча
-                // держался).
-                HealPlayerFully();
+                // держался). PT-001 QA-синхрон: если игрок УЖЕ мёртв — сначала
+                // реальный респавн (Revive + PlayerReviveEvent), не «леченный труп».
+                await EnsurePlayerAliveAsync("multi(b)");
                 int playerHpCrowd0 = _bodyProvider.GetCurrentHealth("player");
                 for (int attempt = 0; attempt < 5 && (attempt == 0 || !_combatServiceImpl.IsInCombat); attempt++)
                 // R29-харденинг: гонка «UI-пара уже открыта NPC-AI до входа»
@@ -1581,14 +1582,14 @@ public partial class CombatSimDebug : Node
             && _buffService != null && _auraHold != null && _playerService != null
             && _npcSpawner != null && _bodyProvider != null && _damageAppliedPub != null)
         {
-            // Стабилизация (паттерн 3k): мёртвый игрок → респавн 3с + телепорт
-            // в центр; ждём и лечим — шагу нужен живой FULL-HP игрок.
-            if (_bodyProvider.GetCurrentHealth("player") <= 0)
-            {
-                GD.Print("[CombatSim] bug001: игрок мёртв — жду респавн 3.5с");
-                await ToSignal(GetTree().CreateTimer(3.5), SceneTreeTimer.SignalName.Timeout);
-            }
-            HealPlayerFully();
+            // Стабилизация: шагу нужен живой FULL-HP игрок. PT-001 QA-синхрон
+            // (23.10): прежнее «жду респавн 3.5с» смотрело в прошлое (авто-
+            // респавн удалён GAP-001) — за смертью следовал сырой HealPart:
+            // IsAlive снова true, но PlayerReviveEvent НЕ публиковался →
+            // «вылеченный труп» разваливал событийные состояния (death-гейты
+            // NPC AI PT-001, висящий экран смерти). Теперь — РЕАЛЬНЫЙ
+            // респавн-путь (RequestPlayerRespawn → Revive + событие) + лечение.
+            await EnsurePlayerAliveAsync("bug001");
 
             // Чистая зона в границах карты (паттерн 3k: QA-мир 50×50, кламп).
             var bpos = _playerService.Position;
@@ -1622,6 +1623,15 @@ public partial class CombatSimDebug : Node
                 };
                 pinTarget();
 
+                // PT-flake-синхрон (23.10): мстители ранних секций (толпа/aoe)
+                // могут догнать игрока в «чистой» зоне и оказаться БЛИЖЕ
+                // пинненного прохожего — FindTargetInRange берёт «ближайшего»
+                // → проклятие/яд уходили не в прохожего (флаки bug001(b)/(c),
+                // вскрыты регрессией плейтест-раунда). Tab-приоритет —
+                // принудительный выбор прохожего: детерминизм шага.
+                bool qaTargetPinned = _targeting != null
+                    && _targeting.SelectTargetForQa(bugTarget);
+                GD.Print($"[CombatSim] bug001: QA-таргет пиннут на прохожего {bugTarget}={qaTargetPinned}");
                 int blevel = _qiService != null ? (int)_qiService.CultivationLevel : 1;
                 if (blevel < 1) blevel = 1;
                 _techniqueService.ExtraLibraryCapacity += 4;
@@ -1730,6 +1740,7 @@ public partial class CombatSimDebug : Node
                          $"после каста={supportHpAfterCast} (ожид: лечение > 0)");
                 bug001Ok &= supportFired && supportHpAfterCast > supportHpAfter;
 
+                _targeting?.ClearTarget(bugTarget); // PT-flake-синхрон: снять QA-выбор
                 _npcSpawner.DespawnNPC(bugTarget);
             }
         }
@@ -1754,7 +1765,8 @@ public partial class CombatSimDebug : Node
             // Полное здоровье — гейт «нечего лечить» обязан сработать на Stage 0.
             // Инвариант summary (playerTookDamage) сохраняем: после шага
             // возвращаем синтет-урон (паттерн 3m(d)).
-            HealPlayerFully();
+            // PT-001 QA-синхрон: мёртвый игрок — реальный респавн, не «леченный труп».
+            await EnsurePlayerAliveAsync("bug012");
             int bug012HpFull = _bodyProvider.GetCurrentHealth("player");
 
             int b2level = (int)_qiService.CultivationLevel;
@@ -1978,6 +1990,28 @@ public partial class CombatSimDebug : Node
             _bodyService.HealPart(p.Type, 10000);
         }
         GD.Print($"[CombatSim] player heal (R41-1): HP={_bodyProvider.GetCurrentHealth("player")}");
+    }
+
+    /// <summary>
+    /// PT-001 QA-синхрон (плейтест-раунд, 23.10): игрок мог УМЕРЕТЬ в ранних
+    /// секциях (толпа/мстители — «Вы пали (Голова разрушена)», убийца
+    /// Ксения в регрессии 23.10). Прежняя стабилизация — сырой HealPlayerFully:
+    /// IsAlive (через BodyService) снова true, но PlayerReviveEvent НЕ
+    /// публиковался → «вылеченный труп» ломал событийные death-состояния
+    /// (гейты агро NPC AI PT-001 держали «мёртвого» игрока вечным трупом,
+    /// экран смерти висел). РЕАЛЬНЫЙ респавн-путь GWC — полный контракт:
+    /// лечение всех частей + Revive + PlayerReviveEvent + телепорт в центр
+    /// (секция затем всё равно телепортирует игрока куда нужно).
+    /// </summary>
+    private async System.Threading.Tasks.Task EnsurePlayerAliveAsync(string step)
+    {
+        if (_playerService != null && !_playerService.IsAlive && _gwc != null)
+        {
+            GD.Print($"[CombatSim] {step}: игрок мёртв → RequestPlayerRespawn (реальный Revive + событие, не «леченный труп»)");
+            _gwc.RequestPlayerRespawn();
+            await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+        }
+        HealPlayerFully();
     }
 
     private string? FindHostileNpc()

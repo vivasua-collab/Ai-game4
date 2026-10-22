@@ -80,9 +80,9 @@ public static class WeaponVisualCatalog
         string key = TextureKey(weaponClass, tier, rarity);
         if (_cache.TryGetValue(key, out var cached)) return cached;
 
-        // G0: PNG-первый (без editor-импорта — Image.LoadFromFile).
-        ImageTexture? iconPng = LoadEquipmentPng($"icons/weapon_{weaponClass}_{tier}.png");
-        ImageTexture? handPng = LoadEquipmentPng($"equipped/weapon_hand_{weaponClass}_{tier}.png");
+        // G0: PNG-первый (PT-005: двойной путь — импортированный ресурс → raw).
+        Texture2D? iconPng = LoadEquipmentPng($"icons/weapon_{weaponClass}_{tier}.png");
+        Texture2D? handPng = LoadEquipmentPng($"equipped/weapon_hand_{weaponClass}_{tier}.png");
         if (iconPng != null) _pngIconCount++;
         if (handPng != null) _pngHandCount++;
 
@@ -99,8 +99,10 @@ public static class WeaponVisualCatalog
     /// <summary>
     /// G0: загрузка PNG экипировки из res://resources/sprites/equipment/
     /// (null — файла нет; НЕ логируем — штатный fallback).
+    /// PT-005: Texture2D — SpriteSheetCache.TryLoadTexture теперь возвращает
+    /// импортированный ресурс либо raw ImageTexture (двойной путь).
     /// </summary>
-    private static ImageTexture? LoadEquipmentPng(string relative)
+    private static Texture2D? LoadEquipmentPng(string relative)
     {
         string path = $"{SpriteSheetCache.Root}/equipment/{relative}";
         if (!SpriteSheetCache.TryLoadTexture(path, out var tex)) return null;

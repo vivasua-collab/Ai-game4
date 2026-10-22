@@ -1,0 +1,53 @@
+=== Плейтест-раунд 1 — QA-лог (23.10) ===
+
+--- RESPAWN (шаг 5 = PT-001 агро-сброс, ключевые строки) ---
+[RespawnSim] 4a. смерть: был жив=True, IsAlive=False (ожидали false), оверлей виден=True, ввод блокирован=True, причина='Голова разрушена (0 % HP)' (ожидали 'Голова…')
+[RespawnSim] 4a-killer (BUG-010): 'Последний удар: неведомая сила' (ожидали 'неведомая сила' из KillerId=npc_qa_killer; гонка кэша показала бы 'собственное рассеяние' от удара player_0)
+[RespawnSim] 4a2. GWC-гейты смерти (BUG-009) — headless: ввод не эмулируется, гейт по коду (DeathScreenShown: HandleFreeMovement/HandleStickyInput/V-T-X-Z-Space/_UnhandledInput)
+[RespawnSim] 4b. авто-респавн отменён: через 3.6с IsAlive=False (ожидали false — мёртв), оверлей виден=True (ожидали true)
+[RespawnSim] 4c. после «Возродиться»: IsAlive=True (ожидали true), оверлей скрыт=True, позиция=(25,25) (ожидали центр 25,25)
+[RespawnSim] 4d. BUG-011: повторная смерть=True (ожидали true), нажатие без делегата: экран виден=True (ожидали true), мёртв=True (ожидали true); после перепривязки: IsAlive=True (ожидали true), скрыт=True (ожидали true), позиция=(25,25) (ожидали 25,25)
+[RespawnSim] 5-пред: NPC npc_d1ff7618baa64342 Attacking+threat+inCombat=True, dot-атрибуция на игрока=True (фантома нет), зверь animal_wolf_6 hostile=True
+[RespawnSim] 5c. после смерти: NPC сброшен (не в бою, цель null, threats 0, не Attacking)=True, dot-NPC чист=True, зверь без мести=True (ожидали true/true/true)
+[RespawnSim] 5d. после респавна: пере-агра нет=True, зверь спокоен=True, игрок жив в центре=True (ожидали true/true/true)
+[RespawnSim] VERDICT: PASS — resource respawn + honest travel + time delta + death screen (GAP-001 + АУДИТ-1020: BUG-009/010/011) + агро-сброс на смерть (PT-001, плейтест PT-C02)
+
+--- COMBAT_SIM (после честного респавна сима + QA-пина цели) ---
+[CombatSim] multi(b): игрок мёртв → RequestPlayerRespawn (реальный Revive + событие, не «леченный труп»)
+[CombatSim] aoe(b) bystander revenge: crowd2=True, crowd3=True (immediate=True; post-wait — затухание, информ.; ожид хотя бы один true — «мир жесток»)
+[CombatSim] bug001: QA-таргет пиннут на прохожего npc_bba97194d86949df=True
+[CombatSim] bug001(a) sensory: зарядка+выпуск=True, бафф=True, модификатор урона 0‰→200‰ (ожид: бафф true, рост)
+[CombatSim] bug001(b) curse: зарядка+выпуск=True, дебафф=True, модификатор атаки цели 0‰→-150‰ (ожид: дебафф true, падение)
+[CombatSim] bug001(c) poison: зарядка+выпуск=True, бафф=True, DoT-тиков=3 (суммарно 27 урона), цель HP 500→482 (ожид: тики ≥2, HP падает)
+[CombatSim] bug001(d) support: зарядка+выпуск=True, HP после синтет-урона=465, до выпуска=466, после каста=493 (ожид: лечение > 0)
+[CombatSim] VERDICT: PASS — обе стороны боя получают урон (melee + ranged + LOS/ammo gates + readiness-gate + multi R24-C + vfx R29 + bug001 каст-эффекты 4 типов + bug012 ранний гейт Support)
+
+--- Полный раннер qa_regression.sh: 27/27 ---
+COMBAT_SIM: PASS — обе стороны боя получают урон (melee + ranged + LOS/ammo gates + readiness-gate + multi R24-C + vfx R29 + bug001 каст-эффекты 4 типов + bug012 ранний гейт Support)
+COMBATAI: PASS — месть/двусторонний бой/селектор защит/бегство/leash/стойка/анимация
+RESPAWN: PASS — resource respawn + honest travel + time delta + death screen (GAP-001 + АУДИТ-1020: BUG-009/010/011) + агро-сброс на смерть (PT-001, плейтест PT-C02)
+ANIMALQA: PASS — таргетинг/урон/месть/смерть→труп/killfeed-имя/de-aggro/мирный вид/HP-бары+тумблер
+LOOT: PASS
+DOT: PASS — DoT (Poison/Burn/Bleed/Freeze) наносит реальный урон через единый пайплайн
+SAVELOAD: PASS — Save/Load round-trip: 20 блоков + Этап-3 полнота/версия/честное удаление
+STAGE4: PASS — pre-flight, транзакционный откат, полнота v2, BUG-013, GAP-014
+STAGE5: PASS — BUG-015/016/017: тело=истина смерти, сплит сердца, DoT-зачёт + атрибуция
+STAGE6: PASS — BUG-018..021: инварианты стаков, честные Delta/Price, валидация колец
+STAGE7: PASS — BUG-022/023/024 + GAP-025
+STAGE8: PASS — ST8-01..06 закрыты
+KILLFEED: PASS — kill-feed: тост/журнал/дедуп/old_age
+QUEST: PASS — все квесты: accept(диалог)→event→complete→reward; гейты работают
+STORAGE: PASS — spirit retrieve/stacking, ring Qi, craft overflow, pickup integrity
+HOTBAR: PASS — assign/empty/cooldown/qi-gate/belt-gate/drag&drop-слота
+TRASHDROP: PASS — материалы draggable, корзина выбрасывает, кукла отклоняет
+CONTEXT: PASS — ПКМ-свойства, слайдер деления, кучки, слот-адресный выброс
+MODALQA: PASS — «×»/bg-click всех 6 окон доходит до резюма
+MODAL2: PASS — 30×2 пар стеков: пауза держится до последнего окна
+L500: PASS — мир 500×500 основной: сетка/NPC/звери/группы интегрированы
+WEAPONVIS: PASS
+REASSEMBLY: PASS — Reset фаз работает, реестры world-scoped, double-spawn отсутствует
+CHARGE: PASS — fill model + aura hold + release all wired
+AUDIT0922: PASS — (полный список инвариантов EventBus/DI/save/time/items/trade)
+CHARGERQA: PASS — камни Ци вставляются, анти-дюп жив, пояс ≠ зарядник
+ANIMQA: PASS — cache/fallback/loader/animator(one-shot,death)/weapon-keys/npc/animals готовы к доставке PNG
+ИТОГ: 27/27 PASS

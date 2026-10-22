@@ -16,7 +16,7 @@
 
 | Компонент | Файл | Что делает |
 |---|---|---|
-| **I-2 Лист-загрузчик** | `game/src/Adapter/Scene/SpriteSheetCache.cs` | PNG → `ImageTexture` **без editor-импорта** (`Image.LoadFromFile` — файл кладётся в каталог и работает сразу, в т.ч. headless). Реестр fps/loop (24 анимации: игрок 13 / NPC 6 / звери 5). Кадры = размеры PNG (W/64). Негативный кэш. |
+| **I-2 Лист-загрузчик** | `game/src/Adapter/Scene/SpriteSheetCache.cs` | PNG → `Texture2D` двойным путём (PT-005, 23.10): сначала штатный импортированный ресурс (ResourceLoader — editor сгенерировал .import; работает в экспорт-сборке, без предупреждения Godot), затем raw-фолбэк `Image.LoadFromFile` — «файл положил в каталог → работает», в т.ч. headless. Реестр fps/loop (24 анимации: игрок 13 / NPC 6 / звери 5). Кадры = размеры PNG (W/64). Негативный кэш. |
 | **I-1 Аниматор игрока** | `game/src/Adapter/Scene/PlayerAnimator.cs` | Sprite2D Hframes/Vframes/Frame по состояниям: death > melee > bow > hit > meditate > run/walk > idle. One-shot-длительности синхронны кодовым таймерам (melee 0.42с = MainHandSwingSec). walk/run fps × множитель скорости движения. Пауза — стоп-кадр. |
 | **I-11 PNG оружия** | `WeaponVisualCatalog.GetOrCreate` | PNG-первый по тем же ключам `class|tier` (rarity НЕ в имени — золотая обводка остаётся кодом). Нет PNG → процедурный рецепт R15. Механика крепления/офсетов/замаха не менялась. |
 | **I-5 NPC** | `NPCSpriteRenderer` | `npc_{role}_{anim}` → `npc_base_{anim}` → процедурный. Кадры — `DrawTextureRectRegion` в `_Draw`; walk-детект по дельте позиции; melee — по замахам R16; рассинхрон толпы по хэшу id. |

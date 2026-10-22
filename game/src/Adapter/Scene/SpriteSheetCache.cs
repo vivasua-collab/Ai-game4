@@ -14,9 +14,14 @@
 //   процедурный спрайт КАК СЕЙЧАС (нулевая визуальная регрессия до
 //   доставки ассетов).
 //
-// Загрузка — Image.LoadFromFile + ImageTexture (НЕ ResourceLoader):
-//   - не требует editor-импорта (.import) — файл можно положить в каталог
-//     и он сразу работает, в т.ч. в headless-режиме;
+// Загрузка — двойной путь (PT-005, плейтест PT-S00, 23.10):
+//   1) ResourceLoader — штатный ИМПОРТИРОВАННЫЙ ресурс: editor генерирует
+//      .import при скане каталога → экспорт-сборка включает .ctex, путь
+//      работает «из коробки» и НЕ триггерит предупреждение Godot
+//      «Loaded resource as image file, this will not work on export»;
+//   2) Image.LoadFromFile + ImageTexture — raw-фолбэк для headless-QA и
+//      каталогов без editor-импорта: контракт «доставка = положить файл
+//      в каталог и он сразу работает» (§11 I-2, G0) сохранён.
 //   - фильтр — NEAREST (project.godot default_texture_filter=0; CanvasItem
 //     игрока задаёт Nearest явно).
 //
@@ -147,7 +152,7 @@ public static class SpriteSheetCache
     }
 
     /// <summary>Загрузка произвольного PNG-спрайта (иконки/стикеры 32/24/48).</summary>
-    public static bool TryLoadTexture(string resPath, out ImageTexture texture)
+    public static bool TryLoadTexture(string resPath, out Texture2D texture)
     {
         texture = LoadPngTexture(resPath);
         return texture != null;
@@ -208,11 +213,26 @@ public static class SpriteSheetCache
     }
 
     /// <summary>
-    /// PNG → ImageTexture без editor-импорта (FileAccess/ResourceLoader
-    /// независим). Отсутствие файла → null (тихо — это штатный fallback).
+    /// PNG → Texture2D. PT-005 (плейтест PT-S00, 23.10): двойной путь —
+    /// сначала штатный импортированный ресурс (ResourceLoader: editor
+    /// сгенерировал .import → CompressedTexture2D; убирает предупреждение
+    /// «will not work on export» и делает путь рабочим в экспорт-сборке),
+    /// затем raw-фолбэк Image.LoadFromFile (headless-QA, каталог без
+    /// импорта — контракт §11 I-2 «файл положил → работает»).
+    /// Отсутствие файла → null (тихо — это штатный fallback).
     /// </summary>
-    private static ImageTexture? LoadPngTexture(string resPath)
+    private static Texture2D? LoadPngTexture(string resPath)
     {
+        // 1) Импортированный ресурс (editor/export). Exists честен к ремапу
+        //    .import; артефакт отсутствует (fresh clone без --import) →
+        //    Load вернёт null → тихо падаем в raw-путь ниже.
+        if (ResourceLoader.Exists(resPath))
+        {
+            var imported = ResourceLoader.Load<Texture2D>(resPath);
+            if (imported != null) return imported;
+        }
+
+        // 2) Raw PNG (headless / каталог без editor-импорта).
         if (!FileAccess.FileExists(resPath)) return null;
         var image = Image.LoadFromFile(resPath);
         if (image == null || image.IsEmpty())
