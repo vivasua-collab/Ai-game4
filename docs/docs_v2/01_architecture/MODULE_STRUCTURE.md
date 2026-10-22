@@ -221,6 +221,13 @@ Modules/Xxx/
 - 5 подтипов атак: melee_strike, melee_weapon, ranged_projectile, ranged_beam, ranged_aoe.
 - AoE до 300×300 м.
 - Урон real-time-with-pause, tick-resolved (НЕ physics-driven).
+- **Этап-8 аудита (22.10):** вырожденное направление AoE (прицел в клетку кастера)
+  у Cone/Semicircle/Line поражает НОЛЬ целей — направленная форма без направления не
+  «круг» (ST8-01); контракт «одно применение техники = один TechniqueUsedEvent» —
+  единственный издатель для Combat-каста CombatService в момент фактического пуска
+  (после гейтов), CompleteUse игрока для Combat молчит, basic_attack событие не
+  публикует (ST8-03); смерть/боевой стюн/медитация срывают зарядку через
+  `TechniqueChargeService` с возвратом 50% ChargedQi (ST8-04).
 
 ---
 
@@ -378,6 +385,13 @@ hand-спрайта к цели (sin-кривая 0.42с, инверсия dx п
 - PlayerStance: Normal, Combat, Meditating, Sleeping.
 - `ResetFrameFlags()` вызывается из PlayerModule.Tick() ПОСЛЕ всех потребителей (не внутри PlayerService.Tick).
 - Запрещена двойная регенерация HP во сне.
+- **Этап-8 аудита (22.10):** отказ выпуска удержанной техники (FireTechnique→bool)
+  СОХРАНЯЕТ удержание в ауре — Ци остаётся, выпуск повторим (ST8-02); прерывания
+  §5.4 wired: `AuraHoldService` рассеивает удержание по смерти/стюну (combat_stun)/
+  медитации с возвратом 50% остаточной Ци, decay-возврат — от post-decay остатка
+  (ST8-04/06); Defense-каст гейтится по MIN_QI_FOR_BUFFER до CompleteUse — щит без
+  резерва Ци честно отказывает, резервный режим помечен в reason (ST8-05);
+  честная причина «Уже заряжается другая техника» для занятого StartCharge.
 
 ---
 
@@ -410,6 +424,11 @@ hand-спрайта к цели (sin-кривая 0.42с, инверсия dx п
 - Command events (QiConsumeRequest, QiAddRequest, QiBufferActivateRequest, QiBufferDeactivateRequest) — для развязки модулей.
 - Нельзя перезаписывать `_coreCapacity` после прорыва.
 - Track потреблённого Ци в буфере для корректного возврата при Deactivate.
+- **Этап-8 аудита (22.10, ST8-05):** `QiBufferService.Activate` при пуле ниже
+  `MIN_QI_FOR_BUFFER` отказывает вовсе (IsActive=false, БЕЗ QiBufferActivatedEvent —
+  прежде «успех» без инвестированной Ци при нулевом поглощении); резервный режим
+  (пул ≥ MIN, инвестиция не списалась) активен с QiInvested=0 и реально поглощает
+  из текущего пула; UI синхронизируется QiBufferStateChangedEvent(false).
 
 ---
 

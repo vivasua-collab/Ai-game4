@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "updated": "2026-10-22T09:50:06Z",
+  "updated": "2026-10-22T15:22:42Z",
   "generated_by": "tools/gen_bus_map.py",
   "update_policy": "по требованию: правки кода → python3 tools/gen_bus_map.py → коммит",
-  "source_head": "163cc9b",
+  "source_head": "d49cbba",
   "hub": {
     "id": "Core",
     "title": "Центральная шина (Core)",
@@ -1079,6 +1079,8 @@
         "DamageAppliedEvent",
         "DefenseIntentEvent",
         "EquipmentChangedEvent",
+        "MeditationStateChangedEvent",
+        "PlayerDeathEvent",
         "QiBufferStateChangedEvent",
         "QiChangedEvent",
         "QiDepletedEvent",
@@ -1152,7 +1154,8 @@
           "CombatModule.cs"
         ],
         "BuffAppliedEvent": [
-          "CombatModule.cs"
+          "CombatModule.cs",
+          "TechniqueChargeService.cs"
         ],
         "BuffRemovedEvent": [
           "CombatModule.cs"
@@ -1173,6 +1176,12 @@
         ],
         "EquipmentChangedEvent": [
           "CombatModule.cs"
+        ],
+        "MeditationStateChangedEvent": [
+          "TechniqueChargeService.cs"
+        ],
+        "PlayerDeathEvent": [
+          "TechniqueChargeService.cs"
         ],
         "QiBufferStateChangedEvent": [
           "CombatService.cs",
@@ -2016,10 +2025,12 @@
       "subscribes": [
         "AttackRejectedEvent",
         "BodyCriticalEvent",
+        "BuffAppliedEvent",
         "CombatEndedEvent",
         "DamageAppliedEvent",
         "FormationActivatedEvent",
         "MeditationStateChangedEvent",
+        "PlayerDeathEvent",
         "QiChangedEvent",
         "SaveStartedEvent",
         "TechniqueCastRequestedEvent",
@@ -2083,6 +2094,9 @@
         "BodyCriticalEvent": [
           "PlayerService.cs"
         ],
+        "BuffAppliedEvent": [
+          "AuraHoldService.cs"
+        ],
         "CombatEndedEvent": [
           "PlayerCombatAdapter.cs"
         ],
@@ -2093,7 +2107,11 @@
           "PlayerTechniqueCaster.cs"
         ],
         "MeditationStateChangedEvent": [
+          "AuraHoldService.cs",
           "StatProgressProducer.cs"
+        ],
+        "PlayerDeathEvent": [
+          "AuraHoldService.cs"
         ],
         "QiChangedEvent": [
           "PlayerService.cs"
@@ -4424,7 +4442,7 @@
       "order": 120,
       "description": "QA-харнессы (*SimDebug) — вне продакшн-потребления",
       "debug": true,
-      "files": 34,
+      "files": 35,
       "publishes": [
         "AttackIntentEvent",
         "Audit1020MsgA",
@@ -4437,6 +4455,7 @@
         "ItemAddRequestEvent",
         "ItemAddedEvent",
         "MeditationStateChangedEvent",
+        "MeditationToggleRequestedEvent",
         "NPCDeathEvent",
         "NPCInteractedEvent",
         "OtherMsg",
@@ -4473,6 +4492,8 @@
         "PlayerDeathEvent",
         "PlayerTargetChangedEvent",
         "ProjectileSpawnedEvent",
+        "QiAddRequestEvent",
+        "QiBufferActivatedEvent",
         "SaveCompletedEvent",
         "TechniqueCastResultEvent",
         "TechniqueChargeCancelledEvent",
@@ -4480,6 +4501,7 @@
         "TechniqueChargeProgressEvent",
         "TechniqueChargeStartedEvent",
         "TechniqueSlotAssignedEvent",
+        "TechniqueUsedEvent",
         "TileChangedEvent",
         "TimeChangedEvent",
         "TradeCompletedEvent",
@@ -4489,7 +4511,8 @@
         "AttackIntentEvent": [
           "AnimalCombatSimDebug.cs",
           "CombatAISimDebug.cs",
-          "CombatSimDebug.cs"
+          "CombatSimDebug.cs",
+          "Stage8TechniqueTruthSimDebug.cs"
         ],
         "Audit1020MsgA": [
           "Audit0922SimDebug.cs"
@@ -4526,6 +4549,9 @@
         "MeditationStateChangedEvent": [
           "Audit0922SimDebug.cs"
         ],
+        "MeditationToggleRequestedEvent": [
+          "Stage8TechniqueTruthSimDebug.cs"
+        ],
         "NPCDeathEvent": [
           "KillFeedSimDebug.cs",
           "LootSimDebug.cs",
@@ -4545,7 +4571,8 @@
         ],
         "TechniqueCastRequestedEvent": [
           "ChargeSimDebug.cs",
-          "CombatSimDebug.cs"
+          "CombatSimDebug.cs",
+          "Stage8TechniqueTruthSimDebug.cs"
         ],
         "TechniqueUsedEvent": [
           "Audit0922SimDebug.cs"
@@ -4562,14 +4589,16 @@
       },
       "subscribes_files": {
         "AoeImpactEvent": [
-          "CombatSimDebug.cs"
+          "CombatSimDebug.cs",
+          "Stage8TechniqueTruthSimDebug.cs"
         ],
         "AttackIntentEvent": [
           "ChargeSimDebug.cs",
           "CombatSimDebug.cs"
         ],
         "AttackRejectedEvent": [
-          "CombatSimDebug.cs"
+          "CombatSimDebug.cs",
+          "Stage8TechniqueTruthSimDebug.cs"
         ],
         "Audit1020MsgA": [
           "Audit0922SimDebug.cs"
@@ -4610,7 +4639,8 @@
           "CheatEquipSimDebug.cs"
         ],
         "HeldTechniqueChangedEvent": [
-          "ChargeSimDebug.cs"
+          "ChargeSimDebug.cs",
+          "Stage8TechniqueTruthSimDebug.cs"
         ],
         "ItemAddedEvent": [
           "Stage6TradeEconomySimDebug.cs",
@@ -4642,26 +4672,40 @@
         "ProjectileSpawnedEvent": [
           "CombatSimDebug.cs"
         ],
+        "QiAddRequestEvent": [
+          "Stage8TechniqueTruthSimDebug.cs"
+        ],
+        "QiBufferActivatedEvent": [
+          "Stage8TechniqueTruthSimDebug.cs"
+        ],
         "SaveCompletedEvent": [
           "SaveLoadSimDebug.cs"
         ],
         "TechniqueCastResultEvent": [
-          "CombatSimDebug.cs"
+          "CombatSimDebug.cs",
+          "Stage8TechniqueTruthSimDebug.cs"
         ],
         "TechniqueChargeCancelledEvent": [
-          "ChargeSimDebug.cs"
+          "ChargeSimDebug.cs",
+          "Stage8TechniqueTruthSimDebug.cs"
         ],
         "TechniqueChargeCompletedEvent": [
-          "ChargeSimDebug.cs"
+          "ChargeSimDebug.cs",
+          "Stage8TechniqueTruthSimDebug.cs"
         ],
         "TechniqueChargeProgressEvent": [
-          "ChargeSimDebug.cs"
+          "ChargeSimDebug.cs",
+          "Stage8TechniqueTruthSimDebug.cs"
         ],
         "TechniqueChargeStartedEvent": [
-          "ChargeSimDebug.cs"
+          "ChargeSimDebug.cs",
+          "Stage8TechniqueTruthSimDebug.cs"
         ],
         "TechniqueSlotAssignedEvent": [
           "HotbarSimDebug.cs"
+        ],
+        "TechniqueUsedEvent": [
+          "Stage8TechniqueTruthSimDebug.cs"
         ],
         "TileChangedEvent": [
           "RespawnSimDebug.cs"
@@ -5419,7 +5463,7 @@
         "publishers": [
           "Qi"
         ],
-        "debug_only": false
+        "debug_only": true
       },
       {
         "event": "QiBufferDeactivatedEvent",
@@ -5680,8 +5724,8 @@
     "contracts_defined": 163,
     "events_published": 130,
     "events_subscribed": 101,
-    "publish_edges": 178,
-    "subscribe_edges": 193,
+    "publish_edges": 179,
+    "subscribe_edges": 200,
     "provide_edges": 213,
     "require_edges": 293,
     "services_provided": 160,
