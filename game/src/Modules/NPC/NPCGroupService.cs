@@ -11,7 +11,9 @@
 using System;
 using System.Collections.Generic;
 using CultivationGame.Core.Data;
+using CultivationGame.Core.Events;
 using CultivationGame.Core.Interfaces;
+using CultivationGame.Core.Messaging.Contracts;
 
 namespace CultivationGame.Modules.NPC
 {
@@ -35,11 +37,40 @@ namespace CultivationGame.Modules.NPC
         // РАНЬШЕ «npc_groups» (контракт RestoreOrder агрегатора).
         private readonly NPCService _npcService;
         private readonly IAnimalService _animalService;
+        // ST10-03 (Этап-10): смерть участника → исключение из группы.
+        private readonly ISubscriber<NPCDeathEvent>? _npcDeathSub;
+        private IDisposable? _npcDeathToken;
 
-        public NPCGroupService(NPCService npcService, IAnimalService animalService)
+        public NPCGroupService(NPCService npcService, IAnimalService animalService,
+            ISubscriber<NPCDeathEvent>? npcDeathSub = null)
         {
             _npcService = npcService ?? throw new ArgumentNullException(nameof(npcService));
             _animalService = animalService ?? throw new ArgumentNullException(nameof(animalService));
+            _npcDeathSub = npcDeathSub;
+        }
+
+        /// <summary>
+        /// ST10-03 (Этап-10 аудита, 23.10): подписка на NPCDeathEvent — гигиена
+        /// групп при смерти участников. Вызывается из NPCModule.Start()
+        /// (паттерн CorpseService.Initialize). Идемпотентен.
+        /// </summary>
+        public void Initialize()
+        {
+            _npcDeathToken?.Dispose();
+            _npcDeathToken = _npcDeathSub?.Subscribe(OnNpcDeath);
+        }
+
+        private void OnNpcDeath(in NPCDeathEvent e)
+        {
+            // Смерть участника (NPC или зверя — группы смешанные, GAP-014):
+            // исключаем; RemoveMember продвигает лидерство следующему
+            // или расформировывает пустую группу.
+            if (string.IsNullOrEmpty(e.NpcId)) return;
+            if (_memberToGroup.TryGetValue(e.NpcId, out var groupId))
+            {
+                Console.WriteLine($"[NPCGroupService] NPCDeathEvent: '{e.NpcId}' покидает группу {groupId} (ST10-03)");
+                RemoveMember(groupId, e.NpcId);
+            }
         }
 
         public int GroupCount => _groups.Count;

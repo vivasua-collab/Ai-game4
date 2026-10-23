@@ -16,8 +16,17 @@ namespace CultivationGame.Modules.Tile;
 /// Implements <see cref="IResourceService"/>. Cross-module integration is
 /// via EventBus only (ResourceHarvestedEvent, ResourceRespawnedEvent,
 /// ItemAddRequestEvent). DayChangedEvent subscription drives respawn checks.
+///
+/// ST10-01 (Этап-10 аудита, 23.10): + IWorldResettable. Очередь истощённых
+/// ресурсов — world-scoped: singleton переживал пересборку мира, и
+/// armed-записи старого мира стреляли ResourceRespawnedEvent по координатам
+/// НОВОЙ карты (TileService.OnResourceRespawned восстанавливает объект по
+/// X/Y без проверки мира). Координатная валидация бессмысленна — координаты
+/// легальты в любом мире; верный контракт — сброс очереди при пересборке.
+/// Координатор сбрасывает через ResolveAll&lt;IWorldResettable&gt; — регистрация
+/// не нужна (инстанс-ориентированный матчинг по фактическому типу, P2-12).
 /// </summary>
-public sealed class ResourceService : IResourceService, IDisposable
+public sealed class ResourceService : IResourceService, IWorldResettable, IDisposable
 {
     [Inject] private readonly ITimeService _timeService = null!;
     [Inject] private readonly ISubscriber<DayChangedEvent> _dayChangedSub = null!;
@@ -152,6 +161,26 @@ public sealed class ResourceService : IResourceService, IDisposable
         _dayChangedToken?.Dispose();
         _dayChangedToken = null;
         _depleted.Clear();
+    }
+
+    // === ST10-01 (Этап-10 аудита, 23.10): IWorldResettable =============
+
+    /// <summary>
+    /// Пересборка мира (NewGame ИЛИ LoadGame — вызывается координатором
+    /// WorldDomainResetPhase через ResolveAll&lt;IWorldResettable&gt;):
+    /// armed-очередь истощённых ресурсов очищается — расписание старого
+    /// мира не воздействует на новый (события респауна по старым
+    /// координатам отменены).
+    /// Сохранение очереди — ОТКРЫТЫЙ GAP (см. отчёт Этапа-10): тайлы в сейве
+    /// не хранятся (карта регенерируется) — без персистентности тайлов
+    /// восстановление «истощённости» после LoadGame невозможно; ресурс на
+    /// свежесгенерированной карте доступен сразу (решение за владельцем).
+    /// </summary>
+    public void ResetWorld()
+    {
+        int armed = _depleted.Count;
+        _depleted.Clear();
+        Console.WriteLine($"[ResourceService] ResetWorld: {armed} armed-записей очереди респауна очищено (ST10-01)");
     }
 
     private struct DepletedResource

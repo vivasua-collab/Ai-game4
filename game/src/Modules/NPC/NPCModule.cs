@@ -119,6 +119,11 @@ public class NPCModule : IModule, IWorldResettable
         _yearChangedSubscription = _yearChangedSub.Subscribe(OnYearChanged);
         // R13: подписка CorpseService на NPCDeathEvent (трупы-контейнеры).
         _corpseService?.Initialize();
+        // ST10-03 (Этап-10 аудита, 23.10): подписка NPCGroupService на
+        // NPCDeathEvent — гигиена групп при смерти участников (мёртвый
+        // исключается, лидерство migrating, пустая группа расформируется).
+        if (_groupService is NPCGroupService groupSvc)
+            groupSvc.Initialize();
         // M2: позиция игрока → кэш (дистанция атаки NPC→игрок).
         _playerPosSubscription = _playerPosSub.Subscribe(OnPlayerPositionChanged);
         // PT-001: жив ли игрок — гейт интентов по мёртвому игроку.
