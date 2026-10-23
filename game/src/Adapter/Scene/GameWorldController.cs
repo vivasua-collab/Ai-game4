@@ -871,6 +871,18 @@ public partial class GameWorldController : Node2D
             var stage11Sim = new Stage11BodyTruthSimDebug { Name = "Stage11BodyTruthSimDebug" };
             AddChild(stage11Sim);
         }
+        // Этап-12 аудита (23.10, GODOT_STAGE12_DEBUG=1): развитие/баффы/Ци —
+        // ST12-001 (переполнение AddQi), ST12-002 (штраф сердца при
+        // пересчёте уровня/прорыве), ST12-003 (потерянные тики DoT/HoT
+        // при большом deltaTime), ST12-004 (неизвестный buffId ≠ случайный
+        // AttackBoost), ST12-005 (валидация сохранённых статов),
+        // ST12-006 (проводимость: перки живы, временные баффы запрещены),
+        // прогрессия (дельты/сон/медитация/прорывы/round-trip).
+        if (System.Environment.GetEnvironmentVariable("GODOT_STAGE12_DEBUG") == "1")
+        {
+            var stage12Sim = new Stage12ProgressionTruthSimDebug { Name = "Stage12ProgressionTruthSimDebug" };
+            AddChild(stage12Sim);
+        }
         // 2026-09-08 (баг-репорт пользователя): headless-верификация
         // инвентарного drag&drop в корзину (GODOT_TRASHDROP_DEBUG=1) —
         // материалы draggable, корзина выбрасывает, кукла отклоняет.

@@ -48,6 +48,9 @@ ALL_SIMS=(
   # Этап-11 аудита (23.10): тело/травмы/морфологии (ST11-001..007,
   # HoT-распределение и Amorphous Core = GAP).
   "STAGE11:GODOT_STAGE11_DEBUG"
+  # Этап-12 аудита (23.10): баффы/статы/Ци/культивация (ST12-001..006
+  # + прогрессия: дельты/сон/медитация/прорывы).
+  "STAGE12:GODOT_STAGE12_DEBUG"
   "KILLFEED:GODOT_KILLFEED_DEBUG"
   "QUEST:GODOT_QUEST_DEBUG"
   "STORAGE:GODOT_STORAGE_DEBUG"

@@ -35,6 +35,10 @@ namespace CultivationGame.Core.Interfaces
         /// <summary>Ци исчерпан</summary>
         bool IsEmpty { get; }
 
+        /// <summary>QI-C01/ST12-002: ампутация сердца — активный штраф регенерации (−50%).</summary>
+        bool IsHeartSevered { get; }
+
+
         /// <summary>Ци полный</summary>
         bool IsFull { get; }
 
