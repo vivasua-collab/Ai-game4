@@ -922,3 +922,64 @@ NEXT: 1) aoe(c) пин-изоляция в CombatSimDebug (геометрия к
 в таблице: ST14-004 пере-скоупнут в регресс, 003/005/006 — подтверждённые
 ядра); 3) follow-up ST11-006res/ST12-003res отдельным пакетом (не мешать
 с 14).
+
+## Сессия 2026-10-23 coder-1023 ч.5 — ЭТАП-14 РЕАЛИЗОВАН и ЗАКРЫТ (6/6 PASS) + стабилизация харнессов
+
+**HEAD старт:** 0472dec (после ч.4). **Коммиты:** e1c5140 (фиксы
+ST14-001/002/003/005/006+004-edge), ad9c060 (сим+STAGE14-регистрация),
+d9c0dcc (постфикс 6/6+логи), 0f31124 (отчёт+TESTING_RULES+PT-U04..08),
+f50a0fe (пины aoe(c)/STAGE8-C3 + GODOT_QA_SEED).
+
+**Реализация [STAGE 14 AUDIT]** (канон: 10_23_stage14_interaction_focus_
+audit_request.md; пере-скоуп по ST14-PRECHECK):
+- **ST14-001 FIXED:** фактический клавиатурный фокус
+  (GuiGetFocusOwner: LineEdit/TextEdit/CodeEdit/SpinBox) глушит ВСЕ
+  игровые sticky+движение+хотбар (прежде ~24 действия безусловно; набор
+  имени сейва запускал медитацию/окна/техники). Сим A: V/B/E при фокусе
+  → 0 эффектов; контроль после снятия фокуса ✓.
+- **ST14-002 FIXED:** единый предикат — WorldMouseBlockedByModal() =
+  AnyModalWindowOpen() ∨ DeathScreen (для _UnhandledInput) и
+  SetOverUI(AnyModalWindowOpen()) — зарядник H и меню сейвов прежде
+  выпадали из списков (зум/клики/атаки уходили в мир поверх окон). Сим
+  B: 9 окон × (AnyModal ∧ WorldMouseBlocked) + базовая линия ✓.
+- **ST14-003 FIXED (ядро):** Esc по фактическому стеку открытия
+  (_modalOpenSeq): попапы → верхнее окно → пауза (при пустом стеке);
+  прежняя жёсткая цепочка закрывала НИЖНЕЕ (T поверх B → Esc бил книгу).
+  Инвариант INP-1 сохранён (C4: пред-существующая пауза пережила
+  закрытие окна — игровым путём T). Сим C1-C4 ✓.
+- **ST14-004 DISPROVED (как дефект) + edge FIXED:** унификация выходов
+  диалога уже была (Phase 2) — подтверждена F-сценарием полного игрового
+  пути (DialogueDebugOpen); латентный GoToNode-призрак → диагностика +
+  честный EndDialogue (окно закрыто, DialogueEnded+1) ✓.
+- **ST14-005 FIXED (ядро):** E над планировочными окнами съедается
+  (AnyModalWindowOpen-гейт после trade/loot/dialogue-веток); дубли
+  опровергнуты пре-верификацией (однокадровый sticky). Сим D ✓.
+- **ST14-006 FIXED (контракт) / OS-путь NOT TESTED→PT-U06:**
+  NotificationApplicationFocusOut → release ВСЕХ игровых действий (41) +
+  нулевой кадр — held WASD/бег/ПКМ-длительность прежде залипали до
+  возврата фокуса. Сим E1-E3 ✓ (повторное нажатие после «возврата»
+  двигает).
+- **Постфикс: 6/6 PASS / 0 FAIL** (лог:
+  checkpoints/10_23_stage14_interaction_focus_report.log; отчёт:
+  10_23_stage14_interaction_focus_report.md; честное пояснение о
+  префиксе — QA-хуки появились с фиксами, префикс-доказательство =
+  статическая пре-верификация + промежуточный лог 5/6).
+- Плейтест: PT-U04..PT-U08 (ux, planned). TESTING_RULES §0.1 STAGE14.
+
+**Стабилизация харнессов после «ожившего» мира (продолжение ч.4):**
+- STAGE8-C3 регресс: NPC уходит с тайла прицела («Цель исчезла») — пин в
+  кадр замаха (телепорт+Idle) → STAGE8 стабильно PASS.
+- CombatSim aoe(c): пин клина перед каждым залпом → aoe-секция зелёная.
+- Детерминизм QA: GODOT_QA_SEED (PreGen/TechniqueGrant; мир 12345 уже
+  был) — устраняет флаки от случайного оружия NPC.
+- **Регрессия финальная: 32/33.** Единственный остаток — COMBAT_SIM
+  флаки на bug012-субассерте (между прогонами с ОДИНАКОВЫМ сидом:
+  residual-энтропия — несидированный Random.Shared (wander), возможно
+  time-based readiness). multi/aoe/ANIMALQA/STAGE8 — зелёные стабильно.
+
+NEXT: 1) COMBAT_SIM bug012: найти residual-энтропию (Random.Shared в
+NPCMovementService.GenerateRandomPointInRadius / AnimalService._wanderRng
+— сеять от GODOT_QA_SEED) → 33/33; 2) follow-up ST11-006res/ST12-003res
+(канон: 10_23_stage11_12_residual_followups.md) отдельным пакетом;
+3) владельцу: раунд-2 физплейтеста (PT-AI01..06 + PT-U04..08 новые),
+5 прежних GAP-решений + 2 новых GAP этапа-13.
