@@ -306,15 +306,63 @@ public sealed class StatService : IStatService, ISaveable, IWorldResettable
         _virtualDelta.Clear();
         _threshold.Clear();
 
+        // ST12-005 (Этап-12 аудита, 23.10): по-записная валидация значений —
+        // прежде проверялось ТОЛЬКО перечисление StatType: NaN/±Infinity/
+        // отрицательные/сверхкапа попадали в статы (префикс: AGI=NaN;
+        // VIT=+∞ → П.24-пересчёт HP давал торсу MaxRed=1; VITΔ=999>капа).
+        // Контракт повреждённых данных (установленный прецедентом
+        // EquipmentService/ItemDatabase): отклонение ЗАПИСИ с журналом —
+        // валидные записи того же блока восстанавливаются, загрузка не падает.
         foreach (var e in data.Base)
-            if (Enum.IsDefined(typeof(StatType), e.Stat))
-                _base[(StatType)e.Stat] = e.Value;
+        {
+            if (!Enum.IsDefined(typeof(StatType), e.Stat))
+            {
+                Console.WriteLine($"[StatService] RestoreState: base — неизвестный StatType {e.Stat}, запись отклонена");
+                continue;
+            }
+            if (!float.IsFinite(e.Value) || e.Value < 0f || e.Value > Core.Data.GameConstants.MAX_STAT_VALUE)
+            {
+                Console.WriteLine($"[StatService] RestoreState: base {(StatType)e.Stat}={e.Value} вне диапазона [0;{Core.Data.GameConstants.MAX_STAT_VALUE}] — запись отклонена");
+                continue;
+            }
+            _base[(StatType)e.Stat] = e.Value; // дубликаты: побеждает последняя запись (сквозной порядок блока)
+        }
         foreach (var e in data.VirtualDelta)
-            if (Enum.IsDefined(typeof(StatType), e.Stat))
-                _virtualDelta[(StatType)e.Stat] = e.Value;
+        {
+            if (!Enum.IsDefined(typeof(StatType), e.Stat))
+            {
+                Console.WriteLine($"[StatService] RestoreState: virtualDelta — неизвестный StatType {e.Stat}, запись отклонена");
+                continue;
+            }
+            var type = (StatType)e.Stat;
+            // Инварианты AddVirtualDelta (P2-49/§2): только первичные, ≥ 0, ≤ кап.
+            if (!IsPrimaryStat(type))
+            {
+                Console.WriteLine($"[StatService] RestoreState: virtualDelta {type}={e.Value} — вторичный стат не развивается, запись отклонена");
+                continue;
+            }
+            float cap = VirtualDeltaCaps.TryGetValue(type, out var c) ? c : 10f;
+            if (!float.IsFinite(e.Value) || e.Value < 0f || e.Value > cap)
+            {
+                Console.WriteLine($"[StatService] RestoreState: virtualDelta {type}={e.Value} вне [0;{cap}] — запись отклонена");
+                continue;
+            }
+            _virtualDelta[type] = e.Value;
+        }
         foreach (var e in data.Threshold)
-            if (Enum.IsDefined(typeof(StatType), e.Stat))
-                _threshold[(StatType)e.Stat] = e.Value;
+        {
+            if (!Enum.IsDefined(typeof(StatType), e.Stat))
+            {
+                Console.WriteLine($"[StatService] RestoreState: threshold — неизвестный StatType {e.Stat}, запись отклонена");
+                continue;
+            }
+            if (!float.IsFinite(e.Value) || e.Value < 0f || e.Value > Core.Data.GameConstants.MAX_STAT_VALUE)
+            {
+                Console.WriteLine($"[StatService] RestoreState: threshold {(StatType)e.Stat}={e.Value} вне диапазона — запись отклонена");
+                continue;
+            }
+            _threshold[(StatType)e.Stat] = e.Value;
+        }
 
         // События с РЕАЛЬНЫМ diff → BodyModule пересчитает VIT→HP (П.24).
         foreach (var kvp in _base)

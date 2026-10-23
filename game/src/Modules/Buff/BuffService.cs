@@ -478,7 +478,16 @@ namespace CultivationGame.Modules.Buff
             }
 
             // Маппинг ID → тип/статы; producer-potency вбирается в Value/TickDamage.
-            MapBuffIdToType(buffId, buff, potency);
+            // ST12-004 (Этап-12 аудита, 23.10): неизвестный ID → отказ (null),
+            // НЕ молчаливый AttackBoost +10%: комментарий BF-A08 обещал
+            // «предупреждение вместо тихого AttackBoost», а код применял
+            // бонус урона (префикс: модификатор +100‰). Контракт: явный отказ
+            // с диагностикой (ApplyBuff=false, HasBuff=false, 0 модификатор).
+            if (!MapBuffIdToType(buffId, buff, potency))
+            {
+                Console.WriteLine($"[BuffService] Неизвестный buffId '{buffId}' — ОТКАЗ (контракт ST12-004: неизвестные ID не превращаются в случайный модификатор; проверьте данные продюсера)");
+                return null;
+            }
 
             // BF-A02: Potency — множитель мощности НАЛОЖЕНИЯ. Маппинг уже
             // учёл producer-potency (см. комментарий метода) → нейтральный 1.
@@ -496,8 +505,15 @@ namespace CultivationGame.Modules.Buff
         /// DoT (bleed/burn/poison) — HP урона за тик; проценты (slow/shock/
         /// void_pierce) — промилле (300 = 30%); ампутации (severed_*) — доля
         /// (−0.15); перки — доля (+0.30 проводимости).
+        ///
+        /// ST12-004: возвращает false для неизвестных ID (отказ вместо
+        /// AttackBoost +10%).
+        /// ST12-006: ветка проводимости — ТОЛЬКО перки ("perk", постоянные,
+        /// PerkService-путь): BUFF_MODIFIERS_SYSTEM §A.4 запрещает временные
+        /// баффы проводимости (ранее ID с "conductivity" тоже попадали в
+        /// ветку — теперь такие ID отказаны контрактом неизвестных).
         /// </summary>
-        private static void MapBuffIdToType(string buffId, ActiveBuff buff, float potency)
+        private static bool MapBuffIdToType(string buffId, ActiveBuff buff, float potency)
         {
             string id = buffId.ToLowerInvariant();
 
@@ -523,17 +539,21 @@ namespace CultivationGame.Modules.Buff
                     buff.AffectedStat = StatType.Agility;
                 }
                 buff.Value = potency != 0f ? potency : -0.15f;
-                return;
+                return true;
             }
 
             // === Перки проводимости (PerkService) — проводимость, не урон ===
-            if (id.Contains("perk") || id.Contains("conductivity"))
+            // ST12-006: только "perk" — временные conductivity-баффы запрещены
+            // спецификацией (§A.4: «Баффы НЕ модифицируют!»); реальные
+            // потребители числовой проводимости — PerkService (IQiDataProvider),
+            // бафф-запись — учёт для HasBuff/UI.
+            if (id.Contains("perk"))
             {
                 buff.Type = BuffType.CastSpeed; // косметика типа; реальный эффект ведёт PerkService (IQiDataProvider)
                 buff.AffectedStat = StatType.Conductivity;
                 buff.IsPercentage = true;
                 buff.Value = potency != 0f ? potency : 0.1f;
-                return;
+                return true;
             }
 
             // === Кровотечение (CombatConsequencesService, BUF-2) ===
@@ -546,7 +566,7 @@ namespace CultivationGame.Modules.Buff
                 buff.HasTickEffect = true;
                 buff.TickInterval = 3f;
                 buff.TickDamage = potency > 0f ? potency : 5f; // 5% maxHP/тик от продюсера
-                return;
+                return true;
             }
 
             // === Шок (CombatConsequencesService, BUF-3) ===
@@ -558,7 +578,7 @@ namespace CultivationGame.Modules.Buff
                 buff.IsDebuff = true;
                 buff.IsPercentage = true;
                 buff.Value = potency > 0f ? -potency / 1000f : -0.2f; // продюсер: 200‰ = −20%
-                return;
+                return true;
             }
 
             // === Пробитие брони Void (ElementalEffectService, BUF-3) ===
@@ -569,7 +589,7 @@ namespace CultivationGame.Modules.Buff
                 buff.IsDebuff = true;
                 buff.IsPercentage = true;
                 buff.Value = potency > 0f ? -potency / 1000f : -0.3f; // продюсер: 300‰ = −30% брони
-                return;
+                return true;
             }
 
             if (id.Contains("attack_boost") || id.Contains("rage"))
@@ -649,13 +669,14 @@ namespace CultivationGame.Modules.Buff
             }
             else
             {
-                // BF-A08: Неизвестный ID баффа — предупреждение вместо тихого AttackBoost
-                Console.WriteLine($"[BuffService] Неизвестный buffId '{buffId}', применяется модификатор по умолчанию (AttackBoost +10%)");
-                buff.Type = BuffType.AttackBoost;
-                buff.AffectedStat = StatType.Damage;
-                buff.Value = 0.1f;
-                buff.IsPercentage = true;
+                // ST12-004 (Этап-12 аудита): неизвестный ID — ОТКАЗ. Прежде
+                // (BF-A08) здесь применялся AttackBoost +10% «по умолчанию» —
+                // расходилось с собственным комментарием о недопустимости
+                // тихого бонуса: любой новый/битый ID молча усиливал урон.
+                return false;
             }
+
+            return true;
         }
 
         private static readonly IReadOnlyList<ActiveBuffData> _emptyDataList = new List<ActiveBuffData>().AsReadOnly();
