@@ -568,3 +568,54 @@ NEXT: владельцу — раунд 2 физплейтеста (пункты
 отчёта 10_23_playtest_r1_report.md: агро-респавн, скриншот Q, X-цикл,
 молния+Tab, чистый editor-лог, вопрос о штрафе за смерть Ци/баффы);
 затем продолжение чек-листа PT-C04..C09 / PT-Q / PT-T / PT-S02+.
+
+---
+
+## Эпизод 2026-10-23 (continuation-audit): персист аудита 9/10 + верификация Этапа-8 и плейтест-фиксов firsthand
+
+**Время:** 06:33–06:50 UTC. Режим lite. Плейтест раунда-2 отложен
+владельцем («не вышло, переносится») — работаем по аудиту.
+
+**Окружение:** песочница сброшена (dotnet мёртв) → cold_start.sh
+foreground (фон убивается платформой): .NET 8/9, Godot 4.7.2 mono
+ed1daf0bf, build 0 errors, портал-скелет 23 файла, dev-сервер 3000 OK.
+Токен-креды восстановлены вручную из my-project/.auth (push до
+cold_start падал на credential store).
+
+**Персист аудита (до кодинга, по директиве владельца):** сессия аудита
+9/10 оборвалась по лимиту контекста ДО сохранения в git —
+восстановлено из протокола беседы и закоммичено (3915d36):
+- 10_23_stage9_inventory_audit_request.md — ST9-01..03 (крафт-атомарность/
+  ампутация+двуручное/переносы при переполнении; прочность = GAP-кандидат)
+  + канон [STAGE 9 AUDIT] (артефакты 10_22_stage9_inventory_*)
+- 10_23_stage10_lifecycle_audit_request.md — ST10-01..04 (очередь респауна
+  ресурсов без ISaveable/IWorldResettable; RemoveOldCorpses без вызова;
+  группы NPC при смерти лидера/участника; BulkAdvanceTicks пропускает
+  календарные события) + канон [STAGE 10 AUDIT] (+ lifecycle-регресс с
+  повтором PT-C02)
+- 10_23_playtest_registry_vs_checklist.md — семантика verified(реестр) vs
+  passed(физраунд владельца); факты сверены: 37 пунктов (2 passed/3 failed/
+  32 planned, 17 high), bugs.json 53 (STAGE8-001..006 + PT-001..005 verified)
+
+**Верификация аудитора (сверка заявлений кодера с кодом + исполнением):**
+- Этап-8 (de5a8f4): все 6 фиксов подтверждены по коду HEAD — AoEResolver
+  dx==0&&dy==0→false ×3 + IsAoeAimValid «Прицел в свою клетку»;
+  FireTechnique→bool; CompleteUse(publishUsedEvent) с единым издателем
+  CombatService; подписки PlayerDeath/Meditation/BuffApplied в
+  AuraHold+ChargeService; QiBuffer честный отказ при pool<MIN; decay
+  до порога + возврат от post-decay.
+- PT-001..005 (75b8634): все 5 подтверждены по коду — агро-сброс
+  (NPCAIService:740/AnimalService:686/NPCModule:318 + OriginalAttackerId
+  ×4), QuestWindow PanelContainer+HSeparator, X-цикл слоты 3-9
+  (CycleSelection удалён), отказ цели с радиусом+Tab (:256/:272),
+  SpriteSheetCache dual-path ResourceLoader→raw.
+- **Регрессия воспроизведена firsthand: 27/27 раннер + FORM = 28/28
+  PASS** (батчи foreground 06:38–06:44 UTC; детали
+  checkpoints/10_23_audit_verification.log). Расхождений с логами кодера
+  нет. Физплейтест-пункты НЕ закрываются симулятором (канон) —
+  PT-T01..T07/PT-C01..C03 остаются владельцу.
+
+NEXT: кодеру — [STAGE 9 AUDIT] и [STAGE 10 AUDIT] (каноны в
+checkpoints/10_23_stage{9,10}_*_audit_request.md); владельцу — раунд 2
+физплейтеста; аудитору — сверка отчётов 9/10 по той же схеме, затем
+общий анализ десяти этапов.

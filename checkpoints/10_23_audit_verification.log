@@ -1,0 +1,66 @@
+# Лог верификации аудитора — воспроизведение регрессии firsthand
+# Дата: 2026-10-23 06:38–06:44 UTC
+# Сессия: continuation-audit (main Z.ai Code)
+# HEAD: 75b8634 (рабочее дерево чистое)
+# Godot: 4.7.2.stable.mono.official.ed1daf0bf
+# .NET: 8.0.425 / 9.0.319 (восстановлен cold_start.sh, build 0 errors)
+# Команды: bash tools/qa_regression.sh <батчи> (внутри GODOT_BIN=…/Godot_v4.7.2…);
+#           FORM — прямой прогон GODOT_NEWGAME=1 GODOT_FORM_DEBUG=1 $GODOT --headless --path . scenes/MainMenu.tscn
+#           (с export DOTNET_ROOT=/home/z/.dotnet, PATH=/home/z/.dotnet:$PATH)
+# Примечание: платформа убивает фоновые процессы — прогоны батчами foreground,
+#             вердикты скопированы дословно из вывода прогонов этой сессии.
+
+─── Батч 1 (06:38 UTC): STAGE8 RESPAWN ─────────────────────
+  ✅ [Stage8Sim] VERDICT: PASS — ST8-01..06 закрыты
+  ✅ [RespawnSim] VERDICT: PASS — resource respawn + honest travel + time delta + death screen (GAP-001 + АУДИТ-1020: BUG-009/010/011) + агро-сброс на смерть (PT-001, плейтест PT-C02)
+  Итог: 2/2 PASS
+
+─── Батч 2 (06:39 UTC): CHARGE DOT STAGE5 STAGE4 (контроль зоны воздействия ST8/PT-фиксов) ───
+  ✅ [ChargeSim] VERDICT: PASS (fill model + aura hold + release)
+  ✅ [DotSim] VERDICT: PASS — DoT (Poison/Burn/Bleed/Freeze) наносит реальный урон через единый пайплайн
+  ✅ [Stage5Sim] VERDICT: PASS — BUG-015/016/017: тело=истина смерти, сплит сердца 100%, DoT-зачёт квесту + атрибуция
+  ✅ [Stage4Sim] VERDICT: PASS — Этап-4: pre-flight, транзакционный откат, полнота v2, BUG-013, GAP-014
+  Итог: 4/4 PASS
+
+─── Батч 3 (06:41 UTC): COMBAT_SIM COMBATAI ANIMALQA LOOT SAVELOAD STAGE6 STAGE7 ───
+  ✅ [CombatSim] VERDICT: PASS — обе стороны боя получают урон (melee + ranged + LOS/ammo gates + readiness-gate + multi R24-C + vfx R29 + bug001 каст-эффекты 4 типов + bug012 ранний гейт Support)
+  ✅ [CombatAI] VERDICT: PASS — месть/двусторонний бой/селектор защит/бегство/leash/стойка/анимация
+  ✅ [AnimalQA] VERDICT: PASS — таргетинг/урон/месть/смерть→труп/killfeed-имя/de-aggro/мирный вид/HP-бары/овекилл-перенос
+  ✅ [LootSim] VERDICT: PASS — full-loot: спаун-генерация/трупы/обыск/full-loot/TTL/R14+ивент-спаун
+  ✅ [SaveLoadSim] VERDICT: PASS — Save/Load round-trip: 20 блоков + Этап-3 полнота/версия/fanтом-каталоги/fail-closed
+  ✅ [Stage6Sim] VERDICT: PASS — BUG-018/019/020/021: инварианты стаков, честные Delta/Price, непредставимые котировки, валидация колец
+  ✅ [Stage7Sim] VERDICT: PASS — BUG-022/023/024 + GAP-025: источник предмета решает сбор, снимок итерации, честные награды, talk-гейт
+  Итог: 7/7 PASS
+
+─── Батч 4 (06:42 UTC): KILLFEED QUEST STORAGE HOTBAR TRASHDROP CONTEXT MODALQA MODAL2 ───
+  ✅ [KillFeedSim] VERDICT: PASS
+  ✅ [QuestSim] VERDICT: PASS
+  ✅ [StorageSim] VERDICT: PASS
+  ✅ [HotbarSim] VERDICT: PASS
+  ✅ [TrashDropSim] VERDICT: PASS
+  ✅ [ContextSim] VERDICT: PASS — ПКМ-свойства, слайдер деления, кучки, слот-адресный выброс работают
+  ✅ [ModalSim] VERDICT: PASS — «×»/bg-click всех 6 окон, двойной резюм идемпотентен, стек не вешает паузу
+  ✅ [ModalStackSim] VERDICT: PASS — 30×2 пар стеков, Esc-пауза переживает окна, тройной стек чист
+  Итог: 8/8 PASS
+
+─── Батч 5 (06:43 UTC): L500 WEAPONVIS REASSEMBLY AUDIT0922 CHARGERQA ANIMQA ───
+  ✅ [L500Sim] VERDICT: PASS
+  ✅ [WeaponVisSim] VERDICT: PASS
+  ✅ [ReassemblySim] VERDICT: PASS
+  ✅ [Audit0922Sim] VERDICT: PASS — EventBus isolation/re-entrancy, DI, startup fail-closed, world-reset fail-closed, retry без дублей, Pure без расхода Ци, time catch-up, item identity, equipment гейты, stat progression, P2-бэклог Фаз 11–14, BUG-004/005/006
+  ✅ [ChargerSim] VERDICT: PASS — камни Ци вставляются в зарядник, анти-дюп жив, пояс ≠ зарядник
+  ✅ [AnimQA] VERDICT: PASS — cache/fallback/loader/animator/weapon-keys/npc/animals готовы к доставке PNG
+  Итог: 6/6 PASS
+
+─── FORM отдельно (06:44 UTC, прямой прогон) ───────────────────
+  ✅ [FormShot] VERDICT: PASS
+
+══════════ ИТОГ ВОСПРОИЗВЕДЕНИЯ ══════════
+  Раннер qa_regression.sh: 27/27 PASS
+  FORM: 1/1 PASS
+  ВСЕГО: 28/28 PASS
+════════════════════════════════════════
+
+Расхождений с логами кодера (checkpoints/10_22_stage8_technique.log,
+checkpoints/10_23_playtest_r1.log) не обнаружено.
+Заявление «QA 28/28» подтверждено исполнением аудитора firsthand.
