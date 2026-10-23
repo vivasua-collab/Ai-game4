@@ -377,10 +377,29 @@ namespace CultivationGame.Modules.NPC
         }
 
         /// <summary>
-        /// Взвешенный случайный выбор следующего состояния.
-        /// Веса зависят от PersonalityTrait и текущей ситуации.
+        /// ST13-006 (Этап-13): QA-аксессор весов решений для детерминированной
+        /// проверки черт личности (Stage13NpcAiTruthSimDebug). Возвращает
+        /// клампленные веса (idle, wander, patrol, flee, attack, follow) —
+        /// тот же расчёт, что использует DecideNextState.
         /// </summary>
-        private NPCAIState DecideNextState(NPCState state, float healthRatio)
+        public (float Idle, float Wander, float Patrol, float Flee, float Attack, float Follow)
+            ComputeDecideWeightsForQa(NPCState state)
+        {
+            float healthRatio = state.MaxHealth > 0
+                ? (float)state.CurrentHealth / state.MaxHealth
+                : 0f;
+            float playerDist = Vector2.Distance(state.Position, _playerPosition);
+            return ComputeDecideWeights(state, healthRatio, playerDist);
+        }
+
+        /// <summary>
+        /// ST13-006: чистый расчёт весов (личность + ситуация). Выделен из
+        /// DecideNextState без изменения поведения — Stage13-сим проверяет
+        /// модификаторы черт детерминированно, без случайной выборки.
+        /// NPC.md §4.2 — нормативные эффекты черт на веса AI.
+        /// </summary>
+        private (float Idle, float Wander, float Patrol, float Flee, float Attack, float Follow)
+            ComputeDecideWeights(NPCState state, float healthRatio, float playerDist)
         {
             // Базовые веса для каждого состояния
             float idleWeight = 1f;
@@ -434,7 +453,6 @@ namespace CultivationGame.Modules.NPC
             if (healthRatio < 0.5f) fleeWeight += 2f;
             if (healthRatio < 0.3f) fleeWeight += 3f;
 
-            float playerDist = Vector2.Distance(state.Position, _playerPosition);
             if (playerDist < _config.AggroRadius)
             {
                 // Игрок рядом — зависит от отношения
@@ -456,6 +474,19 @@ namespace CultivationGame.Modules.NPC
             fleeWeight = Math.Max(0f, fleeWeight);
             attackWeight = Math.Max(0f, attackWeight);
             followWeight = Math.Max(0f, followWeight);
+
+            return (idleWeight, wanderWeight, patrolWeight, fleeWeight, attackWeight, followWeight);
+        }
+
+        /// <summary>
+        /// Взвешенный случайный выбор следующего состояния.
+        /// Веса зависят от PersonalityTrait и текущей ситуации.
+        /// </summary>
+        private NPCAIState DecideNextState(NPCState state, float healthRatio)
+        {
+            float playerDist = Vector2.Distance(state.Position, _playerPosition);
+            var (idleWeight, wanderWeight, patrolWeight, fleeWeight, attackWeight, followWeight) =
+                ComputeDecideWeights(state, healthRatio, playerDist);
 
             // Взвешенная случайная выборка
             float total = idleWeight + wanderWeight + patrolWeight + fleeWeight + attackWeight + followWeight;

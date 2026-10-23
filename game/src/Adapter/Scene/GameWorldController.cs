@@ -883,6 +883,18 @@ public partial class GameWorldController : Node2D
             var stage12Sim = new Stage12ProgressionTruthSimDebug { Name = "Stage12ProgressionTruthSimDebug" };
             AddChild(stage12Sim);
         }
+        // Этап-13 аудита (23.10, GODOT_STAGE13_DEBUG=1): ИИ NPC, выбор целей,
+        // навигация, группы, животные — ST13-001 (движение сквозь препятствия
+        // vs A* §6), ST13-002 (приоритет бой>группа §6 GROUP_SYSTEM),
+        // ST13-003 (переключение на более опасную цель §5.3/§9.2),
+        // ST13-004 (месть животного каноническому атакующему ANIMALS §5.1),
+        // ST13-005 (детект по радиусу — норма; GAP потери цели за препятствием),
+        // ST13-006 (черты Loyal/Treacherous NPC.md §4.2).
+        if (System.Environment.GetEnvironmentVariable("GODOT_STAGE13_DEBUG") == "1")
+        {
+            var stage13Sim = new Stage13NpcAiTruthSimDebug { Name = "Stage13NpcAiTruthSimDebug" };
+            AddChild(stage13Sim);
+        }
         // 2026-09-08 (баг-репорт пользователя): headless-верификация
         // инвентарного drag&drop в корзину (GODOT_TRASHDROP_DEBUG=1) —
         // материалы draggable, корзина выбрасывает, кукла отклоняет.

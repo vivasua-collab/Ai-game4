@@ -51,6 +51,9 @@ ALL_SIMS=(
   # Этап-12 аудита (23.10): баффы/статы/Ци/культивация (ST12-001..006
   # + прогрессия: дельты/сон/медитация/прорывы).
   "STAGE12:GODOT_STAGE12_DEBUG"
+  # Этап-13 аудита (23.10): ИИ NPC/навигация/группы/животные (ST13-001..006;
+  # детект по радиусу — норма §9.1, перки/лестница Attitude — GAP).
+  "STAGE13:GODOT_STAGE13_DEBUG"
   "KILLFEED:GODOT_KILLFEED_DEBUG"
   "QUEST:GODOT_QUEST_DEBUG"
   "STORAGE:GODOT_STORAGE_DEBUG"
