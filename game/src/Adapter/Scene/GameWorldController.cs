@@ -835,6 +835,18 @@ public partial class GameWorldController : Node2D
             var stage8Sim = new Stage8TechniqueTruthSimDebug { Name = "Stage8TechniqueTruthSimDebug" };
             AddChild(stage8Sim);
         }
+        // Этап-9 аудита (23.10, GODOT_STAGE9_DEBUG=1): инвентарь/экипировка/
+        // переносы — ST9-01 (крафт: отказ mid-loop без отката = латентная
+        // потеря ингредиентов; проверены недостижимость при текущей модели
+        // и транзакционный откат), ST9-02 (экипировка: swap/двуручное/гейты/
+        // ампутация/round-trip/провайдер), ST9-03 (пояс/зарядник/переполнение:
+        // суммы по ВСЕМ хранилищам инвариантны, stale SlotId безопасен),
+        // DUR — прочность не подключена к игровому пути (GAP, не имитация PASS).
+        if (System.Environment.GetEnvironmentVariable("GODOT_STAGE9_DEBUG") == "1")
+        {
+            var stage9Sim = new Stage9InventoryTruthSimDebug { Name = "Stage9InventoryTruthSimDebug" };
+            AddChild(stage9Sim);
+        }
         // 2026-09-08 (баг-репорт пользователя): headless-верификация
         // инвентарного drag&drop в корзину (GODOT_TRASHDROP_DEBUG=1) —
         // материалы draggable, корзина выбрасывает, кукла отклоняет.

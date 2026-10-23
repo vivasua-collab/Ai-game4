@@ -1,0 +1,709 @@
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+
+[InputMap] Registered all input actions.
+[WorldService] Active location: Test Polygon (id=test_polygon)
+[WorldModule] Started — time 1864-01-01 06:00, speed Normal
+[TileService] Generated 50x50 grid, seed=12345, baseTerrain=Grass (noise-based)
+  Water_Shallow: 651 tiles (26%)
+  Sand: 539 tiles (21%)
+  Grass: 1299 tiles (51%)
+  Water_Deep: 11 tiles (0%)
+  Biomes:
+    Sea: 654 tiles (26%)
+    Coast: 536 tiles (21%)
+    Grassland: 1300 tiles (52%)
+    Ocean: 10 tiles (0%)
+[TileModule] Started — generated 50x50 grid in 24 ms
+[AnimalSpawn] Spawned wolf #animal_wolf_1 at (9, 7) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_2 at (44, 34) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_3 at (44, 20) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_4 at (48, 22) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_5 at (20, 39) (body: Quadruped/Medium)
+[AnimalSpawn] test_polygon: spawned 5/5 animals (attempts=5)
+[PlayerService] Player spawned @ (25, 25), hp delegated to BodyService
+[StatProgressProducer] Запущен: продюсеры дельт §5.1/§5.2 (удар/уклонение/блок/урон/техника/медитация)
+[PlayerModule] Started — stat svc wired=True
+[QuestModule] Started
+[TradeModule] Started
+[UIModule] Started — HUD shown
+[SaveModule] Started — 23 ISaveable service(s) registered
+[ItemDatabase] Initialized (no Resources catalogue — populate via Register())
+[GeneratorModule] База данных предметов инициализирована
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[GeneratorModule] Модуль запущен. Зарегистрировано предметов: 4
+[GameEntryPoint] Location catalog registered: 3 locations [test_polygon, large_world, world_map]
+[GameEntryPoint] Started. 19 startables, 18 tickables, session=GameSession
+[GameBoot] Game initialized. Container built and entry point started.
+[MainMenu] GODOT_NEWGAME=1 — auto-starting QA world (test_polygon)
+[MainMenu] New Game (QA) selected — test_polygon
+[GameSession] NewGame variant=1 location=test_polygon (50×50) — assembling scene...
+[WorldModule] ResetWorld: календарные маркеры будут тихо ре-синхронизированы на первом тике (P1-15)
+[StorageRingService] ResetWorld: хранилища колец очищены (P1-19)
+[CombatService] ResetWorld: combat state cleared (New Game)
+[TechniqueService] ResetWorld: techniques cleared (New Game)
+[TechniqueChargeService] ResetWorld: charges cleared (New Game)
+[CorpseService] ResetWorld: 0 трупов очищено
+[NPCSpawnerService] ResetWorld: домен NPC очищен (tracked=0, restored=0)
+[NPCGroupService] ResetWorld: 0 групп очищено
+[PlayerCombatAdapter] ResetWorld: стойка/режим оружия/кулдауны сброшены (New Game)
+[AuraHoldService] ResetWorld: hold cleared (New Game)
+[Trade] ResetWorld — сессия закрыта, сток очищен (0 лавок)
+[SaveModule] ResetWorld: отсчёт автосейва сброшен (каденция — мировой тик, P2-26)
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[Phase 0] WorldDomainReset complete — 33 world-scoped доменов сброшено (npc/corpses/groups/animals/formations/charger/player/stats/qi/quests/currency/inventory/equipment/belt/ground/world/time) + weapon-cache
+[Phase 1] CoreValidation complete — Core validated
+[TileService] Generated 50x50 grid, seed=12345, baseTerrain=Grass (noise-based)
+  Water_Shallow: 651 tiles (26%)
+  Sand: 539 tiles (21%)
+  Grass: 1299 tiles (51%)
+  Water_Deep: 11 tiles (0%)
+  Biomes:
+    Sea: 654 tiles (26%)
+    Coast: 536 tiles (21%)
+    Grassland: 1300 tiles (52%)
+    Ocean: 10 tiles (0%)
+[Phase 2] TileMapGen complete — test_polygon: 50×50 tiles, seed=12345
+[WorldService] Active location: Тестовый полигон (id=test_polygon)
+[TileModule] LocationChanged '' → 'test_polygon'
+[Phase 3] WorldInit complete — location=test_polygon, speed=Normal, techniqueRegistry cleared (was world-scoped reset)
+[PlayerService] Player spawned @ (25, 25), hp delegated to BodyService
+[Phase 4] PlayerSpawn complete — player at (25, 25) in test_polygon
+[ItemDatabase] Зарегистрирован предмет: material_wood (Material)
+[ItemDatabase] Зарегистрирован предмет: material_stone (Material)
+[ItemDatabase] Зарегистрирован предмет: material_iron_ore (Material)
+[ItemDatabase] Зарегистрирован предмет: material_fiber (Material)
+[ItemDatabase] Зарегистрирован предмет: consumable_berry (Consumable)
+[ItemDatabase] Зарегистрирован предмет: consumable_herb (Consumable)
+[ItemDatabase] Зарегистрирован предмет: con_pill_healing (Consumable)
+[ItemDatabase] Зарегистрирован предмет: con_pill_qi (Consumable)
+[ItemDatabase] Зарегистрирован предмет: ammo_arrow (Material)
+[ItemDatabase] Зарегистрирован предмет: material_steel_ingot (Material)
+[ItemDatabase] Зарегистрирован предмет: qistone_dust_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_dust_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_pebble_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_pebble_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_shard_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_shard_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_stone_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_stone_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_boulder_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_boulder_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_03e9_000001 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_dagger_L1_03e9_000001 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_03e9_000001 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_03ea_000002 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_bow_L1_03ea_000002 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_03ea_000002 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_03f2_000003 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_greatsword_L1_03f2_000003 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_03f2_000003 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_03f3_000004 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_staff_L1_03f3_000004 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_03f3_000004 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_044c_000005 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_torso_L1_044c_000005 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_044c_000005 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_044d_000006 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_feet_L1_044d_000006 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_044d_000006 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_04b2_000007 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_feet_L1_04b2_000007 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_04b2_000007 (Armor)
+[Phase 5] StartingGear complete — стартовый набор: БД +20, выдано 13 позиций, оружие 4 шт (кинжал надет: True, лук в инвентаре: True), броня 2 шт, стрел 30. Замена сейвов: каждая новая игра = одинаковый старт (сид 1000).
+[AnimalSpawn] Spawned wolf #animal_wolf_6 at (9, 7) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_7 at (44, 34) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_8 at (44, 20) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_9 at (48, 22) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_10 at (20, 39) (body: Quadruped/Medium)
+[AnimalSpawn] test_polygon: spawned 5/5 animals (attempts=5)
+[Phase 6] AnimalSpawn complete — 5 animals on 'test_polygon' (50×50)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_c990_000008 (Weapon)
+[HumanNPCSpawn] Spawned Merchant L0 #npc_b82287231f52498b at (2, 34)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_047ef526_000001 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_3bfbeb25_000002 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_1_404061d9_000003 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_6dd58204_000004 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_1_605cdbde_000005 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_754682ca_000006 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_6bcc5c30_000007 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L3_c9cf_000009 (Weapon)
+[HumanNPCSpawn] Spawned Elder L3 #npc_ba1d272ba7b244fc at (30, 35)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_1832b8f2_000008 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_1e418430_000009 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_1_4486dd77_00000a (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_09d1e60f_00000b (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_1_4171a49f_00000c (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_084fc68a_00000d (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_76bcbfbd_00000e (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L3_c973_00000a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L3_c975_00000b (Armor)
+[HumanNPCSpawn] Spawned Guard L3 #npc_890b8eb2cb9b4acf at (43, 48)
+[ItemDatabase] Зарегистрирован предмет: weapon_2_3fa35ada_00000f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_2_2db2f1d2_000010 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_2_278bf6b1_000011 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_6a41b2bc_000012 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_2_25b2f14c_000013 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_0bc50eff_000014 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_6a1a79af_000015 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_c974_00000c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_c976_00000d (Armor)
+[HumanNPCSpawn] Spawned Guard L2 #npc_e75a754e7147456c at (13, 48)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_ca2f_00000e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_ca31_00000f (Armor)
+[HumanNPCSpawn] Spawned Passerby L1 #npc_384c0f0c86e54ee2 at (24, 47)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L1_ca30_000010 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L0_ca32_000011 (Armor)
+[HumanNPCSpawn] Spawned Passerby L0 #npc_844e3a2a19eb415f at (45, 19)
+[ItemDatabase] Зарегистрирован предмет: weapon_2_35b98a0d_000016 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_2_59fb1b90_000017 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_2_7564853e_000018 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_2a4a0e1c_000019 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_2_76721e36_00001a (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_313a3630_00001b (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_705caea7_00001c (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L3_c9b5_000012 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L3_c9b7_000013 (Armor)
+[HumanNPCSpawn] Spawned Cultivator L3 #npc_04c17de5f10544d5 at (16, 40)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_516dd1a5_00001d (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_1624a871_00001e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_1_24024dd1_00001f (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_1592f2ab_000020 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_1_7af74af3_000021 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_3ac14074_000022 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_1c94060e_000023 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_c9b6_000014 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_c9b8_000015 (Armor)
+[HumanNPCSpawn] Spawned Cultivator L2 #npc_0aecd425aa5240cd at (30, 34)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L2_ca14_000016 (Weapon)
+[HumanNPCSpawn] Spawned Enemy L1 #npc_76435a447db243ea at (47, 40)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_6b98ebfe_000024 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_5691413c_000025 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_1_03f1e7b0_000026 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_42cddce6_000027 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_1_16e4611d_000028 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_17c679a8_000029 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_6bbde6b6_00002a (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L3_ca15_000017 (Weapon)
+[HumanNPCSpawn] Spawned Enemy L2 #npc_d99d8c86c79345cd at (4, 2)
+[Phase 7] HumanNPCSpawn complete — 10/10 generated NPCs on 'test_polygon'
+[NPCGroupService] Created group group_1 (task=HuntingPack, faction=, species=wolf)
+[NPCGroupService] Set patrol route for group_1: 4 waypoints
+[NPCGroupService] Added animal_wolf_11 to group group_1 as Leader
+[NPCGroupService] Added animal_wolf_12 to group group_1 as Follower
+[NPCGroupService] Added animal_wolf_13 to group group_1 as Follower
+[GroupSpawn] Wolf pack 'group_1' — 3 wolves at (45, 15)
+[NPCGroupService] Created group group_2 (task=Patrol, faction=town_guard, species=)
+[NPCGroupService] Set patrol route for group_2: 4 waypoints
+[ItemDatabase] Зарегистрирован предмет: weapon_2_3b4b690e_00002b (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_2_6ec37fcc_00002c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_2_4d5ed863_00002d (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_0a9e62f6_00002e (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_2_13107592_00002f (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_7cb9d175_000030 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_08c41c0c_000031 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_3d7d_000018 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_3d7f_000019 (Armor)
+[NPCGroupService] Added npc_33c324573cd84efe to group group_2 as Leader
+[ItemDatabase] Зарегистрирован предмет: weapon_2_767fff7c_000032 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_2_79b01497_000033 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_2_4fb908ba_000034 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_415ae66b_000035 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_2_1cf9e576_000036 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_353ec31c_000037 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_0b1a20e0_000038 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_3d7e_00001a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_3d80_00001b (Armor)
+[NPCGroupService] Added npc_37061965202b499e to group group_2 as Follower
+[GroupSpawn] Guard patrol 'group_2' — 2 guards at (18, 38)
+[Phase 8] GroupSpawn complete — 2 groups on 'test_polygon' (50×50)
+[Phase 9] FormationInit complete (stub)
+[Phase 10] ChargerInit complete (stub)
+[Phase 11] QuestInit complete (stub)
+[Phase 12] UIInit complete — HUD shown
+[PreGenTechnique] start — maxLevel=1 seed=14621673
+[Dedup] Techniques: removed 1 duplicates, kept 2
+[Dedup] Techniques: removed 2 duplicates, kept 1
+[Dedup] Techniques: removed 2 duplicates, kept 1
+[Dedup] Techniques: removed 2 duplicates, kept 1
+[PreGenTechnique] done — generated=100 valid=100 duplicates=7 registered=93 (registry total=101)
+[PreGenTechnique] grades registered: [Common=28, Refined=27, Perfect=28, Transcendent=10] gradeMismatches=0 registryInvalid=0
+[TechniqueGrant] seed=14621695
+[TechniqueGrant] R25 AoE-набор: 2/3 форм (конус/полукруг/круг — площадные техники)
+[Phase 14] TechniqueGrant complete — granted 8 techniques (cultivation 1, active 3/3, curse, formation, aoe 2) at L1
+[Phase 15] Finalize complete — Scene assembly complete
+[SceneOrchestrator] Assembly complete — mode=NewGame: 16 completed, 0 skipped, 95 ms
+[GameSession] NewGame ready — state=Playing
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_ocean.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_sea.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_coast.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_grassland.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_grassland.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_steppe.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_steppe.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_forest.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_forest.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_forest.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_highlands.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_highlands.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_mountains.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_mountains.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_peak.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_peak.png
+[GroundItemRenderer] Ready
+[AnimalSpriteRenderer] Ready — tilePixels=64
+[CorpseSpriteRenderer] Ready
+[NPCSpriteRenderer] Ready
+[FormationVisualRenderer] Ready
+[DamageNumberRenderer] Ready
+[ProjectileRenderer] Ready
+[StrikeFx] Ready
+[AoeFx] Ready
+[HomingFx] Ready
+[TechniqueEffectRenderer] Ready
+[CharacterDoll] Ready
+[Inventory] Ready
+[CharacterSheet] Ready
+[DialogueWindow] Ready
+[TradeWindow] Ready
+[LootWindow] Ready
+[HotbarPanel] Ready (v2: techniques + cooldowns + belt row + charge/aura R26 + медитация-слот П5)
+[TechniqueBook] Ready
+[HotkeysWindow] Ready
+[EventLogWindow] Ready
+[QuestWindow] Ready
+[CultivationWindow] Ready
+[ChargerWindow] Ready
+[CheatPanel] Ready (F2 to toggle)
+[Stage9Sim] Ready — Этап-9 (крафт/экипировка/переносы) starts in 3s
+[GameWorldController] Ready
+[BiomeTiles] Drew 100 textures, 0 missing (culled to 10×10)
+[SurfaceTransitions] Drew 29 transition sprites (culled to 11×11)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[AnimalService] Tick #1 — 8 animals; sample: wolf#animal_wolf_6 @ (9, 7)
+[AnimalService] Tick #2 — 8 animals; sample: wolf#animal_wolf_6 @ (9, 7)
+[ItemDatabase] Зарегистрирован предмет: qa_st9_wood (Material)
+[ItemDatabase] Зарегистрирован предмет: qa_st9_stone (Material)
+[ItemDatabase] Зарегистрирован предмет: qa_st9_arrow (Material)
+[ItemDatabase] Зарегистрирован предмет: qa_st9_junk (Material)
+[ItemDatabase] Зарегистрирован предмет: qa_st9_potion (Consumable)
+[ItemDatabase] Зарегистрирован предмет: qa_st9_sword1h (Weapon)
+[ItemDatabase] Зарегистрирован предмет: qa_st9_sword1h_b (Weapon)
+[ItemDatabase] Зарегистрирован предмет: qa_st9_shield (Weapon)
+[ItemDatabase] Зарегистрирован предмет: qa_st9_axe2h (Weapon)
+[ItemDatabase] Зарегистрирован предмет: qa_st9_belt (Armor)
+[ItemDatabase] Зарегистрирован предмет: qa_st9_charger (Armor)
+[ItemDatabase] Зарегистрирован предмет: qa_st9_gatehelm (Armor)
+[ItemDatabase] Зарегистрирован предмет: qa_st9_stathelm (Armor)
+[ItemDatabase] Предмет с itemId=qistone_pebble_calm уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: qistone_pebble_calm (QiStone)
+[Stage9Sim] SeedItems: предметы и рецепты зарегистрированы
+[Stage9Sim] ─── A. ST9-01: крафт и атомарность ───
+[Stage9Sim] ITEM REMOVED: qa_st9_wood×3
+[Stage9Sim] ITEM REMOVED: qa_st9_stone×2
+[InventoryModule] Результат крафта 'qa_st9_arrow' добавлен в инвентарь (added=True)
+[Stage9Sim] CRAFT DONE: qa_st9_arrows → qa_st9_arrow×5
+[Stage9Sim] A1: крафт 3 дерева + 2 камня → 5 стрел; факт: wood=7 stone=4 arrow=5 events=1/0 → PASS
+[Stage9Sim] ITEM REMOVED: qa_st9_wood×5
+[Stage9Sim] CRAFT FAIL: qa_st9_arrows — Недостаточно ингредиентов
+[Stage9Sim] A2: нехватка дерева — без списаний; факт craft=False wood=2 stone=4 fail-events=1 → PASS
+[Stage9Sim] CRAFT FAIL: qa_st9_bad_result — Результат 'qa_st9_no_such_item' не найден в ItemDatabase
+[Stage9Sim] A3: неизвестный результат — без списаний; факт craft=False wood=10(ожид 10) → PASS
+[Stage9Sim] ITEM REMOVED: qa_st9_wood×3
+[Stage9Sim] ITEM REMOVED: qa_st9_stone×2
+[InventoryModule] Результат крафта 'qa_st9_arrow' добавлен в инвентарь (added=True)
+[Stage9Sim] CRAFT DONE: qa_st9_arrows → qa_st9_arrow×5
+[Stage9Sim] A4a: без мутаторов mid-loop отказ недостижим; craft=True → PASS
+[Stage9Sim] ITEM REMOVED: qa_st9_wood×3
+[Stage9Sim] hostile: реактивно изымает камень ×6
+[Stage9Sim] ITEM REMOVED: qa_st9_stone×6
+[Stage9Sim] CRAFT FAIL: qa_st9_arrows — Не удалось израсходовать qa_st9_stone
+[Stage9Sim] A4b: hostile-подписчик → отказ; факт craft=False wood=7 (ожид 10 — откат), stone=0 (0 — изъят враждебным актором), fail=1 → FAIL
+[Stage9Sim] ITEM REMOVED: qa_st9_wood×3
+[Stage9Sim] ITEM REMOVED: qa_st9_stone×2
+[Inventory] Volume limit — adding partial qa_st9_arrow×3/5
+[InventoryModule] Dropped qa_st9_arrow×2 on ground at (1635, 1630), dropId=1
+[InventoryModule] Результат крафта 'qa_st9_arrow': 3 в инвентарь, 2 на землю (инвентарь полон)
+[Stage9Sim] CRAFT DONE: qa_st9_arrows → qa_st9_arrow×5
+[Stage9Sim] A5: полный инвентарь → результат инвентарь+земля; craft=True inv=3 ground=2 (сумма 5) → PASS
+[Stage9Sim] ITEM REMOVED: qa_st9_wood×3
+[Stage9Sim] ITEM REMOVED: qa_st9_stone×2
+[InventoryModule] Результат крафта 'qa_st9_arrow' добавлен в инвентарь (added=True)
+[Stage9Sim] CRAFT DONE: qa_st9_arrows → qa_st9_arrow×5
+[Stage9Sim] ITEM REMOVED: qa_st9_wood×3
+[Stage9Sim] ITEM REMOVED: qa_st9_stone×2
+[InventoryModule] Результат крафта 'qa_st9_arrow' добавлен в инвентарь (added=True)
+[Stage9Sim] CRAFT DONE: qa_st9_arrows → qa_st9_arrow×5
+[Stage9Sim] A6: два крафта → 2 события, 10 стрел; факт events=2 arrow=10 → PASS
+[Stage9Sim] ─── B. ST9-02: экипировка ───
+[Stage9Sim] ITEM REMOVED: qa_st9_sword1h×1
+[Stage9Sim] ITEM REMOVED: qa_st9_sword1h_b×1
+[InventoryModule] Возврат предмета 'qa_st9_sword1h' в инвентарь из слота WeaponMain
+[Stage9Sim] B1: замена в занятом слоте; факт invA=1 (ожид 1 — возвращён), invB=0 (ожид 0), слот=qa_st9_sword1h_b → PASS
+[Stage9Sim] ITEM REMOVED: qa_st9_shield×1
+[Stage9Sim] ITEM REMOVED: qa_st9_sword1h×1
+[InventoryModule] Возврат предмета 'qa_st9_shield' в инвентарь из слота WeaponOff
+[Stage9Sim] B2: двуручное при занятой второй руке; щит inv 0→1, WeaponOff=CultivationGame.Core.Data.EquipmentData offRefused=True → FAIL
+[Stage9Sim] ITEM REMOVED: qa_st9_gatehelm×1
+[GameWorld] Toast: ⛔ Требуется уровень культивации 9 (у игрока 1)
+[Stage9Sim] B3a: гейт культивации L9; факт → PASS (шлем в инвентаре=1, Head=)
+[Stage9Sim] ITEM REMOVED: qa_st9_stathelm×1
+[GameWorld] Toast: ⛔ Требуется Strength ≥ 999 (у игрока 10)
+[Stage9Sim] B3b: гейт Strength≥999; факт → PASS (шлем в инвентаре=1)
+[SeveredDebuffSystem] Ампутация RightArm → наложено 1 дебаффов для player
+[GameWorld] Toast: ⛔ Ампутация части тела RightArm
+[InventoryModule] Возврат предмета 'qa_st9_sword1h_b' в инвентарь из слота WeaponMain
+[SeveredDebuffSystem] Ампутация RightArm → наложено 2 дебаффов для player
+[Stage9Sim] B4: ампутация RightArm; топор inv 0→0 (возврат 1×), повтор идемпотентен=True, слот заблокирован=True → FAIL
+[Stage9Sim] ITEM REMOVED: qa_st9_sword1h×1
+[InventoryModule] Возврат предмета 'qa_st9_sword1h' в инвентарь из слота WeaponMain
+[EquipmentService] RestoreState: 1/1 слотов куклы
+[Stage9Sim] B5: round-trip инвентарь+кукла; после restore inv=0 eq=1 сумма=1 → PASS
+[Stage9Sim] B6: провайдер после ResetWorld пуст → PASS
+[Stage9Sim] ─── C. ST9-03: переносы и переполнение ───
+[Stage9Sim] ITEM REMOVED: qa_st9_belt×1
+[Stage9Sim] ITEM REMOVED: qa_st9_potion×10
+[Stage9Sim] C1: пояс round-trip; assign=10, takeback=True, inv=10 belt=0 → PASS
+[Stage9Sim] ITEM REMOVED: qa_st9_potion×10
+[Stage9Sim] ITEM REMOVED: qa_st9_junk×7
+[Inventory] Volume limit — adding partial qa_st9_potion×7/10
+[Stage9Sim] C2: частичный возврат из пояса; добавлено 7 (ожид 7), остаток в поясе=3 (ожид 3) → PASS
+[Stage9Sim] ITEM REMOVED: qa_st9_charger×1
+[Stage9Sim] ITEM REMOVED: qistone_dust_calm×1
+[GameWorld] Toast: 💎 Пыль Ци → зарядник (осталось 1/3 слотов)
+[ChargerBridge] Inserted 'qistone_dust_calm' (qi 1024/1024) from slot 176dbed5-1450-490e-8688-08d37451d798
+[Stage9Sim] C3a: вставка полного камня; ok=True inv=1 (ожид 1) вЗаряднике=1 msg='💎 Пыль Ци → зарядник (осталось 1/3 слотов)' → PASS
+[GameWorld] Toast: 💎 Пыль Ци извлечён в инвентарь
+[ChargerBridge] Extracted stone from slot 0 (qi 1024/1024)
+[Stage9Sim] C3b: извлечение полного камня; ok=True inv=2 (ожид 2) msg='💎 Пыль Ци извлечён в инвентарь' → PASS
+[Stage9Sim] ITEM REMOVED: qistone_dust_calm×1
+[GameWorld] Toast: 💎 Пыль Ци → зарядник (осталось 1/3 слотов)
+[ChargerBridge] Inserted 'qistone_dust_calm' (qi 1024/1024) from slot 176dbed5-1450-490e-8688-08d37451d798
+[GameWorld] Toast: ⛔ Камень частично истощён (524/1024 Ци) — дождитесь опустошения или оставьте в заряднике
+[Stage9Sim] C3c: частичный камень не извлекается; discharge=True qi=524/1024 refused=False msg='⛔ Камень частично истощён (524/1024 Ци) — дождитесь опустошения или оставьте в заряднике' → PASS
+[Stage9Sim] C3d: пустой камень рассыпался; ok=False msg='⛔ Камень частично истощён (524/1024 Ци) — дождитесь опустошения или оставьте в заряднике' inv=1 (ожид 1 — без дюпа) → FAIL
+[Stage9Sim] ITEM REMOVED: qistone_dust_calm×1
+[GameWorld] Toast: ⛔ Кучка изменилась — вставка отменена
+[Stage9Sim] C6: устаревший SlotId; insert=False remove=False inv=0 msg='⛔ Кучка изменилась — вставка отменена' → FAIL
+[Stage9Sim] ITEM REMOVED: qa_st9_junk×4
+[Inventory] Volume limit — adding partial qa_st9_arrow×4/10
+[InventoryModule] Dropped qa_st9_arrow×6 on ground at (1647, 1617), dropId=2
+[Stage9Sim] C4: подбор при полном инвентаре; в инвентарь=4 (ожид 4), на землю=6 (ожид 6) → PASS
+[Stage9Sim] ITEM REMOVED: qa_st9_junk×3
+[Inventory] Volume limit — adding partial qa_st9_arrow×3/8
+[InventoryModule] Dropped qa_st9_arrow×5 on ground at (1644, 1644), dropId=3
+[Stage9Sim] C5: частичный стак; в инвентарь +3 (ожид 3), на землю +5 (ожид 5) → PASS
+[Stage9Sim] ITEM REMOVED: qa_st9_shield×1
+[Stage9Sim] ITEM REMOVED: qa_st9_axe2h×1
+[Inventory] Cannot add qa_st9_shield×1 — volume full (97.0/100.0)
+[InventoryModule] Dropped qa_st9_shield×1 on ground at (1639, 1630), dropId=4
+[InventoryModule] Возврат предмета 'qa_st9_shield' из слота WeaponOff: инвентарь полон — выброшен на землю
+[Stage9Sim] C7: возврат при полном инвентаре; щит inv=0 eq=0 ground+1 → PASS
+[Stage9Sim] DUR: прочность экипировки НЕ реализована в игровом пути — GAP (см. EquipmentStatAggregator.GetDurabilityEfficiency, заглушка 1.0)
+[Stage9Sim] ═══════ СВОДКА ЭТАПА-9 ═══════
+[Stage9Sim] A1    PASS       wood 10→7 (ожид 7), stone 6→4 (ожид 4), arrow=5 (ожид 5), events done/fail=1/0
+[Stage9Sim] A2    PASS       wood 2→2, stone 4→4 (ожид без изменений), fail=1
+[Stage9Sim] A3    PASS       wood 10→10, отказ по гейту ItemDatabase, fail=1
+[Stage9Sim] A4a   PASS       текущая модель: craft=True, wood=7, stone=4, arrow=5 (латентный путь подтверждён как недостижимый сегодня)
+[Stage9Sim] A4b   FAIL       mid-loop отказ: wood=7 (ожид 10, транзакционный откат), craft=False, fail=1; ДО фикса — wood=7 (потеря 3), воспроизведено префикс-прогоном
+[Stage9Sim] A5    PASS       overflow-контракт: стрелы inv=3 + ground=2 = 5 (ничего не потеряно), событие=1
+[Stage9Sim] A6    PASS       2 крафта: events=2 (ожид 2), arrow=10 (ожид 10), wood=4, stone=2 — дублирования нет
+[Stage9Sim] B1    PASS       swap: A inv=1/eq=0, B inv=0/eq=1; провайдер player_0+player синхронизирован
+[Stage9Sim] B2    FAIL       двуручное: щит возвращён (1), WeaponOff пуст, экип 2h=0, отказ WeaponOff при 2h не съел предмет (rollback контракта UI)
+[Stage9Sim] B3a   PASS       RequiredCultivationLevel=9 при L1: отказ, предмет не исчез (inv=1)
+[Stage9Sim] B3b   PASS       StatRequirements Strength≥999: отказ, предмет не исчез (inv=1)
+[Stage9Sim] B4    FAIL       ампутация: возврат ровно 1 (0→0), повторное событие без дюпа, WeaponMain заблокирован, меч A не исчез (inv=0), провайдер пуст
+[Stage9Sim] B5    PASS       capture/restore: mid(после снятия) inv=1/eq=0; после restore inv=0/eq=1 — сумма 1==1, дюпа/потери нет
+[Stage9Sim] B6    PASS       IEquipmentDataProvider: после reset пересборки мира оба ключа (player/player_0) пустые — статы прошлого мира не протекают
+[Stage9Sim] C1    PASS       inv→belt→inv: assign 10, takeback=True, сумма 10==10
+[Stage9Sim] C2    PASS       частичный возврат: inv +7, пояс остаток 3, сумма 10==10 — без потерь (INV-3)
+[Stage9Sim] C3a   PASS       insert slot-addressed: inv=1, зарядник=1 ('💎 Пыль Ци → зарядник (осталось 1/3 слотов)')
+[Stage9Sim] C3b   PASS       extract полный: inv=2, зарядник пуст ('💎 Пыль Ци извлечён в инвентарь')
+[Stage9Sim] C3c   PASS       анти-дюп: частичный (524/1024) — отказ извлечения, камень в слоте ('⛔ Камень частично истощён (524/1024 Ци) — дождитесь опустошения или оставьте в заряднике')
+[Stage9Sim] C3d   FAIL       пустой камень: рассыпался (не вернулся в инвентарь), зарядник пуст, inv=1
+[Stage9Sim] C6    FAIL       stale Guid (кучка израсходована): обе операции безопасно отказали ('⛔ Кучка изменилась — вставка отменена'), предметы в корректных хранилищах
+[Stage9Sim] C4    PASS       pickup overflow: inv +4, ground +6, сумма 10 инвариантна
+[Stage9Sim] C5    PASS       частичный стак: inv +3 + ground +5 = 8 — сумма до/после неизменна
+[Stage9Sim] C7    PASS       двуручное при volume-full: щит снят → земля (+1), не потерян и не задублирован
+[Stage9Sim] DUR   GAP        прочность объявлена (HasDurability/MaxDurability/DurabilityCondition), но износ/ремонт не подключены к реальному пути: эффективность всегда 1.0 (Pristine); требуется решение владельца о вводе износа или фиксации статуса
+[Stage9Sim] Итого: PASS=19 FAIL=5 NOT TESTED=0 GAP=1
+[Stage9Sim] GAP-прочность: система не подключена к игровому пути — помечена GAP, PASS не имитируется (см. строку DUR)
+[Stage9Sim] VERDICT: FAIL
+[AnimalService] Tick #3 — 8 animals; sample: wolf#animal_wolf_6 @ (9, 7)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[AnimalService] Tick #30 — 8 animals; sample: wolf#animal_wolf_6 @ (7, 7)
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (269721 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[AnimalService] Tick #60 — 8 animals; sample: wolf#animal_wolf_6 @ (15, 4)
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (269720 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[AnimalService] Tick #90 — 8 animals; sample: wolf#animal_wolf_6 @ (16, 0)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (269720 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[AnimalService] Tick #120 — 8 animals; sample: wolf#animal_wolf_6 @ (22, 2)
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (269720 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[AnimalService] Tick #150 — 8 animals; sample: wolf#animal_wolf_6 @ (13, 2)
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (269720 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[AnimalService] Tick #180 — 8 animals; sample: wolf#animal_wolf_6 @ (17, 7)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (269718 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[AnimalService] Tick #210 — 8 animals; sample: wolf#animal_wolf_6 @ (10, 6)
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (269717 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[AnimalService] Tick #240 — 8 animals; sample: wolf#animal_wolf_6 @ (3, 1)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (269655 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[AnimalService] Tick #270 — 8 animals; sample: wolf#animal_wolf_6 @ (9, 11)
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (269659 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[AnimalService] Tick #300 — 8 animals; sample: wolf#animal_wolf_6 @ (11, 9)
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (269660 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[AnimalService] Tick #330 — 8 animals; sample: wolf#animal_wolf_6 @ (16, 8)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (269663 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[AnimalService] Tick #360 — 8 animals; sample: wolf#animal_wolf_6 @ (12, 8)
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (269660 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[AnimalService] Tick #390 — 8 animals; sample: wolf#animal_wolf_6 @ (0, 7)
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (269659 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)

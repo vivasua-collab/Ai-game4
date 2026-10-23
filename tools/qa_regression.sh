@@ -40,6 +40,9 @@ ALL_SIMS=(
   "STAGE7:GODOT_STAGE7_DEBUG"
   # Этап-8 аудита (22.10): техники/Ци/эффекты (ST8-01..06).
   "STAGE8:GODOT_STAGE8_DEBUG"
+  # Этап-9 аудита (23.10): инвентарь/экипировка/переносы (ST9-01..03,
+  # прочность = GAP).
+  "STAGE9:GODOT_STAGE9_DEBUG"
   "KILLFEED:GODOT_KILLFEED_DEBUG"
   "QUEST:GODOT_QUEST_DEBUG"
   "STORAGE:GODOT_STORAGE_DEBUG"
