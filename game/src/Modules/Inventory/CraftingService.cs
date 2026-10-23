@@ -2,6 +2,7 @@
 // Создано: 2026-05-09 00:00:00 UTC
 // Реализация ICraftingService.
 // Заменяет legacy CraftingController.cs (776 LOC) — упрощённая модель.
+using System;
 using System.Collections.Generic;
 using CultivationGame.Core;
 using CultivationGame.Core.Data;
@@ -115,15 +116,28 @@ namespace CultivationGame.Modules.Inventory
                 return false;
             }
 
-            // Расход ингредиентов
+            // Расход ингредиентов.
+            // ST9-01 (Этап-9 аудита, 23.10): транзакционный расход. Прежде при
+            // неудаче mid-loop ранее списанные ингредиенты НЕ откатывались —
+            // частичная потеря материалов. При текущей модели событий путь
+            // латентный (ItemRemovedEvent никто не слушает, между HasIngredients
+            // и удалениями мутаторов нет), НО любой будущий реактивный подписчик
+            // ItemRemovedEvent (синхронно изымающий предметы) делает его
+            // достижимым — воспроизведено Stage9InventoryTruthSimDebug A4b
+            // (hostile-подписчик: wood 10→7 при отказавшем крафте).
+            // Теперь: фиксируем списанное, при любом отказе — полный возврат.
+            var removedSoFar = new List<KeyValuePair<string, int>>(recipe.Ingredients.Count);
             foreach (var ingredient in recipe.Ingredients)
             {
                 if (!_inventoryService.TryRemoveItem(ingredient.Key, ingredient.Value))
                 {
                     // Это не должно произойти, т.к. HasIngredients проверил
+                    // (за исключением реактивной мутации между шагами).
+                    RollbackRemovedIngredients(removedSoFar, recipeId);
                     _craftFailedPub.Publish(new CraftFailedEvent(recipeId, $"Не удалось израсходовать {ingredient.Key}"));
                     return false;
                 }
+                removedSoFar.Add(ingredient);
             }
 
             // Добавление результата
@@ -131,6 +145,38 @@ namespace CultivationGame.Modules.Inventory
             // Пока — публикуем событие завершения крафта
             _craftCompletedPub.Publish(new CraftCompletedEvent(recipeId, recipe.ResultItemId, recipe.ResultCount));
             return true;
+        }
+
+        /// <summary>
+        /// ST9-01: откат списанных ингредиентов при mid-loop отказе расхода.
+        /// Best-effort с громкой диагностикой: предметы только что покинули
+        /// инвентарь (объём освободён), TryAddItem обязан вместить их обратно;
+        /// теоретический отказ (враждебный мутатор забил объём между шагами)
+        /// не должен проходить молча — предмет теряется ТОЛЬКО с ошибкой в лог.
+        /// Источник ItemSources.Craft: транзакция крафта, net-zero откат
+        /// (QuestProgressTracker различает поступление: craft ≠ harvest).
+        /// </summary>
+        private void RollbackRemovedIngredients(List<KeyValuePair<string, int>> removed, string recipeId)
+        {
+            if (removed.Count == 0) return;
+            foreach (var r in removed)
+            {
+                if (_itemDatabase != null && _itemDatabase.TryGetItem(r.Key, out var item) && item != null)
+                {
+                    if (!_inventoryService.TryAddItem(item, r.Value, out int returned, ItemSources.Craft)
+                        || returned < r.Value)
+                    {
+                        Console.WriteLine($"[CraftingService] ST9-01 ROLLBACK FAIL: '{r.Key}' возвращено " +
+                                          $"{returned}/{r.Value} (рецепт '{recipeId}') — ДИАГНОСТИКА: проверь подписчиков ItemRemovedEvent");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"[CraftingService] ST9-01 ROLLBACK FAIL: предмет '{r.Key}' " +
+                                      $"не резолвится каталогом (рецепт '{recipeId}') — вернуть невозможно");
+                }
+            }
+            Console.WriteLine($"[CraftingService] ST9-01: откат {removed.Count} ингредиентов рецепта '{recipeId}' (транзакция крафта прервана)");
         }
     }
 }
