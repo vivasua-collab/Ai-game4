@@ -419,6 +419,14 @@ namespace CultivationGame.Modules.NPC
         }
 
         /// <summary>
+        /// ST13-003 (Этап-13): QA-аксессор выбора топ-угрозы для
+        /// детерминированной проверки tie-break (Stage13NpcAiTruthSimDebug
+        /// C3): равная угроза → лексикографически меньший ID, независимо
+        /// от порядка вставки/перечисления Dictionary.
+        /// </summary>
+        public string? GetTopThreatIdForQa(NPCState state) => GetTopThreatId(state);
+
+        /// <summary>
         /// ST13-006: чистый расчёт весов (личность + ситуация). Выделен из
         /// DecideNextState без изменения поведения — Stage13-сим проверяет
         /// модификаторы черт детерминированно, без случайной выборки.
