@@ -161,7 +161,11 @@ namespace CultivationGame.Modules.NPC
             IPublisher<CombatDisengageEvent> combatDisengagePub,
             IPublisher<EnemyKilledEvent> enemyKilledPub,
             IPlayerService playerService,
-            ISubscriber<PlayerDeathEvent> playerDeathSub)
+            ISubscriber<PlayerDeathEvent> playerDeathSub,
+            // ST13-004 (Этап-13): реестр NPC — месть животного направлена на
+            // РЕАЛЬНОГО атаковавшего (ANIMALS §5.1: «только к атаковавшему, не
+            // глобально»); позиция/валидность NPC-атакующего — из NPCService.
+            INPCService? npcService = null)
         {
             _bodyDataProvider = bodyDataProvider ?? throw new ArgumentNullException(nameof(bodyDataProvider));
             _bodyFactory = bodyFactory ?? throw new ArgumentNullException(nameof(bodyFactory));
@@ -174,7 +178,11 @@ namespace CultivationGame.Modules.NPC
             _enemyKilledPub = enemyKilledPub ?? throw new ArgumentNullException(nameof(enemyKilledPub));
             _playerService = playerService ?? throw new ArgumentNullException(nameof(playerService));
             _playerDeathSub = playerDeathSub ?? throw new ArgumentNullException(nameof(playerDeathSub));
+            _npcService = npcService;
         }
+
+        // ST13-004: реестр NPC для позиции/валидности NPC-атакующих.
+        private readonly INPCService? _npcService;
 
         // === IStartable ===
 
@@ -490,16 +498,30 @@ namespace CultivationGame.Modules.NPC
                 var a = _animals[i];
                 if (!a.IsAlive) continue;
 
-                // === Combat: hostile animals chase & bite the player ===
-                // 2026-09-11 (аудит D4): честная месть по ANIMALS.md §5.2/5.4 —
-                // ЧЕЙЗ игрока (раньше стоял на месте и «кусал» через всю карту:
-                // интент уходил с любой дистанции, никто его не гейтил);
-                // атака — только вплотную (Чебышёв ≤ 2); R38-2: погоня живёт
-                // в радиусе ChaseRangeTiles (grace-окно вместо мгновенного
-                // de-aggro на 5 тайлах).
+                // === Combat: hostile animals chase & bite the ATTACKER ===
+                // ST13-004 (Этап-13, ANIMALS §5.1): месть направлена на
+                // КАНОНИЧЕСКОГО атаковавшего (игрок ИЛИ NPC — прежде всегда
+                // игрок, независимо от того, кто ударил). Атакующий
+                // умер/исчез → §5.4: de-aggro. 2026-09-11 (аудит D4): чейз
+                // вместо «укуса через всю карту»; атака — только вплотную
+                // (Чебышёв ≤ 2); R38-2: grace-окно ChaseRangeTiles.
                 if (_hostileAnimals.Contains(a.EntityId))
                 {
-                    var playerPos = _playerService.Position;
+                    var attackerPosOpt = ResolveAttackerPosition(a);
+                    if (attackerPosOpt == null)
+                    {
+                        // §5.4: цель мести умерла/исчезла → wander (симметрия
+                        // с leash NPC R16 D3: честный CombatDisengageEvent).
+                        _hostileAnimals.Remove(a.EntityId);
+                        a.Target = null;
+                        a.ChaseLostTicks = 0;
+                        a.MoveCooldownTicks = 5;
+                        _combatDisengagePub.Publish(new CombatDisengageEvent(
+                            a.EntityId, "animal-deaggro: атакующий умер/исчез"));
+                        Console.WriteLine($"[AnimalService] {a.Species}#{a.EntityId}: атакующий '{a.LastAttackerId}' умер/исчез → de-aggro, wander");
+                        continue;
+                    }
+                    var playerPos = attackerPosOpt.Value; // имя сохранено: ниже — только чтение
                     int dist = Math.Max(
                         Math.Abs(a.Position.X - playerPos.X),
                         Math.Abs(a.Position.Y - playerPos.Y));
@@ -556,11 +578,12 @@ namespace CultivationGame.Modules.NPC
 
                     if (dist <= AnimalAttackRangeTiles)
                     {
-                        // Канонический ID игрока (раньше — литерал "player",
-                        // алиас работал через PlayerIdResolver, но источник
-                        // должен быть честным).
+                        // ST13-004: цель интента — канонический атаковавший
+                        // (раньше — всегда PlayerService.PlayerId: зверь,
+                        // ударенный NPC, кусал ИГРОКА). Легаси-записи без
+                        // LastAttackerId — фолбэк на игрока.
                         _attackIntentPub.Publish(new AttackIntentEvent(
-                            a.EntityId, _playerService.PlayerId, string.Empty, false));
+                            a.EntityId, a.LastAttackerId ?? _playerService.PlayerId, string.Empty, false));
                         // R21-2: тиковый троттлинг интентов (гейт готовности в
                         // CombatService авторитетен; CombatCooldownTicks —
                         // только анти-спам здесь, 2 тика ≈ 500‰/тик).
@@ -664,24 +687,62 @@ namespace CultivationGame.Modules.NPC
                 return;
             }
 
+            // ST13-004 (Этап-13, ANIMALS §5.1): месть — только РЕАЛЬНОМУ
+            // атаковавшему, не глобально. DoT-тик приходит с техническим
+            // фантомом SourceId="dot:{buffId}" → канонический автор — в
+            // OriginalAttackerId (паттерн BUG-017). Атакующий, которого нет
+            // (не игрок и не живой NPC), месть не провоцирует — иначе зверь
+            // вечно гнался бы за «неизвестно кем» (фантом). Прежне месть
+            // всегда была к ИГРОКУ независимо от того, кто ударил.
+            string attackerId = sourceId;
+            if (attackerId.StartsWith("dot:", StringComparison.Ordinal)
+                && !string.IsNullOrEmpty(e.OriginalAttackerId))
+            {
+                attackerId = e.OriginalAttackerId;
+            }
+            bool attackerIsValid =
+                Core.Helpers.PlayerIdResolver.IsPlayer(attackerId)
+                || (_npcService?.GetNPCState(attackerId)?.IsAlive == true);
+            if (!attackerIsValid)
+            {
+                Console.WriteLine($"[AnimalService] {animal.Species}#{animal.EntityId} hit by '{attackerId}' → атакующий неизвестен/мёртв, месть не включается");
+                return;
+            }
+
             // Mark as hostile (retaliate).
             _hostileAnimals.Add(animal.EntityId);
 
-            // Track attacker ID (for AttackIntentEvent target).
-            animal.LastAttackerId = sourceId;
+            // Track attacker ID (ST13-004: цель мести = канонический атакующий).
+            animal.LastAttackerId = attackerId;
             animal.CombatCooldownTicks = 0; // attack next tick
             animal.ChaseLostTicks = 0; // R38-2: новый удар — grace-окно погони заново
 
-            Console.WriteLine($"[AnimalService] {animal.Species}#{animal.EntityId} hit by {e.SourceId} → hostile, chase (range {ChaseRangeTiles} tiles, grace {ChaseGraceTicks} ticks)!");
+            Console.WriteLine($"[AnimalService] {animal.Species}#{animal.EntityId} hit by {attackerId} → hostile, месть к атаковавшему (range {ChaseRangeTiles} tiles, grace {ChaseGraceTicks} ticks)!");
         }
 
         /// <summary>
-        /// PT-001 (плейтест PT-C02, 23.10): смерть игрока — звери сбрасывают
-        /// месть. Прежде хвост _hostileAnimals переживал смерть: чейз следовал
-        /// за респавн-телепортом (кэш позиции игрока прыгает в центр карты),
-        /// и «те же волки из дальнего угла» атаковали заново. Финал — тот же,
-        /// что у de-aggro R38-2 (безопасный CombatDisengageEvent: AbandonCombat
-        /// игнорирует неучастников).
+        /// ST13-004: позиция канонического атаковавшего (цель мести).
+        /// Игрок — позиция игрока; NPC — позиция живого NPC (умер/удалён —
+        /// null → §5.4 de-aggro). Пустой LastAttackerId (легаси-записи) —
+        /// фолбэк на игрока как прежде.
+        /// </summary>
+        private Position2D? ResolveAttackerPosition(AnimalEntity a)
+        {
+            if (string.IsNullOrEmpty(a.LastAttackerId))
+                return _playerService.Position;
+            if (Core.Helpers.PlayerIdResolver.IsPlayer(a.LastAttackerId))
+                return _playerService.Position;
+            var npc = _npcService?.GetNPCState(a.LastAttackerId);
+            if (npc == null || !npc.IsAlive) return null;
+            return npc.Position;
+        }
+
+        /// <summary>
+        /// PT-001 (плейтест PT-C02, 23.10) + ST13-004 (Этап-13): смерть
+        /// игрока — звери сбрасывают месть К ИГРОКУ; месть к NPC-атакующему
+        /// от смерти игрока не зависит (прежде чистились ВСЕ). Финал — тот
+        /// же, что у de-aggro R38-2 (безопасный CombatDisengageEvent:
+        /// AbandonCombat игнорирует неучастников).
         /// </summary>
         private void OnPlayerDeath(in PlayerDeathEvent e)
         {
@@ -689,19 +750,27 @@ namespace CultivationGame.Modules.NPC
 
             string[] ids = new string[_hostileAnimals.Count];
             _hostileAnimals.CopyTo(ids);
-            _hostileAnimals.Clear();
 
+            int cleared = 0;
             foreach (var id in ids)
             {
-                var animal = _animals.Find(a => a.EntityId == id);
+                var animal = _animals.Find(x => x.EntityId == id);
                 if (animal == null || !animal.IsAlive) continue;
+
+                // ST13-004: месть к NPC переживает смерть игрока.
+                if (!string.IsNullOrEmpty(animal.LastAttackerId)
+                    && !Core.Helpers.PlayerIdResolver.IsPlayer(animal.LastAttackerId))
+                    continue;
+
+                _hostileAnimals.Remove(id);
                 animal.Target = null;
                 animal.ChaseLostTicks = 0;
                 animal.MoveCooldownTicks = 5; // ~5 тиков «успокаивается»
                 _combatDisengagePub.Publish(new CombatDisengageEvent(
-                    id, "смерть игрока: сброс мести зверя"));
+                    id, "смерть игрока: сброс мести зверя к игроку"));
+                cleared++;
             }
-            Console.WriteLine($"[AnimalService] PT-001: смерть игрока — месть снята у {ids.Length} зверей");
+            Console.WriteLine($"[AnimalService] PT-001: смерть игрока — месть к игроку снята у {cleared} зверей");
         }
 
         // === Helpers ===
