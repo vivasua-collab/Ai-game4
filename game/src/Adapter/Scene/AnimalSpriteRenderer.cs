@@ -289,6 +289,15 @@ public partial class AnimalSpriteRenderer : Node2D
     // === G0 (I-7): анимационный резолв =====================================
 
     /// <summary>
+    /// G0 (I-7)/ST16-004: чистый предикат «идёт ли зверь» по кадровой дельте
+    /// (тело прежней IsAnimalMoving; вынесен для headless-QA — Stage16Sim
+    /// D2a сравнивает его с доменным сигналом Target != null).
+    /// Порог >0.02 тайла: прыжок тика 1-2 тайла ≫ порога, покой = 0.
+    /// </summary>
+    internal static bool QaFrameDeltaMoving(Vector2 last, Vector2 current)
+        => (current - last).LengthSquared() > 0.0004f; // >0.02 тайла
+
+    /// <summary>
     /// Движение зверя: дельта позиции с прошлого кадра отрисовки
     /// (шаг зверя — телепорт 1-2 тайла за игровой тик → любая дельта > 0
     /// означает «идёт»; между тиками кадр замирает — это канон D1).
@@ -298,10 +307,17 @@ public partial class AnimalSpriteRenderer : Node2D
         var p = new Vector2(position.X, position.Y);
         bool moving = true;
         if (_animalLastPos.TryGetValue(entityId, out var last))
-            moving = (p - last).LengthSquared() > 0.0004f; // >0.02 тайла
+            moving = QaFrameDeltaMoving(last, p);
         _animalLastPos[entityId] = p;
         return moving;
     }
+
+    /// <summary>
+    /// ST16-007 QA: суммарный размер per-entity кэшей (позиции/фазы/последний
+    /// резолв). Рост после смерти/деспавна = утечка; чистка держит ~числу живых.
+    /// </summary>
+    internal int QaPerEntityCacheEntries =>
+        _animalLastPos.Count + _phaseOffsetCache.Count + _lastAnimInfo.Count;
 
     /// <summary>
     /// Резолв анимации зверя: walk (движение) / idle. Лист

@@ -479,15 +479,18 @@ public partial class NPCSpriteRenderer : Node2D
         if (!string.IsNullOrEmpty(beastSpecies))
         {
             animId = CachedAnimId("animal", beastSpecies!, kind);
+            QaLastTriedSheetKey = animId;
             sheet = SpriteSheetCache.TryGetSheet(animId);
         }
         else
         {
             animId = CachedAnimId("npc", RoleLower(role), kind);
+            QaLastTriedSheetKey = animId;
             sheet = SpriteSheetCache.TryGetSheet(animId);
             if (sheet == null)
             {
                 animId = CachedAnimId("npc", "base", kind);
+                QaLastTriedSheetKey = animId;
                 sheet = SpriteSheetCache.TryGetSheet(animId);
             }
         }
@@ -579,6 +582,22 @@ public partial class NPCSpriteRenderer : Node2D
     }
 
     // === G0: QA-доступ (GODOT_ANIMQA_DEBUG) ================================
+
+    /// <summary>
+    /// ST16-003 QA: последний ключ PNG-листа, который пробовал ResolveNpcAnim
+    /// (до TryGetSheet; пусто — резолв не выполнялся). Канон звериного melee —
+    /// animal_{species}_attack (SPRITE_DELIVERY §5), гуманоида — npc_{role}_melee
+    /// → npc_base_melee. Инструментация без изменения поведения.
+    /// </summary>
+    internal string QaLastTriedSheetKey { get; private set; } = "";
+
+    /// <summary>
+    /// ST16-007 QA: суммарный размер per-entity кэшей (позиции/facing/X-кэш/
+    /// фазы/последний резолв). Рост после смерти/деспавна = утечка.
+    /// </summary>
+    internal int QaPerEntityCacheEntries =>
+        _npcLastPos.Count + _npcLastX.Count + _npcFacingLeft.Count
+        + _phaseOffsetCache.Count + _lastAnimInfo.Count;
 
     /// <summary>QA: последний резолв анимации NPC (по id; null — не резолвился).</summary>
     public NpcAnimInfo? GetNpcAnimInfo(string npcId) =>

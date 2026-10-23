@@ -63,6 +63,9 @@ ALL_SIMS=(
   # Этап-15 аудита (23.10): генераторы/валидация/дедуп/ID/реестры
   # (ST15-001..008; cold-load — парой процессов GODOT_STAGE15_COLD).
   "STAGE15:GODOT_STAGE15_DEBUG"
+  # Этап-16 аудита (23.10): рендеринг/анимация/синхронизация визуального
+  # состояния (ST16-001..009; фактический walk-рейшо зверей — Xvfb-прогон).
+  "STAGE16:GODOT_STAGE16_DEBUG"
   "KILLFEED:GODOT_KILLFEED_DEBUG"
   "QUEST:GODOT_QUEST_DEBUG"
   "STORAGE:GODOT_STORAGE_DEBUG"

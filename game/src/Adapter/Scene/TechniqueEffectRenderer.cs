@@ -71,6 +71,27 @@ public partial class TechniqueEffectRenderer : Node2D
     // === QA-счётчик (GODOT_COMBAT_SIM 3k; инкремент на событии) ===
     public static int TotalHoldAuraChanges;
 
+    // === ST16-006 QA: видимость жизненного цикла Shield-визуалов ============
+    // Инструментация без изменения поведения: Stage16Sim F1-F4 проверяет
+    // «persistent Qi-буфер ≠ one-shot каст» (стаки/преждевременное удаление).
+
+    /// <summary>ST16-006 QA: всего активных визуалов в списке.</summary>
+    internal int QaActiveVisualCount => _active.Count;
+
+    /// <summary>
+    /// ST16-006 QA: активных визуалов щита (VisualKind.Shield — до фикса и
+    /// one-shot каста, и persistent Qi-буфера; после фикса — только one-shot).
+    /// </summary>
+    internal int QaShieldVisualCount
+    {
+        get
+        {
+            int n = 0;
+            foreach (var v in _active) if (v.Kind == VisualKind.Shield) n++;
+            return n;
+        }
+    }
+
     public override void _Ready()
     {
         var container = Scene.GameBoot.Container;

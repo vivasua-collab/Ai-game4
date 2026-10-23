@@ -269,6 +269,11 @@ public partial class GameWorldController : Node2D
     /// <summary>Аниматор игрока (QA: кадры/листы/оверлеи).</summary>
     public PlayerAnimator? PlayerAnimatorForQA => _playerAnimator;
 
+    /// <summary>ST16-009 QA: идёт ли сейчас замах MainHand (age ≥ 0).
+    /// Инструментация без изменения поведения (Stage16Sim I1/I2 — синхрон
+    /// тела и оружия по AttackIntentEvent).</summary>
+    internal bool QaMainHandSwinging => _mainHandSwingAge >= 0f;
+
     /// <summary>Текущая анимация игрока ("player_idle"…; QA).</summary>
     public string PlayerAnimId => _playerAnimator?.AnimId ?? "player_idle";
 
@@ -1036,6 +1041,19 @@ public partial class GameWorldController : Node2D
         {
             var stage15Sim = new Stage15GeneratorIntegrityTruthSimDebug { Name = "Stage15GeneratorIntegrityTruthSimDebug" };
             AddChild(stage15Sim);
+        }
+        // Этап-16 аудита (23.10, GODOT_STAGE16_DEBUG=1): рендеринг/анимация/
+        // синхронизация визуального состояния — ST16-001 one-shot после
+        // death/respawn, ST16-002 живые состояния+D2-ряд, ST16-003 канон
+        // звериного melee-ключа (attack), ST16-004 доменный сигнал движения
+        // зверя (Target) vs кадровая дельта, ST16-005 ZIndex/порядок формации,
+        // ST16-006 Shield one-shot ≠ persistent Qi-буфер, ST16-007 чистка
+        // per-entity кэшей рендереров, ST16-008 геометрия/негативный кэш,
+        // ST16-009 синхрон тела/MainHand.
+        if (System.Environment.GetEnvironmentVariable("GODOT_STAGE16_DEBUG") == "1")
+        {
+            var stage16Sim = new Stage16RenderAnimationSyncTruthSimDebug { Name = "Stage16RenderAnimationSyncTruthSimDebug" };
+            AddChild(stage16Sim);
         }
         // 2026-09-08 (баг-репорт пользователя): headless-верификация
         // инвентарного drag&drop в корзину (GODOT_TRASHDROP_DEBUG=1) —
