@@ -131,6 +131,21 @@ public readonly struct Vector2f : IEquatable<Vector2f>
     public override int GetHashCode() => HashCode.Combine(X, Y);
     public static bool operator ==(Vector2f a, Vector2f b) => a.Equals(b);
     public static bool operator !=(Vector2f a, Vector2f b) => !a.Equals(b);
+
+    /// <summary>
+    /// ST13-001a (Этап-13 аудита, вскрыто A*-интеграцией): масштабирование
+    /// float-вектора. ОТСУТСТВИЕ этого оператора заставляло выражение
+    /// `direction * step` (NPCMovementService.MoveToward/ProcessFleeing/
+    /// kiting-отход и др.) резолвиться через implicit Vector2f→Position2D
+    /// с (int)-транкацией компонентов: ЛЮБОЕ неосевое направление
+    /// (диагональ (0.707,0.707), доминирующее (0.986,0.164)) превращалось
+    /// в (0,0) — нулевое смещение. Диагональный чейс/бегство/койтинг
+    /// ЗАМОРАЖИВАЛИ NPC (маскировалось: осевые направления работали,
+    /// блуждание рандомно попадало на оси). Осевые случаи дают
+    /// идентичный результат (1,0)*3==Position2D(1,0)*3 — регрессии нет.
+    /// </summary>
+    public static Vector2f operator *(Vector2f a, float s) => new Vector2f(a.X * s, a.Y * s);
+
     public override string ToString() => $"({X:F2}, {Y:F2})";
 }
 

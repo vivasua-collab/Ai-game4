@@ -1,0 +1,724 @@
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+
+[InputMap] Registered all input actions.
+[WorldService] Active location: Test Polygon (id=test_polygon)
+[WorldModule] Started — time 1864-01-01 06:00, speed Normal
+[TileService] Generated 50x50 grid, seed=12345, baseTerrain=Grass (noise-based)
+  Water_Shallow: 651 tiles (26%)
+  Sand: 539 tiles (21%)
+  Grass: 1299 tiles (51%)
+  Water_Deep: 11 tiles (0%)
+  Biomes:
+    Sea: 654 tiles (26%)
+    Coast: 536 tiles (21%)
+    Grassland: 1300 tiles (52%)
+    Ocean: 10 tiles (0%)
+[TileModule] Started — generated 50x50 grid in 24 ms
+[AnimalSpawn] Spawned wolf #animal_wolf_1 at (9, 7) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_2 at (44, 34) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_3 at (44, 20) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_4 at (48, 22) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_5 at (20, 39) (body: Quadruped/Medium)
+[AnimalSpawn] test_polygon: spawned 5/5 animals (attempts=5)
+[PlayerService] Player spawned @ (25, 25), hp delegated to BodyService
+[StatProgressProducer] Запущен: продюсеры дельт §5.1/§5.2 (удар/уклонение/блок/урон/техника/медитация)
+[PlayerModule] Started — stat svc wired=True
+[QuestModule] Started
+[TradeModule] Started
+[UIModule] Started — HUD shown
+[SaveModule] Started — 23 ISaveable service(s) registered
+[ItemDatabase] Initialized (no Resources catalogue — populate via Register())
+[GeneratorModule] База данных предметов инициализирована
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[GeneratorModule] Модуль запущен. Зарегистрировано предметов: 4
+[GameEntryPoint] Location catalog registered: 3 locations [test_polygon, large_world, world_map]
+[GameEntryPoint] Started. 19 startables, 18 tickables, session=GameSession
+[GameBoot] Game initialized. Container built and entry point started.
+[MainMenu] GODOT_NEWGAME=1 — auto-starting QA world (test_polygon)
+[MainMenu] New Game (QA) selected — test_polygon
+[GameSession] NewGame variant=1 location=test_polygon (50×50) — assembling scene...
+[WorldModule] ResetWorld: календарные маркеры будут тихо ре-синхронизированы на первом тике (P1-15)
+[ResourceService] ResetWorld: 0 armed-записей очереди респауна очищено (ST10-01)
+[BodyService] ResetWorld: тело пересоздано (Humanoid/Medium, VIT 10) — New Game/LoadGame
+[StorageRingService] ResetWorld: хранилища колец очищены (P1-19)
+[CombatService] ResetWorld: combat state cleared (New Game)
+[TechniqueService] ResetWorld: techniques cleared (New Game)
+[TechniqueChargeService] ResetWorld: charges cleared (New Game)
+[CorpseService] ResetWorld: 0 трупов очищено
+[NPCSpawnerService] ResetWorld: домен NPC очищен (tracked=0, restored=0)
+[NPCGroupService] ResetWorld: 0 групп очищено
+[PlayerCombatAdapter] ResetWorld: стойка/режим оружия/кулдауны сброшены (New Game)
+[AuraHoldService] ResetWorld: hold cleared (New Game)
+[Trade] ResetWorld — сессия закрыта, сток очищен (0 лавок)
+[SaveModule] ResetWorld: отсчёт автосейва сброшен (каденция — мировой тик, P2-26)
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[Phase 0] WorldDomainReset complete — 36 world-scoped доменов сброшено (npc/corpses/groups/animals/formations/charger/player/stats/qi/quests/currency/inventory/equipment/belt/ground/world/time) + weapon-cache
+[Phase 1] CoreValidation complete — Core validated
+[TileService] Generated 50x50 grid, seed=12345, baseTerrain=Grass (noise-based)
+  Water_Shallow: 651 tiles (26%)
+  Sand: 539 tiles (21%)
+  Grass: 1299 tiles (51%)
+  Water_Deep: 11 tiles (0%)
+  Biomes:
+    Sea: 654 tiles (26%)
+    Coast: 536 tiles (21%)
+    Grassland: 1300 tiles (52%)
+    Ocean: 10 tiles (0%)
+[Phase 2] TileMapGen complete — test_polygon: 50×50 tiles, seed=12345
+[WorldService] Active location: Тестовый полигон (id=test_polygon)
+[TileModule] LocationChanged '' → 'test_polygon'
+[Phase 3] WorldInit complete — location=test_polygon, speed=Normal, techniqueRegistry cleared (was world-scoped reset)
+[PlayerService] Player spawned @ (25, 25), hp delegated to BodyService
+[Phase 4] PlayerSpawn complete — player at (25, 25) in test_polygon
+[ItemDatabase] Зарегистрирован предмет: material_wood (Material)
+[ItemDatabase] Зарегистрирован предмет: material_stone (Material)
+[ItemDatabase] Зарегистрирован предмет: material_iron_ore (Material)
+[ItemDatabase] Зарегистрирован предмет: material_fiber (Material)
+[ItemDatabase] Зарегистрирован предмет: consumable_berry (Consumable)
+[ItemDatabase] Зарегистрирован предмет: consumable_herb (Consumable)
+[ItemDatabase] Зарегистрирован предмет: con_pill_healing (Consumable)
+[ItemDatabase] Зарегистрирован предмет: con_pill_qi (Consumable)
+[ItemDatabase] Зарегистрирован предмет: ammo_arrow (Material)
+[ItemDatabase] Зарегистрирован предмет: material_steel_ingot (Material)
+[ItemDatabase] Зарегистрирован предмет: qistone_dust_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_dust_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_pebble_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_pebble_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_shard_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_shard_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_stone_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_stone_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_boulder_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_boulder_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_03e9_000001 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_dagger_L1_03e9_000001 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_03e9_000001 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_03ea_000002 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_bow_L1_03ea_000002 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_03ea_000002 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_03f2_000003 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_greatsword_L1_03f2_000003 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_03f2_000003 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_03f3_000004 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_staff_L1_03f3_000004 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_03f3_000004 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_044c_000005 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_torso_L1_044c_000005 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_044c_000005 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_044d_000006 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_feet_L1_044d_000006 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_044d_000006 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_04b2_000007 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_feet_L1_04b2_000007 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_04b2_000007 (Armor)
+[Phase 5] StartingGear complete — стартовый набор: БД +20, выдано 13 позиций, оружие 4 шт (кинжал надет: True, лук в инвентаре: True), броня 2 шт, стрел 30. Замена сейвов: каждая новая игра = одинаковый старт (сид 1000).
+[AnimalSpawn] Spawned wolf #animal_wolf_6 at (9, 7) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_7 at (44, 34) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_8 at (44, 20) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_9 at (48, 22) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_10 at (20, 39) (body: Quadruped/Medium)
+[AnimalSpawn] test_polygon: spawned 5/5 animals (attempts=5)
+[Phase 6] AnimalSpawn complete — 5 animals on 'test_polygon' (50×50)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_c990_000008 (Weapon)
+[HumanNPCSpawn] Spawned Merchant L0 #npc_fe36c5f3b6304836 at (2, 34)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_047ef526_000001 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_3bfbeb25_000002 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_1_404061d9_000003 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_6dd58204_000004 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_1_605cdbde_000005 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_754682ca_000006 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_6bcc5c30_000007 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L3_c9cf_000009 (Weapon)
+[HumanNPCSpawn] Spawned Elder L3 #npc_034fd14fa6c54fab at (30, 35)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_1832b8f2_000008 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_1e418430_000009 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_1_4486dd77_00000a (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_09d1e60f_00000b (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_1_4171a49f_00000c (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_084fc68a_00000d (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_76bcbfbd_00000e (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L3_c973_00000a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L3_c975_00000b (Armor)
+[HumanNPCSpawn] Spawned Guard L3 #npc_6804d9237ec94486 at (43, 48)
+[ItemDatabase] Зарегистрирован предмет: weapon_2_3fa35ada_00000f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_2_2db2f1d2_000010 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_2_278bf6b1_000011 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_6a41b2bc_000012 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_2_25b2f14c_000013 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_0bc50eff_000014 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_6a1a79af_000015 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_c974_00000c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_c976_00000d (Armor)
+[HumanNPCSpawn] Spawned Guard L2 #npc_6f469a2e6c7f43c2 at (13, 48)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_ca2f_00000e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_ca31_00000f (Armor)
+[HumanNPCSpawn] Spawned Passerby L1 #npc_840591dd9b9a4362 at (24, 47)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L1_ca30_000010 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L0_ca32_000011 (Armor)
+[HumanNPCSpawn] Spawned Passerby L0 #npc_4dd6599e28044b48 at (45, 19)
+[ItemDatabase] Зарегистрирован предмет: weapon_2_35b98a0d_000016 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_2_59fb1b90_000017 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_2_7564853e_000018 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_2a4a0e1c_000019 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_2_76721e36_00001a (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_313a3630_00001b (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_705caea7_00001c (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L3_c9b5_000012 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L3_c9b7_000013 (Armor)
+[HumanNPCSpawn] Spawned Cultivator L3 #npc_9e63466faa1a4d93 at (16, 40)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_516dd1a5_00001d (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_1624a871_00001e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_1_24024dd1_00001f (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_1592f2ab_000020 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_1_7af74af3_000021 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_3ac14074_000022 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_1c94060e_000023 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_c9b6_000014 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_c9b8_000015 (Armor)
+[HumanNPCSpawn] Spawned Cultivator L2 #npc_eea0a529b7d34ee3 at (30, 34)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L2_ca14_000016 (Weapon)
+[HumanNPCSpawn] Spawned Enemy L1 #npc_5aaa3e83851840c1 at (47, 40)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_6b98ebfe_000024 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_5691413c_000025 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_1_03f1e7b0_000026 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_42cddce6_000027 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_1_16e4611d_000028 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_17c679a8_000029 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_6bbde6b6_00002a (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L3_ca15_000017 (Weapon)
+[HumanNPCSpawn] Spawned Enemy L2 #npc_01b4a8f85cf346a2 at (4, 2)
+[Phase 7] HumanNPCSpawn complete — 10/10 generated NPCs on 'test_polygon'
+[NPCGroupService] Created group group_1 (task=HuntingPack, faction=, species=wolf)
+[NPCGroupService] Set patrol route for group_1: 4 waypoints
+[NPCGroupService] Added animal_wolf_11 to group group_1 as Leader
+[NPCGroupService] Added animal_wolf_12 to group group_1 as Follower
+[NPCGroupService] Added animal_wolf_13 to group group_1 as Follower
+[GroupSpawn] Wolf pack 'group_1' — 3 wolves at (45, 15)
+[NPCGroupService] Created group group_2 (task=Patrol, faction=town_guard, species=)
+[NPCGroupService] Set patrol route for group_2: 4 waypoints
+[ItemDatabase] Зарегистрирован предмет: weapon_2_3b4b690e_00002b (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_2_6ec37fcc_00002c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_2_4d5ed863_00002d (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_0a9e62f6_00002e (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_2_13107592_00002f (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_7cb9d175_000030 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_08c41c0c_000031 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_3d7d_000018 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_3d7f_000019 (Armor)
+[NPCGroupService] Added npc_0967fa7a6c6f4330 to group group_2 as Leader
+[ItemDatabase] Зарегистрирован предмет: weapon_2_767fff7c_000032 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_2_79b01497_000033 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_2_4fb908ba_000034 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_415ae66b_000035 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_2_1cf9e576_000036 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_353ec31c_000037 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_0b1a20e0_000038 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_3d7e_00001a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_3d80_00001b (Armor)
+[NPCGroupService] Added npc_22ff9ca1e05048fa to group group_2 as Follower
+[GroupSpawn] Guard patrol 'group_2' — 2 guards at (18, 38)
+[Phase 8] GroupSpawn complete — 2 groups on 'test_polygon' (50×50)
+[Phase 9] FormationInit complete (stub)
+[Phase 10] ChargerInit complete (stub)
+[Phase 11] QuestInit complete (stub)
+[Phase 12] UIInit complete — HUD shown
+[PreGenTechnique] start — maxLevel=1 seed=30502077
+[Dedup] Techniques: removed 1 duplicates, kept 2
+[Dedup] Techniques: removed 1 duplicates, kept 2
+[Dedup] Techniques: removed 2 duplicates, kept 1
+[Dedup] Techniques: removed 2 duplicates, kept 1
+[Dedup] Techniques: removed 2 duplicates, kept 1
+[PreGenTechnique] done — generated=100 valid=100 duplicates=8 registered=92 (registry total=100)
+[PreGenTechnique] grades registered: [Common=28, Refined=27, Perfect=27, Transcendent=10] gradeMismatches=0 registryInvalid=0
+[TechniqueGrant] seed=30502095
+[TechniqueGrant] R25 AoE-набор: 2/3 форм (конус/полукруг/круг — площадные техники)
+[Phase 14] TechniqueGrant complete — granted 8 techniques (cultivation 1, active 3/3, curse, formation, aoe 2) at L1
+[Phase 15] Finalize complete — Scene assembly complete
+[SceneOrchestrator] Assembly complete — mode=NewGame: 16 completed, 0 skipped, 98 ms
+[GameSession] NewGame ready — state=Playing
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_ocean.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_sea.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_coast.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_grassland.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_grassland.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_steppe.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_steppe.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_forest.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_forest.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_forest.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_highlands.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_highlands.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_mountains.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_mountains.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_peak.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_peak.png
+[GroundItemRenderer] Ready
+[AnimalSpriteRenderer] Ready — tilePixels=64
+[CorpseSpriteRenderer] Ready
+[NPCSpriteRenderer] Ready
+[FormationVisualRenderer] Ready
+[DamageNumberRenderer] Ready
+[ProjectileRenderer] Ready
+[StrikeFx] Ready
+[AoeFx] Ready
+[HomingFx] Ready
+[TechniqueEffectRenderer] Ready
+[CharacterDoll] Ready
+[Inventory] Ready
+[CharacterSheet] Ready
+[DialogueWindow] Ready
+[TradeWindow] Ready
+[LootWindow] Ready
+[HotbarPanel] Ready (v2: techniques + cooldowns + belt row + charge/aura R26 + медитация-слот П5)
+[TechniqueBook] Ready
+[HotkeysWindow] Ready
+[EventLogWindow] Ready
+[QuestWindow] Ready
+[CultivationWindow] Ready
+[ChargerWindow] Ready
+[CheatPanel] Ready (F2 to toggle)
+[Stage13Sim] Ready — Этап-13 (NPC AI/навигация/группы/животные) starts in 3s
+[GameWorldController] Ready
+[BiomeTiles] Drew 100 textures, 0 missing (culled to 10×10)
+[SurfaceTransitions] Drew 29 transition sprites (culled to 11×11)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[AnimalService] Tick #1 — 8 animals; sample: wolf#animal_wolf_6 @ (9, 7)
+[AnimalService] Tick #2 — 8 animals; sample: wolf#animal_wolf_6 @ (9, 7)
+[Stage13Sim] player=player_0 @ (25, 25); карта 50x50
+[Stage13Sim] Арена (4..21)² очищена (Grass)
+[Stage13Sim] ─── A. ST13-001: NPC не проходят сквозь препятствия (A*, §6) ───
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_de1d_00001c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_de1e_00001d (Weapon)
+[AnimalService] Tick #3 — 8 animals; sample: wolf#animal_wolf_6 @ (9, 7)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 47 transition sprites (culled to 14×14)
+[Stage13Sim] A1: прямая: дистанция до цели 0.0 (≤1.6), тайлы чисты=True → PASS
+[ItemDatabase] Зарегистрирован предмет: weapon_1_1c267ecb_000039 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_7d336090_00003a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_1_78bf2c59_00003b (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_5d191366_00003c (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_1_4aabe89c_00003d (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_7472c763_00003e (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_6ba4fbc0_00003f (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_de1f_00001e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_de21_00001f (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_de20_000020 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_de22_000021 (Armor)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 47 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[Stage13Sim] A2: обход стены: дистанция 12.0 (≤1.6), ни одного кадра на стене=True → FAIL
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_de21_000022 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_de23_000023 (Armor)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_4ead1bae_000040 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_66bfbb28_000041 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_1_7aa6c512_000042 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_7cee6fe9_000043 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_1_05f04e33_000044 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_75e1f900_000045 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_65fbe48d_000046 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_de22_000024 (Weapon)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 47 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 4 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 47 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 4 object sprites (culled to 12×12)
+[Stage13Sim] A3: пути нет: дистанция 0.0 (>1.6 — не достиг), чисто=True, стабилен=True (max 874 кадров) → FAIL
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 47 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[AnimalService] Tick #30 — 8 animals; sample: wolf#animal_wolf_6 @ (7, 7)
+[NPCAIService] npc_f3d882c6905f463b покидает бой: бегство: HP ниже порога
+[Stage13Sim] A4: препятствие убрано: дистанция 0.0 (≤1.6), чисто=True → PASS
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_de23_000025 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_de25_000026 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_de24_000027 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_66f6a70f_000047 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_7f74ca2a_000048 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_1_2ce173b7_000049 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_22a18d86_00004a (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_1_5d930a3f_00004b (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_2c7df490_00004c (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_5f4a6f45_00004d (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_de25_000028 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_de27_000029 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L1_de26_00002a (Weapon)
+[NPCGroupService] Created group group_3 (task=Patrol, faction=qa_stage13, species=human)
+[NPCGroupService] Added npc_b6b4d63e09fb4a6b to group group_3 as Leader
+[NPCGroupService] Set patrol route for group_3: 2 waypoints
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (354352 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 47 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[CorpseService] Труп 'Ольга' (corpse_1) на (14,6): 2 записей лута
+[GameWorld] NPC death: npc_f3d882c6905f463b 'Ольга' by npc_2008a39ae5214507
+[NPCAIService] npc_2008a39ae5214507 покидает бой: цель погибла
+[CorpseService] Труп 'Илья' (corpse_2) на (18,18): 3 записей лута
+[GameWorld] NPC death: npc_fba310b90ec34985 'Илья' by npc_75205afd675b4f61
+[NPCAIService] npc_75205afd675b4f61 покидает бой: цель погибла
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 47 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[CorpseService] Труп 'Михаил' (corpse_3) на (4,12): 3 записей лута
+[GameWorld] NPC death: npc_4a60dba36c044c57 'Михаил' by npc_76eddc1c25274f45
+[NPCAIService] npc_76eddc1c25274f45 покидает бой: цель погибла
+[Stage13Sim] A5: мульти: m1=12.2, m2=14.4, группа=12.2 (все ≤1.6), тайлы чисты=True → FAIL
+[Stage13Sim] ─── B. ST13-002: бой > групповая задача > индивидуальное (§6) ───
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_de27_00002b (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_17c8ffda_00004e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_272f1e90_00004f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_1_65502f9f_000050 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_6b990a53_000051 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_1_08fdb87b_000052 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_0e711adc_000053 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_1cf9a781_000054 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_de28_00002c (Weapon)
+[NPCGroupService] Created group group_4 (task=Patrol, faction=qa_stage13_b, species=human)
+[NPCGroupService] Added npc_a049ca0b93d2448a to group group_4 as Leader
+[NPCGroupService] Set patrol route for group_4: 2 waypoints
+[Stage13Sim] B1: в бою: до врага 6.0→9.0 (↓), до waypoint -1.0→-1.0 → FAIL
+[Stage13Sim] B2: после боя: до групповой цели 4.0→1.0 (↓ — вернулся к задаче) → PASS
+[Stage13Sim] ─── B3: Fleeing vs групповая цель ───
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L1_de29_00002d (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_1eb542c3_000055 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_3f11e3c1_000056 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_1_08e29669_000057 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_17f70cb2_000058 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_1_24442c3e_000059 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_54db09d7_00005a (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_73bd3153_00005b (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_de2a_00002e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_de2c_00002f (Armor)
+[NPCGroupService] Created group group_5 (task=Patrol, faction=qa_stage13_b3, species=human)
+[NPCGroupService] Added npc_f0891523d0134449 to group group_5 as Leader
+[NPCGroupService] Set patrol route for group_5: 2 waypoints
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 47 transition sprites (culled to 14×14)
+[Stage13Sim] B3: бегство: x 10→10 (запад от угрозы), y 12→15 → FAIL
+[Stage13Sim] ─── C. ST13-003: более опасная цель (§5.3/§9.2) ───
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_de2b_000030 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_4a657b2e_00005c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_2ce8212b_00005d (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_1_5b64b955_00005e (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_6ea14f37_00005f (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_1_7dd4288c_000060 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_68233932_000061 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_6ff303a4_000062 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_de2c_000031 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_de2e_000032 (Armor)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[Stage13Sim] C1: цель-игрок (угроза 60) + NPC-угроза 200 → TargetId='player_0' (ожид 'npc_bf1daf5ff6e04c34') → FAIL
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_de2d_000033 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_de2e_000034 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_6f321627_000063 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_33618f97_000064 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_1_05e11f6b_000065 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_0b16e5c0_000066 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_1_5a88a01b_000067 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_0391c596_000068 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_381e5951_000069 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L2_de2f_000035 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_de31_000036 (Armor)
+[NPCAI] Retarget npc_c52330bf30e64de8: Устинья Селянинов переключается на нового атакующего (npc_466697f7a62c4910, угроза 80 > 60)
+[GameWorld] Toast: 💥 −5 HP — Дарья Селянинов
+[Stage13Sim] C2: урон от нового атакующего (80 > 60) → TargetId='npc_466697f7a62c4910' (ожид 'npc_466697f7a62c4910') → PASS
+[ItemDatabase] Зарегистрирован предмет: weapon_1_58e37880_00006a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_41f3dd51_00006b (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_1_38c39e57_00006c (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_1ffa566d_00006d (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_1_2208e787_00006e (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_2fb26fa9_00006f (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_4d8179bf_000070 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_de30_000037 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L2_de31_000038 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_de33_000039 (Armor)
+[GameWorld] Toast: 💥 −8 HP — Дарья Селянинов
+[Stage13Sim] C2b: DoT-тик: угроза автору 'npc_2f20115596ad4bb3'=True, фантом 'dot:…' отсутствует=True → PASS
+[ItemDatabase] Зарегистрирован предмет: weapon_1_22c451b7_000071 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_1cc18315_000072 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_1_4d980aa6_000073 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_0cd23acb_000074 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_1_3c912a35_000075 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_1dfa9cde_000076 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_46b1c866_000077 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_de32_00003a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_de33_00003b (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_18d2607c_000078 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_791640c2_000079 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_1_101648c0_00007a (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_1e1e956a_00007b (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_1_3090902a_00007c (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_5c7af88a_00007d (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_5d41e4a5_00007e (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L2_de34_00003c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_de36_00003d (Armor)
+[GameWorld] Toast: 💥 −5 HP — Дарья Селянинов
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 47 transition sprites (culled to 14×14)
+[Stage13Sim] C3: равная угроза 100/100: выбран min-ordinal 'npc_84b82f80f692443b' в 0/5 повторах → FAIL
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_de35_00003e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_de37_00003f (Armor)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_6aaab0fc_00007f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_5e6b06c9_000080 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_1_705e425d_000081 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_1565fdc0_000082 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_1_0f5dbf17_000083 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_2745b3d1_000084 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_150c764d_000085 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L2_de36_000040 (Weapon)
+[Combat] AbandonCombat('npc_092231591f804581'): не участник (instigator=npc_5cf9a8382e844d6f, target=player_0) — игнор
+[NPCAIService] npc_092231591f804581 покидает бой: цель погибла
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[Stage13Sim] C4: цель умерла → AIState=Wandering, TargetId='', IsInCombat=False → PASS
+[Stage13Sim] ─── D. ST13-004: месть животного — только атаковавшему (ANIMALS §5.1) ───
+[AnimalService] wolf#animal_wolf_14 hit by player_0 → hostile, chase (range 15 tiles, grace 3 ticks)!
+[GameWorld] Toast: 💥 −2 HP — ?
+[Stage13Sim] D1: игрок ударил волка: hostile=True, интент в игрока=True → PASS
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_de37_000041 (Weapon)
+[AnimalService] wolf#animal_wolf_15 hit by npc_ed757f351e7a4d87 → hostile, chase (range 15 tiles, grace 3 ticks)!
+[GameWorld] Toast: 💥 −17 HP — Дарья Селянинов
+[GameWorld] Toast: 💥 −27 HP — Дарья Селянинов
+[Stage13Sim] D2: NPC ударил волка: дистанция к NPC 3.0→6.7 (↓), интент в NPC=False, в игрока=False → FAIL
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 47 transition sprites (culled to 14×14)
+[GameWorld] Toast: 💥 −14 HP — ?
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[GameWorld] Toast: 💥 −27 HP — Дарья Селянинов
+[Combat] AbandonCombat('npc_466697f7a62c4910'): не участник (instigator=npc_5cf9a8382e844d6f, target=player_0) — игнор
+[NPCAIService] npc_466697f7a62c4910 покидает бой: бегство: HP ниже порога
+[Stage13Sim] D3: атакующий умер: hostile=True (ожид false) → FAIL
+[AnimalService] wolf#animal_wolf_16 hit by dot:mystery_qa → hostile, chase (range 15 tiles, grace 3 ticks)!
+[Stage13Sim] D4: DoT без атрибуции: hostile=True (ожид false) → FAIL
+[AnimalService] rabbit#animal_rabbit_17 hit by player_0 → мирный вид, бежит
+[GameWorld] Toast: 💥 −14 HP — ?
+[CorpseService] Труп 'Екатерина Лунев' (corpse_4) на (14,10): 2 записей лута
+[GameWorld] NPC death: npc_466697f7a62c4910 'Екатерина Лунев' by npc_c52330bf30e64de8
+[GameWorld] Toast: 💥 −27 HP — Дарья Селянинов
+[AnimalService] Tick #60 — 12 animals; sample: wolf#animal_wolf_6 @ (13, 9)
+[Combat] AbandonCombat('npc_c52330bf30e64de8'): не участник (instigator=npc_5cf9a8382e844d6f, target=player_0) — игнор
+[NPCAIService] npc_c52330bf30e64de8 покидает бой: цель погибла
+[Stage13Sim] D5: кролик: hostile=False (ожид false) → PASS
+[Stage13Sim] ─── D6: смерть игрока снимает только месть к игроку (PT-001 фильтр) ───
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_de38_000042 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_de3a_000043 (Armor)
+[AnimalService] wolf#animal_wolf_18 hit by npc_56fbdd47e5c844f6 → hostile, chase (range 15 tiles, grace 3 ticks)!
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (577853 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 47 transition sprites (culled to 14×14)
+[Combat] AbandonCombat('animal_wolf_14'): не участник (instigator=npc_5cf9a8382e844d6f, target=player_0) — игнор
+[Combat] AbandonCombat('animal_wolf_15'): не участник (instigator=npc_5cf9a8382e844d6f, target=player_0) — игнор
+[Combat] AbandonCombat('animal_wolf_16'): не участник (instigator=npc_5cf9a8382e844d6f, target=player_0) — игнор
+[Combat] AbandonCombat('animal_wolf_18'): не участник (instigator=npc_5cf9a8382e844d6f, target=player_0) — игнор
+[AnimalService] PT-001: смерть игрока — месть снята у 4 зверей
+[Combat] AbandonCombat('npc_5cf9a8382e844d6f'): бой завершён стадией Flee
+[NPCAIService] npc_5cf9a8382e844d6f покидает бой: смерть игрока: сброс агра
+[NPCAIService] PT-001: смерть игрока — агро сброшен у 1 NPC
+[GameWorld] Toast: ☠ Вы пали (qa_stage13_d6)
+[GameWorld] Player death: qa_stage13_d6 — экран смерти (респавн по кнопке)
+[DeathScreen] Показ: причина='qa_stage13_d6', убийца='Последний удар: Дарья Селянинов'
+[CorpseService] Труп 'Григорий' (corpse_5) на (16,10): 2 записей лута
+[GameWorld] NPC death: npc_1cdf3858558f44e5 'Григорий' by npc_2f20115596ad4bb3
+[GameWorld] Toast: 💥 −14 HP — ?
+[GameWorld] Toast: 💥 −21 HP — ?
+[NPCAIService] npc_2f20115596ad4bb3 покидает бой: цель погибла
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[Stage13Sim] D6: после смерти игрока hostile(к NPC)=False (ожид true) → FAIL
+[Stage13Sim] ─── E. ST13-005: детект по радиусу (§2.1/§9.1; LOS в детекте спецем не требуется) ───
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L2_de39_000044 (Weapon)
+[GameWorld] Toast: 💥 −27 HP — Дарья Селянинов
+[Stage13Sim] E1: hostile в радиусе 4, стена между: угроза игроку=True (норма: радиус, не видимость) → PASS
+[ItemDatabase] Зарегистрирован предмет: weapon_1_1770eca6_000086 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_15bb138c_000087 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_1_03399155_000088 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_7b3d7786_000089 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_1_6c5837dd_00008a (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_202f13fa_00008b (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_0a0e09d0_00008c (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_de3a_000045 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_de3c_000046 (Armor)
+[GameWorld] Toast: 💥 −57 HP — Тихон
+[GameWorld] Toast: 💥 −27 HP — Дарья Селянинов
+[Stage13Sim] E1b: hostile вне радиуса (7): угроза игроку=True (ожид true) → PASS
+[Stage13Sim] E-GAP (ST13-005): потеря уже обнаруженной цели за препятствием в спеце не определена → GAP владельцу
+[Stage13Sim] ─── F. ST13-006: Loyal/Treacherous в весах решений (NPC.md §4.2) ───
+[ItemDatabase] Зарегистрирован предмет: weapon_1_448e7b60_00008d (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_7d400617_00008e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_1_5eb77a00_00008f (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_2de09e2f_000090 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_1_211bb987_000091 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_5728d590_000092 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_1405c683_000093 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_de3b_000047 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_de3d_000048 (Armor)
+[Stage13Sim] F1: Loyal: idle 1.0→1.0 (ожид ×0.5) → FAIL
+[Stage13Sim] F2: Treacherous: patrol @Neutral 1.0 (== base 1.0), @Hostile 1.0 (ожид ×1.4=1.4) → FAIL
+[Stage13Sim] F-GAP (ST13-006): перки в решениях AI/лестница Attitude §10.2/фракции — GAP владельцу (механики не определены, не придумываем)
+[Stage13Sim] Итого: PASS=10, FAIL=13, GAP=2, NOT TESTED=0
+[Stage13Sim] VERDICT: FAIL
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 58 transition sprites (culled to 14×14)
+[GameWorld] Toast: 💥 −57 HP — Тихон
+[GameWorld] Toast: 💥 −27 HP — Дарья Селянинов
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[GameWorld] Toast: 💥 −57 HP — Тихон
+[Combat] AbandonCombat('npc_5cf9a8382e844d6f'): бой завершён стадией Flee
+[NPCAIService] npc_5cf9a8382e844d6f покидает бой: смерть игрока: сброс агра
+[NPCAIService] npc_e9d85ab91b69407e покидает бой: смерть игрока: сброс агра
+[NPCAIService] PT-001: смерть игрока — агро сброшен у 2 NPC
+[GameWorld] Toast: ☠ Вы пали (Голова разрушена (0 % HP))
+[GameWorld] Player death: Голова разрушена (0 % HP) — экран смерти (респавн по кнопке)
+[DeathScreen] Показ: причина='Голова разрушена (0 % HP)', убийца='Последний удар: Дарья Селянинов'
+[PlayerService] Player died: Голова разрушена (0 % HP) (killer: npc_5cf9a8382e844d6f)
+[GameWorld] Toast: 💥 −27 HP — Дарья Селянинов
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 58 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 58 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 58 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[NPCAIService] npc_5d16db30ec2f45f1 покидает бой: бегство: HP ниже порога
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 58 transition sprites (culled to 14×14)
+[CorpseService] Труп 'Светлана Уваров' (corpse_6) на (18,16): 9 записей лута
+[GameWorld] NPC death: npc_5d16db30ec2f45f1 'Светлана Уваров' by npc_aae998fc9b574dc9
+[AnimalService] Tick #90 — 13 animals; sample: wolf#animal_wolf_6 @ (14, 15)
+[NPCAIService] npc_aae998fc9b574dc9 покидает бой: цель погибла
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (627393 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 58 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 58 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 58 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 58 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 58 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[AnimalService] Tick #120 — 13 animals; sample: wolf#animal_wolf_6 @ (21, 16)
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (627389 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 58 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 58 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 58 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 58 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 58 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[AnimalService] Tick #150 — 13 animals; sample: wolf#animal_wolf_6 @ (23, 10)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 58 transition sprites (culled to 14×14)
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (627397 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 58 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 58 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 58 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 58 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 58 transition sprites (culled to 14×14)
+[AnimalService] Tick #180 — 13 animals; sample: wolf#animal_wolf_6 @ (14, 7)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (627388 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 58 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 58 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 58 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+ERROR: BUG: Unreferenced static string to 0: Physics2DConstraintSolveIslands
+   at: unref (core/string/string_name.cpp:118)
+ERROR: BUG: Unreferenced static string to 0: Physics2DConstraintSetup
+   at: unref (core/string/string_name.cpp:118)
+ERROR: BUG: Unreferenced static string to 0: servers
+   at: unref (core/string/string_name.cpp:118)
+WARNING: A Thread object is being destroyed without its completion having been realized.
+Please call wait_to_finish() on it to ensure correct cleanup.
+     at: ~Thread (core/os/thread.cpp:116)
+ERROR: 7 RID allocations of type '23NavMeshGeometryParser2D' were leaked at exit.
+ERROR: 6 RID allocations of type '23NavMeshGeometryParser3D' were leaked at exit.
+ERROR: Pages in use exist at exit in PagedAllocator: N12VariantPools11BucketLargeE
+   at: ~PagedAllocator (./core/templates/paged_allocator.h:170)
+ERROR: Pages in use exist at exit in PagedAllocator: N12VariantPools12BucketMediumE
+   at: ~PagedAllocator (./core/templates/paged_allocator.h:170)
+ERROR: Pages in use exist at exit in PagedAllocator: N12VariantPools11BucketSmallE
+   at: ~PagedAllocator (./core/templates/paged_allocator.h:170)
+ERROR: BUG: Unreferenced static string to 0: _shaped_text_draw
+   at: unref (core/string/string_name.cpp:118)
+ERROR: BUG: Unreferenced static string to 0: _shaped_text_get_carets
+   at: unref (core/string/string_name.cpp:118)
+ERROR: BUG: Unreferenced static string to 0: _shaped_text_get_line_breaks
+   at: unref (core/string/string_name.cpp:118)
+ERROR: BUG: Unreferenced static string to 0: _get_hex_code_box_size
+   at: unref (core/string/string_name.cpp:118)
+ERROR: BUG: Unreferenced static string to 0: _initialize
+   at: unref (core/string/string_name.cpp:118)
+ERROR: BUG: Unreferenced static string to 0: _exists
+   at: unref (core/string/string_name.cpp:118)
+ERROR: BUG: Unreferenced static string to 0: _recognize_path
+   at: unref (core/string/string_name.cpp:118)
+ERROR: Pages in use exist at exit in PagedAllocator: N10StringName5_DataE
+   at: ~PagedAllocator (./core/templates/paged_allocator.h:170)

@@ -276,10 +276,13 @@ namespace CultivationGame.Modules.NPC
             if (fleeFrom == Vector2.zero) fleeFrom = pos; // Нет угрозы — стоим
 
             // Направление от угрозы
-            Vector2 direction = (pos - fleeFrom).normalized;
-            if (direction == Vector2.zero) direction = RandomDirection();
+            // ST13-001a: Vector2f (float!) — прежнее объявление Vector2
+            // (=Position2D, int) применяло implicit-конверсию с (int)-
+            // транкацией: неосевое направление бегства → (0,0) — замирало.
+            Vector2f direction = (pos - fleeFrom).normalized;
+            if (direction == Vector2f.Zero) direction = new Vector2f(1, 0);
 
-            Vector2 fleeTarget = pos + direction * _config.FleeRadius;
+            var fleeTarget = pos + direction * _config.FleeRadius;
             float fleeSpeed = _config.DefaultMoveSpeed * _config.FleeSpeedMultiplier;
 
             MoveTowardSmart(state, fleeTarget, fleeSpeed, deltaTime);
@@ -317,9 +320,10 @@ namespace CultivationGame.Modules.NPC
                     // Слишком близко — отход от цели (стрелять в упор нельзя,
                     // melee-противник бьёт).
                     Vector2 pos = state.Position;
-                    Vector2 dir = (pos - targetPos).normalized;
-                    if (dir == Vector2.zero) dir = RandomDirection();
-                    Vector2 retreatTarget = pos + dir * 2f;
+                    // ST13-001a: float-направление (см. MoveToward).
+                    Vector2f dir = (pos - targetPos).normalized;
+                    if (dir == Vector2f.Zero) dir = new Vector2f(1, 0);
+                    var retreatTarget = pos + dir * 2f;
                     MoveTowardSmart(state, retreatTarget, _config.DefaultMoveSpeed, deltaTime);
                     return;
                 }
@@ -375,6 +379,7 @@ namespace CultivationGame.Modules.NPC
 
         private readonly Dictionary<string, PathState> _pathStates = new();
         private float _pathClock;
+
 
         private PathState GetPathState(string npcId)
         {
@@ -464,7 +469,24 @@ namespace CultivationGame.Modules.NPC
                 MoveToward(state, target, speed, deltaTime);
                 return;
             }
-            MoveToward(state, ps.Waypoints[ps.Index], speed, deltaTime);
+            // Тайловое следование: Position2D оператор+ ТРАНКАТ к int —
+            // для смежного диагонального вейпоинта сдвиг 0.7071*1.4142 =
+            // 0.99999 < 1 округляется В НУЛЬ (вечный застой у первого
+            // вейпоинта — пойман Stage13-симом A2). Шаг покрывает
+            // дистанцию до вейпоинта → SNAP на тайл (эквивалент
+            // «1 тайл = 1 тик», NPC_AI_SYSTEM §6.1).
+            var wp = ps.Waypoints[ps.Index];
+            float dWp = Vector2.Distance(state.Position, wp);
+            float stepWp = speed * deltaTime;
+            if (stepWp >= dWp)
+            {
+                state.Position = wp;
+                _npcService.UpdatePosition(state.NpcId, wp);
+            }
+            else
+            {
+                MoveToward(state, wp, speed, deltaTime);
+            }
         }
 
         /// <summary>
@@ -487,7 +509,10 @@ namespace CultivationGame.Modules.NPC
             else if (dy != 0 && _pathfinder.IsWalkableTile(new Vector2(here.X, here.Y + dy)))
                 step = new Vector2(here.X, here.Y + dy);
             if (step == null) return; // окружён — стоим
-            MoveToward(state, step.Value, speed, deltaTime);
+            // SNAP на смежный тайл: транкация operator+ даёт 0 для
+            // диагонали (0.99999 < 1) — тот же застой, что у вейпоинтов.
+            state.Position = step.Value;
+            _npcService.UpdatePosition(state.NpcId, step.Value);
         }
 
         // === Утилиты движения ===
@@ -522,7 +547,15 @@ namespace CultivationGame.Modules.NPC
         private void MoveToward(NPCState state, Vector2 target, float speed, float deltaTime)
         {
             Vector2 pos = state.Position;
-            Vector2 direction = (target - pos).normalized;
+            // ST13-001a (Этап-13, КОРЕНЬ): Vector2f (float) — прежнее
+            // объявление «Vector2 direction» (= Position2D, int) применяло
+            // implicit Vector2f→Position2D с (int)-транкацией: ЛЮБОЕ неосевое
+            // направление (диагональ (0.71,0.71), доминирующее (0.99,0.16))
+            // становилось (0,0) — нулевое смещение. Осевые (±1,0)/(0,±1)
+            // выживали — движение NPC работало только по осям (маскировалось
+            // случайным блужданием). Поймано Stage13-симом: A*-вейпоинты с
+            // диагональными сегментами замирали детерминированно.
+            Vector2f direction = (target - pos).normalized;
             float step = speed * deltaTime;
 
             // Ограничиваем шаг до расстояния до цели
