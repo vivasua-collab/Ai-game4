@@ -22,9 +22,13 @@ import type { StatusFile } from '@/lib/portal/types';
 export function StatusTab({ status }: { status: StatusFile }) {
   const playtest = status.playtest;
   const build = status.build;
-  const focus = status.focus ?? [];
-  const next = status.next ?? [];
-  const sources = status.portal?.data_sources ?? [];
+  // Дефенсивные гарды: дрейф формы данных (строка вместо массива, 607215b)
+  // не должен ронять всю страницу — пустой список вместо краш-скрина.
+  const focus = Array.isArray(status.focus) ? status.focus : [];
+  const next = Array.isArray(status.next) ? status.next : [];
+  const sources = Array.isArray(status.portal?.data_sources)
+    ? status.portal.data_sources
+    : [];
 
   return (
     <div className="flex flex-col gap-6 pt-4">
