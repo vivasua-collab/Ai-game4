@@ -44,6 +44,26 @@ namespace CultivationGame.Core.Interfaces
         /// </summary>
         void ApplyDamage(BodyPartType target, int totalDamage, string? sourceId = null);
         void HealPart(BodyPartType target, int amount);
+
+        /// <summary>
+        /// ST11-001 (Этап-11 аудита, 23.10): восстановить КРАСНУЮ HP части до
+        /// максимума — путь ПОЛНОГО восстановления (респавн), без 70/30-сплита
+        /// лечения. Ампутированная часть игнорируется (приживление — отдельный
+        /// контракт ReattachPart). Публикует BodyPartHealedEvent с фактическим
+        /// количеством. Источник нормы: DEATH_AND_LOOT §4.2 «полное лечение
+        /// до RedHP=max» — HealPart(missing) закрывал дефицит лишь на 70%
+        /// (RED_HP_RATIO-сплит в чёрную HP), а частично леченная vital-часть
+        /// меняла исход проверки PlayerService.Revive (голова 35/50).
+        /// </summary>
+        void HealPartToFullRed(BodyPartType target);
+
+        /// <summary>
+        /// ST11-007 (Этап-11 аудита): слоты экипировки, блокируемые ампутацией
+        /// данной части (Core-контракт для производных состояний после
+        /// RestoreState — InventoryModule не ссылается на Modules.Body).
+        /// </summary>
+        EquipmentSlot[] GetBlockedSlotsForPart(BodyPartType part);
+
         bool IsSlotBlocked(EquipmentSlot slot);
         IReadOnlyList<BodyPartData> GetAllParts();
 

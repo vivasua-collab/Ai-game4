@@ -37,7 +37,7 @@ namespace CultivationGame.Modules.Body
     /// Кросс-модульные вызовы (Qi) — через MessagePipe события.
     /// CultivationLevel кэшируется из QiChangedEvent.
     /// </summary>
-    public class BodyService : IBodyService, IBodyDataProvider, ISaveable, IDisposable
+    public class BodyService : IBodyService, IBodyDataProvider, ISaveable, IWorldResettable, IDisposable
     {
         // P2-01 (V3) FIX: статический массив для ResolveTarget — без GC-аллокации при каждом вызове
         private static readonly BodyPartType[] VitalPriority = { BodyPartType.Head, BodyPartType.Heart };
@@ -57,6 +57,15 @@ namespace CultivationGame.Modules.Body
         // === Внутреннее состояние ===
         private readonly Dictionary<BodyPartType, BodyPart> _parts = new();
         private readonly HashSet<BodyPartType> _severedParts = new();
+
+        // === ST11-003 (Этап-11 аудита, 23.10): «часть отсутствует по морфологии» ≠
+        // «существовавшая часть ампутирована». Отсутствующие по морфологии части
+        // НЕ блокируют слот, если слот разрешён существующей альтернативной
+        // анатомией (крылья гарпии ↔ слоты рук); прежде Initialize клал ВСЕ
+        // отсутствующие типы в _severedParts, а IsSlotBlocked блокировал по
+        // ЛЮБОЙ части обратного маппинга → гуманоид терял WeaponMain (нет
+        // RightWing!), гарпия не могла держать оружие крыльями.
+        private readonly HashSet<BodyPartType> _morphologyMissingParts = new();
         private readonly List<BodyPartData> _partsCache = new();
 
         // === IBodyDataProvider: хранилище per-entity BodyParts (для NPC) ===
@@ -75,6 +84,7 @@ namespace CultivationGame.Modules.Body
         private BodyMaterial _material;
         private Morphology _morphology;
         private SizeClass _size = SizeClass.Medium;
+        private float _lastVitality = 10f; // ST11-002: конфиг последней Initialize — источник дефолтов ResetWorld
         private bool _isInitialized;
 
         // === Регенерация ===
@@ -138,6 +148,7 @@ namespace CultivationGame.Modules.Body
             _entityId = entityId ?? string.Empty;
             _morphology = morphology;
             _material = material;
+            _lastVitality = vitality;
 
             // Создаём части тела через фабрику (data-driven)
             var createdParts = _bodyFactory.CreateBody(morphology, _size, vitality);
@@ -147,12 +158,10 @@ namespace CultivationGame.Modules.Body
             }
 
             // BD-23: Части, отсутствующие в морфологии, считаются «ампутированными»
-            // для корректной работы IsSlotBlocked (змея не может экипировать оружие)
-            foreach (BodyPartType type in Enum.GetValues(typeof(BodyPartType)))
-            {
-                if (!_parts.ContainsKey(type))
-                    _severedParts.Add(type);
-            }
+            // для корректной работы IsSlotBlocked (змея не может экипировать оружие).
+            // ST11-003: одновременно фиксируем их в отдельном наборе «отсутствует
+            // по морфологии» — IsSlotBlocked учитывает только существующую анатомию.
+            RebuildMorphologyMissing();
 
             _listDirty = true;
             _cacheDirty = true;
@@ -355,13 +364,70 @@ namespace CultivationGame.Modules.Body
         }
 
         /// <summary>
+        /// ST11-001 (Этап-11 аудита, 23.10): восстановить красную HP части до
+        /// максимума — путь ПОЛНОГО восстановления (респавн), без 70/30-сплита
+        /// HealPart. Норма: DEATH_AND_LOOT §4.2 «полное лечение до RedHP=max».
+        /// Ампутированная часть игнорируется (приживление = ReattachPart).
+        /// Публикует BodyPartHealedEvent с фактическим количеством.
+        /// </summary>
+        public void HealPartToFullRed(BodyPartType target)
+        {
+            if (!_isInitialized) return;
+            if (!_parts.TryGetValue(target, out var part)) return;
+
+            int missing = part.MaxRedHP - part.CurrentRedHP;
+            if (missing <= 0) return;
+
+            // 100% в красную HP: семантика восстановления, а не лечения-сплита.
+            int actualHealed = part.Heal(missing, 0);
+            if (actualHealed <= 0) return; // Severed/уже полный — без события
+
+            _listDirty = true;
+            _cacheDirty = true;
+            _healedPublisher.Publish(new BodyPartHealedEvent(
+                _entityId, part.Type, actualHealed, part.CurrentRedHP, part.MaxRedHP));
+        }
+
+        /// <summary>
+        /// ST11-007 (Этап-11 аудита): Core-контракт производных состояний —
+        /// слоты, блокируемые ампутацией данной части (для IPostLoadSync
+        /// потребителей: EquipmentService пересобирает кэш блокировок после
+        /// RestoreState, не ссылаясь на Modules.Body).
+        /// </summary>
+        public EquipmentSlot[] GetBlockedSlotsForPart(BodyPartType part)
+            => BodySlotMapping.GetBlockedSlots(part);
+
+        /// <summary>
         /// Проверить: блокирован ли слот экипировки из-за ампутации.
         /// Использует кэш _severedParts для O(1) доступа.
         /// BD-23: Учитывает отсутствующие в морфологии части.
+        /// ST11-003 (Этап-11 аудита): слот блокируется, только если ВСЕ маппящиеся
+        /// на него части морфологии ампутированы; отсутствующая по морфологии
+        /// часть не блокирует слот, разрешённый альтернативной анатомией
+        /// (гарпия: крылья вместо рук); слот без анатомии вовсе — закрыт (змея).
         /// </summary>
         public bool IsSlotBlocked(EquipmentSlot slot)
         {
-            return BodySlotMapping.IsSlotBlocked(slot, _severedParts);
+            return BodySlotMapping.IsSlotBlocked(slot, _severedParts, _morphologyMissingParts);
+        }
+
+        /// <summary>
+        /// ST11-003: пересобрать набор «частей, отсутствующих по морфологии»
+        /// (отдельно от реальных ампутаций). BD-23-совместимо: отсутствующие
+        /// типы также остаются в _severedParts (обратная совместимость
+        /// внутренних проверок), но IsSlotBlocked их не считает блокирующими.
+        /// </summary>
+        private void RebuildMorphologyMissing()
+        {
+            _morphologyMissingParts.Clear();
+            foreach (BodyPartType type in Enum.GetValues(typeof(BodyPartType)))
+            {
+                if (!_parts.ContainsKey(type))
+                {
+                    _morphologyMissingParts.Add(type);
+                    _severedParts.Add(type); // BD-23 (набор-унион, как прежде)
+                }
+            }
         }
 
         /// <summary>
@@ -835,12 +901,53 @@ namespace CultivationGame.Modules.Body
                 if (kvp.Value.State == BodyPartState.Severed)
                     _severedParts.Add(kvp.Key);
             }
-            // Части, отсутствующие в морфологии, тоже считаются «ампутированными» (BD-23)
-            foreach (BodyPartType type in Enum.GetValues(typeof(BodyPartType)))
+            // Части, отсутствующие в морфологии, тоже считаются «ампутированными» (BD-23).
+            // ST11-003: одновременно пересобираем набор отсутствующих по морфологии.
+            RebuildMorphologyMissing();
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        // ST11-002 (Этап-11 аудита, 23.10): IWorldResettable — тело не
+        // переживает пересборку мира. Прежде BodyService был singleton без
+        // reset-контракта: Initialize() выходил по _isInitialized,
+        // WorldDomainResetCoordinator.ResetAll сбрасывал только
+        // IWorldResettable-домены → раны/ампутации/LastDamageSourceId
+        // протекали в НОВУЮ игру (префикс: Torso 0/100 после ResetAll).
+        // ResetWorld ПЕРЕСОЗДАЁТ тело из конфигурации последней Initialize
+        // (морфология/материал/размер/Vitality) — не зависит от повторного
+        // BodyModule.Start() (P1-10 resume его не вызывает).
+        // ══════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// R17-семантика (как QiService.ResetWorld): пересборка мира = новый
+        /// практик с теми же врождёнными параметрами. Вызывается
+        /// WorldDomainResetPhase (NewGame, фаза 0) и GameSession.LoadGame
+        /// (до RestoreState — тело восстанавливается из блока "body" поверх
+        /// свежего состояния).
+        /// </summary>
+        public void ResetWorld()
+        {
+            if (!_isInitialized) return; // Initialize ещё не звался — модуль Start даст тело
+
+            _parts.Clear();
+            _severedParts.Clear();
+            _morphologyMissingParts.Clear();
+            _partsCache.Clear();
+            _bodyPartsList.Clear();
+            _entityBodyParts.Clear(); // NPC-тела старого мира
+            LastDamageSourceId = null; // источник последнего удара прошлого мира
+            _regenAccumulator = 0f;
+
+            var createdParts = _bodyFactory.CreateBody(_morphology, _size, _lastVitality);
+            foreach (var part in createdParts)
             {
-                if (!_parts.ContainsKey(type))
-                    _severedParts.Add(type);
+                _parts[part.Type] = part;
             }
+            RebuildMorphologyMissing();
+
+            _listDirty = true;
+            _cacheDirty = true;
+            Console.WriteLine($"[BodyService] ResetWorld: тело пересоздано ({_morphology}/{_size}, VIT {_lastVitality}) — New Game/LoadGame");
         }
 
         /// <summary>

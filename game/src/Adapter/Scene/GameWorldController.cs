@@ -2842,6 +2842,11 @@ public partial class GameWorldController : Node2D
         try
         {
             // Полное лечение всех частей (Q4: HP = Σ RedHP).
+            // ST11-001 (Этап-11 аудита, 23.10): HealPart(missing) закрывал
+            // дефицит красной HP лишь на 70% (RED_HP_RATIO-сплит в чёрную),
+            // а частично леченная vital-часть меняла исход проверки Revive.
+            // Норма DEATH_AND_LOOT §4.2 — «полное лечение до RedHP=max»:
+            // доменный путь полного восстановления HealPartToFullRed.
             if (BodyService != null)
             {
                 var parts = BodyService.GetAllParts();
@@ -2849,8 +2854,9 @@ public partial class GameWorldController : Node2D
                 {
                     foreach (var p in parts)
                     {
-                        int missing = p.MaxRedHP - p.CurrentRedHP;
-                        if (missing > 0) BodyService.HealPart(p.Type, missing);
+                        if (p.State == Core.Data.BodyPartState.Severed) continue; // ампутации — контракт ReattachPart (Revive)
+                        if (p.MaxRedHP - p.CurrentRedHP > 0)
+                            BodyService.HealPartToFullRed(p.Type);
                     }
                 }
             }

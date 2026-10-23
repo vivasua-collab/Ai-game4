@@ -373,7 +373,7 @@ namespace CultivationGame.Adapter.Scene
             Record("B2", b2, "New Game = свежее тело (морфология/HP базовые), раны/ампутации/дебаффы/блокировки прошлого мира не протекают");
 
             // B3: повторный цикл (накопление подписок/состояний не должно проявляться).
-            _body.ApplyDamage(BodyPartType.LeftLeg, 300, "qa_st11_src"); // Severed leg
+            _body.ApplyDamage(BodyPartType.LeftLeg, 400, "qa_st11_src"); // Severed leg (black 100 < 120)
             bool legSevered2 = _body.IsPartSevered(BodyPartType.LeftLeg);
             int legDebuffs = CountActiveBuffs("player", "severed_left_leg_agi");
             WorldDomainResetCoordinator.ResetAll(resolver!);
@@ -425,15 +425,21 @@ namespace CultivationGame.Adapter.Scene
                 var svc = BuildSecondaryBody(resolver, $"qa_st11_{m}");
                 try
                 {
-                    // Ожидание: слот разрешён ⇔ ∃ часть морфологии, маппящаяся на слот.
+                    // Ожидание (ST11-003, канон): слот закрыт ⇐ на него маппится
+                    // ≥1 часть, но ВСЕ маппящиеся части отсутствуют по морфологии
+                    // (BD-23: змея без оружия); слот с существующей здоровой
+                    // анатомией — свободен; слот без телесного маппинга вовсе
+                    // (Amulet/Ring/Belt) — не телесный гейт, свободен.
                     foreach (EquipmentSlot slot in Enum.GetValues(typeof(EquipmentSlot)))
                     {
                         if (slot == EquipmentSlot.None) continue;
-                        bool expected = HasAnyMorphPartForSlot(svc, slot, out var partName);
+                        bool hasAnatomy = HasAnyMorphPartForSlot(svc, slot, out var partName);
+                        bool mappedNonEmpty = BodySlotMapping.GetMappedParts(slot).Length > 0;
+                        bool expectBlocked = !hasAnatomy && mappedNonEmpty;
                         bool actual = svc.IsSlotBlocked(slot);
-                        if (expected == actual) continue;
+                        if (actual == expectBlocked) continue;
                         mismatched++;
-                        GD.Print($"[Stage11Sim] C-МИСМАТЧ: {m}/{slot}: ожид-анатомия={partName}, факт-заблокирован={actual}");
+                        GD.Print($"[Stage11Sim] C-МИСМАТЧ: {m}/{slot}: анатомия={partName}, ожид-заблокирован={expectBlocked}, факт={actual}");
                     }
                 }
                 finally { (svc as IDisposable)?.Dispose(); }

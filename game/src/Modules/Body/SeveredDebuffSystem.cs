@@ -35,12 +35,15 @@ namespace CultivationGame.Modules.Body;
 /// Торс (Torso)    → Все физ. × 0.50 (-50%) — STR, AGI, VIT
 /// Крыло (Wing)    → AGI × 0.70 (-30%)
 /// </summary>
-public sealed class SeveredDebuffSystem : IStartable, IDisposable
+public sealed class SeveredDebuffSystem : IStartable, IWorldResettable, IPostLoadSync, IDisposable
 {
     // === DI-зависимости ===
     private readonly ISubscriber<BodyPartSeveredEvent> _severedSub;
     private readonly ISubscriber<BodyPartReattachedEvent> _reattachedSub;
     private readonly IBuffService _buffService;
+    // ST11-007 (Этап-11 аудита): тело для пост-загрузочной пересборки дебаффов
+    // игрока (внутримодульная зависимость Body — легальна).
+    private readonly IBodyService? _bodyService;
 
     // === Подписки ===
     private IDisposable? _severedSubscription;
@@ -187,11 +190,13 @@ public sealed class SeveredDebuffSystem : IStartable, IDisposable
     public SeveredDebuffSystem(
         ISubscriber<BodyPartSeveredEvent> severedSub,
         ISubscriber<BodyPartReattachedEvent> reattachedSub,
-        IBuffService buffService)
+        IBuffService buffService,
+        IBodyService? bodyService = null)
     {
         _severedSub = severedSub ?? throw new ArgumentNullException(nameof(severedSub));
         _reattachedSub = reattachedSub ?? throw new ArgumentNullException(nameof(reattachedSub));
         _buffService = buffService ?? throw new ArgumentNullException(nameof(buffService));
+        _bodyService = bodyService;
     }
 
         // P1-10 (аудит 09.22, Фазы 7/10): идемпотентный Start — повторный вызов
@@ -214,17 +219,28 @@ public sealed class SeveredDebuffSystem : IStartable, IDisposable
     /// <summary>
     /// Обработчик ампутации части тела.
     /// EventBus handler signature: void OnXxx(in XxxEvent e).
+    /// ST11-007: идемпотентен — повторное событие для УЖЕ отслеживаемой
+    /// (entity, part) не применяет дебаффы второй раз (ключ активен).
     /// </summary>
     private void OnPartSevered(in BodyPartSeveredEvent e)
     {
         if (!DebuffTable.TryGetValue(e.Part, out var debuffs)) return;
 
         var key = (e.EntityId, e.Part);
-        if (!_activeDebuffs.TryGetValue(key, out var buffIds))
+        if (_activeDebuffs.ContainsKey(key))
         {
-            buffIds = new List<string>();
-            _activeDebuffs[key] = buffIds;
+            Console.WriteLine($"[SeveredDebuffSystem] Повторное событие ампутации {e.Part} для {e.EntityId} — дебаффы уже активны, пропуск");
+            return;
         }
+
+        ApplyDebuffs(key, debuffs);
+    }
+
+    /// <summary>Применить таблицу дебаффов ампутации и зарегистрировать ключ.</summary>
+    private void ApplyDebuffs((string EntityId, BodyPartType Part) key, SeveredDebuffDef[] debuffs)
+    {
+        var buffIds = new List<string>();
+        _activeDebuffs[key] = buffIds;
 
         foreach (var def in debuffs)
         {
@@ -233,11 +249,11 @@ public sealed class SeveredDebuffSystem : IStartable, IDisposable
 
             // Накладываем дебафф через IBuffService
             // Permanent = длится пока не снят явно
-            _buffService.ApplyBuff(e.EntityId, def.BuffId, duration: -1f, potency: def.Potency);
+            _buffService.ApplyBuff(key.EntityId, def.BuffId, duration: -1f, potency: def.Potency);
             buffIds.Add(def.BuffId);
         }
 
-        Console.WriteLine($"[SeveredDebuffSystem] Ампутация {e.Part} → наложено {buffIds.Count} дебаффов для {e.EntityId}");
+        Console.WriteLine($"[SeveredDebuffSystem] Ампутация {key.Part} → наложено {buffIds.Count} дебаффов для {key.EntityId}");
     }
 
     /// <summary>
@@ -267,6 +283,58 @@ public sealed class SeveredDebuffSystem : IStartable, IDisposable
         _severedSubscription = null;
         _reattachedSubscription?.Dispose();
         _reattachedSubscription = null;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // ST11-002/ST11-007 (Этап-11 аудита, 23.10): reset-контракт и
+    // пост-загрузочная синхронизация.
+    //
+    // Префикс-дефекты: (1) _activeDebuffs переживали New Game (ключи
+    // (entity, part) накапливались — BuffService.ResetWorld чистил сами
+    // баффы, но учёт системы оставался); (2) после LoadGame
+    // RestoreState блока "body" не публикует BodyPartSeveredEvent →
+    // ампутационные дебаффы игрока пропадали при загрузке (тело
+    // ампутировано, штрафа нет).
+    // ══════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// IWorldResettable: пересборка мира = пустой учёт (сами баффы чистит
+    /// BuffService.ResetWorld; тело пересоздаёт BodyService.ResetWorld).
+    /// </summary>
+    public void ResetWorld()
+    {
+        if (_activeDebuffs.Count > 0)
+        {
+            _activeDebuffs.Clear();
+            Console.WriteLine("[SeveredDebuffSystem] ResetWorld: учёт ампутационных дебаффов очищен (New Game)");
+        }
+    }
+
+    /// <summary>
+    /// IPostLoadSync: тело восстановлено из сейва — повторно применить
+    /// ампутационные дебаффы игрока ровно один раз (идемпотентно по ключу).
+    /// NPC-сторона: перечисление сущностей тела не экспортировано —
+    /// резидуальный GAP (NPC-баффы не переживают загрузку в принципе:
+    /// BuffService не ISaveable).
+    /// </summary>
+    public void OnAfterLoad()
+    {
+        if (_bodyService == null) return;
+
+        int applied = 0;
+        foreach (var p in _bodyService.GetAllParts())
+        {
+            if (p.State != BodyPartState.Severed) continue;
+            if (!DebuffTable.TryGetValue(p.Type, out var debuffs)) continue;
+
+            var key = (_bodyService.EntityId, p.Type);
+            if (_activeDebuffs.ContainsKey(key)) continue; // идемпотентность
+
+            ApplyDebuffs(key, debuffs);
+            applied++;
+        }
+        if (applied > 0)
+            Console.WriteLine($"[SeveredDebuffSystem] OnAfterLoad: повторно применены дебаффы {applied} ампутаций игрока");
     }
 
     /// <summary>

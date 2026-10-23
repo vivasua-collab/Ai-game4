@@ -130,6 +130,40 @@ namespace CultivationGame.Modules.Body
         }
 
         /// <summary>
+        /// ST11-003 (Этап-11 аудита, 23.10): альтернативная анатомия морфологии
+        /// не должна блокировать допустимые слоты. Семантика:
+        ///  - часть, ОТСУТСТВУЮЩУЮ по морфологии (morphologyMissingParts), не
+        ///    считаем блокирующей — слот может быть разрешён существующей
+        ///    альтернативой (гарпия: крылья с функцией Manipulation ↔ слоты рук;
+        ///    гуманоид: отсутствие RightWing не закрывает WeaponMain);
+        ///  - слот блокируется, если существует часть морфологии, маппящаяся
+        ///    на слот, и она ампутирована (событийная семантика EquipmentService);
+        ///  - если на слот НЕ маппится ни одной части морфологии — слот закрыт
+        ///    (BD-23: змея не может экипировать оружие).
+        /// </summary>
+        public static bool IsSlotBlocked(EquipmentSlot slot,
+            HashSet<BodyPartType> severedParts,
+            HashSet<BodyPartType>? morphologyMissingParts)
+        {
+            var mappedParts = GetMappedParts(slot);
+
+            // Слот без телесного маппинга (Amulet/Ring*/Belt) — НЕ телесный гейт:
+            // украшения не требуют анатомии, блокировать нечего.
+            if (mappedParts.Length == 0) return false;
+
+            bool anyPresent = false;
+            foreach (var part in mappedParts)
+            {
+                if (morphologyMissingParts != null && morphologyMissingParts.Contains(part))
+                    continue; // отсутствует по морфологии — не альтернатива
+                anyPresent = true;
+                if (severedParts != null && severedParts.Contains(part))
+                    return true; // реальная ампутация блокирует
+            }
+            return !anyPresent; // нет существующей анатомии вовсе → BD-23: закрыт
+        }
+
+        /// <summary>
         /// Построить обратный маппинг (ленивая инициализация).
         /// BD-02/BD-40: Исправлена типизация — промежуточный словарь List→ToArray.
         /// </summary>
