@@ -1,0 +1,570 @@
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+
+[InputMap] Registered all input actions.
+[WorldService] Active location: Test Polygon (id=test_polygon)
+[WorldModule] Started — time 1864-01-01 06:00, speed Normal
+[TileService] Generated 50x50 grid, seed=12345, baseTerrain=Grass (noise-based)
+  Water_Shallow: 651 tiles (26%)
+  Sand: 539 tiles (21%)
+  Grass: 1299 tiles (51%)
+  Water_Deep: 11 tiles (0%)
+  Biomes:
+    Sea: 654 tiles (26%)
+    Coast: 536 tiles (21%)
+    Grassland: 1300 tiles (52%)
+    Ocean: 10 tiles (0%)
+[TileModule] Started — generated 50x50 grid in 24 ms
+[AnimalSpawn] Spawned wolf #animal_wolf_1 at (9, 7) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_2 at (44, 34) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_3 at (44, 20) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_4 at (48, 22) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_5 at (20, 39) (body: Quadruped/Medium)
+[AnimalSpawn] test_polygon: spawned 5/5 animals (attempts=5)
+[PlayerService] Player spawned @ (25, 25), hp delegated to BodyService
+[StatProgressProducer] Запущен: продюсеры дельт §5.1/§5.2 (удар/уклонение/блок/урон/техника/медитация)
+[PlayerModule] Started — stat svc wired=True
+[QuestModule] Started
+[TradeModule] Started
+[UIModule] Started — HUD shown
+[SaveModule] Started — 23 ISaveable service(s) registered
+[ItemDatabase] Initialized (no Resources catalogue — populate via Register())
+[GeneratorModule] База данных предметов инициализирована
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[GeneratorModule] Модуль запущен. Зарегистрировано предметов: 4
+[GameEntryPoint] Location catalog registered: 3 locations [test_polygon, large_world, world_map]
+[GameEntryPoint] Started. 19 startables, 18 tickables, session=GameSession
+[GameBoot] Game initialized. Container built and entry point started.
+[MainMenu] GODOT_NEWGAME=1 — auto-starting QA world (test_polygon)
+[MainMenu] New Game (QA) selected — test_polygon
+[GameSession] NewGame variant=1 location=test_polygon (50×50) — assembling scene...
+[WorldModule] ResetWorld: календарные маркеры будут тихо ре-синхронизированы на первом тике (P1-15)
+[ResourceService] ResetWorld: 0 armed-записей очереди респауна очищено (ST10-01)
+[BodyService] ResetWorld: тело пересоздано (Humanoid/Medium, VIT 10) — New Game/LoadGame
+[StorageRingService] ResetWorld: хранилища колец очищены (P1-19)
+[CombatService] ResetWorld: combat state cleared (New Game)
+[TechniqueService] ResetWorld: techniques cleared (New Game)
+[TechniqueChargeService] ResetWorld: charges cleared (New Game)
+[CorpseService] ResetWorld: 0 трупов очищено
+[NPCSpawnerService] ResetWorld: домен NPC очищен (tracked=0, restored=0)
+[NPCGroupService] ResetWorld: 0 групп очищено
+[PlayerCombatAdapter] ResetWorld: стойка/режим оружия/кулдауны сброшены (New Game)
+[AuraHoldService] ResetWorld: hold cleared (New Game)
+[Trade] ResetWorld — сессия закрыта, сток очищен (0 лавок)
+[SaveModule] ResetWorld: отсчёт автосейва сброшен (каденция — мировой тик, P2-26)
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[Phase 0] WorldDomainReset complete — 36 world-scoped доменов сброшено (npc/corpses/groups/animals/formations/charger/player/stats/qi/quests/currency/inventory/equipment/belt/ground/world/time) + weapon-cache
+[Phase 1] CoreValidation complete — Core validated
+[TileService] Generated 50x50 grid, seed=12345, baseTerrain=Grass (noise-based)
+  Water_Shallow: 651 tiles (26%)
+  Sand: 539 tiles (21%)
+  Grass: 1299 tiles (51%)
+  Water_Deep: 11 tiles (0%)
+  Biomes:
+    Sea: 654 tiles (26%)
+    Coast: 536 tiles (21%)
+    Grassland: 1300 tiles (52%)
+    Ocean: 10 tiles (0%)
+[Phase 2] TileMapGen complete — test_polygon: 50×50 tiles, seed=12345
+[WorldService] Active location: Тестовый полигон (id=test_polygon)
+[TileModule] LocationChanged '' → 'test_polygon'
+[Phase 3] WorldInit complete — location=test_polygon, speed=Normal, techniqueRegistry cleared (was world-scoped reset)
+[PlayerService] Player spawned @ (25, 25), hp delegated to BodyService
+[Phase 4] PlayerSpawn complete — player at (25, 25) in test_polygon
+[ItemDatabase] Зарегистрирован предмет: material_wood (Material)
+[ItemDatabase] Зарегистрирован предмет: material_stone (Material)
+[ItemDatabase] Зарегистрирован предмет: material_iron_ore (Material)
+[ItemDatabase] Зарегистрирован предмет: material_fiber (Material)
+[ItemDatabase] Зарегистрирован предмет: consumable_berry (Consumable)
+[ItemDatabase] Зарегистрирован предмет: consumable_herb (Consumable)
+[ItemDatabase] Зарегистрирован предмет: con_pill_healing (Consumable)
+[ItemDatabase] Зарегистрирован предмет: con_pill_qi (Consumable)
+[ItemDatabase] Зарегистрирован предмет: ammo_arrow (Material)
+[ItemDatabase] Зарегистрирован предмет: material_steel_ingot (Material)
+[ItemDatabase] Зарегистрирован предмет: qistone_dust_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_dust_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_pebble_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_pebble_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_shard_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_shard_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_stone_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_stone_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_boulder_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_boulder_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_03e9_000001 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_dagger_L1_03e9_000001 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_03e9_000001 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_03ea_000002 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_bow_L1_03ea_000002 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_03ea_000002 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_03f2_000003 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_greatsword_L1_03f2_000003 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_03f2_000003 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_03f3_000004 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_staff_L1_03f3_000004 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_03f3_000004 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_044c_000005 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_torso_L1_044c_000005 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_044c_000005 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_044d_000006 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_feet_L1_044d_000006 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_044d_000006 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_04b2_000007 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_feet_L1_04b2_000007 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_04b2_000007 (Armor)
+[Phase 5] StartingGear complete — стартовый набор: БД +20, выдано 13 позиций, оружие 4 шт (кинжал надет: True, лук в инвентаре: True), броня 2 шт, стрел 30. Замена сейвов: каждая новая игра = одинаковый старт (сид 1000).
+[AnimalSpawn] Spawned wolf #animal_wolf_6 at (9, 7) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_7 at (44, 34) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_8 at (44, 20) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_9 at (48, 22) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_10 at (20, 39) (body: Quadruped/Medium)
+[AnimalSpawn] test_polygon: spawned 5/5 animals (attempts=5)
+[Phase 6] AnimalSpawn complete — 5 animals on 'test_polygon' (50×50)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_c990_000008 (Weapon)
+[HumanNPCSpawn] Spawned Merchant L0 #npc_98c6ae8f2cd64d26 at (2, 34)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_047ef526_000001 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_3bfbeb25_000002 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_1_404061d9_000003 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_6dd58204_000004 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_1_605cdbde_000005 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_754682ca_000006 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_6bcc5c30_000007 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L3_c9cf_000009 (Weapon)
+[HumanNPCSpawn] Spawned Elder L3 #npc_620f60149b1244c9 at (30, 35)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_1832b8f2_000008 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_1e418430_000009 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_1_4486dd77_00000a (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_09d1e60f_00000b (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_1_4171a49f_00000c (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_084fc68a_00000d (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_76bcbfbd_00000e (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L3_c973_00000a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L3_c975_00000b (Armor)
+[HumanNPCSpawn] Spawned Guard L3 #npc_8ec3d79e7fb944f7 at (43, 48)
+[ItemDatabase] Зарегистрирован предмет: weapon_2_3fa35ada_00000f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_2_2db2f1d2_000010 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_2_278bf6b1_000011 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_6a41b2bc_000012 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_2_25b2f14c_000013 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_0bc50eff_000014 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_6a1a79af_000015 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_c974_00000c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_c976_00000d (Armor)
+[HumanNPCSpawn] Spawned Guard L2 #npc_14706460f4614420 at (13, 48)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_ca2f_00000e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_ca31_00000f (Armor)
+[HumanNPCSpawn] Spawned Passerby L1 #npc_16fab04dff5a410e at (24, 47)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L1_ca30_000010 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L0_ca32_000011 (Armor)
+[HumanNPCSpawn] Spawned Passerby L0 #npc_9dfbbc362ce4400c at (45, 19)
+[ItemDatabase] Зарегистрирован предмет: weapon_2_35b98a0d_000016 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_2_59fb1b90_000017 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_2_7564853e_000018 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_2a4a0e1c_000019 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_2_76721e36_00001a (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_313a3630_00001b (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_705caea7_00001c (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L3_c9b5_000012 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L3_c9b7_000013 (Armor)
+[HumanNPCSpawn] Spawned Cultivator L3 #npc_10cd573a903f4c1e at (16, 40)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_516dd1a5_00001d (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_1624a871_00001e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_1_24024dd1_00001f (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_1592f2ab_000020 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_1_7af74af3_000021 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_3ac14074_000022 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_1c94060e_000023 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_c9b6_000014 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_c9b8_000015 (Armor)
+[HumanNPCSpawn] Spawned Cultivator L2 #npc_e493f97dbad54962 at (30, 34)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L2_ca14_000016 (Weapon)
+[HumanNPCSpawn] Spawned Enemy L1 #npc_87e0444cf8b64f11 at (47, 40)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_6b98ebfe_000024 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_5691413c_000025 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_1_03f1e7b0_000026 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_42cddce6_000027 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_1_16e4611d_000028 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_17c679a8_000029 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_6bbde6b6_00002a (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L3_ca15_000017 (Weapon)
+[HumanNPCSpawn] Spawned Enemy L2 #npc_a3319200307c47cf at (4, 2)
+[Phase 7] HumanNPCSpawn complete — 10/10 generated NPCs on 'test_polygon'
+[NPCGroupService] Created group group_1 (task=HuntingPack, faction=, species=wolf)
+[NPCGroupService] Set patrol route for group_1: 4 waypoints
+[NPCGroupService] Added animal_wolf_11 to group group_1 as Leader
+[NPCGroupService] Added animal_wolf_12 to group group_1 as Follower
+[NPCGroupService] Added animal_wolf_13 to group group_1 as Follower
+[GroupSpawn] Wolf pack 'group_1' — 3 wolves at (45, 15)
+[NPCGroupService] Created group group_2 (task=Patrol, faction=town_guard, species=)
+[NPCGroupService] Set patrol route for group_2: 4 waypoints
+[ItemDatabase] Зарегистрирован предмет: weapon_2_3b4b690e_00002b (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_2_6ec37fcc_00002c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_2_4d5ed863_00002d (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_0a9e62f6_00002e (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_2_13107592_00002f (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_7cb9d175_000030 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_08c41c0c_000031 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_3d7d_000018 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_3d7f_000019 (Armor)
+[NPCGroupService] Added npc_ca8fdee98a404502 to group group_2 as Leader
+[ItemDatabase] Зарегистрирован предмет: weapon_2_767fff7c_000032 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_2_79b01497_000033 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_2_4fb908ba_000034 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_415ae66b_000035 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_2_1cf9e576_000036 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_353ec31c_000037 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_0b1a20e0_000038 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_3d7e_00001a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_3d80_00001b (Armor)
+[NPCGroupService] Added npc_f91e6c63608a4955 to group group_2 as Follower
+[GroupSpawn] Guard patrol 'group_2' — 2 guards at (18, 38)
+[Phase 8] GroupSpawn complete — 2 groups on 'test_polygon' (50×50)
+[Phase 9] FormationInit complete (stub)
+[Phase 10] ChargerInit complete (stub)
+[Phase 11] QuestInit complete (stub)
+[Phase 12] UIInit complete — HUD shown
+[PreGenTechnique] start — maxLevel=1 seed=20039827
+[Dedup] Techniques: removed 2 duplicates, kept 1
+[Dedup] Techniques: removed 2 duplicates, kept 1
+[Dedup] Techniques: removed 2 duplicates, kept 1
+[PreGenTechnique] done — generated=100 valid=100 duplicates=6 registered=94 (registry total=102)
+[PreGenTechnique] grades registered: [Common=28, Refined=28, Perfect=28, Transcendent=10] gradeMismatches=0 registryInvalid=0
+[TechniqueGrant] seed=20039845
+[TechniqueGrant] R25 AoE-набор: 2/3 форм (конус/полукруг/круг — площадные техники)
+[Phase 14] TechniqueGrant complete — granted 8 techniques (cultivation 1, active 3/3, curse, formation, aoe 2) at L1
+[Phase 15] Finalize complete — Scene assembly complete
+[SceneOrchestrator] Assembly complete — mode=NewGame: 16 completed, 0 skipped, 101 ms
+[GameSession] NewGame ready — state=Playing
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_ocean.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_sea.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_coast.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_grassland.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_grassland.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_steppe.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_steppe.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_forest.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_forest.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_forest.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_highlands.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_highlands.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_mountains.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_mountains.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_peak.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_peak.png
+[GroundItemRenderer] Ready
+[AnimalSpriteRenderer] Ready — tilePixels=64
+[CorpseSpriteRenderer] Ready
+[NPCSpriteRenderer] Ready
+[FormationVisualRenderer] Ready
+[DamageNumberRenderer] Ready
+[ProjectileRenderer] Ready
+[StrikeFx] Ready
+[AoeFx] Ready
+[HomingFx] Ready
+[TechniqueEffectRenderer] Ready
+[CharacterDoll] Ready
+[Inventory] Ready
+[CharacterSheet] Ready
+[DialogueWindow] Ready
+[TradeWindow] Ready
+[LootWindow] Ready
+[HotbarPanel] Ready (v2: techniques + cooldowns + belt row + charge/aura R26 + медитация-слот П5)
+[TechniqueBook] Ready
+[HotkeysWindow] Ready
+[EventLogWindow] Ready
+[QuestWindow] Ready
+[CultivationWindow] Ready
+[ChargerWindow] Ready
+[CheatPanel] Ready (F2 to toggle)
+[Stage11Sim] Ready — Этап-11 (тело/травмы/морфологии) starts in 3s
+[GameWorldController] Ready
+[BiomeTiles] Drew 100 textures, 0 missing (culled to 10×10)
+[SurfaceTransitions] Drew 29 transition sprites (culled to 11×11)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[AnimalService] Tick #1 — 8 animals; sample: wolf#animal_wolf_6 @ (9, 7)
+[AnimalService] Tick #2 — 8 animals; sample: wolf#animal_wolf_6 @ (9, 7)
+[ItemDatabase] Зарегистрирован предмет: qa_st11_shield (Weapon)
+[Stage11Sim] ─── A. ST11-001: респавн = полное лечение RedHP (DEATH_AND_LOOT §4.2) ───
+[Stage11Sim] A0: стартовое тело полное: True
+[Stage11Sim] A1 до смерти: torso red 10/100, leg red 0/50
+[NPCAIService] PT-001: смерть игрока — агро сброшен у 0 NPC
+[GameWorld] Toast: ☠ Вы пали (Голова разрушена (0 % HP))
+[GameWorld] Player death: Голова разрушена (0 % HP) — экран смерти (респавн по кнопке)
+[DeathScreen] Показ: причина='Голова разрушена (0 % HP)', убийца='Последний удар: неведомая сила'
+[Stage11Sim] PLAYER DIED: Голова разрушена (0 % HP)
+[PlayerService] Player died: Голова разрушена (0 % HP) (killer: qa_st11_killer)
+[Stage11Sim] A1 смерть: died=True (death=1)
+[Stage11Sim] PLAYER REVIVED
+[GameWorld] Toast: ✦ Вы возродились
+[Stage11Sim] A1: после респавна все части RedHP=max: True (первый пробел: ); revive-событий=1 → PASS
+[Stage11Sim] A2: torso после респавна red 100/100, black 170/200 (чёрная — вне контракта §4.2) → PASS
+[SeveredDebuffSystem] Ампутация LeftArm → наложено 1 дебаффов для player
+[NPCAIService] PT-001: смерть игрока — агро сброшен у 0 NPC
+[GameWorld] Toast: ☠ Вы пали (Голова разрушена (0 % HP))
+[GameWorld] Player death: Голова разрушена (0 % HP) — экран смерти (респавн по кнопке)
+[DeathScreen] Показ: причина='Голова разрушена (0 % HP)', убийца='Последний удар: неведомая сила'
+[Stage11Sim] PLAYER DIED: Голова разрушена (0 % HP)
+[PlayerService] Player died: Голова разрушена (0 % HP) (killer: qa_st11_killer)
+[Stage11Sim] PLAYER REVIVED
+[GameWorld] Toast: ✦ Вы возродились
+[Stage11Sim] A3: ампутация сохранена=True, остальные полны=True, revive=1 → PASS
+[Stage11Sim] A4: heal-событий при последнем респавне=8 (информативно; повреждённых частей до: торс/нога/голова)
+[SeveredDebuffSystem] Приживление LeftArm → снято 1 дебаффов для player
+[Stage11Sim] ─── C. ST11-003: морфология не должна блокировать допустимые слоты ───
+[Stage11Sim] C1: гуманоид, свежее тело: WeaponMain=False WeaponOff=False Hands=False (ожид все false) → PASS
+[Stage11Sim] C6: матрица 10 морфологий × все слоты: расхождений=0 → PASS
+[Stage11Sim] C2: гарпия (крылья = Manipulation): WeaponMain=False WeaponOff=False (ожид false/false) → PASS
+[Stage11Sim] C3: змея: WeaponMain=True Hands=True Torso=False (ожид true/true/…/false) → PASS
+[Stage11Sim] C4: паук: WeaponMain(хелицеры)=False WeaponOff(педипальпы)=False (ожид false/false) → PASS
+[SeveredDebuffSystem] Ампутация Chelicerae → наложено 1 дебаффов для qa_st11_spider
+[SeveredDebuffSystem] Приживление Chelicerae → снято 1 дебаффов для qa_st11_spider
+[Stage11Sim] C5: ампутация хелицер → blocked=True; приживление=True → free=True → PASS
+[Stage11Sim] ─── D. ST11-004: HealthRegen (HoT) и пассивная регенерация ───
+[Stage11Sim] D1: пассивная регенерация: torso 100/100, leg 50/50 (ожид обе полные) → PASS
+[SeveredDebuffSystem] Ампутация LeftArm → наложено 1 дебаффов для player
+[Stage11Sim] D2: ампутированная рука не лечится: severed=True, red=0 → PASS
+[SeveredDebuffSystem] Приживление LeftArm → снято 1 дебаффов для player
+[Stage11Sim] D3: HoT-тик: torso 61/100 (лечился=True), leg 8/50 (не лечился=True)
+[Stage11Sim] D3: GAP — HealthRegen лечит только торс (BodyModule.OnBuffTicked, TODO P1-08); норматив §не определяет распределение HoT → GAP за владельцем
+[Stage11Sim] ─── E. ST11-005: смерть = Head|Heart (§5.3.1); Amorphous без Head/Heart ───
+[Stage11Sim] E1: гуманоид, голова red→0: мёртв=True → PASS
+[Stage11Sim] E2: Amorphous, Core red 0/100 → IsEntityAlive=True
+[Stage11Sim] E2: GAP — §5.3.1 определяет смерть только через Head|Heart; Core (IsVital) фатальным НЕ объявлен → бесформенная сущность переживает разрушение ядра; правило требует решения владельца
+[Stage11Sim] ─── F. ST11-006: CaptureState/RestoreState и повреждённые блоки ───
+[SeveredDebuffSystem] Ампутация LeftArm → наложено 1 дебаффов для player
+[SeveredDebuffSystem] Приживление LeftArm → снято 1 дебаффов для player
+[Stage11Sim] F1: round-trip раны+ампутация: точное восстановление=True → PASS
+[Stage11Sim] F2: повторный round-trip стабилен=True → PASS
+[Stage11Sim] F3: неизвестный partType пропущен без исключения, валидные части точны: True → PASS
+[Stage11Sim] F4: отрицательные/завышенные HP клампятся в [0, Max]: True → PASS
+[WorldModule] ResetWorld: календарные маркеры будут тихо ре-синхронизированы на первом тике (P1-15)
+[ResourceService] ResetWorld: 0 armed-записей очереди респауна очищено (ST10-01)
+[BodyService] ResetWorld: тело пересоздано (Humanoid/Medium, VIT 10) — New Game/LoadGame
+[BuffService] ResetWorld: entity buffs cleared (New Game)
+[StorageRingService] ResetWorld: хранилища колец очищены (P1-19)
+[CombatService] ResetWorld: combat state cleared (New Game)
+[TechniqueService] ResetWorld: techniques cleared (New Game)
+[TechniqueChargeService] ResetWorld: charges cleared (New Game)
+[CorpseService] ResetWorld: 0 трупов очищено
+[NPCSpawnerService] ResetWorld: домен NPC очищен (tracked=12, restored=0)
+[NPCGroupService] ResetWorld: 2 групп очищено
+[PlayerCombatAdapter] ResetWorld: стойка/режим оружия/кулдауны сброшены (New Game)
+[AuraHoldService] ResetWorld: hold cleared (New Game)
+[Trade] ResetWorld — сессия закрыта, сток очищен (0 лавок)
+[SaveModule] ResetWorld: отсчёт автосейва сброшен (каденция — мировой тик, P2-26)
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[Stage11Sim] F5: неполный блок поверх свежего тела: торс 100/100 state=Healthy (ожид полный/Healthy — раны прошлого мира не протекают) → PASS
+[WorldModule] ResetWorld: календарные маркеры будут тихо ре-синхронизированы на первом тике (P1-15)
+[ResourceService] ResetWorld: 0 armed-записей очереди респауна очищено (ST10-01)
+[BodyService] ResetWorld: тело пересоздано (Humanoid/Medium, VIT 10) — New Game/LoadGame
+[StorageRingService] ResetWorld: хранилища колец очищены (P1-19)
+[CombatService] ResetWorld: combat state cleared (New Game)
+[TechniqueService] ResetWorld: techniques cleared (New Game)
+[TechniqueChargeService] ResetWorld: charges cleared (New Game)
+[CorpseService] ResetWorld: 0 трупов очищено
+[NPCSpawnerService] ResetWorld: домен NPC очищен (tracked=0, restored=0)
+[NPCGroupService] ResetWorld: 0 групп очищено
+[PlayerCombatAdapter] ResetWorld: стойка/режим оружия/кулдауны сброшены (New Game)
+[AuraHoldService] ResetWorld: hold cleared (New Game)
+[Trade] ResetWorld — сессия закрыта, сток очищен (0 лавок)
+[SaveModule] ResetWorld: отсчёт автосейва сброшен (каденция — мировой тик, P2-26)
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[Stage11Sim] ─── G. ST11-007: ампутация/приживление/загрузка — согласованность ───
+[ItemDatabase] Зарегистрирован предмет: qa_st11_shield (Weapon)
+[Stage11Sim] G подготовка: щит в инвентаре=True, снят=True, экипирован=True
+[SeveredDebuffSystem] Ампутация LeftArm → наложено 1 дебаффов для player
+[GameWorld] Toast: ⛔ Ампутация части тела LeftArm
+[Stage11Sim] EQUIP BLOCKED: WeaponOff — Ампутация части тела LeftArm
+[InventoryModule] Возврат предмета 'qa_st11_shield' в инвентарь из слота WeaponOff
+[Stage11Sim] G1: ампутация: слот заблокирован=True, авто-съём=True, щит в инвентаре=True (1), EquipmentBlockedEvent=1 (ожид 1), дебафф=True → PASS
+[SeveredDebuffSystem] Повторное событие ампутации LeftArm для player — дебаффы уже активны, пропуск
+[Stage11Sim] G2: дубликат события: активных дебаффов=1 (ожид 1) → PASS
+[SeveredDebuffSystem] Ампутация LeftLeg → наложено 1 дебаффов для player
+[SeveredDebuffSystem] Приживление LeftArm → снято 1 дебаффов для player
+[Stage11Sim] G3: приживление руки=True, слот свободен=True, дебафф руки снят=True, дебафф ноги цел (True/True), повторное приживление=false(False) → PASS
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/qa_st11_slot/main.json (11511 bytes, atomic tmp→rename)
+[SaveService] Save('Manual:qa_st11_slot') → OK
+[WorldModule] ResetWorld: календарные маркеры будут тихо ре-синхронизированы на первом тике (P1-15)
+[ResourceService] ResetWorld: 0 armed-записей очереди респауна очищено (ST10-01)
+[BodyService] ResetWorld: тело пересоздано (Humanoid/Medium, VIT 10) — New Game/LoadGame
+[SeveredDebuffSystem] ResetWorld: учёт ампутационных дебаффов очищен (New Game)
+[BuffService] ResetWorld: entity buffs cleared (New Game)
+[StorageRingService] ResetWorld: хранилища колец очищены (P1-19)
+[CombatService] ResetWorld: combat state cleared (New Game)
+[TechniqueService] ResetWorld: techniques cleared (New Game)
+[TechniqueChargeService] ResetWorld: charges cleared (New Game)
+[CorpseService] ResetWorld: 0 трупов очищено
+[NPCSpawnerService] ResetWorld: домен NPC очищен (tracked=0, restored=0)
+[NPCGroupService] ResetWorld: 0 групп очищено
+[PlayerCombatAdapter] ResetWorld: стойка/режим оружия/кулдауны сброшены (New Game)
+[AuraHoldService] ResetWorld: hold cleared (New Game)
+[Trade] ResetWorld — сессия закрыта, сток очищен (0 лавок)
+[SaveModule] ResetWorld: отсчёт автосейва сброшен (каденция — мировой тик, P2-26)
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[TimeService] RestoreState: 1864-01-01 06:00, tick 0
+[ItemDatabase] RestoreState: 5 предметов восстановлено; счётчики ID: eq=0, gen=0
+[StatService] RestoreState: base=6, virtual=0, threshold=0
+[QiService] RestoreState: L1.0 Normal, qi 1000/1000, heartSevered=False
+[EquipmentService] RestoreState: 0/0 слотов куклы
+[StorageRingService] RestoreState: 0 колец восстановлено (предметов: 0)
+[BeltService] RestoreState: 0/0 слотов пояса
+[NPCRelationshipService] RestoreState: 0 отношений восстановлено (боевые обиды/дружба переживают Load, АУДИТ-0921_2030 Ф4)
+[CorpseService] RestoreState: 0 трупов восстановлено (full-loot переживает Load, AUDIT-0921 A5)
+[AnimalService] RestoreState: 0/0 зверей (живых: 0, враждебных: 0), nextId=14
+[NPCGroupService] RestoreState: 0 групп восстановлено (участников отброшено: 0, групп без состава: 0, промоутов лидера (повышений первого участника): 0); nextGroupId=1
+[QuestService] RestoreState: 3/3 квестов, active=0, rewarded=0, day=0
+[CurrencyService] RestoreState: баланс 50 камней
+[SaveService] Load('Manual:qa_st11_slot') → OK
+[SeveredDebuffSystem] Ампутация LeftLeg → наложено 1 дебаффов для player
+[SeveredDebuffSystem] OnAfterLoad: повторно применены дебаффы 1 ампутаций игрока
+[EquipmentService] OnAfterLoad: кэш блокировок пересобран по телу (1 слотов)
+[Stage11Sim] G4: save=True load=True; после загрузки: нога ампутирована=True, дебафф=True, слот Legs заблокирован=True, щитов=1/1 (без дюпа) → PASS
+[WorldModule] ResetWorld: календарные маркеры будут тихо ре-синхронизированы на первом тике (P1-15)
+[ResourceService] ResetWorld: 0 armed-записей очереди респауна очищено (ST10-01)
+[BodyService] ResetWorld: тело пересоздано (Humanoid/Medium, VIT 10) — New Game/LoadGame
+[SeveredDebuffSystem] ResetWorld: учёт ампутационных дебаффов очищен (New Game)
+[BuffService] ResetWorld: entity buffs cleared (New Game)
+[StorageRingService] ResetWorld: хранилища колец очищены (P1-19)
+[CombatService] ResetWorld: combat state cleared (New Game)
+[TechniqueService] ResetWorld: techniques cleared (New Game)
+[TechniqueChargeService] ResetWorld: charges cleared (New Game)
+[CorpseService] ResetWorld: 0 трупов очищено
+[NPCSpawnerService] ResetWorld: домен NPC очищен (tracked=0, restored=0)
+[NPCGroupService] ResetWorld: 0 групп очищено
+[PlayerCombatAdapter] ResetWorld: стойка/режим оружия/кулдауны сброшены (New Game)
+[AuraHoldService] ResetWorld: hold cleared (New Game)
+[Trade] ResetWorld — сессия закрыта, сток очищен (0 лавок)
+[SaveModule] ResetWorld: отсчёт автосейва сброшен (каденция — мировой тик, P2-26)
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[Stage11Sim] G5: New Game после ампутации: тело чистое=True → PASS
+[Stage11Sim] ─── B. ST11-002: тело не переживает New Game (reset-контракт) ───
+[ItemDatabase] Зарегистрирован предмет: qa_st11_shield (Weapon)
+[Stage11Sim] B1: BodyService is IWorldResettable = True → PASS
+[SeveredDebuffSystem] Ампутация LeftArm → наложено 1 дебаффов для player
+[Stage11Sim] B подготовка: ампутация=True, дебафф=True, слот WeaponOff заблокирован=True
+[WorldModule] ResetWorld: календарные маркеры будут тихо ре-синхронизированы на первом тике (P1-15)
+[ResourceService] ResetWorld: 0 armed-записей очереди респауна очищено (ST10-01)
+[BodyService] ResetWorld: тело пересоздано (Humanoid/Medium, VIT 10) — New Game/LoadGame
+[SeveredDebuffSystem] ResetWorld: учёт ампутационных дебаффов очищен (New Game)
+[BuffService] ResetWorld: entity buffs cleared (New Game)
+[StorageRingService] ResetWorld: хранилища колец очищены (P1-19)
+[CombatService] ResetWorld: combat state cleared (New Game)
+[TechniqueService] ResetWorld: techniques cleared (New Game)
+[TechniqueChargeService] ResetWorld: charges cleared (New Game)
+[CorpseService] ResetWorld: 0 трупов очищено
+[NPCSpawnerService] ResetWorld: домен NPC очищен (tracked=0, restored=0)
+[NPCGroupService] ResetWorld: 0 групп очищено
+[PlayerCombatAdapter] ResetWorld: стойка/режим оружия/кулдауны сброшены (New Game)
+[AuraHoldService] ResetWorld: hold cleared (New Game)
+[Trade] ResetWorld — сессия закрыта, сток очищен (0 лавок)
+[SaveModule] ResetWorld: отсчёт автосейва сброшен (каденция — мировой тик, P2-26)
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[Stage11Sim] B2: после ResetAll(36 доменов): тело свежее=True (), дебаффы сняты=True, слот свободен=True → PASS
+[SeveredDebuffSystem] Ампутация LeftLeg → наложено 1 дебаффов для player
+[WorldModule] ResetWorld: календарные маркеры будут тихо ре-синхронизированы на первом тике (P1-15)
+[ResourceService] ResetWorld: 0 armed-записей очереди респауна очищено (ST10-01)
+[BodyService] ResetWorld: тело пересоздано (Humanoid/Medium, VIT 10) — New Game/LoadGame
+[SeveredDebuffSystem] ResetWorld: учёт ампутационных дебаффов очищен (New Game)
+[BuffService] ResetWorld: entity buffs cleared (New Game)
+[StorageRingService] ResetWorld: хранилища колец очищены (P1-19)
+[CombatService] ResetWorld: combat state cleared (New Game)
+[TechniqueService] ResetWorld: techniques cleared (New Game)
+[TechniqueChargeService] ResetWorld: charges cleared (New Game)
+[CorpseService] ResetWorld: 0 трупов очищено
+[NPCSpawnerService] ResetWorld: домен NPC очищен (tracked=0, restored=0)
+[NPCGroupService] ResetWorld: 0 групп очищено
+[PlayerCombatAdapter] ResetWorld: стойка/режим оружия/кулдауны сброшены (New Game)
+[AuraHoldService] ResetWorld: hold cleared (New Game)
+[Trade] ResetWorld — сессия закрыта, сток очищен (0 лавок)
+[SaveModule] ResetWorld: отсчёт автосейва сброшен (каденция — мировой тик, P2-26)
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[Stage11Sim] B3: цикл ×2: sever→reset; вторая ампутация дебафф=1 (ожид 1), после сброса тело свежее=True, дебаффов=0 → PASS
+[Stage11Sim] ─── REF: строки физического плейтеста (раунд за владельцем) ───
+[Stage11Sim] ═══════ СВОДКА ЭТАПА-11 ═══════
+[Stage11Sim] A1: PASS — респавн = полное лечение RedHP (спецификация §4.2); факт: полное, PlayerReviveEvent=1
+[Stage11Sim] A2: PASS — торс: красная HP = max после респавна; чёрная HP остаётся по факту (контракт §4.2 — только RedHP)
+[Stage11Sim] A3: PASS — ампутация некритической части не приживляется респавном автоматически; остальные части — полное лечение; семантика §4.2/§4.3
+[Stage11Sim] A4: PASS — BodyPartHealedEvent за респавн = 8; дублированного лечения не наблюдается (полное состояние подтверждено A1)
+[Stage11Sim] C1: PASS — гуманоид до повреждений: ни один базовый слот не заблокирован (отсутствующие у вида крылья/хелицеры не блокируют WeaponMain)
+[Stage11Sim] C6: PASS — слот разрешён ⇔ у морфологии есть маппящаяся на него часть (garpy — крылья↔руки, змея — без оружия (BD-23), паук — хелицеры/педипальпы)
+[Stage11Sim] C2: PASS — гибридная гарпия: отсутствующие гуманоидные руки НЕ блокируют слоты оружия — альтернативная анатомия (крылья) разрешает
+[Stage11Sim] C3: PASS — змея без манипулятивной анатомии: оружейные слоты заблокированы, торс/голова доступны (BD-23 сохранён)
+[Stage11Sim] C4: PASS — членистоногое: хелицеры/педипальпы — законная манипулятивная анатомия оружейных слотов
+[Stage11Sim] C5: PASS — реальная ампутация блокирует только предусмотренные слоты; приживление снимает блокировку без остатка
+[Stage11Sim] D1: PASS — ProcessRegeneration восстанавливает красную HP всех неампутированных частей (аккумулятор дробной регенерации)
+[Stage11Sim] D2: PASS — ампутированная часть исключена из регенерации (Heal возвращает 0 для Severed)
+[Stage11Sim] D3: GAP — фактическая семантика: HealthRegen → HealPart(Torso) (TODO P1-08 «распределение HoT по повреждённым частям»); торс лечится (True), конечности — нет (True); решение о распределении по частям — за владельцем (спецификация распределения HoT отсутствует)
+[Stage11Sim] E1: PASS — единое правило тел: разрушение Head (RedHP≤0) = смерть сущности (BODY_SYSTEM §5.3.1)
+[Stage11Sim] E2: GAP — Amorphous: Core red 0/100, IsEntityAlive=True — §5.3.1 (смерть = Head|Heart RedHP≤0) не определяет фатальность Core; предлагается владельцу: (а) считать IsVital-часть без Head/Heart (Core) фатальной, либо (б) зафиксировать бессмертие духа документом; флаг IsVital ≠ смертность (прецедент R20: торс)
+[Stage11Sim] F1: PASS — CaptureState/RestoreState: red/black/state всех частей, включая ампутацию (SetHP 0/0 → Severed), восстанавливаются точно
+[Stage11Sim] F2: PASS — идемпотентность round-trip: второй захват/восстановление не искажает состояние
+[Stage11Sim] F3: PASS — повреждённая запись (partType вне перечисления) отклоняется по-записно: валидные части восстанавливаются, загрузка не падает (контракт per-entry с журналом)
+[Stage11Sim] F4: PASS — BodyPart.SetHP клампит red/black в [0; Max] — повреждённые значения не создают отрицательное здоровье
+[Stage11Sim] F5: PASS — отсутствующая в body-блоке часть после reset-контракта = свежее состояние (нет тихого переноса ран прошлого мира); частичное восстановление видно по журналу
+[Stage11Sim] G1: PASS — ампутация: EquipmentBlockedEvent/авто-съём/возврат в инвентарь/дебафф — каждый ровно один раз
+[Stage11Sim] G2: PASS — повторное событие ампутации не дублирует эффект (Refresh-семантика ApplyBuff сохраняет один активный дебафф)
+[Stage11Sim] G3: PASS — приживление снимает только свои дебаффы и возвращает слот экипировки; повторное приживление — no-op
+[Stage11Sim] G4: PASS — LoadGame: производные состояния пересобираются по восстановленному телу — блокировки слотов (EquipmentService) и ампутационные дебаффы (SeveredDebuffSystem) согласованы, предметы без дюпа
+[Stage11Sim] G5: PASS — New Game между ампутацией и приживлением: тело/дебаффы/блокировки сброшены согласованно (приживлять нечего, слоты свободны)
+[Stage11Sim] B1: PASS — BodyService реализует reset-контракт (WorldDomainResetCoordinator.ResetAll — единая точка сброса world-transition)
+[Stage11Sim] B2: PASS — New Game = свежее тело (морфология/HP базовые), раны/ампутации/дебаффы/блокировки прошлого мира не протекают
+[Stage11Sim] B3: PASS — повторный reset безопасен: ампутационный дебафф применяется ровно один раз, состояния не накапливаются
+[Stage11Sim] B4: PASS — тело пересоздаётся ResetWorld-ом (порядок фаз New Game: ResetAll → генерация → Start-резюме), а не повторным Initialize модуля
+[Stage11Sim] REF-B01: REF — PT-B01 New Game сбрасывает ранения/ампутации/штрафы — закрыто симом B2/B3; физический статус выставляет владелец
+[Stage11Sim] REF-B02: REF — PT-B02 Save/Load восстанавливает каждую часть — закрыто симом F1/G4; физический статус выставляет владелец
+[Stage11Sim] REF-B03: REF — PT-B03 регенерация/HealthRegen — семантика HoT = GAP D3 (решение владельца); физический статус выставляет владелец
+[Stage11Sim] REF-B04: REF — PT-B04 смертность морфологий — GAP E2 (Core: предложение владельцу); физический статус выставляет владелец
+[Stage11Sim] REF-B05: REF — PT-B05 ампутация/приживление синхронны — закрыто симом G1-G4; физический статус выставляет владелец
+[Stage11Sim] REF-B06: REF — PT-B06 альтернативная анатомия не блокирует слоты — закрыто симом C1-C6; физический статус выставляет владелец
+[Stage11Sim] REF-C02+: REF — PT-C02 (дополнение): после возрождения проверить HP ВСЕХ частей тела — закрыто симом A1; физический статус выставляет владелец
+[Stage11Sim] Итого: PASS=27, FAIL=0, GAP=2, REF=7
+[Stage11Sim] VERDICT: PASS
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)

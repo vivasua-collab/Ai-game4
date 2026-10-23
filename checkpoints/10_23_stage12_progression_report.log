@@ -1,0 +1,438 @@
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+
+[InputMap] Registered all input actions.
+[WorldService] Active location: Test Polygon (id=test_polygon)
+[WorldModule] Started — time 1864-01-01 06:00, speed Normal
+[TileService] Generated 50x50 grid, seed=12345, baseTerrain=Grass (noise-based)
+  Water_Shallow: 651 tiles (26%)
+  Sand: 539 tiles (21%)
+  Grass: 1299 tiles (51%)
+  Water_Deep: 11 tiles (0%)
+  Biomes:
+    Sea: 654 tiles (26%)
+    Coast: 536 tiles (21%)
+    Grassland: 1300 tiles (52%)
+    Ocean: 10 tiles (0%)
+[TileModule] Started — generated 50x50 grid in 25 ms
+[AnimalSpawn] Spawned wolf #animal_wolf_1 at (9, 7) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_2 at (44, 34) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_3 at (44, 20) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_4 at (48, 22) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_5 at (20, 39) (body: Quadruped/Medium)
+[AnimalSpawn] test_polygon: spawned 5/5 animals (attempts=5)
+[PlayerService] Player spawned @ (25, 25), hp delegated to BodyService
+[StatProgressProducer] Запущен: продюсеры дельт §5.1/§5.2 (удар/уклонение/блок/урон/техника/медитация)
+[PlayerModule] Started — stat svc wired=True
+[QuestModule] Started
+[TradeModule] Started
+[UIModule] Started — HUD shown
+[SaveModule] Started — 23 ISaveable service(s) registered
+[ItemDatabase] Initialized (no Resources catalogue — populate via Register())
+[GeneratorModule] База данных предметов инициализирована
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[GeneratorModule] Модуль запущен. Зарегистрировано предметов: 4
+[GameEntryPoint] Location catalog registered: 3 locations [test_polygon, large_world, world_map]
+[GameEntryPoint] Started. 19 startables, 18 tickables, session=GameSession
+[GameBoot] Game initialized. Container built and entry point started.
+[MainMenu] GODOT_NEWGAME=1 — auto-starting QA world (test_polygon)
+[MainMenu] New Game (QA) selected — test_polygon
+[GameSession] NewGame variant=1 location=test_polygon (50×50) — assembling scene...
+[WorldModule] ResetWorld: календарные маркеры будут тихо ре-синхронизированы на первом тике (P1-15)
+[ResourceService] ResetWorld: 0 armed-записей очереди респауна очищено (ST10-01)
+[BodyService] ResetWorld: тело пересоздано (Humanoid/Medium, VIT 10) — New Game/LoadGame
+[StorageRingService] ResetWorld: хранилища колец очищены (P1-19)
+[CombatService] ResetWorld: combat state cleared (New Game)
+[TechniqueService] ResetWorld: techniques cleared (New Game)
+[TechniqueChargeService] ResetWorld: charges cleared (New Game)
+[CorpseService] ResetWorld: 0 трупов очищено
+[NPCSpawnerService] ResetWorld: домен NPC очищен (tracked=0, restored=0)
+[NPCGroupService] ResetWorld: 0 групп очищено
+[PlayerCombatAdapter] ResetWorld: стойка/режим оружия/кулдауны сброшены (New Game)
+[AuraHoldService] ResetWorld: hold cleared (New Game)
+[Trade] ResetWorld — сессия закрыта, сток очищен (0 лавок)
+[SaveModule] ResetWorld: отсчёт автосейва сброшен (каденция — мировой тик, P2-26)
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[Phase 0] WorldDomainReset complete — 36 world-scoped доменов сброшено (npc/corpses/groups/animals/formations/charger/player/stats/qi/quests/currency/inventory/equipment/belt/ground/world/time) + weapon-cache
+[Phase 1] CoreValidation complete — Core validated
+[TileService] Generated 50x50 grid, seed=12345, baseTerrain=Grass (noise-based)
+  Water_Shallow: 651 tiles (26%)
+  Sand: 539 tiles (21%)
+  Grass: 1299 tiles (51%)
+  Water_Deep: 11 tiles (0%)
+  Biomes:
+    Sea: 654 tiles (26%)
+    Coast: 536 tiles (21%)
+    Grassland: 1300 tiles (52%)
+    Ocean: 10 tiles (0%)
+[Phase 2] TileMapGen complete — test_polygon: 50×50 tiles, seed=12345
+[WorldService] Active location: Тестовый полигон (id=test_polygon)
+[TileModule] LocationChanged '' → 'test_polygon'
+[Phase 3] WorldInit complete — location=test_polygon, speed=Normal, techniqueRegistry cleared (was world-scoped reset)
+[PlayerService] Player spawned @ (25, 25), hp delegated to BodyService
+[Phase 4] PlayerSpawn complete — player at (25, 25) in test_polygon
+[ItemDatabase] Зарегистрирован предмет: material_wood (Material)
+[ItemDatabase] Зарегистрирован предмет: material_stone (Material)
+[ItemDatabase] Зарегистрирован предмет: material_iron_ore (Material)
+[ItemDatabase] Зарегистрирован предмет: material_fiber (Material)
+[ItemDatabase] Зарегистрирован предмет: consumable_berry (Consumable)
+[ItemDatabase] Зарегистрирован предмет: consumable_herb (Consumable)
+[ItemDatabase] Зарегистрирован предмет: con_pill_healing (Consumable)
+[ItemDatabase] Зарегистрирован предмет: con_pill_qi (Consumable)
+[ItemDatabase] Зарегистрирован предмет: ammo_arrow (Material)
+[ItemDatabase] Зарегистрирован предмет: material_steel_ingot (Material)
+[ItemDatabase] Зарегистрирован предмет: qistone_dust_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_dust_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_pebble_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_pebble_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_shard_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_shard_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_stone_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_stone_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_boulder_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_boulder_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_03e9_000001 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_dagger_L1_03e9_000001 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_03e9_000001 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_03ea_000002 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_bow_L1_03ea_000002 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_03ea_000002 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_03f2_000003 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_greatsword_L1_03f2_000003 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_03f2_000003 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_03f3_000004 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_staff_L1_03f3_000004 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_03f3_000004 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_044c_000005 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_torso_L1_044c_000005 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_044c_000005 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_044d_000006 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_feet_L1_044d_000006 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_044d_000006 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_04b2_000007 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_feet_L1_04b2_000007 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_04b2_000007 (Armor)
+[Phase 5] StartingGear complete — стартовый набор: БД +20, выдано 13 позиций, оружие 4 шт (кинжал надет: True, лук в инвентаре: True), броня 2 шт, стрел 30. Замена сейвов: каждая новая игра = одинаковый старт (сид 1000).
+[AnimalSpawn] Spawned wolf #animal_wolf_6 at (9, 7) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_7 at (44, 34) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_8 at (44, 20) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_9 at (48, 22) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_10 at (20, 39) (body: Quadruped/Medium)
+[AnimalSpawn] test_polygon: spawned 5/5 animals (attempts=5)
+[Phase 6] AnimalSpawn complete — 5 animals on 'test_polygon' (50×50)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_c990_000008 (Weapon)
+[HumanNPCSpawn] Spawned Merchant L0 #npc_8077802a370041bb at (2, 34)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_047ef526_000001 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_3bfbeb25_000002 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_1_404061d9_000003 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_6dd58204_000004 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_1_605cdbde_000005 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_754682ca_000006 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_6bcc5c30_000007 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L3_c9cf_000009 (Weapon)
+[HumanNPCSpawn] Spawned Elder L3 #npc_448a23fdef2a4a3b at (30, 35)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_1832b8f2_000008 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_1e418430_000009 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_1_4486dd77_00000a (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_09d1e60f_00000b (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_1_4171a49f_00000c (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_084fc68a_00000d (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_76bcbfbd_00000e (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L3_c973_00000a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L3_c975_00000b (Armor)
+[HumanNPCSpawn] Spawned Guard L3 #npc_01ff9639a4a9498f at (43, 48)
+[ItemDatabase] Зарегистрирован предмет: weapon_2_3fa35ada_00000f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_2_2db2f1d2_000010 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_2_278bf6b1_000011 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_6a41b2bc_000012 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_2_25b2f14c_000013 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_0bc50eff_000014 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_6a1a79af_000015 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_c974_00000c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_c976_00000d (Armor)
+[HumanNPCSpawn] Spawned Guard L2 #npc_30cfa415f8014cbe at (13, 48)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_ca2f_00000e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_ca31_00000f (Armor)
+[HumanNPCSpawn] Spawned Passerby L1 #npc_4655d7d59987488e at (24, 47)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L1_ca30_000010 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L0_ca32_000011 (Armor)
+[HumanNPCSpawn] Spawned Passerby L0 #npc_bc6a37073e664a11 at (45, 19)
+[ItemDatabase] Зарегистрирован предмет: weapon_2_35b98a0d_000016 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_2_59fb1b90_000017 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_2_7564853e_000018 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_2a4a0e1c_000019 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_2_76721e36_00001a (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_313a3630_00001b (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_705caea7_00001c (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L3_c9b5_000012 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L3_c9b7_000013 (Armor)
+[HumanNPCSpawn] Spawned Cultivator L3 #npc_a8b8bc60e8a34d35 at (16, 40)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_516dd1a5_00001d (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_1624a871_00001e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_1_24024dd1_00001f (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_1592f2ab_000020 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_1_7af74af3_000021 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_3ac14074_000022 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_1c94060e_000023 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_c9b6_000014 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_c9b8_000015 (Armor)
+[HumanNPCSpawn] Spawned Cultivator L2 #npc_c8dda50922814ffe at (30, 34)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L2_ca14_000016 (Weapon)
+[HumanNPCSpawn] Spawned Enemy L1 #npc_89d964f86d8f454c at (47, 40)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_6b98ebfe_000024 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_5691413c_000025 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_1_03f1e7b0_000026 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_42cddce6_000027 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_1_16e4611d_000028 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_17c679a8_000029 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_6bbde6b6_00002a (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L3_ca15_000017 (Weapon)
+[HumanNPCSpawn] Spawned Enemy L2 #npc_625de663ec4a4e42 at (4, 2)
+[Phase 7] HumanNPCSpawn complete — 10/10 generated NPCs on 'test_polygon'
+[NPCGroupService] Created group group_1 (task=HuntingPack, faction=, species=wolf)
+[NPCGroupService] Set patrol route for group_1: 4 waypoints
+[NPCGroupService] Added animal_wolf_11 to group group_1 as Leader
+[NPCGroupService] Added animal_wolf_12 to group group_1 as Follower
+[NPCGroupService] Added animal_wolf_13 to group group_1 as Follower
+[GroupSpawn] Wolf pack 'group_1' — 3 wolves at (45, 15)
+[NPCGroupService] Created group group_2 (task=Patrol, faction=town_guard, species=)
+[NPCGroupService] Set patrol route for group_2: 4 waypoints
+[ItemDatabase] Зарегистрирован предмет: weapon_2_3b4b690e_00002b (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_2_6ec37fcc_00002c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_2_4d5ed863_00002d (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_0a9e62f6_00002e (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_2_13107592_00002f (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_7cb9d175_000030 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_08c41c0c_000031 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_3d7d_000018 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_3d7f_000019 (Armor)
+[NPCGroupService] Added npc_c540e4d825604392 to group group_2 as Leader
+[ItemDatabase] Зарегистрирован предмет: weapon_2_767fff7c_000032 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_2_79b01497_000033 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_2_4fb908ba_000034 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_415ae66b_000035 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_2_1cf9e576_000036 (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_2_353ec31c_000037 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_0b1a20e0_000038 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_3d7e_00001a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_3d80_00001b (Armor)
+[NPCGroupService] Added npc_2652e655cef94241 to group group_2 as Follower
+[GroupSpawn] Guard patrol 'group_2' — 2 guards at (18, 38)
+[Phase 8] GroupSpawn complete — 2 groups on 'test_polygon' (50×50)
+[Phase 9] FormationInit complete (stub)
+[Phase 10] ChargerInit complete (stub)
+[Phase 11] QuestInit complete (stub)
+[Phase 12] UIInit complete — HUD shown
+[PreGenTechnique] start — maxLevel=1 seed=20857257
+[Dedup] Techniques: removed 2 duplicates, kept 1
+[Dedup] Techniques: removed 2 duplicates, kept 1
+[Dedup] Techniques: removed 2 duplicates, kept 1
+[PreGenTechnique] done — generated=100 valid=100 duplicates=6 registered=94 (registry total=102)
+[PreGenTechnique] grades registered: [Common=28, Refined=28, Perfect=28, Transcendent=10] gradeMismatches=0 registryInvalid=0
+[TechniqueGrant] seed=20857276
+[TechniqueGrant] R25 AoE-набор: 2/3 форм (конус/полукруг/круг — площадные техники)
+[Phase 14] TechniqueGrant complete — granted 8 techniques (cultivation 1, active 3/3, curse, formation, aoe 2) at L1
+[Phase 15] Finalize complete — Scene assembly complete
+[SceneOrchestrator] Assembly complete — mode=NewGame: 16 completed, 0 skipped, 102 ms
+[GameSession] NewGame ready — state=Playing
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_ocean.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_sea.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_coast.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_grassland.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_grassland.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_steppe.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_steppe.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_forest.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_forest.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_forest.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_highlands.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_highlands.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_mountains.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_mountains.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_peak.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_peak.png
+[GroundItemRenderer] Ready
+[AnimalSpriteRenderer] Ready — tilePixels=64
+[CorpseSpriteRenderer] Ready
+[NPCSpriteRenderer] Ready
+[FormationVisualRenderer] Ready
+[DamageNumberRenderer] Ready
+[ProjectileRenderer] Ready
+[StrikeFx] Ready
+[AoeFx] Ready
+[HomingFx] Ready
+[TechniqueEffectRenderer] Ready
+[CharacterDoll] Ready
+[Inventory] Ready
+[CharacterSheet] Ready
+[DialogueWindow] Ready
+[TradeWindow] Ready
+[LootWindow] Ready
+[HotbarPanel] Ready (v2: techniques + cooldowns + belt row + charge/aura R26 + медитация-слот П5)
+[TechniqueBook] Ready
+[HotkeysWindow] Ready
+[EventLogWindow] Ready
+[QuestWindow] Ready
+[CultivationWindow] Ready
+[ChargerWindow] Ready
+[CheatPanel] Ready (F2 to toggle)
+[Stage12Sim] Ready — Этап-12 (баффы/статы/Ци/культивация) starts in 3s
+[GameWorldController] Ready
+[BiomeTiles] Drew 100 textures, 0 missing (culled to 10×10)
+[SurfaceTransitions] Drew 29 transition sprites (culled to 11×11)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[AnimalService] Tick #1 — 8 animals; sample: wolf#animal_wolf_6 @ (9, 7)
+[AnimalService] Tick #2 — 8 animals; sample: wolf#animal_wolf_6 @ (9, 7)
+[Stage12Sim] ─── B. ST12-002: штраф сердца переживает пересчёт уровня ───
+[Stage12Sim] B1: ампутация сердца: регенерация 110 → 55 (ratio 0.50, ожид ~0.5) → PASS
+[QiService] Сердце приживлено — штраф регенерации снят
+[Stage12Sim] B2: после SetCultivationLevel(2): штраф сохранён=True, regen(сердце ампутировано)=518 vs целое=1037 (ratio 0.50, ожид ~0.5) → PASS
+[QiService] Повторное событие ампутации сердца — штраф уже активен (идемпотентно)
+[Stage12Sim] B3: дубликаты события ×2: регенерация ratio 0.50 (ожид ~0.5 — не 0.25) → PASS
+[QiService] Сердце приживлено — штраф регенерации снят
+[QiService] RestoreState: L1.0 Normal, qi 0/1000, heartSevered=True
+[QiService] Сердце приживлено — штраф регенерации снят
+[Stage12Sim] B4: RestoreState(HeartSevered=true): флаг=True, regen ratio 0.50 (ожид ~0.5) → PASS
+[Stage12Sim] ─── C. ST12-003: 5×1с == 1×5с (догоняющие тики) ───
+[BodyModule] DoT тик: qa_st12_dot → qa_st12_target, урон=10 (Qi)
+[BodyModule] DoT тик: qa_st12_dot → qa_st12_target, урон=10 (Qi)
+[BodyModule] DoT тик: qa_st12_dot → qa_st12_target, урон=10 (Qi)
+[BodyModule] DoT тик: qa_st12_dot → qa_st12_target, урон=10 (Qi)
+[BodyModule] DoT тик: qa_st12_dot → qa_st12_target, урон=10 (Qi)
+[Stage12Sim] C1: 5×ProcessTick(1с): тиков=5 (ожид 5) → PASS
+[BodyModule] DoT тик: qa_st12_dot → qa_st12_target, урон=10 (Qi)
+[BodyModule] DoT тик: qa_st12_dot → qa_st12_target, урон=10 (Qi)
+[BodyModule] DoT тик: qa_st12_dot → qa_st12_target, урон=10 (Qi)
+[BodyModule] DoT тик: qa_st12_dot → qa_st12_target, урон=10 (Qi)
+[BodyModule] DoT тик: qa_st12_dot → qa_st12_target, урон=10 (Qi)
+[Stage12Sim] C2: 1×ProcessTick(5с): тиков=5 (ожид 5 = C1; префикс — 1) → PASS
+[BodyModule] DoT тик: qa_st12_dot → qa_st12_target, урон=10 (Qi)
+[BodyModule] DoT тик: qa_st12_dot → qa_st12_target, урон=10 (Qi)
+[BodyModule] DoT тик: qa_st12_dot → qa_st12_target, урон=10 (Qi)
+[BodyModule] DoT тик: qa_st12_dot → qa_st12_target, урон=10 (Qi)
+[BodyModule] DoT тик: qa_st12_dot → qa_st12_target, урон=10 (Qi)
+[Stage12Sim] C3: 10×ProcessTick(0.5с): тиков=5 (ожид 5) → PASS
+[BodyModule] DoT тик: qa_st12_dot → qa_st12_target, урон=10 (Qi)
+[BodyModule] DoT тик: qa_st12_dot → qa_st12_target, урон=10 (Qi)
+[BodyModule] DoT тик: qa_st12_dot → qa_st12_target, урон=10 (Qi)
+[BodyModule] DoT тик: qa_st12_dot → qa_st12_target, урон=10 (Qi)
+[BodyModule] DoT тик: qa_st12_dot → qa_st12_target, урон=10 (Qi)
+[Stage12Sim] C4: ProcessTick(100с): тиков=5 (ожид 1..5 — потолок) → PASS
+[BodyModule] DoT тик: qa_st12_dot → qa_st12_target, урон=30 (Qi)
+[Stage12Sim] C5: стаки ×3: значение=30 (ожид 30) → PASS
+[Stage12Sim] ─── D. ST12-004: неизвестный ID ≠ случайный AttackBoost ───
+[BuffService] Неизвестный buffId 'qa_totally_unknown_buff_xyz' — ОТКАЗ (контракт ST12-004: неизвестные ID не превращаются в случайный модификатор; проверьте данные продюсера)
+[Stage12Sim] D1: ApplyBuff(unknown): applied=False, HasBuff=False, в списке=0, Damage-модификатор=0‰ → PASS
+[Stage12Sim] D2: контент-батарея 15 реальных ID: расхождений=0 → PASS
+[Stage12Sim] ─── E. ST12-005: RestoreState статов — валидация значений ───
+[StatService] RestoreState: base=6, virtual=1, threshold=1
+[Stage12Sim] E1: round-trip: STR=12.5, AGI=11.25, INTΔ=3.55 (дробные сохранены) → PASS
+[StatService] RestoreState: base Agility=NaN вне диапазона [0;1000] — запись отклонена
+[StatService] RestoreState: base Vitality=Infinity вне диапазона [0;1000] — запись отклонена
+[StatService] RestoreState: base Perception=-Infinity вне диапазона [0;1000] — запись отклонена
+[StatService] RestoreState: base Luck=-7 вне диапазона [0;1000] — запись отклонена
+[StatService] RestoreState: base Intelligence=5000 вне диапазона [0;1000] — запись отклонена
+[StatService] RestoreState: base — неизвестный StatType 9999, запись отклонена
+[StatService] RestoreState: virtualDelta Strength=-3 вне [0;10] — запись отклонена
+[StatService] RestoreState: virtualDelta CritChance=4 — вторичный стат не развивается, запись отклонена
+[StatService] RestoreState: virtualDelta Vitality=999 вне [0;10] — запись отклонена
+[StatService] RestoreState: virtualDelta Agility=NaN вне [0;10] — запись отклонена
+[StatService] RestoreState: threshold Agility=NaN вне диапазона — запись отклонена
+[StatService] RestoreState: threshold Vitality=-5 вне диапазона — запись отклонена
+[StatService] RestoreState: base=1, virtual=1, threshold=1
+[Stage12Sim] E2: повреждённые записи отклонены: STR=10 (валидная жива), AGI=0, INTΔ=2.5, VITΔ=0 → PASS
+[Stage12Sim] E3: VIT 10→12: торс MaxRed 200 → 220 (П.24: ×1.1) → PASS
+[Stage12Sim] ─── F. ST12-006: спецификация проводимости (BUFF_MODIFIERS §A.4) ───
+[BuffService] Неизвестный buffId 'conductivity_surge' — ОТКАЗ (контракт ST12-004: неизвестные ID не превращаются в случайный модификатор; проверьте данные продюсера)
+[Stage12Sim] F1: временный 'conductivity_surge': applied=False, в списке=False (ожид false/false — спец-запрет) → PASS
+[Stage12Sim] F2: перк 'perk_golden_body': applied=True, тип=CastSpeed → PASS
+[Stage12Sim] F3: перк-бафф: Conductivity-мод=0 (инертен — потребителей нет), Damage-мод=0‰ (ожид 0) → PASS
+[Stage12Sim] F4: SetConductivityBonus: 0.5→4.2, −5→2.8 (кламп 0), 99→8.3 (кламп 2 → ×3 базы) → PASS
+[Stage12Sim] ─── P. Прогрессия: дельты/сон/медитация/прорыв ───
+[Stage12Sim] P1: AddVirtualDelta: STRΔ 0 → 10 (кап 10), CritChanceΔ без роста (0 → 0) → PASS
+[StatService] RestoreState: base=6, virtual=0, threshold=0
+[Stage12Sim] P2: сон: <4ч — нет закрепления (10); 8ч: AGI 11.2 (ожид 11.2 = +0.2 дробно +1 порог), остаток Δ=0 → PASS
+[GameWorld] Toast: ☯ Медитация начата (+1.0 Ци/с)
+[GameWorld] Toast: ☯ Медитация завершена
+[Stage12Sim] P3: медитация: INTΔ 0 → 0.049999997 (+0.05 = 5 мин × 0.01), после прерывания Δ=0.049999997 (без роста) → PASS
+[Stage12Sim] P4: NPC↔NPC удар: STRΔ игрока 0 → 0 (без изменений) → PASS
+[Stage12Sim] P5: требования: малый=1100 (спец 1100), большой=5186 (спец 5188); гейт при полном ядре 1000: отказ=True, состояние нетронуто=True → PASS
+[Stage12Sim] P5-GAP (ST12-007): требование 1100 > MaxQi 1000 → малый прорыв L1.0 недостижим; большой L1→L2: 5188 > 1000; успешный путь TryBreakthrough — мёртвый код при текущей модели
+[QiService] Сердце приживлено — штраф регенерации снят
+[QiService] RestoreState: L3.4 Normal, qi 777/39396, heartSevered=True
+[Stage12Sim] P6: qi-round-trip: LInternalFire.4, Ци=777, heartSevered=True → PASS
+[Stage12Sim] ─── A. ST12-001: насыщающее сложение AddQi ───
+[Stage12Sim] A1: AddQi(500): 777 → 1277 (Max 39396) → PASS
+[Stage12Sim] A2: AddQi(long.MaxValue): 1177 → 39396/39396 (ожид MaxQi, без отрицательных) → PASS
+[Stage12Sim] A3: AddQi в заполненное ядро: CurrentQi=39396/39396, QiFullEvent +1 → PASS
+[Stage12Sim] A4: AddQi(0)/AddQi(-5): CurrentQi не изменился (39396) → PASS
+[Stage12Sim] ═══════ СВОДКА ЭТАПА-12 ═══════
+[Stage12Sim] B1: PASS — ампутация сердца: −50% регенерации Ци (QI-C01), применяется один раз
+[Stage12Sim] B2: PASS — RecalculateStats/SetCultivationLevel/прорыв НЕ снимают штраф ампутации сердца; приживление сердца — предусмотренный путь снятия (штраф уходит)
+[Stage12Sim] B3: PASS — повторные события ампутации сердца идемпотентны (штраф применяется ровно один раз)
+[Stage12Sim] B4: PASS — Save/Load: ампутация сердца сохраняется (блок qi), штраф восстанавливается ПОСЛЕ пересчёта — семантика R17/QI-C01
+[Stage12Sim] B5: PASS — штраф снимается ТОЛЬКО предусмотренным правилом восстановления сердца (ReattachPart/BodyPartReattachedEvent)
+[Stage12Sim] C1: PASS — кадровая частота: 5 шагов по 1с при интервале 1с = 5 тиков DoT
+[Stage12Sim] C2: PASS — эквивалентность скачка: один шаг 5с даёт те же тики, что 5 шагов по 1с (факт: 5)
+[Stage12Sim] C3: PASS — дробные шаги: аккумуляция до полного интервала, без преждевременных тиков
+[Stage12Sim] C4: PASS — ограничение всплеска: 100-секундный hitch даёт ≤5 тиков (факт 5), таймер синхронизируется (не копит долг)
+[Stage12Sim] C5: PASS — значение тика масштабируется стаками (TickDamage × CurrentStacks)
+[Stage12Sim] D1: PASS — неизвестный buffId — отказ с диагностикой (префикс: AttackBoost +10% к урону молча); ApplyBuff=False, модификатор=0‰
+[Stage12Sim] D2: PASS — все реальные вызовы ApplyBuff (боевые следствия/элементальные эффекты/техники/ампутации/перки) совместимы с контрактом отказа
+[Stage12Sim] E1: PASS — валидный сейв точно восстанавливается, дробные дельты/пороги без потерь
+[Stage12Sim] E2: PASS — по-записная валидация RestoreState: NaN/±Infinity/отрицательные/сверхкапа/вторичные-дельты/неизвестный StatType отклоняются с журналом; валидные записи восстановлены
+[Stage12Sim] E3: PASS — изменение Vitality публикует StatChangedEvent → BodyModule пересчитывает HP частей (П.24), HP растёт с VIT
+[Stage12Sim] F1: PASS — временный бафф проводимости отказан (BUFF_MODIFIERS_SYSTEM §A.4: только перки/проклятия; ветка perk/conductivity сужена до перков)
+[Stage12Sim] F2: PASS — перки проводимости — постоянные баффы (PerkService.ApplyPerk путь), кастинговый тип для UI
+[Stage12Sim] F3: PASS — нет двойного применения: бафф-ветка — учёт для HasBuff/UI, числовую проводимость ведёт PerkService (IQiDataProvider.SetConductivity), Damage-модификатор от перка = 0
+[Stage12Sim] F4: PASS — бонус проводимости клампится в [0..2] (SetConductivityBonus), итоговая проводимость = база × (1 + бонус)
+[Stage12Sim] P1: PASS — дельты: только первичные статы, не-отрицательные, капы 10/15 (§4.2: «при капе прирост невозможен до закрепления сном»)
+[Stage12Sim] P2: PASS — ConsolidateSleep §6: минимум 4 часа; consolidated = min(Δ, часы×0.025); §6.4 пороговый шаг +1 пока Δ ≥ threshold; остаток сохраняется
+[Stage12Sim] P3: PASS — медитация: 0.01 INT/игровую минуту только при активной медитации; прерывание останавливает прирост (§5.2)
+[Stage12Sim] P4: PASS — действия NPC↔NPC виртуальных дельт игроку не дают (PlayerIdResolver-фильтр продюсера)
+[Stage12Sim] P5: PASS — требования прорыва точно соответствуют BREAKTHROUGH_MODELS §4.3-4.4 (Модель В: capacity(next)×density(next)); TryBreakthrough честно отказывает при Ци < требования, не мутируя состояние
+[Stage12Sim] P5-GAP: GAP — ST12-007 (новая находка): требования прорыва (спец и реализация совпадают) превышают ёмкость ядра текущего уровня (L1.0: малый 1100 > MaxQi 1000; L1→L2: 5188 > 1000) — Ци всюду клампится по ёмкости, успешный прорыв недостижим. Предложение владельцу: (а) требование = доля ёмкости следующего уровня (напр. 90%), либо (б) накопление сверх ёмкости (расширяемое ядро/резервуар медитации), либо (в) пересмотр формулы §4.3. Формулы реализации каноничны — правка без решения владельца не производится
+[Stage12Sim] P6: PASS — блок qi (R17/QI-2): уровень/подуровень/качество/текущая Ци/ампутация сердца точно восстанавливаются
+[Stage12Sim] A1: PASS — обычная порция: CurrentQi = +500, инвариант 0 ≤ CurrentQi ≤ MaxQi
+[Stage12Sim] A2: PASS — насыщающее сложение без переполнения long: CurrentQi = 39396 (префикс — отрицательная Ци от overflow)
+[Stage12Sim] A3: PASS — заполненное ядро: повторное добавление не превышает MaxQi, QiFullEvent публикуется
+[Stage12Sim] A4: PASS — нулевые/отрицательные значения игнорируются guard-ом (без исключений)
+[Stage12Sim] Итого: PASS=29, FAIL=0, GAP=1
+[Stage12Sim] VERDICT: PASS
+[BodyModule] DoT тик: combat_bleed → qa_st12_combat_bleed, урон=100 (Physical)
+[BodyModule] DoT тик: elemental_burn → qa_st12_elemental_burn, урон=100 (Qi)
+[BodyModule] DoT тик: elemental_burn → qa_st12_elemental_burn, урон=100 (Qi)
+[BodyModule] DoT тик: elemental_poison → qa_st12_elemental_poison, урон=100 (Qi)
+[BodyModule] DoT тик: elemental_poison → qa_st12_elemental_poison, урон=100 (Qi)
+[BodyModule] DoT тик: technique_poison → qa_st12_technique_poison, урон=100 (Qi)
+[BodyModule] DoT тик: technique_poison → qa_st12_technique_poison, урон=100 (Qi)
+[BodyModule] Тик баффа: qi_restoration → qa_st12_qi_restoration, значение=100
+[AnimalService] Tick #3 — 8 animals; sample: wolf#animal_wolf_6 @ (9, 7)
+[BodyModule] DoT тик: elemental_burn → qa_st12_elemental_burn, урон=100 (Qi)
+[BodyModule] DoT тик: elemental_poison → qa_st12_elemental_poison, урон=100 (Qi)
+[BodyModule] DoT тик: technique_poison → qa_st12_technique_poison, урон=100 (Qi)
+[BodyModule] DoT тик: elemental_burn → qa_st12_elemental_burn, урон=100 (Qi)
+[BodyModule] DoT тик: elemental_poison → qa_st12_elemental_poison, урон=100 (Qi)
+[BodyModule] DoT тик: technique_poison → qa_st12_technique_poison, урон=100 (Qi)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[BodyModule] DoT тик: combat_bleed → qa_st12_combat_bleed, урон=100 (Physical)
+[BodyModule] DoT тик: elemental_burn → qa_st12_elemental_burn, урон=100 (Qi)
+[BodyModule] DoT тик: elemental_poison → qa_st12_elemental_poison, урон=100 (Qi)
+[BodyModule] DoT тик: technique_poison → qa_st12_technique_poison, урон=100 (Qi)
