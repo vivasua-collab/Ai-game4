@@ -42,12 +42,17 @@ namespace CultivationGame.Modules.Inventory
     /// резолвятся через каталог item_db, который восстанавливается РАНЬШЕ
     /// по контракту RestoreOrder) + IWorldResettable.
     /// </summary>
-    public class EquipmentService : IEquipmentService, ISaveable, IWorldResettable, IDisposable
+    public class EquipmentService : IEquipmentService, ISaveable, IWorldResettable, IPostLoadSync, IDisposable
     {
         // === Зависимости (DI через конструктор) ===
         private readonly IPublisher<EquipmentChangedEvent> _equipChangedPub;
         private readonly IPublisher<EquipmentBlockedEvent> _equipBlockedPub;
         private readonly ISubscriber<BodyPartSeveredEvent> _severedSub;
+        // ST11-007 (Этап-11 аудита): приживление части возвращает заблокированный слот.
+        private readonly ISubscriber<BodyPartReattachedEvent>? _reattachedSub;
+        // ST11-007: пересборка кэша блокировок после LoadGame — Core-контракт
+        // (IBodyService.GetBlockedSlotsForPart), НЕ ссылка на Modules.Body.
+        private readonly IBodyService? _bodyService;
         private readonly IEquipmentDataProvider? _equipmentDataProvider;
         // R17 (INV-4): резолв itemId → EquipmentData при RestoreState.
         private readonly IItemDatabaseService? _itemDatabase;
@@ -67,6 +72,7 @@ namespace CultivationGame.Modules.Inventory
 
         private string _entityId;
         private IDisposable _severedSubscription;
+        private IDisposable? _reattachedSubscription;
 
         // === Свойства ===
         public string EntityId => _entityId;
@@ -85,11 +91,15 @@ namespace CultivationGame.Modules.Inventory
             IEquipmentDataProvider? equipmentDataProvider = null,
             IItemDatabaseService? itemDatabase = null,
             IQiService? qiService = null,
-            IStatService? statService = null)
+            IStatService? statService = null,
+            ISubscriber<BodyPartReattachedEvent>? reattachedSub = null,
+            IBodyService? bodyService = null)
         {
             _equipChangedPub = equipChangedPub;
             _equipBlockedPub = equipBlockedPub;
             _severedSub = severedSub;
+            _reattachedSub = reattachedSub;
+            _bodyService = bodyService;
             _equipmentDataProvider = equipmentDataProvider;
             _itemDatabase = itemDatabase;
             _qiService = qiService;
@@ -107,6 +117,12 @@ namespace CultivationGame.Modules.Inventory
 
             // QI-C01: Подписка на BodyPartSeveredEvent — автоснятие экипировки
             _severedSubscription = _severedSub.Subscribe(OnBodyPartSevered);
+
+            // ST11-007 (Этап-11 аудита): приживление ампутированной части
+            // возвращает заблокированный слот (SeveredDebuffSystem так же
+            // снимает дебаффы по этому событию). Идемпотентная подписка.
+            if (_reattachedSubscription == null && _reattachedSub != null)
+                _reattachedSubscription = _reattachedSub.Subscribe(OnBodyPartReattached);
         }
 
         // === IEquipmentService ===
@@ -276,6 +292,73 @@ namespace CultivationGame.Modules.Inventory
         }
 
         // ══════════════════════════════════════════════════════════════
+        // ST11-007 (Этап-11 аудита, 23.10): приживление + пост-загрузочная
+        // синхронизация производного кэша _blockedSlots.
+        // Префикс-дефекты: (1) приживление не разблокировало слот — навсегда;
+        // (2) LoadGame: RestoreState блока "body" не публикует события
+        // BodyPartSeveredEvent → _blockedSlots пуст при ампутированном теле
+        // → экипировка в слот отрубленной руки разрешалась после загрузки.
+        // ══════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Приживление части: снять блокировку со слотов, которые блокировала
+        /// именно эта часть. Не трогает блокировки других ампутаций.
+        /// </summary>
+        private void OnBodyPartReattached(in BodyPartReattachedEvent e)
+        {
+            // Та же сущность (фильтр как в OnBodyPartSevered)
+            if (_entityId == null || e.EntityId != _entityId) return;
+
+            if (_bodyService == null)
+            {
+                // Без Core-контракта тела (легаси-ручные конструкции без DI-графа)
+                // пересчёт невозможен — архитектурно НЕ ссылаемся на Modules.Body.
+                Console.WriteLine($"[EquipmentService] OnBodyPartReattached: IBodyService недоступен — блокировки не пересчитаны ({e.Part})");
+                return;
+            }
+
+            // Пересчёт по фактическому состоянию тела: слот остаётся
+            // заблокированным, только если ДРУГАЯ ампутированная часть
+            // также мапится на него (например, LeftArm + LeftHand → WeaponOff).
+            _blockedSlots.Clear();
+            foreach (var p in _bodyService.GetAllParts())
+            {
+                if (p.State == Core.Data.BodyPartState.Severed)
+                {
+                    foreach (var slot in _bodyService.GetBlockedSlotsForPart(p.Type))
+                        _blockedSlots.Add(slot);
+                }
+            }
+        }
+
+        /// <summary>
+        /// IPostLoadSync: домены восстановлены из сейва — пересобрать кэш
+        /// _blockedSlots по восстановленному телу (RestoreState блока "body"
+        /// не публикует событий — иначе авто-съём создавал бы дюпы в момент,
+        /// когда блоки equipment/inventory ещё восстанавливаются).
+        /// Идемпотентно (повторный вызов = тот же результат), без исключений
+        /// в валидных состояниях (контракт IPostLoadSync).
+        /// </summary>
+        public void OnAfterLoad()
+        {
+            if (_bodyService == null) return; // без тела пересобирать нечего
+
+            _blockedSlots.Clear();
+            int blocked = 0;
+            foreach (var p in _bodyService.GetAllParts())
+            {
+                if (p.State == Core.Data.BodyPartState.Severed)
+                {
+                    foreach (var slot in _bodyService.GetBlockedSlotsForPart(p.Type))
+                    {
+                        if (_blockedSlots.Add(slot)) blocked++;
+                    }
+                }
+            }
+            Console.WriteLine($"[EquipmentService] OnAfterLoad: кэш блокировок пересобран по телу ({blocked} слотов)");
+        }
+
+        // ══════════════════════════════════════════════════════════════
         // R17 (INV-4): ISaveable — блок "equipment" (кукла игрока)
         // ══════════════════════════════════════════════════════════════
 
@@ -368,6 +451,8 @@ namespace CultivationGame.Modules.Inventory
         {
             _severedSubscription?.Dispose();
             _severedSubscription = null;
+            _reattachedSubscription?.Dispose();
+            _reattachedSubscription = null;
         }
     }
 }
