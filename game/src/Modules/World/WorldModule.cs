@@ -132,15 +132,27 @@ public sealed class WorldModule : IModule, IWorldResettable
             // Docs (MODULE_STRUCTURE §WorldContracts): Day/Month/YearChanged fire
             // when the calendar component rolls over. Consumed by quests, buffs,
             // cultivation — anything that reacts to game-calendar boundaries.
+            // ST10-04 (Этап-10 аудита, 23.10): компоненты календаря НЕЗАвИСИМЫ.
+            // Преже Month/Year были ВЛОЖЕНЫ в ветку t.Day != _lastDay: скачок
+            // ровно на N месяцев (BulkAdvanceTicks/GameBoot catch-up) не менял
+            // day-of-month → молчали ВСЕ календарные события, включая месяц/год
+            // (воспроизведено Stage10-симом D3a/D3b). Теперь каждый компонент
+            // сверяется и публикуется независимо; маркеры синхронизируются
+            // каждый тик. Естественная игра (день 30→1) даёт те же Day+Month,
+            // что и прежде — поведение для живого мира не изменилось.
             if (t.Day != _lastDay)
             {
                 _dayChangedPublisher.Publish(new DayChangedEvent(t.Day));
-                if (t.Month != _lastMonth)
-                    _monthChangedPublisher.Publish(new MonthChangedEvent(t.Month, t.Year));
-                if (t.Year != _lastYear)
-                    _yearChangedPublisher.Publish(new YearChangedEvent(t.Year));
-                _lastDay = t.Day; _lastMonth = t.Month; _lastYear = t.Year;
             }
+            if (t.Month != _lastMonth)
+            {
+                _monthChangedPublisher.Publish(new MonthChangedEvent(t.Month, t.Year));
+            }
+            if (t.Year != _lastYear)
+            {
+                _yearChangedPublisher.Publish(new YearChangedEvent(t.Year));
+            }
+            _lastDay = t.Day; _lastMonth = t.Month; _lastYear = t.Year;
         }
     }
 
