@@ -234,14 +234,13 @@ namespace CultivationGame.Modules.NPC
         }
 
         /// <summary>
-        /// AUDIT-0911 NPC-7 FIX: раньше возвращал любой ключ Threats с макс.
-        /// значением — включая ФАНТОМНЫЕ («sever_unknown» от ампутации;
-        /// «dot:{buffId}» от DoT-тиков: BodyModule публикует DamageAppliedEvent
-        /// с SourceId="dot:…"). После таймаута Fleeing NPC выбирал фантом как
-        /// TargetId → движение «не-NPC = игрок» → NPC преследовал и БИЛ игрока
-        /// без всякого агро. Теперь ключ обязан быть реальной живой целью:
-        /// игрок или живой NPC (DoT-урон от яда не должен провоцировать атаку
-        /// на игрока — месть от REAL ударов уже работает через DamageApplied).
+        /// AUDIT-0911 NPC-7 FIX + ST13-003 (Этап-13): ключ с максимальной
+        /// угрозой — только РЕАЛЬНАЯ живая цель (игрок или живой NPC);
+        /// фантомы («sever_unknown», «dot:…») и мёртвые пропускаются.
+        /// ST13-003: детерминированный tie-break — при РАВНОЙ угрозе
+        /// выбирается лексикографически меньший ID (раньше победитель
+        /// зависел от порядка перечисления Dictionary — недетерминизм
+        /// между запусками, пойман Stage13-симом C3: 3/5 и 0/5 в двух ранах).
         /// </summary>
         private string? GetTopThreatId(NPCState state)
         {
@@ -249,7 +248,9 @@ namespace CultivationGame.Modules.NPC
             float max = 0f;
             foreach (var kvp in state.Threats)
             {
-                if (kvp.Value <= max) continue;
+                bool better = kvp.Value > max
+                    || (kvp.Value == max && topId != null && string.CompareOrdinal(kvp.Key, topId) < 0);
+                if (!better) continue;
 
                 // Валидация цели: игрок или ЖИВОЙ NPC.
                 if (CultivationGame.Core.Helpers.PlayerIdResolver.IsPlayer(kvp.Key))
@@ -323,6 +324,31 @@ namespace CultivationGame.Modules.NPC
                 {
                     PublishDisengage(state, "цель погибла");
                     _npcService.SetAIState(state.NpcId, NPCAIState.Wandering);
+                    return;
+                }
+            }
+
+            // ST13-003 (Этап-13, NPC_AI_SYSTEM §5.3/§9.2): в бою — пересмотр
+            // цели каждый тик. Более опасная цель (строго большая угроза) →
+            // переключение с ЛЮБОЙ текущей цели, включая ИГРОКА (прежде
+            // переключение с игрока было невозможно вовсе). При РАВНОЙ
+            // угрозе текущая цель сохраняется — детерминированный tie-break
+            // (стабильность), а не порядок перечисления Dictionary. Смена
+            // цели завершает прежнюю боевую сессию честно (дизенгейдж),
+            // не очищая таблицу угроз.
+            if (state.IsInCombat && state.AIState == NPCAIState.Attacking
+                && !string.IsNullOrEmpty(state.TargetId))
+            {
+                string? topThreat = GetTopThreatId(state);
+                if (topThreat != null && topThreat != state.TargetId
+                    && state.Threats.TryGetValue(topThreat, out float topT)
+                    && (!state.Threats.TryGetValue(state.TargetId, out float curT) || topT > curT))
+                {
+                    _combatDisengagePub.Publish(new CombatDisengageEvent(state.NpcId,
+                        $"ретаргет: {topThreat} опаснее ({topT:F0} > {curT:F0})"));
+                    state.IsInCombat = false; // адаптер уже сбросил; страховка
+                    state.TargetId = topThreat;
+                    Console.WriteLine($"[NPCAI] Retarget {state.NpcId}: {state.DisplayName} → более опасная цель {topThreat} ({topT:F0})");
                     return;
                 }
             }
@@ -447,6 +473,29 @@ namespace CultivationGame.Modules.NPC
                 // Мстительность увеличивает атаку при наличии угроз
                 float totalThreat = GetTotalThreat(state);
                 attackWeight += totalThreat * 0.05f;
+            }
+
+            // ST13-006 (Этап-13, NPC.md §4.2 — нормативные веса черт):
+            // Loyal — «−50% idle, +30% work, +20% talk». Work/talk в
+            // упрощённый chooser не входят (FSM-состояния без весов) —
+            // применено −50% idle; ограничение зафиксировано в отчёте
+            // Этапа-13. Прежне Loyal назначался ролями, но в решениях
+            // не читался вовсе.
+            if ((state.Personality & PersonalityTrait.Loyal) != 0)
+            {
+                idleWeight *= 0.5f;
+            }
+
+            // ST13-006: Treacherous — «Если Attitude < Neutral: −50% talk,
+            // +40% patrol» (talk не в chooser — ограничение в отчёте).
+            // Отношение — через NPCService.GetAttitude (делегирует
+            // NPCRelationshipService); прежде черта не назначалась и не
+            // читалась (enum-only).
+            if ((state.Personality & PersonalityTrait.Treacherous) != 0)
+            {
+                var attitude = _npcService.GetAttitude(state.NpcId, PlayerId);
+                if (attitude < Attitude.Neutral)
+                    patrolWeight *= 1.4f;
             }
 
             // Модификаторы от ситуации
@@ -665,22 +714,24 @@ namespace CultivationGame.Modules.NPC
         /// </summary>
         private void RetaliateOrFlee(NPCState state, string sourceId)
         {
-            // R20 (баг №2): NPC уже в Attacking/Fleeing, но бьёт НОВЫЙ атакующий
-            // (типичная сцена репорта: NPC в эмерджентной стычке с волком →
-            // игрок бьёт его → «вступает в бой, но не перемещается, меня не
-            // преследует» — NPC продолжал гонять волка). Ретаргет: если
-            // угроза нового атакующего (уже добавлена OnDamageApplied до
-            // этого вызова) больше текущей цели — переключаемся на него.
+            // R20 (баг №2) + ST13-003 (Этап-13): NPC уже в Attacking, но бьёт
+            // НОВЫЙ атакующий с БОЛЬШЕЙ угрозой — переключаемся. Прежнее
+            // условие !IsPlayer(state.TargetId) навсегда блокировало смену
+            // цели-игрока на более опасного NPC (§5.3/§9.2 исключений не
+            // имеют). Смена завершает прежнюю сессию дизенгейджем (без
+            // очистки угроз — чистый ретаргет).
             if (state.AIState == NPCAIState.Attacking
                 && !string.IsNullOrEmpty(state.TargetId)
-                && state.TargetId != sourceId
-                && !Core.Helpers.PlayerIdResolver.IsPlayer(state.TargetId))
+                && state.TargetId != sourceId)
             {
                 state.Threats.TryGetValue(sourceId, out float newThreat);
                 state.Threats.TryGetValue(state.TargetId, out float curThreat);
                 if (newThreat > curThreat)
                 {
-                    state.TargetId = sourceId;
+                    if (state.IsInCombat)
+                        _combatDisengagePub.Publish(new CombatDisengageEvent(state.NpcId,
+                            $"ретаргет: {sourceId} опаснее ({newThreat:F0} > {curThreat:F0})"));
+                    state.TargetId = sourceId; // ПОСЛЕ дизенгейджа (адаптер чистит TargetId)
                     Console.WriteLine($"[NPCAI] Retarget {state.NpcId}: {state.DisplayName} переключается на нового атакующего ({sourceId}, угроза {newThreat:F0} > {curThreat:F0})");
                     return; // состояние уже Attacking — цель сменена
                 }
