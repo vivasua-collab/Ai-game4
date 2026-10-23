@@ -320,13 +320,17 @@ namespace CultivationGame.Adapter.Scene
             await PhysFrames(2);
 
             // C4: инвариант паузы: пред-существующая Esc-пауза переживает
-            // закрытие окна (гейт _wasPausedBeforeInventory).
+            // закрытие окна (гейт _wasPausedBeforeInventory). Окно открываем
+            // ИГРОВЫМ путём (клавиша T → HandleModalPauseOnOpen делает
+            // снапшот паузы) — прямой book.Open() снапшот не делает и
+            // проверял бы не тот путь.
             _time!.Pause();
-            book.Open(); await PhysFrames(2);
-            await PressAction("pause"); // закрывает книгу
-            bool c4 = _time.IsPaused;   // пауза НЕ снята закрытием окна
+            await PressAction("techniques"); // T: открывает книгу поверх паузы
+            bool c4open = book is { Visible: true };
+            await PressAction("pause");      // Esc закрывает книгу
+            bool c4 = c4open && _time.IsPaused; // пауза НЕ снята закрытием окна
             _time.Resume();
-            GD.Print($"[Stage14Sim] C4: пред-существующая пауза после Esc-закрытия книги: IsPaused={c4} (ожид true) → {(c4 ? "PASS" : "FAIL")}");
+            GD.Print($"[Stage14Sim] C4: T поверх паузы (книга открыта={c4open}), Esc-закрытие: пауза пережила={_time.IsPaused} (ожид true) → {(c4 ? "PASS" : "FAIL")}");
 
             Record("C", c1 && c2 && c3 && c4, $"T→B={c1}, second-Esc={c2}, B→T={c3}, pause-invariant={c4}");
         }
@@ -381,10 +385,20 @@ namespace CultivationGame.Adapter.Scene
             GodotInput.ActionRelease("move_right");
             GodotInput.ActionRelease("run");
             await PhysFrames(2);
+
+            // E3 (контроль): после «возврата фокуса» действие снова требует
+            // АКТУАЛЬНОГО ввода — повторное нажатие двигает.
+            GodotInput.ActionPress("move_right");
+            await PhysFrames(3);
+            bool e3 = _input.MoveDirection.X > 0f;
+            GodotInput.ActionRelease("move_right");
+            await PhysFrames(2);
+            GD.Print($"[Stage14Sim] E3: новое нажатие после потери фокуса двигает={e3} → {(e3 ? "PASS" : "FAIL")}");
+
             // Реальный OS-путь (alt-tab) headless не воспроизводится —
             // физический сценарий PT-U06; здесь проверен контракт обработчика.
-            Record("E", heldBefore && cleared,
-                $"held={heldBefore}, cleared={cleared}; OS-путь — PT-U06 (физический)");
+            Record("E", heldBefore && cleared && e3,
+                $"held={heldBefore}, cleared={cleared}, re-press={e3}; OS-путь — PT-U06 (физический)");
         }
 
         // ================================================================
@@ -411,10 +425,13 @@ namespace CultivationGame.Adapter.Scene
                 },
             };
             _dialogues.RegisterDialogue("qa_stage14_ghost_dialog", nodes);
-            bool started = _dialogues.StartDialogue(npcId, "qa_stage14_ghost_dialog");
+            // Полный ИГРОВОЙ путь: MapNpcDialogue + DialogueDebugOpen
+            // (TryStartNpcDialogue + снапшот паузы + открытие окна).
+            _dialogues.MapNpcDialogue(npcId, "qa_stage14_ghost_dialog");
+            bool started = _world!.DialogueDebugOpen(npcId);
             await PhysFrames(6); // typewriter печатает
-            bool winOpen = _world!.DialogueWindowForQA is { IsOpen: true };
-            GD.Print($"[Stage14Sim] F1: диалог стартовал={started}, окно открыто={winOpen}");
+            bool winOpen = _world.DialogueWindowForQA is { IsOpen: true };
+            GD.Print($"[Stage14Sim] F1: игровой путь DialogueDebugOpen: старт={started}, окно открыто={winOpen}");
 
             int endedBefore = _dialogueEndedEvents;
             _dialogues.AdvanceDialogue();   // докончить печать либо линейный переход

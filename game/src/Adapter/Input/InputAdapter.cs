@@ -253,14 +253,35 @@ public partial class InputAdapter : Node
         }
     }
 
+    /// <summary>Все игровые действия (ST14-006: на потере фокуса каждое
+    /// отпускается ЯВНО — опрос следующего кадра вернёт «не нажато», иначе
+    /// held-состояния пережили бы потерю фокуса до возврата).</summary>
+    private static readonly string[] AllGameActions =
+    {
+        "move_up", "move_down", "move_left", "move_right", "run",
+        "interact", "inventory", "rest", "harvest", "special_action",
+        "pause", "quicksave", "quickload", "journal", "techniques",
+        "character_sheet", "quest_log", "world_map", "minimap",
+        "time_speed_up", "time_speed_down", "meditate", "cast_technique",
+        "attack", "defend", "cycle_target", "cheat_menu",
+        "toggle_enemy_vitals", "toggle_fps_counter", "help_hotkeys",
+        "cultivation_window", "charger_window",
+        "hotbar_1", "hotbar_2", "hotbar_3", "hotbar_4", "hotbar_5",
+        "hotbar_6", "hotbar_7", "hotbar_8", "hotbar_9",
+    };
+
     private void OnApplicationFocusLost()
     {
-        // Немедленный нулевой кадр: held-состояния сброшены, sticky-набор
-        // пуст (одноразовые флаги пересоберутся только реальным вводом).
+        // ST14-006: (1) явный release ВСЕХ игровых действий — иначе опрос
+        // следующего физ-кадра снова увидит «нажатые» клавиши и held-стейт
+        // переживёт потерю фокуса; (2) немедленный нулевой кадр — сервис
+        // ввода не держит движение/бег/ПКМ-длительность ни одного тика.
+        foreach (var action in AllGameActions)
+            GodotInput.ActionRelease(action);
         _stickyKeys.Clear();
         _rmbHoldDuration = 0f;
         PushFrame(Godot.Vector2.Zero, isRun: false, isLmb: false, isRmb: false, hotbarSlot: null);
-        GD.Print("[InputAdapter] ST14-006: потеря фокуса приложения — held-ввод сброшен");
+        GD.Print("[InputAdapter] ST14-006: потеря фокуса приложения — held-ввод и действия сброшены");
     }
 
     /// <summary>ST14-006 QA: симуляция потери фокуса (headless не получает
