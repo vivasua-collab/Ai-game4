@@ -1012,6 +1012,17 @@ public partial class GameWorldController : Node2D
             var stage13Sim = new Stage13NpcAiTruthSimDebug { Name = "Stage13NpcAiTruthSimDebug" };
             AddChild(stage13Sim);
         }
+        // Этап-14 аудита (23.10, GODOT_STAGE14_DEBUG=1): ввод/фокус/модальные
+        // окна — ST14-001 (текст-фокус глушит игровые sticky), ST14-002
+        // (единый предикат модальности), ST14-003 (Esc по фактическому
+        // стеку окон), ST14-005 (E над планировочными окнами), ST14-006
+        // (потеря фокуса — сброс held-ввода), ST14-004-edge (узел-призрак
+        // завершает диалог).
+        if (System.Environment.GetEnvironmentVariable("GODOT_STAGE14_DEBUG") == "1")
+        {
+            var stage14Sim = new Stage14InteractionFocusTruthSimDebug { Name = "Stage14InteractionFocusTruthSimDebug" };
+            AddChild(stage14Sim);
+        }
         // 2026-09-08 (баг-репорт пользователя): headless-верификация
         // инвентарного drag&drop в корзину (GODOT_TRASHDROP_DEBUG=1) —
         // материалы draggable, корзина выбрасывает, кукла отклоняет.

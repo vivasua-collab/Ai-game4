@@ -54,6 +54,9 @@ ALL_SIMS=(
   # Этап-13 аудита (23.10): ИИ NPC/навигация/группы/животные (ST13-001..006;
   # детект по радиусу — норма §9.1, перки/лестница Attitude — GAP).
   "STAGE13:GODOT_STAGE13_DEBUG"
+  # Этап-14 аудита (23.10): ввод/фокус/модальные окна (ST14-001..006;
+  # OS-путь потери фокуса — физический PT-U06).
+  "STAGE14:GODOT_STAGE14_DEBUG"
   "KILLFEED:GODOT_KILLFEED_DEBUG"
   "QUEST:GODOT_QUEST_DEBUG"
   "STORAGE:GODOT_STORAGE_DEBUG"
