@@ -847,6 +847,17 @@ public partial class GameWorldController : Node2D
             var stage9Sim = new Stage9InventoryTruthSimDebug { Name = "Stage9InventoryTruthSimDebug" };
             AddChild(stage9Sim);
         }
+        // Этап-10 аудита (23.10, GODOT_STAGE10_DEBUG=1): жизненный цикл мира —
+        // ST10-01 (очередь истощённых ресурсов: изоляция миров, сброс при
+        // пересборке), ST10-02 (TTL трупов по игровому возрасту), ST10-03
+        // (гигиена групп при смерти: лидер → следующий, пустая → расформ),
+        // ST10-04 (BulkAdvanceTicks: 1 hitched, календарные переходы на
+        // первом естественном тике без фантомов), GAP-заметки.
+        if (System.Environment.GetEnvironmentVariable("GODOT_STAGE10_DEBUG") == "1")
+        {
+            var stage10Sim = new Stage10WorldLifecycleTruthSimDebug { Name = "Stage10WorldLifecycleTruthSimDebug" };
+            AddChild(stage10Sim);
+        }
         // 2026-09-08 (баг-репорт пользователя): headless-верификация
         // инвентарного drag&drop в корзину (GODOT_TRASHDROP_DEBUG=1) —
         // материалы draggable, корзина выбрасывает, кукла отклоняет.

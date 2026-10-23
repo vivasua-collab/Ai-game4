@@ -43,6 +43,8 @@ ALL_SIMS=(
   # Этап-9 аудита (23.10): инвентарь/экипировка/переносы (ST9-01..03,
   # прочность = GAP).
   "STAGE9:GODOT_STAGE9_DEBUG"
+  # Этап-10 аудита (23.10): жизненный цикл мира (ST10-01..04).
+  "STAGE10:GODOT_STAGE10_DEBUG"
   "KILLFEED:GODOT_KILLFEED_DEBUG"
   "QUEST:GODOT_QUEST_DEBUG"
   "STORAGE:GODOT_STORAGE_DEBUG"
