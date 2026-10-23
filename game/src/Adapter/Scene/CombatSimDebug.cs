@@ -736,6 +736,38 @@ public partial class CombatSimDebug : Node
                 // фактически бессмертен после торс-0, сим на этом молча
                 // держался). PT-001 QA-синхрон: если игрок УЖЕ мёртв — сначала
                 // реальный респавн (Revive + PlayerReviveEvent), не «леченный труп».
+                // ST13-001a-изоляция (Этап-13, регресс 23.10): с починкой
+                // НЕОСЕВОГО движения NPC «тихая» война (a) больше не
+                // замирает — B реально преследует A в паузах (b) и доводит
+                // её до flee-порога: AbandonCombat('Flee') закрывает
+                // UI-сессию толпы посреди проверки (30/32 → FAIL). Гасим
+                // войну пары; для толпы берём небитого NPC (flee 20% не
+                // грозит в окне проверки).
+                if (crowdB != null)
+                {
+                    var bState = _npcService.GetNPCState(crowdB);
+                    if (bState != null)
+                    {
+                        bState.Threats.Clear();
+                        bState.IsInCombat = false;
+                        bState.TargetId = "";
+                        _npcService.SetAIState(crowdB, NPCAIState.Wandering);
+                    }
+                }
+                if (crowdA != null)
+                {
+                    var aState2 = _npcService.GetNPCState(crowdA);
+                    if (aState2 != null)
+                    {
+                        aState2.Threats.Clear();
+                        aState2.IsInCombat = false;
+                        aState2.TargetId = "";
+                        _npcService.SetAIState(crowdA, NPCAIState.Wandering);
+                    }
+                }
+                string? crowdAtk = crowdA;
+                if (crowdAtk != null && _bodyProvider.GetCurrentHealth(crowdAtk) < 250)
+                    crowdAtk = FindSecondNpc(crowdA) ?? crowdA;
                 await EnsurePlayerAliveAsync("multi(b)");
                 int playerHpCrowd0 = _bodyProvider.GetCurrentHealth("player");
                 for (int attempt = 0; attempt < 5 && (attempt == 0 || !_combatServiceImpl.IsInCombat); attempt++)
@@ -745,8 +777,8 @@ public partial class CombatSimDebug : Node
                 {
                     await WaitForOwnCastClearAsync(crowdA, 2.0f);
                     _combatServiceImpl.DebugSetReadinessPermil(crowdA, 1000);
-                    var acc = _combatServiceImpl.ExecuteAttack(crowdA, "npc_strike", PlayerCombatId, false);
-                    GD.Print($"[CombatSim] multi(b) attempt {attempt + 1}: {crowdA}→player acc={acc}");
+                    var acc = _combatServiceImpl.ExecuteAttack(crowdAtk, "npc_strike", PlayerCombatId, false);
+                    GD.Print($"[CombatSim] multi(b) attempt {attempt + 1}: {crowdAtk}→player acc={acc}");
                     await ToSignal(GetTree().CreateTimer(0.8), SceneTreeTimer.SignalName.Timeout);
                 }
                 await ToSignal(GetTree().CreateTimer(1.0), SceneTreeTimer.SignalName.Timeout);

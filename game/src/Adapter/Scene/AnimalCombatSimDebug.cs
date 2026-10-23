@@ -228,7 +228,14 @@ public partial class AnimalCombatSimDebug : Node2D
             && wolfCorpse.ItemCount >= 1
             && !_animalService.IsHostile(wolf.EntityId); // месть погашена смертью
         // CombatService обязан завершить бой (Victory) при смерти защитника.
-        bool combatEndedOnKill = !_combatServiceImpl.IsInCombat;
+        // ST13-001a-изоляция: с починкой НЕОСЕВОГО движения NPC (Этап-13)
+        // мирные враждебные NPC теперь реально ДОХОДЯТ до игрока —
+        // эмерджентная атака постороннего NPC открывает НОВУЮ сессию
+        // глобальным 1v1-флагом. Проверяем семантику: сессия с ВОЛКОМ
+        // завершена (активный оппонент — не волк; отсутствие сессии —
+        // тоже успех).
+        bool combatEndedOnKill = !_combatServiceImpl.IsInCombat
+            || _combatServiceImpl.CurrentTargetId != wolf.EntityId;
         corpseOk &= combatEndedOnKill;
         GD.Print($"[AnimalQA] 4-смерть: бой был={combatActiveBeforeKill}, волк IsAlive={wolf.IsAlive}, " +
                  $"трупов {corpsesBefore}→{corpsesAfter}, DisplayName='{wolfCorpse?.DisplayName}', " +
