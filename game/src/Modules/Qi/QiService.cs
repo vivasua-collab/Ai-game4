@@ -38,6 +38,9 @@ public class QiService : IQiService, ISaveable, IWorldResettable, IDisposable
     private readonly IPublisher<QiFullEvent> _qiFullPub;
     private readonly IPublisher<CultivationBreakthroughEvent> _breakthroughPub;
     private readonly IPublisher<CultivationLevelChangedEvent> _cultivationLevelChangedPub;
+    // ST12-002 (Этап-12 аудита): приживление сердца — предусмотренный путь
+    // снятия штрафа регенерации (ReattachPart → BodyPartReattachedEvent).
+    private readonly ISubscriber<BodyPartReattachedEvent>? _reattachedSubscriber;
 
     // === Состояние ===
     private string _entityId = string.Empty;
@@ -45,6 +48,7 @@ public class QiService : IQiService, ISaveable, IWorldResettable, IDisposable
     /// <summary>R17: конфиг последней Initialize — источник дефолтов для ResetWorld.</summary>
     private QiConfig? _initialConfig;
     private IDisposable? _severedSubscription;
+    private IDisposable? _reattachedSubscription;
     private IDisposable? _qiConsumeRequestSubscription;
     private IDisposable? _qiAddRequestSubscription;
     private bool _heartSevered; // QI-C01: Флаг ампутации сердца
@@ -97,16 +101,22 @@ public class QiService : IQiService, ISaveable, IWorldResettable, IDisposable
         IPublisher<CultivationLevelChangedEvent> cultivationLevelChangedPub,
         ISubscriber<BodyPartSeveredEvent> severedSubscriber,
         ISubscriber<QiConsumeRequestEvent> qiConsumeRequestSub,
-        ISubscriber<QiAddRequestEvent> qiAddRequestSub)
+        ISubscriber<QiAddRequestEvent> qiAddRequestSub,
+        ISubscriber<BodyPartReattachedEvent>? reattachedSubscriber = null)
     {
         _qiChangedPub = qiChangedPub;
         _qiDepletedPub = qiDepletedPub;
         _qiFullPub = qiFullPub;
         _breakthroughPub = breakthroughPub;
         _cultivationLevelChangedPub = cultivationLevelChangedPub;
+        _reattachedSubscriber = reattachedSubscriber;
 
         // QI-C01: подписка на ампутацию части тела
         _severedSubscription = severedSubscriber.Subscribe(OnBodyPartSevered);
+
+        // ST12-002: приживление сердца снимает штраф регенерации
+        if (_reattachedSubscriber != null)
+            _reattachedSubscription = _reattachedSubscriber.Subscribe(OnBodyPartReattached);
 
         // EVT-01: подписка на command-события (вместо прямых вызовов от других модулей)
         // P0-X1 FIX: фильтрация по EntityId — обрабатываем только свои события (пустой EntityId = игрок)
@@ -170,7 +180,17 @@ public class QiService : IQiService, ISaveable, IWorldResettable, IDisposable
     public void AddQi(long amount)
     {
         if (amount < 0) return;
-        _currentQi = Math.Min(_maxQiCapacity, _currentQi + amount);
+
+        // ST12-001 (Этап-12 аудита, 23.10): насыщающее сложение — прежде
+        // _currentQi + amount переполняло long ДО клампа: AddQi(long.MaxValue)
+        // на непустом ядре давало ОТРИЦАТЕЛЬНУЮ Ци (префикс: −9.22e18),
+        // «заполненное ядро» ломалось (Math.Min с отрицательным — отрицательное).
+        // Разность _maxQiCapacity − _currentQi ≥ 0 — переполнения нет.
+        if (amount >= _maxQiCapacity - _currentQi)
+            _currentQi = _maxQiCapacity;
+        else
+            _currentQi += amount;
+
         PublishQiChanged();
 
         if (IsFull)
@@ -301,16 +321,27 @@ public class QiService : IQiService, ISaveable, IWorldResettable, IDisposable
         _baseConductivity = (double)_coreCapacity / 360.0;
         _conductivity = (float)(_baseConductivity * (1.0 + _conductivityBonus));
 
-        // Множитель регенерации по уровню
+        // Множитель регенерации по уровню — С УЧЁТОМ штрафа ампутации сердца.
+        // ST12-002 (Этап-12 аудита, 23.10): штраф — ПРОИЗВОДНАЯ от _heartSevered,
+        // а не мутация поля: прежде RecalculateStats перезаписывал множитель
+        // таблицей уровня БЕЗ _heartSevered → SetCultivationLevel/прорыв
+        // снимали штраф при ампутированном сердце, а повторное событие
+        // ампутации уменьшало множитель многократно (префикс: ratio 0.25).
         if (_cultivationLevel >= 1 && _cultivationLevel <= 10)
         {
             _regenMultiplier = GameConstants.RegenerationMultipliers[_cultivationLevel - 1];
+        }
+        if (_heartSevered)
+        {
+            _regenMultiplier *= 0.5f; // QI-C01: ампутация сердца — −50% регенерации
         }
     }
 
     /// <summary>
     /// QI-C01: Обработка ампутации части тела.
     /// При ампутации сердца — -50% регенерация Ци.
+    /// ST12-002: идемпотентна — штраф выводится в RecalculateStats из флага;
+    /// повторное событие не уменьшает множитель дополнительно.
     /// EventBus handler signature: void OnXxx(in XxxEvent e).
     /// </summary>
     private void OnBodyPartSevered(in BodyPartSeveredEvent e)
@@ -319,8 +350,27 @@ public class QiService : IQiService, ISaveable, IWorldResettable, IDisposable
 
         if (e.Part == BodyPartType.Heart)
         {
+            bool wasSevered = _heartSevered;
             _heartSevered = true;
-            _regenMultiplier *= 0.5f; // -50% регенерация
+            RecalculateStats(); // штраф = производная флага (идемпотентно)
+            if (wasSevered)
+                Console.WriteLine("[QiService] Повторное событие ампутации сердца — штраф уже активен (идемпотентно)");
+        }
+    }
+
+    /// <summary>
+    /// ST12-002: приживление сердца — предусмотренное игровым правилом
+    /// восстановление (ReattachPart): штраф регенерации снимается.
+    /// </summary>
+    private void OnBodyPartReattached(in BodyPartReattachedEvent e)
+    {
+        if (e.EntityId != _entityId) return;
+
+        if (e.Part == BodyPartType.Heart && _heartSevered)
+        {
+            _heartSevered = false;
+            RecalculateStats();
+            Console.WriteLine("[QiService] Сердце приживлено — штраф регенерации снят");
         }
     }
 
@@ -348,6 +398,8 @@ public class QiService : IQiService, ISaveable, IWorldResettable, IDisposable
     {
         _severedSubscription?.Dispose();
         _severedSubscription = null;
+        _reattachedSubscription?.Dispose();
+        _reattachedSubscription = null;
         _qiConsumeRequestSubscription?.Dispose();
         _qiConsumeRequestSubscription = null;
         _qiAddRequestSubscription?.Dispose();
@@ -402,13 +454,12 @@ public class QiService : IQiService, ISaveable, IWorldResettable, IDisposable
         _conductivityBonus = Math.Clamp(data.ConductivityBonus, 0f, 2f);
         _enablePassiveRegen = data.EnablePassiveRegen;
 
-        RecalculateStats();
-
-        // QI-C01: ампутация сердца — постоянный штраф регена. Семантика та же,
-        // что в OnBodyPartSevered (RecalculateStats перезаписывает множитель
-        // из таблицы — штраф применяется ПОСЛЕ пересчёта).
+        // QI-C01/ST12-002: флаг ампутации сердца — ДО пересчёта: штраф
+        // теперь производная флага внутри RecalculateStats (прежде штраф
+        // применялся вручную ПОСЛЕ — и только в этом пути, теряясь при
+        // любом другом пересчёте уровня).
         _heartSevered = data.HeartSevered;
-        if (_heartSevered) _regenMultiplier *= 0.5f;
+        RecalculateStats();
 
         _currentQi = Math.Clamp(data.CurrentQi, 0, _maxQiCapacity);
         _dailyAccumulator = 0.0;
