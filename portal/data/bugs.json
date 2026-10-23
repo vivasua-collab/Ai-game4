@@ -1,5 +1,5 @@
 {
- "version": 1.8,
+ "version": 1.9,
  "updated": "2026-10-23",
  "format": {
   "purpose": "Реестр находок аудита и волн их исправления. Запуск процесса: директива владельца от 19.10.2026 — «по важным находкам аудита запустить анализ и исправление». Источник находок: аудит-вердикты итерации 2 карты проекта (коммит dfb98d0) + открытые верификации PROJECT_MAP.md §5. Ведёт main-агент Z.ai Code; веб-портал читает файл напрямую (runtime, no-store).",
@@ -1370,6 +1370,74 @@
    "qa": "ANIMQA PASS. Локально прогнан godot --headless --import (генерация .import/.ctex для спрайтов — player_idle/player_walk в .godot/imported, файлы gitignored, коммита не требуют): сим загрузил листы через ResourceLoader-путь; _qa-плейсхолдеры — по-прежнему raw. Отрицательный кэш и fallback целы (step1/2b ANIMQA). Владельцу: предупреждение в editor-логе должно исчезнуть (раунд 2).",
    "progress_pct": 100,
    "fix_note": "Плейтест-раунд 1 (PT-S00). Экспорт-пресет/include_filter — вне скоупа (экспорт не веха); при первом экспорте спрайты пойдут штатным путём."
+  },
+  {
+   "id": "STAGE9-001",
+   "type": "bug",
+   "severity": "P1",
+   "title": "Крафт терял ингредиенты при mid-loop отказе расхода (ST9-01)",
+   "module": "Инвентарь (Inventory)",
+   "track_ref": "tech-s9",
+   "status": "verified",
+   "fix_wave": 6,
+   "assignee": "assistant",
+   "found": "2026-10-23",
+   "verified": "2026-10-23",
+   "summary": "CraftingService.TryCraft удалял ингредиенты последовательно без отката: отказ удаления одного из них терял ранее списанные. При текущей модели путь латентный (ItemRemovedEvent без подписчиков), но любой будущий реактивный подписчик делал его реальным — воспроизведено hostile-подписчиком в Stage9-симе (wood 10→7 при отказавшем крафте).",
+   "analysis": "Pre-flight HasIngredients есть, но между проверкой и удалениями нет транзакции. Событийная модель EventBus допускает синхронных подписчиков ItemRemovedEvent, мутирующих инвентарь между шагами.",
+   "fix": "Транзакционный расход: фиксация removedSoFar, при любом отказе — полный возврат RollbackRemovedIngredients (TryAddItem через каталог, ItemSources.Craft, громкая диагностика при неудаче). Коммит a83c36e; префикс/постфикс: checkpoints/10_22_stage9_inventory_{prefix,report}.log; отчёт checkpoints/10_22_stage9_inventory_report.md.",
+   "artifacts": "Stage9InventoryTruthSimDebug 24 ассерта PASS (A4b — регресс отката); зона 6/6."
+  },
+  {
+   "id": "STAGE10-001",
+   "type": "bug",
+   "severity": "P1",
+   "title": "Очередь истощённых ресурсов переживала пересборку мира (ST10-01)",
+   "module": "Мир и тайлы (World/Tile)",
+   "track_ref": "tech-s10",
+   "status": "verified",
+   "fix_wave": 6,
+   "assignee": "assistant",
+   "found": "2026-10-23",
+   "verified": "2026-10-23",
+   "summary": "ResourceService — singleton без IWorldResettable: armed-записи _depleted старого мира стреляли ResourceRespawnedEvent по координатам НОВОЙ карты (TileService восстанавливает объект по X/Y). Воспроизведено Stage10-симом A4/A5 (префикс FAIL).",
+   "analysis": "Координатная валидация бессмысленна (координаты легальны в любом мире); верный контракт — сброс world-scoped очереди при пересборке. GAP: тайлы не в сейве — восстановление истощённости после LoadGame требует персистентности тайлов (решение владельца).",
+   "fix": "ResourceService : IWorldResettable, ResetWorld() очищает очередь; координатор подхватывает через ResolveAll инстанс-матчингом. Коммит 712ecdc.",
+   "artifacts": "Stage10-сим A4/A5 PASS постфикс; REASSEMBLY/STAGE4/SAVELOAD зона PASS."
+  },
+  {
+   "id": "STAGE10-002",
+   "type": "bug",
+   "severity": "P2",
+   "title": "Смерть NPC не исключала его из группы: мёртвые лидеры и висячие ссылки (ST10-03)",
+   "module": "NPC и группы (NPC)",
+   "track_ref": "tech-s10",
+   "status": "verified",
+   "fix_wave": 6,
+   "assignee": "assistant",
+   "found": "2026-10-23",
+   "verified": "2026-10-23",
+   "summary": "NPCGroupService не подписывался на NPCDeathEvent: мёртвые оставались участниками и лидерами (патрули вели мёртвые лидеры, висячие ссылки переживали Save/Load). Воспроизведено Stage10-симом C1-C3 (префикс FAIL).",
+   "analysis": "RemoveMember существовал (перенос между группами), но путь смерти не был подключён; группы смешанные NPC+звери (GAP-014) — нужен общий контракт.",
+   "fix": "Initialize() из NPCModule.Start (паттерн CorpseService), NPCDeathEvent → RemoveMember: лидерство → следующему, пустая группа расформируется. Коммит 712ecdc.",
+   "artifacts": "Stage10-сим C1-C3 PASS постфикс; ANIMALQA/KILLFEED зона PASS."
+  },
+  {
+   "id": "STAGE10-003",
+   "type": "bug",
+   "severity": "P2",
+   "title": "Month/Year события молчали при скачке ровно на N месяцев/лет (ST10-04b, новый дефект)",
+   "module": "Мир и время (World)",
+   "track_ref": "tech-s10",
+   "status": "verified",
+   "fix_wave": 6,
+   "assignee": "assistant",
+   "found": "2026-10-23",
+   "verified": "2026-10-23",
+   "summary": "MonthChangedEvent/YearChangedEvent были вложены в ветку t.Day != _lastDay: BulkAdvanceTicks (catch-up при загрузке) ровно на N месяцев/лет не менял day-of-month → молчали ВСЕ календарные события. Найден Stage10-симом D3a/D3b при проверке ST10-04 (префикс FAIL: +30 дней и +360 дней — ноль событий).",
+   "analysis": "Календарные компоненты независимы: месяц/год могут перейти без смены day-of-month только в bulk-скачках (естественная игра день 30→1 меняет всё) — потому дефект жил в catch-up пути.",
+   "fix": "Каждый компонент сверяется и публикуется независимо; маркеры синхронизируются каждый тик. Живой мир не изменился. Коммит b62babc. GAP (решение владельца): подписчики-счётчики (квесты «прожить N дней», старение) недосчитывают hitched-интервал.",
+   "artifacts": "Stage10-сим D3a/D3b PASS постфикс; AUDIT0922 (P1-13/15 time-ассерты) зона PASS."
   }
  ]
 }
