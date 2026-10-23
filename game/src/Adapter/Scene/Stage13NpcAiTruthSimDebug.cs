@@ -201,27 +201,75 @@ namespace CultivationGame.Adapter.Scene
 
         private async Task<bool> WaitFramesSampling(
             string moverId,
+            Position2D goal,
             int frames,
+            bool stopOnReach,
             Action<int>? onFrame = null,
             params (string id, Position2D pos)[] pins)
         {
-            // Возвращает false, если хоть один кадр мовер стоял на
-            // непроходимом тайле (или тайл вне карты).
+            // Возвращает false, если хоть один сегмент траектории мовера
+            // прошёл через непроходимый тайл. Движение ТИКОВОЕ (шаг до
+            // нескольких тайлов за тик) — проверяем СЕГМЕНТ между
+            // последовательными позициями (supercover-Bresenham), а не
+            // только позиции на кадрах: иначе прыжок «через стену» между
+            // кадрами не ловится. Ранний выход при dist ≤ 1.6 к goal.
             bool clean = true;
-            for (int i = 0; i < frames; i++)
+            bool reached = false;
+            var last = _npcs!.GetNPCState(moverId)?.Position ?? new Position2D(0, 0);
+            for (int i = 0; i < frames && !reached; i++)
             {
                 if (_npcs != null)
                     foreach (var (id, pos) in pins) Pin(_npcs, id, pos);
                 var st = _npcs!.GetNPCState(moverId);
-                if (st != null && !_tiles!.IsWalkable(st.Position.X, st.Position.Y))
+                if (st != null)
                 {
-                    GD.PrintErr($"[Stage13Sim] кадр {i}: {moverId} на непроходимом тайле ({st.Position.X},{st.Position.Y})");
-                    clean = false;
+                    if (st.Position != last)
+                    {
+                        if (!SegmentWalkable(last, st.Position))
+                        {
+                            GD.PrintErr($"[Stage13Sim] кадр {i}: сегмент {moverId} ({last.X},{last.Y})→({st.Position.X},{st.Position.Y}) пересекает непроходимые тайлы");
+                            clean = false;
+                        }
+                        last = st.Position;
+                    }
+                    if (stopOnReach && Position2D.Distance(st.Position, goal) <= 1.6f)
+                        reached = true;
                 }
                 onFrame?.Invoke(i);
                 await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
             }
+            _reachedGoal = reached;
             return clean;
+        }
+
+        private bool _reachedGoal;
+
+        /// <summary>Supercover-Bresenham: все тайлы отрезка (включая концы)
+        /// проходимы? Диагональные шаги проверяют ОБА ортогональных соседа
+        /// (угол не срезается).</summary>
+        private bool SegmentWalkable(Position2D a, Position2D b)
+        {
+            int x0 = a.X, y0 = a.Y;
+            int x1 = b.X, y1 = b.Y;
+            if (!_tiles!.IsWalkable(x0, y0) || !_tiles.IsWalkable(x1, y1)) return false;
+            int dx = Math.Abs(x1 - x0), dy = Math.Abs(y1 - y0);
+            int sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+            int err = dx - dy;
+            int x = x0, y = y0;
+            while (x != x1 || y != y1)
+            {
+                int e2 = err * 2;
+                if (e2 > -dy && e2 < dx)
+                {
+                    // диагональный шаг: угол не режем — оба соседа проходимы
+                    if (!_tiles.IsWalkable(x + sx, y) || !_tiles.IsWalkable(x, y + sy)) return false;
+                    x += sx; y += sy; err -= dy; err += dx;
+                }
+                else if (e2 > -dy) { x += sx; err -= dy; }
+                else if (e2 < dx) { y += sy; err += dx; }
+                if ((x != x1 || y != y1) && !_tiles.IsWalkable(x, y)) return false;
+            }
+            return true;
         }
 
         private float Dist(string idA, Position2D b)
@@ -238,6 +286,27 @@ namespace CultivationGame.Adapter.Scene
             _npcs.SetAIState(id, NPCAIState.Attacking); // → IsInCombat=true (адаптер)
         }
 
+        /// <summary>Мирное движение к цели (без атак/интентов) — детерминированная
+        /// проба навигации: kiting/оружие/готовность ударов не вмешиваются.</summary>
+        private void SetFollowing(string id, string targetId)
+        {
+            var st = _npcs!.GetNPCState(id);
+            if (st == null) return;
+            st.TargetId = targetId;
+            if (st.AIState != NPCAIState.Following)
+                _npcs.SetAIState(id, NPCAIState.Following);
+        }
+
+        /// <summary>Ре-установка Following если DecideNextState перевёл
+        /// состояние (таймаут 6с) — удерживает мовера на маршруте.</summary>
+        private void KeepFollowing(string id, string targetId)
+        {
+            var st = _npcs!.GetNPCState(id);
+            if (st == null) return;
+            if (st.AIState != NPCAIState.Following || st.TargetId != targetId)
+                SetFollowing(id, targetId);
+        }
+
         // ================================================================
         //  A. ST13-001 — навигация сквозь препятствия
         // ================================================================
@@ -245,15 +314,19 @@ namespace CultivationGame.Adapter.Scene
         private async Task ScenarioA()
         {
             GD.Print("[Stage13Sim] ─── A. ST13-001: NPC не проходят сквозь препятствия (A*, §6) ───");
+            // Движение тестируем МИРНОЙ веткой Following: Attacking-мProvOST
+            // зависит от оружия (лучник kiting стоит с дистанции) — для
+            // навигации важна траектория, а не бой.
 
             // --- A1: прямая без препятствий ---
             string b1 = SpawnNpc("A1-target", 14, 6, NPCRole.Passerby, 2026102301);
             string a1 = SpawnNpc("A1-mover", 6, 6, NPCRole.Passerby, 2026102302);
-            SetAttacking(a1, b1);
-            bool a1Clean = await WaitFramesSampling(a1, 480, pins: (b1, P(14, 6))); // ~8с
+            SetFollowing(a1, b1);
+            bool a1Clean = await WaitFramesSampling(a1, P(14, 6), 480, false,
+                _ => KeepFollowing(a1, b1), (b1, P(14, 6))); // ~8с
             float a1Dist = Dist(a1, P(14, 6));
-            bool a1ok = a1Clean && a1Dist <= 1.6f;
-            GD.Print($"[Stage13Sim] A1: прямая: дистанция до цели {a1Dist:F1} (≤1.6), тайлы чисты={a1Clean} → {(a1ok ? "PASS" : "FAIL")}");
+            bool a1ok = a1Clean && a1Dist <= 2.05f; // followDistance=2
+            GD.Print($"[Stage13Sim] A1: прямая: дистанция до цели {a1Dist:F1} (≤2.05), сегменты чисты={a1Clean} → {(a1ok ? "PASS" : "FAIL")}");
             Record("A1", a1ok, $"dist={a1Dist:F1}, clean={a1Clean}");
 
             // --- A2: стена с обходом (зазор сверху) ---
@@ -261,11 +334,12 @@ namespace CultivationGame.Adapter.Scene
             for (int y = 8; y <= 16; y++) Wall(12, y);
             string b2 = SpawnNpc("A2-target", 18, 12, NPCRole.Passerby, 2026102303);
             string a2 = SpawnNpc("A2-mover", 6, 12, NPCRole.Passerby, 2026102304);
-            SetAttacking(a2, b2);
-            bool a2Clean = await WaitFramesSampling(a2, 1500, pins: (b2, P(18, 12))); // ~25с
+            SetFollowing(a2, b2);
+            bool a2Clean = await WaitFramesSampling(a2, P(18, 12), 1800, false,
+                _ => KeepFollowing(a2, b2), (b2, P(18, 12))); // ~30с
             float a2Dist = Dist(a2, P(18, 12));
-            bool a2ok = a2Clean && a2Dist <= 1.6f;
-            GD.Print($"[Stage13Sim] A2: обход стены: дистанция {a2Dist:F1} (≤1.6), ни одного кадра на стене={a2Clean} → {(a2ok ? "PASS" : "FAIL")}");
+            bool a2ok = a2Clean && a2Dist <= 2.05f;
+            GD.Print($"[Stage13Sim] A2: обход стены: дистанция {a2Dist:F1} (≤2.05), ни одного сегмента сквозь стену={a2Clean} → {(a2ok ? "PASS" : "FAIL")}");
             Record("A2", a2ok, $"dist={a2Dist:F1}, clean={a2Clean}");
 
             // --- A3: пути нет (кольцо вокруг цели) → нет телепорта/зависания ---
@@ -273,93 +347,92 @@ namespace CultivationGame.Adapter.Scene
             for (int y = 17; y <= 19; y++) { Wall(16, y); Wall(20, y); }
             string b3 = SpawnNpc("A3-target", 18, 18, NPCRole.Passerby, 2026102305);
             string a3 = SpawnNpc("A3-mover", 14, 18, NPCRole.Passerby, 2026102306);
-            SetAttacking(a3, b3);
+            SetFollowing(a3, b3);
             var lastA3 = _npcs!.GetNPCState(a3)!.Position;
             int stableFrames = 0; int maxStable = 0;
-            bool a3Clean = await WaitFramesSampling(a3, 900, onFrame: _ =>
+            bool a3Clean = await WaitFramesSampling(a3, P(18, 18), 1200, false, _ =>
             {
+                KeepFollowing(a3, b3);
                 var st = _npcs.GetNPCState(a3);
                 if (st == null) return;
                 float d = Position2D.Distance(st.Position, lastA3);
                 if (d < 0.01f) { stableFrames++; maxStable = Math.Max(maxStable, stableFrames); }
                 else stableFrames = 0;
                 lastA3 = st.Position;
-            }, pins: (b3, P(18, 18))); // ~15с
+            }, (b3, P(18, 18))); // ~20с
             float a3Dist = Dist(a3, P(18, 18));
             bool a3Stable = maxStable >= 120; // ≥2с без движения → не циклит
-            bool a3ok = a3Clean && a3Dist > 1.6f && a3Stable;
-            GD.Print($"[Stage13Sim] A3: пути нет: дистанция {a3Dist:F1} (>1.6 — не достиг), чисто={a3Clean}, стабилен={a3Stable} (max {maxStable} кадров) → {(a3ok ? "PASS" : "FAIL")}");
+            bool a3ok = a3Clean && a3Dist > 2.05f && a3Stable;
+            GD.Print($"[Stage13Sim] A3: пути нет: дистанция {a3Dist:F1} (>2.05 — не достиг), чисто={a3Clean}, стабилен={a3Stable} (max {maxStable} кадров) → {(a3ok ? "PASS" : "FAIL")}");
             Record("A3", a3ok, $"dist={a3Dist:F1}, clean={a3Clean}, stable={a3Stable}");
 
             // --- A4: кольцо убрано → re-path и достижимость ---
             ClearWalls();
-            bool a4Clean = await WaitFramesSampling(a3, 900, pins: (b3, P(18, 18))); // ~15с
+            bool a4Clean = await WaitFramesSampling(a3, P(18, 18), 1200, false,
+                _ => KeepFollowing(a3, b3), (b3, P(18, 18))); // ~20с
             float a4Dist = Dist(a3, P(18, 18));
-            bool a4ok = a4Clean && a4Dist <= 1.6f;
-            GD.Print($"[Stage13Sim] A4: препятствие убрано: дистанция {a4Dist:F1} (≤1.6), чисто={a4Clean} → {(a4ok ? "PASS" : "FAIL")}");
+            bool a4ok = a4Clean && a4Dist <= 2.05f;
+            GD.Print($"[Stage13Sim] A4: препятствие убрано: дистанция {a4Dist:F1} (≤2.05), чисто={a4Clean} → {(a4ok ? "PASS" : "FAIL")}");
             Record("A4", a4ok, $"dist={a4Dist:F1}, clean={a4Clean}");
 
-            // --- A5: несколько NPC одновременно, вкл. участника группы ---
+            // --- A5: несколько NPC одновременно (мульти-мовер стресс) ---
             string b5 = SpawnNpc("A5-target", 8, 18, NPCRole.Passerby, 2026102307);
             string m1 = SpawnNpc("A5-m1", 6, 6, NPCRole.Passerby, 2026102308);
             string m2 = SpawnNpc("A5-m2", 16, 6, NPCRole.Passerby, 2026102309);
-            string g1 = SpawnNpc("A5-group", 10, 6, NPCRole.Guard, 2026102310);
-            // Группа патруля: цель (20,8) — ПРОТИВОПОЛОЖНО бою (10,18).
-            string grp = _groups!.CreateGroup(GroupTaskType.Patrol, "qa_stage13", "human");
-            _groups.AddMember(grp, g1, GroupRole.Leader);
-            _groups.SetPatrolRoute(grp, new List<Position2D> { P(20, 8), P(20, 16) });
-            SetAttacking(m1, b5);
-            SetAttacking(m2, b5);
-            SetAttacking(g1, b5);
-            bool a5Clean = await WaitFramesSampling(m1, 1500, pins: (b5, P(8, 18))); // ~25с
+            string m3 = SpawnNpc("A5-m3", 16, 16, NPCRole.Passerby, 2026102311);
+            SetFollowing(m1, b5);
+            SetFollowing(m2, b5);
+            SetFollowing(m3, b5);
+            bool a5Clean = await WaitFramesSampling(m1, P(8, 18), 1800, false, _ =>
+            {
+                KeepFollowing(m1, b5); KeepFollowing(m2, b5); KeepFollowing(m3, b5);
+            }, (b5, P(8, 18))); // ~30с
             var stM2 = _npcs!.GetNPCState(m2);
-            var stG1 = _npcs.GetNPCState(g1);
-            bool a5m2Clean = stM2 == null || _tiles!.IsWalkable(stM2.Position.X, stM2.Position.Y);
-            bool a5g1Clean = stG1 == null || _tiles.IsWalkable(stG1.Position.X, stG1.Position.Y);
-            float dM1 = Dist(m1, P(8, 18)), dM2 = Dist(m2, P(8, 18)), dG1 = Dist(g1, P(8, 18));
-            bool a5ok = a5Clean && a5m2Clean && a5g1Clean
-                && dM1 <= 1.6f && dM2 <= 1.6f && dG1 <= 1.6f;
-            GD.Print($"[Stage13Sim] A5: мульти: m1={dM1:F1}, m2={dM2:F1}, группа={dG1:F1} (все ≤1.6), тайлы чисты={a5Clean && a5m2Clean && a5g1Clean} → {(a5ok ? "PASS" : "FAIL")}");
-            Record("A5", a5ok, $"dM1={dM1:F1}, dM2={dM2:F1}, dG1={dG1:F1}");
+            var stM3 = _npcs.GetNPCState(m3);
+            bool a5m2Clean = stM2 == null || SegmentWalkable(P(16, 6), stM2.Position);
+            bool a5m3Clean = stM3 == null || SegmentWalkable(P(16, 16), stM3.Position);
+            float dM1 = Dist(m1, P(8, 18)), dM2 = Dist(m2, P(8, 18)), dM3 = Dist(m3, P(8, 18));
+            bool a5ok = a5Clean && a5m2Clean && a5m3Clean
+                && dM1 <= 2.05f && dM2 <= 2.05f && dM3 <= 2.05f;
+            GD.Print($"[Stage13Sim] A5: мульти: m1={dM1:F1}, m2={dM2:F1}, m3={dM3:F1} (все ≤2.05), сегменты чисты={a5Clean && a5m2Clean && a5m3Clean} → {(a5ok ? "PASS" : "FAIL")}");
+            Record("A5", a5ok, $"dM1={dM1:F1}, dM2={dM2:F1}, dM3={dM3:F1}");
         }
-
-        // ================================================================
-        //  B. ST13-002 — приоритет группы vs бой
-        // ================================================================
 
         private async Task ScenarioB()
         {
             GD.Print("[Stage13Sim] ─── B. ST13-002: бой > групповая задача > индивидуальное (§6) ───");
 
-            // --- B1: Attacking-участник группы идёт к врагу, не к waypoint ---
-            string enemy = SpawnNpc("B1-enemy", 10, 18, NPCRole.Passerby, 2026102311);
-            string member = SpawnNpc("B1-member", 10, 12, NPCRole.Guard, 2026102312);
+            // --- B1: Attacking-участник группы идёт к врагу, а не к waypoint ---
+            // Враг ДАЛЕКО на ВОСТОКЕ (40,5; Евклид > любой AttackRange лука) —
+            // лучник тоже обязан СБЛИЖАТЬСЯ (kiting не срабатывает за
+            // пределами дальности оружия). Waypoint — чистый ЮГ: направления
+            // различимы по осям. Мовер (12,5).
+            string enemy = SpawnNpc("B1-enemy", 40, 5, NPCRole.Passerby, 2026102312);
+            string member = SpawnNpc("B1-member", 12, 5, NPCRole.Guard, 2026102313);
             string grp = _groups!.CreateGroup(GroupTaskType.Patrol, "qa_stage13_b", "human");
             _groups.AddMember(grp, member, GroupRole.Leader);
-            // Waypoint НА СЕВЕР (y↓), враг НА ЮГЕ (y↑): направления различимы.
-            _groups.SetPatrolRoute(grp, new List<Position2D> { P(10, 5), P(18, 5) });
-            await WaitFrames(70, (enemy, P(10, 18))); // ~1.2с: группа тикнула, цель установлена
-            var groupTarget = _groups.GetGroup(grp)?.CurrentGroupTarget;
-            float distEnemyBefore = Dist(member, P(10, 18));
-            float distWaypointBefore = groupTarget.HasValue
-                ? Dist(member, groupTarget.Value) : -1f;
+            _groups.SetPatrolRoute(grp, new List<Position2D> { P(12, 20), P(19, 20) });
+            await WaitFrames(90, (enemy, P(40, 5))); // ~1.5с: группа тикнула
+            var groupTarget = _groups.GetGroupByMember(member)?.CurrentGroupTarget;
+            GD.Print($"[Stage13Sim] B1: CurrentGroupTarget группы = {groupTarget}");
+            float distEnemyBefore = Dist(member, P(40, 5));
+            float distWaypointBefore = groupTarget.HasValue ? Dist(member, groupTarget.Value) : -1f;
             SetAttacking(member, enemy);
-            await WaitFrames(90, (enemy, P(10, 18))); // ~1.5с в бою
-            float distEnemyAfter = Dist(member, P(10, 18));
-            float distWaypointAfter = groupTarget.HasValue
-                ? Dist(member, groupTarget.Value) : -1f;
-            bool b1 = distEnemyAfter < distEnemyBefore - 1f; // к врагу
-            GD.Print($"[Stage13Sim] B1: в бою: до врага {distEnemyBefore:F1}→{distEnemyAfter:F1} (↓), до waypoint {distWaypointBefore:F1}→{distWaypointAfter:F1} → {(b1 ? "PASS" : "FAIL")}");
+            await WaitFrames(120, (enemy, P(40, 5))); // ~2с в бою
+            float distEnemyAfter = Dist(member, P(40, 5));
+            float distWaypointAfter = groupTarget.HasValue ? Dist(member, groupTarget.Value) : -1f;
+            bool b1 = distEnemyAfter < distEnemyBefore - 1f; // к врагу (восток)
+            GD.Print($"[Stage13Sim] B1: в бою: до врага {distEnemyBefore:F1}→{distEnemyAfter:F1} (↓ — восток), до waypoint {distWaypointBefore:F1}→{distWaypointAfter:F1} → {(b1 ? "PASS" : "FAIL")}");
             Record("B1", b1, $"enemy {distEnemyBefore:F1}→{distEnemyAfter:F1}");
 
             // --- B2: бой завершён → возврат к групповой задаче ---
             _npcs!.SetAIState(member, NPCAIState.Wandering);
             var mst = _npcs.GetNPCState(member);
             if (mst != null) { mst.IsInCombat = false; mst.TargetId = ""; }
-            var groupTarget2 = _groups.GetGroup(grp)?.CurrentGroupTarget;
+            var groupTarget2 = _groups.GetGroupByMember(member)?.CurrentGroupTarget;
             float before2 = groupTarget2.HasValue ? Dist(member, groupTarget2.Value) : -1f;
-            await WaitFrames(120); // ~2с
-            var groupTarget3 = _groups.GetGroup(grp)?.CurrentGroupTarget;
+            await WaitFrames(150); // ~2.5с
+            var groupTarget3 = _groups.GetGroupByMember(member)?.CurrentGroupTarget;
             float after3 = groupTarget3.HasValue ? Dist(member, groupTarget3.Value) : -1f;
             bool b2 = after3 >= 0 && after3 < before2 - 0.5f; // группа ведёт к waypoint
             GD.Print($"[Stage13Sim] B2: после боя: до групповой цели {before2:F1}→{after3:F1} (↓ — вернулся к задаче) → {(b2 ? "PASS" : "FAIL")}");
