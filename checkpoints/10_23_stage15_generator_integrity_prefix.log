@@ -1,0 +1,179 @@
+# STAGE-15 PREFIX — фактическое поведение ДО фиксов (база 1d7ca6e)
+# Дата: 2026-10-23 16:56 UTC
+# Команда: GODOT_NEWGAME=1 GODOT_STAGE15_DEBUG=1 [GODOT_STAGE15_COLD=save|load] godot --headless --path . scenes/MainMenu.tscn
+# Итог основного блока: PASS=12 FAIL=15 GAP=0 NT=0 — VERDICT: FAIL (15 дефект-сценариев подтверждены)
+
+===== ФАЗА 1/3: основной блок сценариев A-H =====
+[Stage15Sim] Ready — Этап-15 (генераторы/валидация/дедуп/ID/реестры) starts in 3s
+[GameWorldController] Ready
+[AnimalService] Tick #1 — 8 animals; sample: wolf#animal_wolf_6 @ (9, 7)
+[AnimalService] Tick #2 — 8 animals; sample: wolf#animal_wolf_6 @ (9, 7)
+[Stage15Sim] каталог предметов: 107; techniqueRegistry=109; formationRegistry=0
+── A. ST15-001: легаси-путь экипировки NPC vs «Матрёшка» ──
+[ItemDatabase] Зарегистрирован предмет: weapon_5_0135289f_000039 (Weapon)
+[A1] легаси-оружие: classId='' material='' pen=0 range=2 spm=1000 NameEn='Sword Level 5' dmg=20 (5+3L=20)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L5_289f_00001c (Weapon)
+[A2] матрёшка-контроль: classId='staff' material='spirit_iron' pen=2 range=2 spm=800 NameEn='spirit_iron_staff_5'
+[ItemDatabase] Зарегистрирован предмет: weapon_1_013d3867_00003a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: weapon_1_3898fad8_00003b (Weapon)
+[ItemDatabase] Зарегистрирован предмет: armor_1_62c77874_00003c (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_012e439d_00003d (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: armor_1_51a3f4a1_00003e (Armor)
+[ItemDatabase] Зарегистрирован предмет: armor_1_16eed2cd_00003f (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_43c3b198_000040 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L3_68b1_00001d (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L3_68b3_00001e (Armor)
+[A3] NPC npc_a4b34a94d4134a21 слоты: WeaponMain:name='steel_axe_3' class='axe' item.Slot=WeaponMain; WeaponOff:name='Sword Level 1' class='' item.Slot=WeaponMain; Head:name='steel_armor_head_3' class='' item.Slot=Head; Torso:name='Armor Level 1' class='' item.Slot=Torso; Legs:name='Armor Level 1' class='' item.Slot=Torso; Feet:name='Armor Level 1' class='' item.Slot=Torso
+── B. ST15-002: валидатор — неизвестный класс / NaN / Infinity ──
+[ItemDatabase] Зарегистрирован предмет: weapon_5_013528a0_000041 (Weapon)
+[B1] легаси-оружие (Weapon): IsValid=True msg='Unknown base class — stat bounds skipped' — границы уровня НЕ проверены
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L5_28a1_00001f (Weapon)
+[B2] Weight=NaN (копия): IsValid=True msg=''
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L5_28a1_000020 (Weapon)
+[B3] Weight=+Inf (копия): IsValid=False; -Inf: IsValid=False
+[ItemDatabase] Зарегистрирован предмет: charger_5_013528a3_000042 (Accessory)
+[B4] charger (Accessory): IsValid=True msg='Unknown base class — stat bounds skipped'
+── C. ST15-003: Clean(FormationRegistry) no-op ──
+[Dedup.Clean] FormationRegistry: 1 duplicates found, ids: dup_b
+[Dedup.Clean] FormationRegistry: 1 duplicates found, ids: dup_b
+[C] Clean#1=1 (ожидается 1 дубль); count после=3 (должно быть 2); уник выжил=True; Clean#2=1 (должно быть 0)
+── D. ST15-004: полнота fingerprint'ов ──
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L5_001f_000021 (Weapon)
+[D1] Penetration: fp равны=True
+[D1] AttackRange: fp равны=True
+[D1] DodgeBonus: fp равны=True
+[D1] DamageReduction: fp равны=True
+[D1] MoveSpeedPenalty: fp равны=True
+[D1] AttackSpeedPermil: fp равны=True
+[D2] Mastery: fp равны=True
+[D2] ArmorPenetration: fp равны=True
+[D2] AoeShape: fp равны=True
+[D2] AoeMaxTargets: fp равны=True
+[D2] IsHoming: fp равны=True
+[D3] ControlType Freeze-vs-Slow: fp равны=True; TargetTag enemy-vs-ally: fp равны=True
+[D4] инвариант vs ru-RU: fp зависит от культуры: inv='2.00|ct:0.80|U:False' vs ru='2,00|ct:0,80|U:False'
+[D5] Cooldown 3.001 vs 3.004: fp равны=True
+── E. ST15-005: 16-бит хеш сида → коллизия ID → молчаливая подмена ──
+[E1a] id(seed=0)='tech_Combat_Earth_Perfect_L3_0000' id(seed=0x10001)='tech_Combat_Light_Refined_L3_0000' хеш-фрагменты равны=True (пространство ID сужено до 16 бит сида)
+[E1b] скан 20000 сидов: полная коллизия не найдена
+[E2] скан 20000 сидов: коллизия Id формаций не найдена
+[E3] воспроизводимость seed=777: id равны=True, контент равен=True
+── F. ST15-006: Heavy в SizePool генератора формаций ──
+[F1] L6: размеры=Small,Great,Large,Medium; L5: размеры=Small,Great,Large,Medium
+[F2] GenerateSpecified(Heavy, L3): size=Medium (ожидание: даунгрейд)
+── G. ST15-007: границы/enum/некорректные входы ──
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L0_003d_000022 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L11_003e_000023 (Weapon)
+[G1] GenerateWeapon(0): ItemLevel=0; GenerateWeapon(11): ItemLevel=11
+[G2] invalid-enum техника: exception=False (); IsValid=False
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L5_003f_000024 (Weapon)
+[G3] Grade=99: exception=True (IndexOutOfRangeException: Index was outside the bounds of the array.); IsValid=
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L5_0040_000025 (Weapon)
+[G4] GenerateWeapon('plasma_rifle'): выдан класс='spear' exception=''
+── H. ST15-008: жизненный цикл реестров/счётчиков/seed=0 ──
+[ItemDatabase] Зарегистрирован предмет: consumable_5_013528a4_000043 (Consumable)
+[ItemDatabase] Initialized (no Resources catalogue — populate via Register())
+[ItemDatabase] RestoreState: 128 предметов восстановлено; счётчики ID: eq=37, gen=67
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L5_0000_000027 (Weapon)
+[H1] cold-restore: маркер=True, счетчики eq=39/gen=67, новый id уникален=True
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[ItemDatabase] Зарегистрирован предмет: consumable_5_013528a5_000001 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[H2] ResetWorld#1 count=4; после генерации+ResetWorld#2 count=4; сирота удалён=True
+[WorldModule] ResetWorld: календарные маркеры будут тихо ре-синхронизированы на первом тике (P1-15)
+[ResourceService] ResetWorld: 0 armed-записей очереди респауна очищено (ST10-01)
+[BodyService] ResetWorld: тело пересоздано (Humanoid/Medium, VIT 10) — New Game/LoadGame
+[StorageRingService] ResetWorld: хранилища колец очищены (P1-19)
+[CombatService] ResetWorld: combat state cleared (New Game)
+[TechniqueService] ResetWorld: techniques cleared (New Game)
+[TechniqueChargeService] ResetWorld: charges cleared (New Game)
+[CorpseService] ResetWorld: 0 трупов очищено
+[NPCSpawnerService] ResetWorld: домен NPC очищен (tracked=13, restored=0)
+[NPCGroupService] ResetWorld: 2 групп очищено
+[PlayerCombatAdapter] ResetWorld: стойка/режим оружия/кулдауны сброшены (New Game)
+[AuraHoldService] ResetWorld: hold cleared (New Game)
+[Trade] ResetWorld — сессия закрыта, сток очищен (0 лавок)
+[SaveModule] ResetWorld: отсчёт автосейва сброшен (каденция — мировой тик, P2-26)
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[H3] ResetAll сбросил 36 доменов; FormationRegistry is IWorldResettable=False; формация-маркер выжила=True (должно false)
+[H3b] TechniqueRegistry.Clear(): маркер был=True, после — count=0
+[ItemDatabase] Зарегистрирован предмет: consumable_5_00000001_000002 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: consumable_5_00000003_000004 (Consumable)
+[H4] seed=0: авто-режим уникален=True; детерминированный режим воспроизводим=True
+
+════════ Stage15GeneratorIntegrityTruthSim: ИТОГ ════════
+[Stage15Sim] ST15-001/A1            FAIL       ПОДТВЕРЖДЕНО: легаси-генератор не заполняет WeaponClassId/MaterialId/Penetration/AttackSpeedPermil, линейный урон, ItemType='Weapon'
+[Stage15Sim] ST15-001/A2            PASS       контроль: матрёшка заполняет класс/материал/пробитие/скорость
+[Stage15Sim] ST15-001/A3            FAIL       боевых слотов=6, легаси=4, морфология-несоответствий=3 — ПОДТВЕРЖДЕНО: EquipHumanoid держит легаси-путь (NameEn 'Armor Level N', Slot=Torso в Head/Legs/Feet)
+[Stage15Sim] ST15-002/B1            FAIL       ПОДТВЕРЖДЕНО: IsValid=true при непроверенных границах (unknown class у оружия)
+[Stage15Sim] ST15-002/B2            FAIL       ПОДТВЕРЖДЕНО: NaN проходит CheckFloat (NaN<min=false, NaN>max=false)
+[Stage15Sim] ST15-002/B3            PASS       ±Infinity отвергаются
+[Stage15Sim] ST15-002/B4            PASS       аксессуар: bounds-skip легитимен (IsValid=true, msg='Unknown base class — stat bounds skipped')
+[Stage15Sim] ST15-003/C1            FAIL       ПОДТВЕРЖДЕНО: no-op — счётчик 1, count 3 (не 2), повторный 1
+[Stage15Sim] ST15-004/D1            FAIL       ПОДТВЕРЖДЕНО: 6/6 полей не различаются (ложные дубли)
+[Stage15Sim] ST15-004/D2            FAIL       ПОДТВЕРЖДЕНО: 5/5 полей не различаются
+[Stage15Sim] ST15-004/D3            FAIL       ПОДТВЕРЖДЕНО: ControlType не различается=True, TargetTag не различается=True
+[Stage15Sim] ST15-004/D4            FAIL       ПОДТВЕРЖДЕНО: fp зависит от культуры: inv='2.00|ct:0.80|U:False' vs ru='2,00|ct:0,80|U:False'
+[Stage15Sim] ST15-004/D5            FAIL       ПОДТВЕРЖДЕНО: различие 0.003 схлопывается (F2-формат)
+[Stage15Sim] ST15-005/E1            PASS       полная коллизия ID не воспроизведена сканом 20000 сидов (фрагментная слабость 16 бит — факт E1a)
+[Stage15Sim] ST15-005/E2            PASS       коллизия ID формаций не воспроизведена сканом 20000 сидов
+[Stage15Sim] ST15-005/E3            PASS       повторный вызов с тем же seed → тот же объект (контракт детерминизма)
+[Stage15Sim] ST15-006/F1            FAIL       ПОДТВЕРЖДЕНО: Heavy недостижим в Generate() на L6 (пул={Small,Great,Large,Medium}; даунгрейд-логика мертва)
+[Stage15Sim] ST15-006/F2            PASS       явный Heavy ниже L6 даунгрейдится (Medium)
+[Stage15Sim] ST15-007/G1            FAIL       ПОДТВЕРЖДЕНО: уровень не клампится (0→0, 11→11; объект с ItemLevel вне диапазона создаётся тихо)
+[Stage15Sim] ST15-007/G2            PASS       invalid-enum отвергнут диагностикой (msg=' CapacityCost 100 out of [200..300]; QiCost 100 out of [200..200]; BaseDamage 50 out of [200..300];')
+[Stage15Sim] ST15-007/G3            FAIL       ПОДТВЕРЖДЕНО: крэш: IndexOutOfRangeException: Index was outside the bounds of the array.
+[Stage15Sim] ST15-007/G4            FAIL       ПОДТВЕРЖДЕНО: тихий фолбэк на случайный класс 'spear' вместо отказа
+[Stage15Sim] ST15-008/H1            PASS       подтверждено: каталог+счётчики переживают restore на свежем экземпляре, новые ID уникальны (R17 держит)
+[Stage15Sim] ST15-008/H2            PASS       двойной сброс мира: каталог эквивалентен, runtime-предметы не переживают границу
+[Stage15Sim] ST15-008/H3            FAIL       ПОДТВЕРЖДЕНО: формации прошлого мира переживают world-transition (FormationRegistry не IWorldResettable, WorldInitPhase его не чистит)
+[Stage15Sim] ST15-008/H3b           PASS       Clear()-API работает (проводка в WorldInitPhase — статический факт с 09.08)
+[Stage15Sim] ST15-008/H4            PASS       обa контракта seed=0 держатся: авто-счётчик уникален; SeededRandom(0) воспроизводим
+[Stage15Sim] PASS=12 FAIL=15 GAP=0 NOT TESTED=0
+[Stage15Sim] VERDICT: FAIL
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (12267 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (12266 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (12267 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (12268 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (12269 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (12268 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+Please call wait_to_finish() on it to ensure correct cleanup.
+     at: ~Thread (core/os/thread.cpp:116)
+
+===== ФАЗА 2/3: cold-SAVE (процесс 1) =====
+[Stage15Sim] Ready — Этап-15 (генераторы/валидация/дедуп/ID/реестры) starts in 3s
+[ColdLoad] фаза=SAVE (ST15-008: межпроцессная живучесть каталога)
+[ColdLoad][SAVE] маркер=st15_cold_marker_20261023164912 зарегистрирован; сейв=True; счётчики: eq=27, gen=56; каталог=108
+[Stage15Sim] ST15-008/COLD-SAVE     PASS       слот сохранён с маркером в каталоге
+[Stage15Sim] PASS=1 FAIL=0 GAP=0 NOT TESTED=0
+[Stage15Sim] VERDICT: PASS
+
+===== ФАЗА 3/3: cold-LOAD (НОВЫЙ процесс) =====
+[Stage15Sim] Ready — Этап-15 (генераторы/валидация/дедуп/ID/реестры) starts in 3s
+[ColdLoad] фаза=LOAD (ST15-008: межпроцессная живучесть каталога)
+[ColdLoad][LOAD] маркер в каталоге=True (st15_cold_marker_20261023164912); новый id=eq_wep_staff_L5_28a7_00001c уникален=True (коллизий=0); каталог=109
+[Stage15Sim] ST15-008/COLD-LOAD     PASS       cold-load в новом процессе: каталог восстановлен, маркер резолвится, новые ID уникальны
+[Stage15Sim] PASS=1 FAIL=0 GAP=0 NOT TESTED=0
+[Stage15Sim] VERDICT: PASS

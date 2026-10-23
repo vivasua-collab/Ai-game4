@@ -60,6 +60,9 @@ ALL_SIMS=(
   # Этап-14 аудита (23.10): ввод/фокус/модальные окна (ST14-001..006;
   # OS-путь потери фокуса — физический PT-U06).
   "STAGE14:GODOT_STAGE14_DEBUG"
+  # Этап-15 аудита (23.10): генераторы/валидация/дедуп/ID/реестры
+  # (ST15-001..008; cold-load — парой процессов GODOT_STAGE15_COLD).
+  "STAGE15:GODOT_STAGE15_DEBUG"
   "KILLFEED:GODOT_KILLFEED_DEBUG"
   "QUEST:GODOT_QUEST_DEBUG"
   "STORAGE:GODOT_STORAGE_DEBUG"
@@ -160,6 +163,47 @@ for entry in "${SIMS[@]}"; do
     FAILED+=("$name")
     echo "  ❌ ${VERDICT:-NO VERDICT LINE}"
     grep -E "FAIL|Error|error|Exception" "$LOG" | grep -vE "^ERROR: (BUG|Pages|[0-9]+ RID)" | head -8
+  fi
+  # STAGE15 cold-load (ST15-008): НАСТОЯЩАЯ пара процессов — SAVE-фаза
+  # (маркер в каталоге → слот) и LOAD-фаза (новый процесс → LoadGame →
+  # маркер резолвится, новые ID уникальны). Подмена внутрипроцессной
+  # проверкой запрещена каноном этапа (audit §4 ST15-008).
+  if [ "$name" = "STAGE15" ]; then
+    echo "─── QA: STAGE15-COLD-SAVE ─────────────────────"
+    : > "$LOG"
+    env GODOT_NEWGAME=1 GODOT_STAGE15_DEBUG=1 GODOT_STAGE15_COLD=save "$GODOT" --headless --path . scenes/MainMenu.tscn > "$LOG" 2>&1 &
+    PID=$!; SIM_PID="$PID"
+    ( i=0; while kill -0 "$PID" 2>/dev/null; do
+        if grep -q "VERDICT" "$LOG" 2>/dev/null; then sleep 3; kill -9 "$PID" 2>/dev/null; break; fi
+        i=$((i+1)); if [ "$i" -ge "$CEILING" ]; then kill -9 "$PID" 2>/dev/null; break; fi
+        sleep 1
+      done ) &
+    WATCHDOG=$!; wait "$PID" 2>/dev/null || true; SIM_PID=""
+    kill "$WATCHDOG" 2>/dev/null; wait "$WATCHDOG" 2>/dev/null || true
+    COLD_SAVE=$(grep -E "COLD-SAVE" "$LOG" | tail -1)
+    echo "$COLD_SAVE"
+    if echo "$COLD_SAVE" | grep -q " PASS "; then :; else
+      RESULTS[$name]="FAIL"; FAILED+=("STAGE15-COLD-SAVE")
+      echo "  ❌ cold-save провален"; fi
+    echo "─── QA: STAGE15-COLD-LOAD (НОВЫЙ процесс) ─────"
+    # NOTE: GODOT_NEWGAME=1 нужен, чтобы поднялась world-сцена с хуком сима
+    # (сим — узел GameWorldController). Каталог при буте НОВОГО процесса пуст;
+    # LoadGame накладывает сейв поверх — холодная семантика сохранена.
+    : > "$LOG"
+    env GODOT_NEWGAME=1 GODOT_STAGE15_DEBUG=1 GODOT_STAGE15_COLD=load "$GODOT" --headless --path . scenes/MainMenu.tscn > "$LOG" 2>&1 &
+    PID=$!; SIM_PID="$PID"
+    ( i=0; while kill -0 "$PID" 2>/dev/null; do
+        if grep -q "VERDICT" "$LOG" 2>/dev/null; then sleep 3; kill -9 "$PID" 2>/dev/null; break; fi
+        i=$((i+1)); if [ "$i" -ge "$CEILING" ]; then kill -9 "$PID" 2>/dev/null; break; fi
+        sleep 1
+      done ) &
+    WATCHDOG=$!; wait "$PID" 2>/dev/null || true; SIM_PID=""
+    kill "$WATCHDOG" 2>/dev/null; wait "$WATCHDOG" 2>/dev/null || true
+    COLD_LOAD=$(grep -E "COLD-LOAD" "$LOG" | tail -1)
+    echo "$COLD_LOAD"
+    if echo "$COLD_LOAD" | grep -q " PASS "; then :; else
+      RESULTS[$name]="FAIL"; FAILED+=("STAGE15-COLD-LOAD")
+      echo "  ❌ cold-load провален (холодная загрузка каталога)"; fi
   fi
 done
 

@@ -1023,6 +1023,20 @@ public partial class GameWorldController : Node2D
             var stage14Sim = new Stage14InteractionFocusTruthSimDebug { Name = "Stage14InteractionFocusTruthSimDebug" };
             AddChild(stage14Sim);
         }
+        // Этап-15 аудита (23.10, GODOT_STAGE15_DEBUG=1): генераторы, верификация
+        // объектов, целостность данных — ST15-001 (легаси-путь экипировки NPC vs
+        // «Матрёшка»), ST15-002 (валидатор: неизвестный класс/NaN/Infinity),
+        // ST15-003 (Clean(FormationRegistry) no-op), ST15-004 (полнота
+        // fingerprint'ов: Pen/Range/Mastery/AoE/ControlType/культура/точность),
+        // ST15-005 (16-бит хеш сида → коллизия ID → молчаливая подмена),
+        // ST15-006 (Heavy недостижим в Generate), ST15-007 (границы/enum/
+        // некорректные входы), ST15-008 (жизненный цикл реестров/счётчиков/
+        // seed=0 + cold-load парой процессов GODOT_STAGE15_COLD=save|load).
+        if (System.Environment.GetEnvironmentVariable("GODOT_STAGE15_DEBUG") == "1")
+        {
+            var stage15Sim = new Stage15GeneratorIntegrityTruthSimDebug { Name = "Stage15GeneratorIntegrityTruthSimDebug" };
+            AddChild(stage15Sim);
+        }
         // 2026-09-08 (баг-репорт пользователя): headless-верификация
         // инвентарного drag&drop в корзину (GODOT_TRASHDROP_DEBUG=1) —
         // материалы draggable, корзина выбрасывает, кукла отклоняет.
