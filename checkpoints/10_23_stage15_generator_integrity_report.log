@@ -1,0 +1,162 @@
+# STAGE-15 POSTFIX — те же сценарии после исправлений
+# Дата: 2026-10-23 17:09 UTC
+# Итог основного блока: PASS=27 FAIL=0 GAP=0 NT=0 — VERDICT: PASS
+
+[Stage15Sim] Ready — Этап-15 (генераторы/валидация/дедуп/ID/реестры) starts in 3s
+[GameWorldController] Ready
+[AnimalService] Tick #1 — 8 animals; sample: wolf#animal_wolf_6 @ (9, 7)
+[AnimalService] Tick #2 — 8 animals; sample: wolf#animal_wolf_6 @ (9, 7)
+[Stage15Sim] каталог предметов: 109; techniqueRegistry=116; formationRegistry=0
+── A. ST15-001: легаси-путь экипировки NPC vs «Матрёшка» ──
+[ItemDatabase] Зарегистрирован предмет: weapon_5_0135289f_000009 (Weapon)
+[A1] легаси-генератор (характеристика): classId='' material='' pen=0 range=2 spm=1000 NameEn='Sword Level 5' dmg=20 — формат неизменен; NPC-путь больше не потребляет (A3)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L5_289f_00004e (Weapon)
+[A2] матрёшка-контроль: classId='staff' material='spirit_iron' pen=2 range=2 spm=800 NameEn='spirit_iron_staff_5'
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_3867_00004f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L1_fad8_000050 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_7874_000051 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_439d_000052 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_f4a1_000053 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_d2cd_000054 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_43c3b198_00000a (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L3_68b1_000055 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L3_68b3_000056 (Armor)
+[A3] NPC npc_f28fae813a95416f слоты: WeaponMain:name='steel_axe_3' class='axe' item.Slot=WeaponMain; WeaponOff:name='iron_sword_1' class='sword' item.Slot=WeaponMain; Head:name='steel_armor_head_3' class='' item.Slot=Head; Torso:name='cloth_armor_torso_1' class='' item.Slot=Torso; Legs:name='wood_armor_legs_1' class='' item.Slot=Legs; Feet:name='bone_armor_feet_1' class='' item.Slot=Feet
+── B. ST15-002: валидатор — неизвестный класс / NaN / Infinity ──
+[ItemDatabase] Зарегистрирован предмет: weapon_5_013528a0_00000b (Weapon)
+[B1] легаси-оружие (Weapon): IsValid=False msg=' weapon/armor class not recognized (ItemType='Weapon', NameEn='Sword Level 5') — stat bounds UNVERIFIABLE;' — границы уровня НЕ проверены
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L5_28a1_000057 (Weapon)
+[B2] Weight=NaN (копия): IsValid=False msg=' Weight=NaN out of [2.00..3.75];'
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L5_28a1_000058 (Weapon)
+[B3] Weight=+Inf (копия): IsValid=False; -Inf: IsValid=False
+[ItemDatabase] Зарегистрирован предмет: charger_5_013528a3_00000c (Accessory)
+[B4] charger (Accessory): IsValid=True msg='accessory — stat bounds N/A (documented skip; аксессуары не имеют таблиц границ)'
+── C. ST15-003: Clean(FormationRegistry) no-op ──
+[Dedup.Clean] FormationRegistry: removed 1 duplicates, ids: dup_b
+[C] Clean#1=1 (ожидается 1 дубль); count после=2 (должно быть 2); уник выжил=True; Clean#2=0 (должно быть 0)
+── D. ST15-004: полнота fingerprint'ов ──
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L5_001f_000059 (Weapon)
+[D1] Penetration: fp равны=False
+[D1] AttackRange: fp равны=False
+[D1] DodgeBonus: fp равны=False
+[D1] DamageReduction: fp равны=False
+[D1] MoveSpeedPenalty: fp равны=False
+[D1] AttackSpeedPermil: fp равны=False
+[D2] Mastery: fp равны=False
+[D2] ArmorPenetration: fp равны=False
+[D2] AoeShape: fp равны=False
+[D2] AoeMaxTargets: fp равны=False
+[D2] IsHoming: fp равны=False
+[D3] ControlType Freeze-vs-Slow: fp равны=False; TargetTag enemy-vs-ally: fp равны=False
+[D4] инвариант vs ru-RU: fp совпадают
+[D5] Cooldown 3.001 vs 3.004: fp равны=False
+── E. ST15-005: 16-бит хеш сида → коллизия ID → молчаливая подмена ──
+[E1a] id(seed=0)='tech_Combat_Earth_Perfect_L3_00000000' id(seed=0x10001)='tech_Combat_Light_Refined_L3_00010001' хеш-фрагменты равны=False (пространство ID сужено до 16 бит сида)
+[E1b] скан 20000 сидов: полная коллизия не найдена
+[E2] скан 20000 сидов: коллизия Id формаций не найдена
+[E3] воспроизводимость seed=777: id равны=True, контент равен=True
+── F. ST15-006: Heavy в SizePool генератора формаций ──
+[F1] L6: размеры=Great,Small,Heavy,Medium,Large; L5: размеры=Great,Small,Medium,Large
+[F2] GenerateSpecified(Heavy, L3): size=Medium (ожидание: даунгрейд)
+── G. ST15-007: границы/enum/некорректные входы ──
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_003d_00005a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L10_003e_00005b (Weapon)
+[G1] GenerateWeapon(0): ItemLevel=1; GenerateWeapon(11): ItemLevel=10
+[G2] invalid-enum техника: exception=False (); IsValid=False
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L5_003f_00005c (Weapon)
+[G3] Grade=99: exception=False (); IsValid=False
+[G4] GenerateWeapon('plasma_rifle'): выдан класс='' exception='ArgumentException: Unknown weapon subtype 'plasma_rifle' (доступны: dagger sword axe spear greatsword bow staff ) (Parameter 'subtype')'
+── H. ST15-008: жизненный цикл реестров/счётчиков/seed=0 ──
+[ItemDatabase] Зарегистрирован предмет: consumable_5_013528a4_00000d (Consumable)
+[ItemDatabase] Initialized (no Resources catalogue — populate via Register())
+[ItemDatabase] RestoreState: 129 предметов восстановлено; счётчики ID: eq=92, gen=13
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L5_0000_00005e (Weapon)
+[H1] cold-restore: маркер=True, счетчики eq=94/gen=13, новый id уникален=True
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[ItemDatabase] Зарегистрирован предмет: consumable_5_013528a5_000001 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[H2] ResetWorld#1 count=4; после генерации+ResetWorld#2 count=4; сирота удалён=True
+[WorldModule] ResetWorld: календарные маркеры будут тихо ре-синхронизированы на первом тике (P1-15)
+[ResourceService] ResetWorld: 0 armed-записей очереди респауна очищено (ST10-01)
+[BodyService] ResetWorld: тело пересоздано (Humanoid/Medium, VIT 10) — New Game/LoadGame
+[StorageRingService] ResetWorld: хранилища колец очищены (P1-19)
+[CombatService] ResetWorld: combat state cleared (New Game)
+[TechniqueService] ResetWorld: techniques cleared (New Game)
+[TechniqueChargeService] ResetWorld: charges cleared (New Game)
+[FormationRegistry] ResetWorld: реестр формаций очищен (world-scoped, Этап-15 ST15-008)
+[CorpseService] ResetWorld: 0 трупов очищено
+[NPCSpawnerService] ResetWorld: домен NPC очищен (tracked=13, restored=0)
+[NPCGroupService] ResetWorld: 2 групп очищено
+[PlayerCombatAdapter] ResetWorld: стойка/режим оружия/кулдауны сброшены (New Game)
+[AuraHoldService] ResetWorld: hold cleared (New Game)
+[Trade] ResetWorld — сессия закрыта, сток очищен (0 лавок)
+[SaveModule] ResetWorld: отсчёт автосейва сброшен (каденция — мировой тик, P2-26)
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[H3] ResetAll сбросил 37 доменов; FormationRegistry is IWorldResettable=True; формация-маркер выжила=False (должно false)
+[H3b] TechniqueRegistry.Clear(): маркер был=True, после — count=0
+[ItemDatabase] Зарегистрирован предмет: consumable_5_00000001_000002 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: consumable_5_00000003_000004 (Consumable)
+[H4] seed=0: авто-режим уникален=True; детерминированный режим воспроизводим=True
+
+════════ Stage15GeneratorIntegrityTruthSim: ИТОГ ════════
+[Stage15Sim] ST15-001/A1            PASS       характеристика: легаси-генератор выдаёт легаси-формат (после миграции используется только для зарядников/расходников; оружие/броня легаси-методов живыми путями не вызываются)
+[Stage15Sim] ST15-001/A2            PASS       контроль: матрёшка заполняет класс/материал/пробитие/скорость
+[Stage15Sim] ST15-001/A3            PASS       боевых слотов=6, легаси=0, морфология-несоответствий=0 — все слоты матрёшка, item.Slot == слоту
+[Stage15Sim] ST15-002/B1            PASS       неизвестный класс оружия → явный отказ (валидация границ не обходится)
+[Stage15Sim] ST15-002/B2            PASS       NaN отвергается валидатором
+[Stage15Sim] ST15-002/B3            PASS       ±Infinity отвергаются
+[Stage15Sim] ST15-002/B4            PASS       аксессуар: bounds-skip легитимен (IsValid=true, msg='accessory — stat bounds N/A (documented skip; аксессуары не имеют таблиц границ)')
+[Stage15Sim] ST15-003/C1            PASS       Clean удаляет фактические дубли (count/counter/unique/idempotent — ок)
+[Stage15Sim] ST15-004/D1            PASS       все поведенческие поля экипировки входят в fingerprint
+[Stage15Sim] ST15-004/D2            PASS       все поведенческие поля техник входят в fingerprint
+[Stage15Sim] ST15-004/D3            PASS       ControlType/TargetTag входят в fingerprint
+[Stage15Sim] ST15-004/D4            PASS       fingerprint культура-независим
+[Stage15Sim] ST15-004/D5            PASS       малые различия сохраняются в fingerprint (полная точность)
+[Stage15Sim] ST15-005/E1            PASS       полная коллизия ID не воспроизведена сканом 20000 сидов (фрагментная слабость 16 бит — факт E1a)
+[Stage15Sim] ST15-005/E2            PASS       коллизия ID формаций не воспроизведена сканом 20000 сидов
+[Stage15Sim] ST15-005/E3            PASS       повторный вызов с тем же seed → тот же объект (контракт детерминизма)
+[Stage15Sim] ST15-006/F1            PASS       Heavy достижим на L6+ (Great,Small,Heavy,Medium,Large), ниже L6 отсутствует
+[Stage15Sim] ST15-006/F2            PASS       явный Heavy ниже L6 даунгрейдится (Medium)
+[Stage15Sim] ST15-007/G1            PASS       уровень клампится в [1..10]
+[Stage15Sim] ST15-007/G2            PASS       invalid-enum отвергнут диагностикой (msg=' CapacityCost 100 out of [200..300]; QiCost 100 out of [200..200]; BaseDamage 50 out of [200..300];')
+[Stage15Sim] ST15-007/G3            PASS       invalid-grade отвергнут диагностикой
+[Stage15Sim] ST15-007/G4            PASS       неизвестный subtype → явный отказ (ArgumentException: Unknown weapon subtype 'plasma_rifle' (доступны: dagger sword axe spear greatsword bow staff ) (Parameter 'subtype'))
+[Stage15Sim] ST15-008/H1            PASS       подтверждено: каталог+счётчики переживают restore на свежем экземпляре, новые ID уникальны (R17 держит)
+[Stage15Sim] ST15-008/H2            PASS       двойной сброс мира: каталог эквивалентен, runtime-предметы не переживают границу
+[Stage15Sim] ST15-008/H3            PASS       FormationRegistry входит в контракт пересборки (сброшено доменов: 37)
+[Stage15Sim] ST15-008/H3b           PASS       Clear()-API работает (проводка в WorldInitPhase — статический факт с 09.08)
+[Stage15Sim] ST15-008/H4            PASS       обa контракта seed=0 держатся: авто-счётчик уникален; SeededRandom(0) воспроизводим
+[Stage15Sim] PASS=27 FAIL=0 GAP=0 NOT TESTED=0
+[Stage15Sim] VERDICT: PASS
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (12267 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (12266 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (12267 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (12268 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (12269 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (12268 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (12269 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+Please call wait_to_finish() on it to ensure correct cleanup.
+     at: ~Thread (core/os/thread.cpp:116)

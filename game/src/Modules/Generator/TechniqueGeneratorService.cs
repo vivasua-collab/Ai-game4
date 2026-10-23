@@ -754,13 +754,17 @@ namespace CultivationGame.Modules.Generator
 
         /// <summary>
         /// Сгенерировать уникальный идентификатор техники.
-        /// Формат: tech_{type}_{element}_{grade}_{level}_{seed_hash}
+        /// Формат: tech_{type}_{element}_{grade}_L{level}_{seed:x8}
+        ///
+        /// Этап-15 (ST15-005): прежде 16-бит фрагмент `(seed ^ (seed>>16))
+        /// & 0xFFFF` — доказанное сужение пространства (префикс E1a: seed 0 и
+        /// 0x10001 дают один фрагмент 0000). Теперь полный 32-бит хвост сида
+        /// (паттерн ужефиксированного ItemGeneratorService.NextId — seed:x8).
+        /// Детерминизм сохранён: тот же seed → тот же ID.
         /// </summary>
         private string GenerateTechniqueId(TechniqueType type, Element element, TechniqueGrade grade, int level, long seed)
         {
-            // Хеш seed для короткого идентификатора
-            int seedHash = (int)(seed ^ (seed >> 16)) & 0xFFFF;
-            return $"tech_{type}_{element}_{grade}_L{level}_{seedHash:X4}";
+            return $"tech_{type}_{element}_{grade}_L{level}_{seed:x8}";
         }
 
         /// <summary>

@@ -74,6 +74,10 @@ public sealed class EquipmentGenerator : IEquipmentGenerator
     private EquipmentData GenerateWeaponCore(int level, string? subtype, long seed,
         bool forceLegendary, bool? forceOvercap)
     {
+        // Этап-15 (ST15-007): уровень клампится в [1..MAX_CULTIVATION_LEVEL]
+        // (прежде 0/11 создавались тихо с ItemLevel вне диапазона — доказано
+        // префиксом G1; паттерн TechniqueGeneratorService.Generate).
+        level = Math.Clamp(level, 1, GameConstants.MAX_CULTIVATION_LEVEL);
         var rng = Rng(level, seed);
         var @class = PickWeaponClass(subtype, rng);
         var material = PickMaterial(level, rng, @class);
@@ -174,6 +178,8 @@ public sealed class EquipmentGenerator : IEquipmentGenerator
     private EquipmentData GenerateArmorCore(int level, string? subtype, long seed,
         bool forceLegendary, bool? forceOvercap)
     {
+        // Этап-15 (ST15-007): кламп уровня (см. GenerateWeaponCore).
+        level = Math.Clamp(level, 1, GameConstants.MAX_CULTIVATION_LEVEL);
         var rng = Rng(level, seed);
         var @class = PickArmorClass(subtype, rng);
         var material = PickMaterial(level, rng, armor: true);
@@ -364,18 +370,44 @@ public sealed class EquipmentGenerator : IEquipmentGenerator
         return $"eq_{prefix}_{subtype}_L{level}_{seed & 0xFFFF:x4}_{counter:x6}";
     }
 
+    /// <summary>
+    /// Класс оружия по subtype. Этап-15 (ST15-007): ЯВНО запрошенный
+    /// неизвестный subtype — ArgumentException (fail-fast: тихой фолбэк на
+    /// случайный класс маскировал опечатки — доказан префиксом G4:
+    /// 'plasma_rifle' молча выдавал 'spear'). subtype=null — случайный класс
+    /// (документированная норма для NPC-пути).
+    /// </summary>
     private static WeaponBaseClass PickWeaponClass(string? subtype, SeededRandom rng)
     {
-        foreach (var w in EquipmentGenerationTables.Weapons)
-            if (w.Id == subtype) return w;
+        if (subtype != null)
+        {
+            foreach (var w in EquipmentGenerationTables.Weapons)
+                if (w.Id == subtype) return w;
+            var known = new System.Text.StringBuilder();
+            foreach (var w in EquipmentGenerationTables.Weapons)
+                known.Append(w.Id).Append(' ');
+            throw new ArgumentException(
+                $"Unknown weapon subtype '{subtype}' (доступны: {known})",
+                nameof(subtype));
+        }
         var list = EquipmentGenerationTables.Weapons;
         return list[rng.Next(0, list.Count)];
     }
 
+    /// <summary>Аналог PickWeaponClass для брони (Этап-15 ST15-007).</summary>
     private static ArmorBaseClass PickArmorClass(string? subtype, SeededRandom rng)
     {
-        foreach (var a in EquipmentGenerationTables.Armors)
-            if (a.Id == subtype) return a;
+        if (subtype != null)
+        {
+            foreach (var a in EquipmentGenerationTables.Armors)
+                if (a.Id == subtype) return a;
+            var known = new System.Text.StringBuilder();
+            foreach (var a in EquipmentGenerationTables.Armors)
+                known.Append(a.Id).Append(' ');
+            throw new ArgumentException(
+                $"Unknown armor subtype '{subtype}' (доступны: {known})",
+                nameof(subtype));
+        }
         var list = EquipmentGenerationTables.Armors;
         return list[rng.Next(0, list.Count)];
     }

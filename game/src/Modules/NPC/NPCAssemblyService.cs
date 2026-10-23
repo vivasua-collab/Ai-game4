@@ -46,6 +46,7 @@ namespace CultivationGame.Modules.NPC
         private readonly NPCConfig _config;
         private readonly ITechniqueGeneratorService _techniqueGenerator;
         private readonly IItemGeneratorService _itemGenerator;
+        private readonly IEquipmentGenerator _equipmentGenerator;
         private readonly BodyEnhancementSystem _enhancementSystem;
         private readonly NPCNameGenerator _nameGenerator;
 
@@ -56,6 +57,7 @@ namespace CultivationGame.Modules.NPC
             NPCConfig config,
             ITechniqueGeneratorService techniqueGenerator,
             IItemGeneratorService itemGenerator,
+            IEquipmentGenerator equipmentGenerator,
             BodyEnhancementSystem enhancementSystem,
             NPCNameGenerator nameGenerator)
         {
@@ -65,6 +67,11 @@ namespace CultivationGame.Modules.NPC
             _config = config ?? throw new ArgumentNullException(nameof(config));
             _techniqueGenerator = techniqueGenerator ?? throw new ArgumentNullException(nameof(techniqueGenerator));
             _itemGenerator = itemGenerator ?? throw new ArgumentNullException(nameof(itemGenerator));
+            // Этап-15 (ST15-001): миграция NPC-экипировки на «Матрёшку» —
+            // WeaponClassId/MaterialId/Penetration/AttackRange/
+            // AttackSpeedPermil заполняются, морфология слотов согласована
+            // (ItemGeneratorService остаётся только для расходников/зарядников).
+            _equipmentGenerator = equipmentGenerator ?? throw new ArgumentNullException(nameof(equipmentGenerator));
             _enhancementSystem = enhancementSystem ?? throw new ArgumentNullException(nameof(enhancementSystem));
             _nameGenerator = nameGenerator ?? throw new ArgumentNullException(nameof(nameGenerator));
         }
@@ -232,34 +239,54 @@ namespace CultivationGame.Modules.NPC
         /// Гуманоиды получают полный комплект экипировки с L1+.
         /// Качество предметов масштабируется по уровню.
         /// Слоты: WeaponMain, WeaponOff, Head, Torso, Belt, Legs, Feet.
+        ///
+        /// Этап-15 (ST15-001): миграция с легаси ItemGeneratorService на
+        /// «Матрёшку» (IEquipmentGenerator) — прежний путь не заполнял
+        /// WeaponClassId/MaterialId/Penetration/AttackRange/AttackSpeedPermil
+        /// и вкладывал предметы Slot=Torso в Head/Legs/Feet (доказано
+        /// префиксами A1/A3). Морфологические ограничения: офхенд — только
+        /// одноручное (двуруч/дальний в WeaponOff не имеет смысла);
+        /// броня — по слоту (armor_head/armor_torso/armor_legs/armor_feet).
+        /// Зарядник Ци (Belt) — остаётся на ItemGeneratorService (канон:
+        /// легаси-генератор отвечает за consumables/chargers).
         /// </summary>
         private void EquipHumanoid(Dictionary<EquipmentSlot, string> equipmentIds, int cultLevel, SeededRandom rng)
         {
             if (cultLevel < 1) return;
 
-            // L1+: Основное оружие (WeaponMain)
+            // L1+: Основное оружие (WeaponMain) — случайный класс «Матрёшки».
             long weaponSeed = rng.Next(0, int.MaxValue);
-            var weapon = _itemGenerator.GenerateWeaponForLevel(cultLevel, weaponSeed);
+            var weapon = _equipmentGenerator.GenerateWeapon(cultLevel, null, weaponSeed);
             if (weapon != null)
                 equipmentIds[EquipmentSlot.WeaponMain] = weapon.ItemId;
 
-            // L1+: Вторичное оружие / щит (WeaponOff)
+            // L1+: Вторичное оружие (WeaponOff) — ТОЛЬКО одноручное
+            // (морфологическое ограничение: парное/щитовой слот).
             long offWeaponSeed = rng.Next(0, int.MaxValue);
-            var offWeapon = _itemGenerator.GenerateWeaponForLevel(cultLevel, offWeaponSeed);
+            var offWeapon = _equipmentGenerator.GenerateWeapon(cultLevel, null, offWeaponSeed);
             if (offWeapon != null)
-                equipmentIds[EquipmentSlot.WeaponOff] = offWeapon.ItemId;
+            {
+                if (offWeapon.HandType != WeaponHandType.OneHand)
+                {
+                    // Двуруч/дальний выпал в офхенд — детерминированная замена
+                    // на парный кинжал (пресет 1H, канон EQUIPMENT_SYSTEM).
+                    offWeapon = _equipmentGenerator.GenerateWeapon(cultLevel, "dagger", offWeaponSeed ^ 0x0FF5);
+                }
+                if (offWeapon != null)
+                    equipmentIds[EquipmentSlot.WeaponOff] = offWeapon.ItemId;
+            }
 
-            // L1+: Шлем (Head)
+            // L1+: Шлем (Head) — класс брони со слотом Head.
             long headSeed = rng.Next(0, int.MaxValue);
-            var headArmor = _itemGenerator.GenerateArmorForLevel(cultLevel, headSeed);
+            var headArmor = _equipmentGenerator.GenerateArmor(cultLevel, "armor_head", headSeed);
             if (headArmor != null)
-                equipmentIds[EquipmentSlot.Head] = headArmor.ItemId;
+                equipmentIds[headArmor.Slot] = headArmor.ItemId;
 
-            // L1+: Нагрудник (Torso)
+            // L1+: Нагрудник (Torso).
             long torsoSeed = rng.Next(0, int.MaxValue);
-            var torsoArmor = _itemGenerator.GenerateArmorForLevel(cultLevel, torsoSeed);
+            var torsoArmor = _equipmentGenerator.GenerateArmor(cultLevel, "armor_torso", torsoSeed);
             if (torsoArmor != null)
-                equipmentIds[EquipmentSlot.Torso] = torsoArmor.ItemId;
+                equipmentIds[torsoArmor.Slot] = torsoArmor.ItemId;
 
             // L1+: Зарядник Ци (Belt) — генератор может вернуть null для низких уровней
             long chargerSeed = rng.Next(0, int.MaxValue);
@@ -267,17 +294,17 @@ namespace CultivationGame.Modules.NPC
             if (charger != null)
                 equipmentIds[EquipmentSlot.Belt] = charger.ItemId;
 
-            // L1+: Поножи (Legs)
+            // L1+: Поножи (Legs).
             long legsSeed = rng.Next(0, int.MaxValue);
-            var legsArmor = _itemGenerator.GenerateArmorForLevel(cultLevel, legsSeed);
+            var legsArmor = _equipmentGenerator.GenerateArmor(cultLevel, "armor_legs", legsSeed);
             if (legsArmor != null)
-                equipmentIds[EquipmentSlot.Legs] = legsArmor.ItemId;
+                equipmentIds[legsArmor.Slot] = legsArmor.ItemId;
 
-            // L1+: Сапоги (Feet)
+            // L1+: Сапоги (Feet).
             long feetSeed = rng.Next(0, int.MaxValue);
-            var feetArmor = _itemGenerator.GenerateArmorForLevel(cultLevel, feetSeed);
+            var feetArmor = _equipmentGenerator.GenerateArmor(cultLevel, "armor_feet", feetSeed);
             if (feetArmor != null)
-                equipmentIds[EquipmentSlot.Feet] = feetArmor.ItemId;
+                equipmentIds[feetArmor.Slot] = feetArmor.ItemId;
         }
 
         // ===================================================================

@@ -21,14 +21,28 @@ namespace CultivationGame.Modules.Generator
 
         /// <summary>
         /// Зарегистрировать технику в реестре.
-        /// Если техника с таким ID уже существует, она заменяется.
+        /// Повторная регистрация ТОГО ЖЕ определения (одинаковый
+        /// fingerprint, детерминизм: тот же seed → тот же объект) —
+        /// идемпотентная замена.
+        /// Этап-15 (ST15-005): коллизия Id с ДРУГИМ контентом больше НЕ
+        /// затирает существующую запись молча — первая остаётся, новая
+        /// отвергается с диагностикой (тихая подмена данных запрещена;
+        /// 16-бит хеш сида в ID доказано сужал пространство — E1a префикса).
         /// </summary>
-        /// <param name="technique">Данные техники для регистрации</param>
-        public void Register(TechniqueData technique)
+        /// <returns>true, если запись зарегистрирована/заменена.</returns>
+        public bool Register(TechniqueData technique)
         {
             if (technique == null || string.IsNullOrEmpty(technique.TechniqueId))
-                return;
+                return false;
+            if (_techniques.TryGetValue(technique.TechniqueId, out var existing)
+                && DeduplicationService.Fingerprint(existing) != DeduplicationService.Fingerprint(technique))
+            {
+                System.Console.WriteLine($"[TechniqueRegistry] Register: id='{technique.TechniqueId}' уже занят техникой с ДРУГИМ контентом — " +
+                                         "новая запись отвергнута (защита от подмены, ST15-005)");
+                return false;
+            }
             _techniques[technique.TechniqueId] = technique;
+            return true;
         }
 
         /// <summary>

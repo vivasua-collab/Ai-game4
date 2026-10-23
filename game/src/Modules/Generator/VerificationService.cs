@@ -110,6 +110,22 @@ namespace CultivationGame.Modules.Generator
                 result.Severity = ValidationSeverity.Critical;
             }
 
+            // Этап-15 (ST15-007/G3): enum-гарды ДО обращения к таблицам границ
+            // — прежний путь индексировал массивы GradeProfiles не проверяя
+            // значения и падал IndexOutOfRangeException (доказано префиксом
+            // G3: Grade=99 → крэш вместо диагностики). Invalid-enum —
+            // Critical-отказ: объект не попадает в каталог/реестр.
+            if (!Enum.IsDefined(item.Grade) || !Enum.IsDefined(item.Rarity)
+                || !Enum.IsDefined(item.Slot) || !Enum.IsDefined(item.Category))
+            {
+                result.AddOutOfBounds("Enum");
+                result.Message += $" invalid enum: Grade={item.Grade}, Rarity={item.Rarity}, " +
+                                  $"Slot={item.Slot}, Category={item.Category};";
+                result.Severity = ValidationSeverity.Critical;
+                result.IsValid = false;
+                return result;
+            }
+
             // 2. Найти базовый класс для сравнения.
             // 2026-08-26: точное матчинг "_id_" вместо подстроки — иначе
             // "sword" ложно матчится внутри "greatsword" (NameEn =
@@ -141,10 +157,25 @@ namespace CultivationGame.Modules.Generator
                 CheckFloat(result, "Coverage", item.Coverage, effective.MinCoverage, effective.MaxCoverage);
                 CheckFloat(result, "Weight", item.Weight, effective.MinWeight, effective.MaxWeight);
             }
+            else if (item.Category == ItemCategory.Accessory)
+            {
+                // Этап-15 (ST15-002): аксессуары — ДОКУМЕНТИРОВАННОЕ исключение:
+                // таблиц границ для аксессуаров нет (нет Damage/Defense-оси),
+                // пропуск статов легитимен. Прежде неразличимое сообщение
+                // "Unknown base class" выпускало и нераспознанное ОРУЖИЕ.
+                result.Message = "accessory — stat bounds N/A (documented skip; аксессуары не имеют таблиц границ)";
+            }
             else
             {
-                // Неизвестный базовый класс (например, accessory) — пропускаем статы.
-                result.Message = "Unknown base class — stat bounds skipped";
+                // Этап-15 (ST15-002): предмет ЗАЯВЛЯЕТ себя оружием/броней, но
+                // класс не распознан — границы проверить НЕВОЗМОЖНО. Прежде
+                // IsValid оставался true (тихий обход валидации — доказан
+                // префиксом B1: легаси-меч 'Sword Level N' проходил валидацию
+                // без единой проверки границ). Теперь — Critical-отказ.
+                result.AddOutOfBounds("BaseClass");
+                result.Message += $" weapon/armor class not recognized (ItemType='{item.ItemType}', " +
+                                  $"NameEn='{item.NameEn}') — stat bounds UNVERIFIABLE;";
+                result.Severity = ValidationSeverity.Critical;
             }
 
             if (result.OutOfBoundsFields.Count > 0)
@@ -247,10 +278,13 @@ namespace CultivationGame.Modules.Generator
 
         private static void CheckFloat(ValidationResult result, string field, float value, float min, float max)
         {
-            if (value < min || value > max)
+            // Этап-15 (ST15-002/B2): NaN не сравним — `NaN < min` и `NaN > max`
+            // оба false, потому прежняя проверка пропускала NaN (доказано
+            // префиксом B2). Явная проверка IsNaN — Critical-отказ.
+            if (float.IsNaN(value) || value < min || value > max)
             {
                 result.AddOutOfBounds(field);
-                result.Message += $" {field}={value:F2} out of [{min:F2}..{max:F2}];";
+                result.Message += $" {field}={value} out of [{min:F2}..{max:F2}];";
             }
         }
     }

@@ -90,12 +90,17 @@ namespace CultivationGame.Modules.Generator
 
         // Размеры, взвешенные к малым (на тестовой карте 50×50 большие бессмысленны,
         // но генератор честно их выдаёт — вес убывает).
+        // Этап-15 (ST15-006): + Heavy (FORM_SYSTEM §4 — размер «только L6+»,
+        // ×10000; прежде отсутствовал в пуле — даунгрейд-логика была мёртвым
+        // кодом, Heavy недостижим в Generate(); доказано префиксом F1).
+        // Вес — самый редкий (городской масштаб 300×300 м).
         private static readonly FormationSize[] SizePool =
         {
             FormationSize.Small, FormationSize.Small, FormationSize.Small, FormationSize.Small,
             FormationSize.Medium, FormationSize.Medium, FormationSize.Medium,
             FormationSize.Large, FormationSize.Large,
-            FormationSize.Great
+            FormationSize.Great,
+            FormationSize.Heavy
         };
 
         private static readonly FormationShape[] AllShapes =
@@ -117,7 +122,8 @@ namespace CultivationGame.Modules.Generator
             var rng = new SeededRandom(seed);
             var type = rng.NextElement(AllTypes);
             var size = rng.NextElement(SizePool);
-            // Heavy — только L6+ (замена выпавшего Heavy на Medium при низком уровне).
+            // Heavy — только L6+ (замена выпавшего Heavy на Medium при низком
+            // уровне; Этап-15: Heavy снова достижим из пула — гейт жив).
             if (size == FormationSize.Heavy && level < GameConstants.HEAVY_FORMATION_MIN_LEVEL)
                 size = FormationSize.Medium;
             return GenerateSpecified(type, size, level, seed);
@@ -138,7 +144,9 @@ namespace CultivationGame.Modules.Generator
 
             var data = new FormationData
             {
-                Id = $"form_{type}_{size}_{element}_{shape}_L{level}_{(seed ^ (seed >> 16)) & 0xFFFF:X4}",
+                // Этап-15 (ST15-005): полный 32-бит хвост сида вместо 16-бит
+                // фрагмента (тот же паттерн, что ItemGeneratorService.NextId).
+                Id = $"form_{type}_{size}_{element}_{shape}_L{level}_{seed:x8}",
                 FormationType = type,
                 Size = size,
                 Shape = shape,

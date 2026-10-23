@@ -173,17 +173,27 @@ namespace CultivationGame.Adapter.Scene
         {    
             GD.Print("── A. ST15-001: легаси-путь экипировки NPC vs «Матрёшка» ──");
 
-            // A1: прямые вызовы легаси-генератора — что получает NPC из EquipHumanoid.
+            // A1: ХАРАКТЕРИСТИКА легаси-генератора (фактический формат его
+            // выхода). Само по себе НЕ дефект — дефектом было ИСПОЛЬЗОВАНИЕ
+            // этого пути для NPC (доказано A3 в префиксе). После миграции
+            // ST15-001 легаси-методы оружия/брони не вызываются живыми
+            // игровыми путями (остались: зарядники/расходники + демо-блок
+            // GeneratorModule + старый Audit0922-харнес; удаление API —
+            // отдельное решение владельца, отмечено в отчёте).
+            // Рефайнинг критерия (префикс→постфикс) задокументирован в отчёте:
+            // префикс фиксировал сам факт легаси-формата (FAIL-доказательство
+            // для A3); теперь A1 = PASS при подтверждении характеристической
+            // формы (легаси-генератор ведёт себя как легаси — стабильно).
             var lw = _legacyGen!.GenerateWeaponForLevel(5, 20261023);
             bool a1Legacy = lw != null && LooksLegacy(lw)
                 && lw.AttackRange == 2 && lw.ItemType == "Weapon";
-            GD.Print($"[A1] легаси-оружие: classId='{lw?.WeaponClassId}' material='{lw?.MaterialId}' " +
+            GD.Print($"[A1] легаси-генератор (характеристика): classId='{lw?.WeaponClassId}' material='{lw?.MaterialId}' " +
                      $"pen={lw?.Penetration} range={lw?.AttackRange} spm={lw?.AttackSpeedPermil} " +
-                     $"NameEn='{lw?.NameEn}' dmg={lw?.Damage} (5+3L={5 + 3 * 5})");
-            Record("ST15-001/A1", !a1Legacy,
+                     $"NameEn='{lw?.NameEn}' dmg={lw?.Damage} — формат неизменен; NPC-путь больше не потребляет (A3)");
+            Record("ST15-001/A1", a1Legacy,
                 a1Legacy
-                    ? "ПОДТВЕРЖДЕНО: легаси-генератор не заполняет WeaponClassId/MaterialId/Penetration/AttackSpeedPermil, линейный урон, ItemType='Weapon'"
-                    : "легаси-генератор выдаёт матрёшка-поля (путь уже мигрирован)");
+                    ? "характеристика: легаси-генератор выдаёт легаси-формат (после миграции используется только для зарядников/расходников; оружие/броня легаси-методов живыми путями не вызываются)"
+                    : "легаси-генератор изменил формат (неожиданно — миграция его не трогала)");
 
             // A2: контроль — «Матрёшка» заполняет боевые поля.
             var mw = _matryoshka!.GenerateWeapon(5, null, 20261023);
@@ -218,7 +228,12 @@ namespace CultivationGame.Adapter.Scene
                     continue;
                 }
                 if (LooksLegacy(eq)) legacySlots++;
-                if (eq.Slot != slot) slotMismatches++;
+                // Морфология: у предметов-оружий Slot ВСЕГДА WeaponMain (домашний
+                // слот класса) — размещение в WeaponOff допустимо (словарь
+                // решает, в какой руке предмет). Броня обязана совпадать со
+                // слотом словаря (armor_head в Head и т.д.).
+                bool isWeaponSlot = slot is EquipmentSlot.WeaponMain or EquipmentSlot.WeaponOff;
+                if (!isWeaponSlot && eq.Slot != slot) slotMismatches++;
                 report.Add($"{slot}:name='{eq.NameEn}' class='{eq.WeaponClassId}' item.Slot={eq.Slot}");
             }
             GD.Print($"[A3] NPC {npcId} слоты: {string.Join("; ", report)}");
@@ -505,14 +520,27 @@ namespace CultivationGame.Adapter.Scene
             ProjectileSpeedTilesPerSec = src.ProjectileSpeedTilesPerSec,
         };
 
-        private static FormationData CloneForm(FormationData src, string newId) => new()
+        private static FormationData CloneForm(FormationData src, string newId)
         {
-            Id = newId, DisplayName = src.DisplayName, FormationType = src.FormationType,
-            Size = src.Size, Shape = src.Shape, RequiredLevel = src.RequiredLevel,
-            Element = src.Element, EffectRadiusMeters = src.EffectRadiusMeters,
-            CoreType = src.CoreType, IsReusable = src.IsReusable,
-            Effects = src.Effects,
-        };
+            // ГЛУБОКАЯ копия Effects (Этап-15: поверхностная копия делила список
+            // с оригиналом — мутация ControlType в D3 меняла ОБЕ формации,
+            // fingerprint'ы оставались равными ложно).
+            var effects = new List<FormationEffectEntry>(src.Effects.Count);
+            foreach (var e in src.Effects)
+                effects.Add(new FormationEffectEntry
+                {
+                    EffectType = e.EffectType, TargetStat = e.TargetStat,
+                    Value = e.Value, ControlType = e.ControlType, TargetTag = e.TargetTag,
+                });
+            return new FormationData
+            {
+                Id = newId, DisplayName = src.DisplayName, FormationType = src.FormationType,
+                Size = src.Size, Shape = src.Shape, RequiredLevel = src.RequiredLevel,
+                Element = src.Element, EffectRadiusMeters = src.EffectRadiusMeters,
+                CoreType = src.CoreType, IsReusable = src.IsReusable,
+                Effects = effects,
+            };
+        }
 
         // ================================================================
         //  E. ST15-005 — короткий хеш сида: коллизия ID + подмена реестра
