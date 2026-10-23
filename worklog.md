@@ -111,3 +111,82 @@ save/load/cold/registries/seed=0), префикс-прогон GODOT_STAGE15_DEB
 2) фиксы по подтверждённым блокам (по одному логическому блоку на коммит);
 3) постфикс + отчёт + qa_regression.sh STAGE15 + TESTING_RULES §0.1;
 4) follow-up ST11-006res/ST12-003res — отдельный пакет ПОСЛЕ этапа-15.
+
+## Сессия 2026-10-23 coder-1023 ч.7 — ЭТАП-15 РЕАЛИЗОВАН и ЗАКРЫТ (27/27 PASS)
+
+**HEAD старт:** 17be1cc (после ч.6). **Коммиты:** 94acd65 (симулятор
+Stage15 + STAGE15-регистрация в qa_regression + префикс-лог 12/15),
+8a941db (все фиксы ST15-001..008 + постфикс 27/27), + текущий (отчёт
+10_23_stage15_generator_integrity_report.md + TESTING_RULES §0.1 STAGE15).
+
+**Реализация [STAGE 15 AUDIT]** (канон: 10_23_stage15_generator_integrity_
+audit_request.md):
+- **Префикс Stage15Sim: 12 PASS / 15 FAIL** — все кандидаты воспроизведены
+  фактами (A1/A3 легаси-NPC-экипировка с морфологией Torso→Head/Legs/Feet;
+  B1 IsValid=true при unknown class; B2 NaN проходит; C1 Clean no-op;
+  D1–D5 fingerprints слепы к 11 полям + культура + F2-схлопывание;
+  F1 Heavy недостижим; G1/G3/G4; H3 FormationRegistry вне сброса мира).
+- **ST15-001 FIXED:** NPCAssemblyService.EquipHumanoid → IEquipmentGenerator
+  («Матрёшка»): все 7 слотов, броня по классам слотов, офхенд только 1H,
+  зарядник остаётся легаси. Открытие: путь был ДВОЙНОЙ (спаунер уже
+  перезаписывал WeaponMain) — легаси-остатки сидели в WeaponOff/Legs/Feet.
+- **ST15-002 FIXED:** unknown class оружия/брони = Critical-отказ; NaN —
+  отвергается; аксессуар — документированный skip. ±Infinity — DISPROVED
+  (сравнения работали и раньше). G2 invalid-enum техник — DISPROVED
+  (отвергался и раньше).
+- **ST15-003 FIXED:** FormationRegistry.Remove/Clear + Clean реально удаляет
+  (идемпотентен, уник выживает).
+- **ST15-004 FIXED:** fingerprints = все поведенческие поля + invariant
+  культура + R-точность.
+- **ST15-005 HARDENED:** ID seed:x8 (32-бит, паттерн NextId) вместо 16-бит
+  фрагмента (E1a: seed 0 ≡ 0x10001 по фрагменту — факт); safe-register в
+  обоих реестрах (коллизия Id с другим контентом не подменяет; идемпотентность
+  сохранена, E3 PASS до/после). Полная коллизия сканом 20000 сидов НЕ
+  воспроизведена (ни до, ни после) — честно отражено в отчёте.
+- **ST15-006 FIXED:** Heavy в SizePool (1/11), гейт L6+ жив; F1 постфикс:
+  Heavy в скане 400 сидов L6, на L5 отсутствует.
+- **ST15-007 FIXED:** кламп уровня [1..10]; ArgumentException на неизвестный
+  subtype; enum-гарды в валидаторе (Grade=99 = диагностика, не крэш).
+- **ST15-008 FIXED (FormationRegistry) + ПОДТВЕРЖДЁН R17 (каталог):**
+  FormationRegistry : IWorldResettable — WorldDomainResetCoordinator сбрасывает
+  (37 доменов). ItemDatabase R17/R35 — подтверждён адресно (H1 fresh-restore,
+  H2 двойной ResetWorld, H4 seed=0 контракты, cold-пара НОВЫХ процессов:
+  маркер переживает холодную загрузку, новые ID уникальны). In-session NewGame
+  отклоняется by design — контракт пересборки проверен операцией координатора
+  (прецедент Stage10-A4/A5).
+- **Постфикс: 27/27 PASS — VERDICT: PASS** (лог:
+  checkpoints/10_23_stage15_generator_integrity_report.log; отчёт:
+  10_23_stage15_generator_integrity_report.md — вкл. верификацию всех
+  генераторных находок аудита 09_11 с актуальными статусами).
+
+**Харнес-факты (честно задокументированы):** A1 → характеристика легаси-
+генератора (дефект-доказательство — A3 end-to-end; рефайнинг критерия в том
+же коммите, что миграция); CloneForm → глубокая копия Effects (поверхностная
+мутация ложно равняла fingerprints); A3-морфология учитывает WeaponMain-
+домашний слот оружия. Отравление каталога +Inf (обнаружено самим префиксом:
+автосейв падал на сериализации) — устранено проверкой копий, не живых предметов.
+
+**Полная регрессия (34 сима, код 8a941db): 32/34 стабильно зелёные.**
+- STAGE15 PASS (27/27 + COLD-SAVE + COLD-LOAD парой процессов).
+- Этапы 4–14 зелёные — регрессий от фиксов нет.
+- **COMBAT_SIM: флаки bug012** (1-й прогон FAIL → повтор PASS, тот же код) —
+  прежний известный остаток, вне этапа-15.
+- **STAGE8 D6a: НОВЫЙ обнаруженный флак** («зарядка для world-reset не
+  стартовала» → NOT TESTED → FAIL; ретраи 2/4 PASS). **ДОКАЗАНО
+  ПРЕДСУЩЕСТВУЮЩИМ:** worktree-эксперимент на префикс-коммите 94acd65 (ДО
+  фиксов): 4 прогона → 2 PASS / 2 FAIL, тот же D6a. Timing-race харнесса
+  (класс bug012), не связан с этапом-15. Прежняя сводка «STAGE8 стабильно»
+  была удачей малого числа прогонов.
+- Инфра-факт песочницы: бинарник Godot периодически ENOENT при exec
+  (overlay-volatile; stat ок, open падает) — лечится копией в /tmp
+  (GODOT_BIN-override qa_regression; /tmp/godot_bin/godot).
+
+NEXT: 1) харнес-стабилизация (отдельный пакет): COMBAT_SIM bug012
+residual-энтропия (сеять Random.Shared от GODOT_QA_SEED) + STAGE8 D6a
+(timing-race старта зарядки: пин/увеличение окна/предусловие qi) → 34/34;
+2) follow-up ST11-006res/ST12-003res (канон:
+10_23_stage11_12_residual_followups.md) — BodyService SizeClass-диапазон +
+BuffTickProcessor дробный остаток таймера — ОТКРЫТЫ, подтверждены
+аудитором, отдельные коммиты; 3) владельцу: 2 GAP этапа-15 (удаление
+легаси-методов оружия/брони из IItemGeneratorService; двойная генерация
+оружия NPC) + раунд-2 физплейтестов (PT-AI01..06, PT-U04..08 — planned).
