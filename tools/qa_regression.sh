@@ -45,6 +45,9 @@ ALL_SIMS=(
   "STAGE9:GODOT_STAGE9_DEBUG"
   # Этап-10 аудита (23.10): жизненный цикл мира (ST10-01..04).
   "STAGE10:GODOT_STAGE10_DEBUG"
+  # Этап-11 аудита (23.10): тело/травмы/морфологии (ST11-001..007,
+  # HoT-распределение и Amorphous Core = GAP).
+  "STAGE11:GODOT_STAGE11_DEBUG"
   "KILLFEED:GODOT_KILLFEED_DEBUG"
   "QUEST:GODOT_QUEST_DEBUG"
   "STORAGE:GODOT_STORAGE_DEBUG"

@@ -858,6 +858,19 @@ public partial class GameWorldController : Node2D
             var stage10Sim = new Stage10WorldLifecycleTruthSimDebug { Name = "Stage10WorldLifecycleTruthSimDebug" };
             AddChild(stage10Sim);
         }
+        // Этап-11 аудита (23.10, GODOT_STAGE11_DEBUG=1): тело/травмы/
+        // морфологии/восстановление — ST11-001 (респавн = полное лечение
+        // RedHP; 70/30-сплит оставлял дефицит), ST11-002 (тело переживает
+        // New Game — reset-контракт), ST11-003 (морфология не блокирует
+        // допустимые слоты — альтернативная анатомия), ST11-004/005 (GAP:
+        // HoT только торс; смертность Amorphous Core), ST11-006 (round-trip
+        // тела + повреждённые блоки), ST11-007 (ампутация/приживление/
+        // загрузка — согласованность дебаффов и слотов).
+        if (System.Environment.GetEnvironmentVariable("GODOT_STAGE11_DEBUG") == "1")
+        {
+            var stage11Sim = new Stage11BodyTruthSimDebug { Name = "Stage11BodyTruthSimDebug" };
+            AddChild(stage11Sim);
+        }
         // 2026-09-08 (баг-репорт пользователя): headless-верификация
         // инвентарного drag&drop в корзину (GODOT_TRASHDROP_DEBUG=1) —
         // материалы draggable, корзина выбрасывает, кукла отклоняет.
