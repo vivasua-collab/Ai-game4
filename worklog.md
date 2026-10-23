@@ -190,3 +190,88 @@ BuffTickProcessor дробный остаток таймера — ОТКРЫТ�
 аудитором, отдельные коммиты; 3) владельцу: 2 GAP этапа-15 (удаление
 легаси-методов оружия/брони из IItemGeneratorService; двойная генерация
 оружия NPC) + раунд-2 физплейтестов (PT-AI01..06, PT-U04..08 — planned).
+
+---
+
+## 2026-10-23 — Этап-16 старт: восстановление песочницы + статическая карта ST16-001..009
+
+Восстановление: песочница была сброшена (нет .NET/Godot) и отставала от GitHub
+на 50 коммитов (Этапы 9–15 уже опубликованы). Сделано: git fetch + ff-only до
+`9cb19a0` (HEAD Этапа-15, 27/27 PASS — опасение аудитора о незавершённости
+Этапа-15 снято: отчёт в main); .NET 8.0.426+9.0.319 ручной install (cold_start
+падал в фоне — песочница убивает nohup-процессы, ставил по шагам foreground);
+Godot 4.7.2 mono python-zipfile-извлечением в my-project/godot + симлинк
+/home/z/godot; NuGet.config на месте; dotnet build 0 errors. Токен жив.
+
+Аудит: upload/audit_10_20_e16.txt — [STAGE 16 AUDIT] Рендеринг/анимация/
+синхронизация визуального состояния. Ревизия аудитора 17be1cc (старт Этапа-15)
+устарела; фактический исходный SHA для этапа: `9cb19a0`. Пре-верификация на
+текущем коде (доставленные PNG: player_idle G1 + player_walk G2 → текущая
+фаза G2):
+
+- **ST16-001 CONFIRMED (статически):** PlayerAnimator.NotifyDeath/NotifyRespawn
+  (PlayerAnimator.cs:165-180) сбрасывают _deathActive/_progress/_phase, но НЕ
+  _meleeAge/_rangedAge/_hitAge. После быстрого death→respawn респавн
+  доигрывает старую атаку/хит (ResolveAnimId приоритетнее idle). Детерминный
+  репро: NotifyMelee→NotifyDeath→NotifyRespawn→Update → player_melee.
+  Экран смерти НЕ пузит мир (DeathScreenOverlay:23-25 — дизайн), но репро
+  не зависит от тайминга. Фикс: сброс one-shot-таймеров в обоих переходах.
+- **ST16-002:** подключено death/melee/bow/hit/meditate/run/walk/idle
+  (ResolveAnimId:225-231); НЕ подключено cast(G3)/guard(G4)/dash(G5)/sleep(G5)/
+  breakthrough(G5) — все будущие фазы манифеста → GAP по плану §5.1, не дефект.
+- **ST16-003 PART CONFIRMED:** квадрупед-NPC в melee ищет `animal_{species}_
+  melee` (NPCSpriteRenderer.cs:481), канон манифеста/SPRITE_DELIVERY §5 —
+  `animal_{species}_attack` → поставка G3 по канону молча промахнётся.
+  Фикс: канонический ключ attack для звериных листов. npc_hit/cast/death
+  не подключены — G3, GAP; смерть→труп сразу = живой жизненный цикл
+  (CorpseSpriteRenderer), задержку НЕ вводить (директива аудита).
+- **ST16-004 CONFIRMED (walk-мерцание):** AnimalSpriteRenderer.IsAnimalMoving
+  (:296-304) — дельта позиции между 15-Гц редравами; зверь прыгает 1-2 тайла
+  раз в тик → walk виден 1 кадр (~66мс), дальше idle, пока домен идёт.
+  Фикс: доменный сигнал AnimalEntity.Target != null (null = стоит/прибыл/
+  отказ/смерть; жив на весь путь блуждания И погони — AnimalService:610-627,
+  557-596; погоня Target=позиция игрока). run/attack/death зверей — G3 GAP.
+- **ST16-005 CONFIRMED:** FormationVisualRenderer класс-комментарий «ниже
+  персонажей» (:31) против ZIndex=Objects+2=5>Player=4 (:78); инлайн «выше
+  объектов, на земле». Между 3 и 4 целого Z нет → канон проекта: равный
+  ZIndex + порядок сиблингов (паттерн трупы-до-NPC, SceneBuilder:54).
+  Фикс: ZIndex=Objects(3) + перенос SetupFormationVisuals сразу после
+  SetupObjectLayer → выше объектов, ниже ground items/тел/NPC/игрока.
+  Y-sort — известный GAP плана §3.2 (не реализован, канон §3.4 RENDER_LAYERS);
+  в этапе — только слои+скриншоты, Y-sort вне объёма фикса.
+- **ST16-006 CONFIRMED (2 суб-дефекта):** (a) деактивация Qi-буфера убивает
+  ВСЕ VisualKind.Shield (TechniqueEffectRenderer:194-201), включая невиновный
+  one-shot 2.5с успешного каста Defense; (b) QiBufferService.AbsorbDamage
+  репаблишит IsActive=true на каждый поглощённый удар (:181) → рендерер
+  СТАКАЕТ persistent-щиты по числу ударов. Фикс: отдельный внутренний
+  VisualKind для persistent-буфера + идемпотентная замена на true, деактивация
+  гасит только persistent-вид. Дубли между 4 VFX-рендерерами — DISPROVED
+  (R29-гварды PublishSuccess:843-848 подавляют generic для AoE/homing);
+  координаты милли-пиксели/1000 = пиксели, согласовано с PlayerPixelPos
+  (контракт CombatContracts:266-269) — DISPROVED offset-концерн, рантайм-ассерт.
+- **ST16-007 CONFIRMED:** нечистимые per-entity словари NPC-рендера
+  (_npcLastPos/_npcLastX/_npcFacingLeft/_lastAnimInfo/_phaseOffsetCache) и
+  звериного (_animalLastPos/_lastAnimInfo/_phaseOffsetCache) растут на каждом
+  уникальном id (NPC id = npc_{Guid} :418, зверь = animal_{species}_{_nextId++}
+  :252 — id НЕ переиспользуются → чистка мёртвых безопасна). Фикс: чистка
+  мёртвых на низкочастотном проходе в _PhysicsProcess (не в _Draw).
+  _weaponTexCache/_weaponKeyCache — по itemId, ограничены каталогом; _npcWeaponIds
+  пересобирается целиком каждые 0.5с (самоочищается) — ОК.
+- **ST16-008 MOSTLY DISPROVED:** геометрия h/w%64 → PrintErr+null+fallback
+  (SpriteSheetCache:190-196), FrameAt клампит кадры/ряды, dual-path загрузка
+  (ResourceLoader→raw), ResetCache чистит, негативный кэш = контракт сессии
+  (SPRITE_DELIVERY §3 «перезапуск»); счёт кадров из PNG — недостаток защиты
+  от «не того числа кадров» закрывается валидатором доставки (runtime не
+  крашится: fps/loop из реестра, FrameAt клампит). ANIMQA step6 без зверей
+  честно WARN (не PASS) — уже соответствует требованию. Рантайм-перепроверка.
+- **ST16-009 STATIC OK:** fallback-цепочка WeaponClassOf, PNG-первый с теми же
+  ключами, HandOffset зеркалирование по X, кэш class|tier|rarity. Аниматор
+  MeleeSec=0.42=MainHandSwingSec, оба стартуют по AttackIntentEvent (GWC:3106)
+  — синхрон подтвердить рантаймом + скриншоты FlipH/позиционирования.
+
+NEXT: эпизод-2 — префиксный сим Stage16RenderAnimationSyncTruthSimDebug.cs
+(GODOT_STAGE16_DEBUG=1) с адресными проверками ST16-001..009 (гарантированно
+живой зверь через прямой спавн; домен Target-сигнал vs кадровая дельта;
+persist/oneshot Shield-жизненный цикл; ZIndex/порядок сиблингов; кэш-чистка),
+регистрация в qa_regression.sh + TESTING_RULES, префикс-прогон ДО фиксов,
+лог checkpoints/10_23_stage16_render_animation_prefix.log.
