@@ -50,6 +50,10 @@ namespace CultivationGame.Modules.NPC
         // R16: экипировка NPC — дальность оружия для кайтинга (санкционированная
         // инъекция чтения, тот же паттерн что NPCModule._equipmentDataProvider).
         private readonly IEquipmentDataProvider? _equipmentProvider;
+        // ST13-001 (Этап-13, NPC_AI_SYSTEM §6): тайлы для проходимости и A*.
+        // Паттерн — тот же санкционированный что у AnimalService (_tileService).
+        private readonly ITileService? _tileService;
+        private readonly NPCPathfinder? _pathfinder;
 
         // === MessagePipe: подписки ===
         private readonly ISubscriber<PlayerPositionChangedEvent> _playerPosChangedSub;
@@ -78,7 +82,9 @@ namespace CultivationGame.Modules.NPC
             INPCGroupService? groupService = null,
             // R16: экипировка для кайтинга лучников (опционально — тот же
             // null-tolerant паттерн, DI подставит зарегистрированный провайдер).
-            IEquipmentDataProvider? equipmentProvider = null)
+            IEquipmentDataProvider? equipmentProvider = null,
+            // ST13-001: тайлы мира — A* pathfinding + проходимость.
+            ITileService? tileService = null)
         {
             _npcService = npcService;
             _config = config;
@@ -86,6 +92,8 @@ namespace CultivationGame.Modules.NPC
             _playerPosChangedSub = playerPosChangedSub;
             _groupService = groupService;
             _equipmentProvider = equipmentProvider;
+            _tileService = tileService;
+            _pathfinder = tileService != null ? new NPCPathfinder(tileService) : null;
         }
 
         /// <summary>
@@ -121,6 +129,7 @@ namespace CultivationGame.Modules.NPC
         {
             _spawnPositions.Remove(npcId);
             _wanderTargets.Remove(npcId);
+            _pathStates.Remove(npcId);
         }
 
         /// <summary>
@@ -151,23 +160,30 @@ namespace CultivationGame.Modules.NPC
 
         /// <summary>
         /// Обработать движение одного NPC на основе AIState.
-        /// GROUP-SPAWN overlay: если NPC состоит в активной группе с
-        /// CurrentGroupTarget, движение к этой цели имеет приоритет над
-        /// индивидуальным AI. Это LIGHT overlay — followers пока не имеют
-        /// formation offsets (v1: все участники движутся к одной цели).
+        /// ST13-002 (Этап-13, GROUP_SYSTEM §6 — канон приоритетов):
+        ///   1. Бой (индивидуальный): Attacking/Fleeing — групповая задача
+        ///      НЕ подавляет боевые состояния (прежде overlay выполнялся до
+        ///      switch: участник патруля в бою продолжал идти к waypoint,
+        ///      игнорируя преследование/бегство).
+        ///   2. Групповая задача: если NPC в группе (не в бою) и группа
+        ///      активна с CurrentGroupTarget — движение к ней.
+        ///   3. Индивидуальное поведение: wander/patrol/прочее.
+        /// После завершения боя (AIState → не-боевое) следующий же тик
+        /// возвращает NPC к групповой задаче (§6: «при завершении боя NPC
+        /// возвращается к групповой задаче»).
+        /// GROUP-SPAWN overlay — LIGHT: followers пока без formation offsets.
         /// </summary>
         private void ProcessNPCMovement(NPCState state, float deltaTime)
         {
-            // === GROUP-SPAWN overlay ===
-            // Проверяем принадлежность к группе до индивидуального AI.
-            // Если группа активна и имеет CurrentGroupTarget — двигаемся к ней.
-            if (_groupService != null)
+            // === ST13-002: групповой overlay — ТОЛЬКО вне боевых состояний ===
+            bool combatMotion = state.AIState is NPCAIState.Attacking or NPCAIState.Fleeing;
+            if (!combatMotion && _groupService != null)
             {
                 var group = _groupService.GetGroupByMember(state.NpcId);
                 if (group != null && group.IsActive && group.CurrentGroupTarget.HasValue)
                 {
-                    MoveToward(state, group.CurrentGroupTarget.Value, _config.DefaultMoveSpeed, deltaTime);
-                    return;  // Skip individual AI logic for this tick.
+                    MoveTowardSmart(state, group.CurrentGroupTarget.Value, _config.DefaultMoveSpeed, deltaTime);
+                    return; // Skip individual AI logic for this tick.
                 }
             }
 
@@ -228,8 +244,8 @@ namespace CultivationGame.Modules.NPC
                 _wanderTargets[state.NpcId] = target;
             }
 
-            // Движение к цели
-            MoveToward(state, target, _config.DefaultMoveSpeed, deltaTime);
+            // Движение к цели (ST13-001: через Smart — обход препятствий)
+            MoveTowardSmart(state, target, _config.DefaultMoveSpeed, deltaTime);
         }
 
         /// <summary>
@@ -246,7 +262,7 @@ namespace CultivationGame.Modules.NPC
                 _wanderTargets[state.NpcId] = target;
             }
 
-            MoveToward(state, target, _config.DefaultMoveSpeed, deltaTime);
+            MoveTowardSmart(state, target, _config.DefaultMoveSpeed, deltaTime);
         }
 
         /// <summary>
@@ -266,7 +282,7 @@ namespace CultivationGame.Modules.NPC
             Vector2 fleeTarget = pos + direction * _config.FleeRadius;
             float fleeSpeed = _config.DefaultMoveSpeed * _config.FleeSpeedMultiplier;
 
-            MoveToward(state, fleeTarget, fleeSpeed, deltaTime);
+            MoveTowardSmart(state, fleeTarget, fleeSpeed, deltaTime);
         }
 
         /// <summary>
@@ -304,14 +320,14 @@ namespace CultivationGame.Modules.NPC
                     Vector2 dir = (pos - targetPos).normalized;
                     if (dir == Vector2.zero) dir = RandomDirection();
                     Vector2 retreatTarget = pos + dir * 2f;
-                    MoveToward(state, retreatTarget, _config.DefaultMoveSpeed, deltaTime);
+                    MoveTowardSmart(state, retreatTarget, _config.DefaultMoveSpeed, deltaTime);
                     return;
                 }
                 if (distance <= weapon.AttackRange) return; // в зоне обстрела — стоим
                 // Дальше дальности оружия — сближаемся (в зону обстрела).
                 // R20 (баг №2): ChaseSpeedMultiplier (1.6) вместо хардкода 1.2 —
                 // погоня 4.8 тайла/с обгоняет игрока (2.8): «медленно убежать» не выйдет.
-                MoveToward(state, targetPos, _config.DefaultMoveSpeed * _config.ChaseSpeedMultiplier, deltaTime);
+                MoveTowardSmart(state, targetPos, _config.DefaultMoveSpeed * _config.ChaseSpeedMultiplier, deltaTime);
                 return;
             }
 
@@ -319,7 +335,7 @@ namespace CultivationGame.Modules.NPC
             if (distance <= _config.AttackRadius) return;
 
             // Движение к цели (R20: ChaseSpeedMultiplier — см. выше).
-            MoveToward(state, targetPos, _config.DefaultMoveSpeed * _config.ChaseSpeedMultiplier, deltaTime);
+            MoveTowardSmart(state, targetPos, _config.DefaultMoveSpeed * _config.ChaseSpeedMultiplier, deltaTime);
         }
 
         /// <summary>
@@ -341,7 +357,137 @@ namespace CultivationGame.Modules.NPC
             if (distance <= followDistance) return;
 
             // Движение к цели
-            MoveToward(state, targetPos, _config.DefaultMoveSpeed, deltaTime);
+            MoveTowardSmart(state, targetPos, _config.DefaultMoveSpeed, deltaTime);
+        }
+
+        // === ST13-001: умное движение с учётом препятствий ===
+
+        /// <summary>Кэш маршрута одного NPC (A*-вейпоинты).</summary>
+        private sealed class PathState
+        {
+            internal readonly List<Vector2> Waypoints = new();
+            internal int Index;
+            internal Vector2 Goal;
+            internal bool HasPath;
+            internal bool NoPath;
+            internal float RetryAt;
+        }
+
+        private readonly Dictionary<string, PathState> _pathStates = new();
+        private float _pathClock;
+
+        private PathState GetPathState(string npcId)
+        {
+            if (!_pathStates.TryGetValue(npcId, out var ps))
+            {
+                ps = new PathState();
+                _pathStates[npcId] = ps;
+            }
+            return ps;
+        }
+
+        /// <summary>
+        /// ST13-001 (NPC_AI_SYSTEM §6): движение к цели с учётом проходимости.
+        /// Быстрый путь: прямая чиста (supercover-Bresenham) — прямое движение
+        /// (наиболее частый случай, O(дистанции), без A*). Прямая перекрыта —
+        /// A*-маршрут по вейпоинтам; цель изменилась / следующий вейпоинт стал
+        /// непроходим (препятствие появилось) — re-path (§6.2). Пути нет —
+        /// жадный шаг (диаг→гор→верт, паттерн AnimalService); всё заблокировано
+        /// — стоим (нет ни телепорта, ни вечного цикла); периодическая
+        ///retry-повторка ловит исчезновение препятствия.
+        /// Без тайлов (тесты без мира) — прежнее прямое MoveToward.
+        /// </summary>
+        private void MoveTowardSmart(NPCState state, Vector2 target, float speed, float deltaTime)
+        {
+            if (_pathfinder == null || !_pathfinder.IsAvailable)
+            {
+                MoveToward(state, target, speed, deltaTime);
+                return;
+            }
+            _pathClock += deltaTime;
+
+            var tileNow = new Vector2((int)MathF.Round(state.Position.X), (int)MathF.Round(state.Position.Y));
+            var tileGoal = new Vector2((int)MathF.Round(target.X), (int)MathF.Round(target.Y));
+
+            // Быстрый путь: прямая чиста (или цель в том же тайле).
+            if (tileNow == tileGoal || _pathfinder.LineWalkable(tileNow, tileGoal))
+            {
+                MoveToward(state, target, speed, deltaTime);
+                return;
+            }
+
+            var ps = GetPathState(state.NpcId);
+
+            // Re-plan: цели нет пути (retry-таймер) / цель сместилась /
+            // следующий вейпоинт стал непроходим (препятствие появилось).
+            bool needReplan = ps.NoPath
+                ? _pathClock >= ps.RetryAt
+                : !ps.HasPath
+                    || ps.Goal != tileGoal
+                    || (ps.Index < ps.Waypoints.Count
+                        && !_pathfinder.IsWalkableTile(ps.Waypoints[ps.Index]));
+            if (needReplan)
+            {
+                ps.Waypoints.Clear();
+                ps.Index = 0;
+                var path = _pathfinder.FindPath(tileNow, tileGoal);
+                if (path == null)
+                {
+                    ps.NoPath = true;
+                    ps.HasPath = false;
+                    ps.RetryAt = _pathClock + 0.5f;
+                }
+                else
+                {
+                    ps.NoPath = false;
+                    ps.HasPath = true;
+                    ps.Goal = tileGoal;
+                    for (int i = 0; i < path.Count; i++)
+                        ps.Waypoints.Add(path[i]);
+                }
+            }
+
+            if (ps.NoPath)
+            {
+                GreedyStep(state, target, speed, deltaTime);
+                return;
+            }
+
+            // Следование по вейпоинтам (достижение — продвижение индекса).
+            while (ps.Index < ps.Waypoints.Count
+                && Vector2.Distance(state.Position, ps.Waypoints[ps.Index]) < 0.35f)
+                ps.Index++;
+            if (ps.Index >= ps.Waypoints.Count)
+            {
+                // Хвост маршрута пройден — финишный отрезок напрямую
+                // (он же — следование за подвижной целью внутри последнего тайла).
+                MoveToward(state, target, speed, deltaTime);
+                return;
+            }
+            MoveToward(state, ps.Waypoints[ps.Index], speed, deltaTime);
+        }
+
+        /// <summary>
+        /// Пути нет: жадный шаг в сторону цели (диагональ → горизонталь →
+        /// вертикаль — паттерн AnimalService.StepTowardsTarget). Всё
+        /// заблокировано — без движения (нет зависания/телепорта).
+        /// </summary>
+        private void GreedyStep(NPCState state, Vector2 target, float speed, float deltaTime)
+        {
+            if (_pathfinder == null) return;
+            var here = new Vector2((int)MathF.Round(state.Position.X), (int)MathF.Round(state.Position.Y));
+            var goal = new Vector2((int)MathF.Round(target.X), (int)MathF.Round(target.Y));
+            int dx = Math.Sign(goal.X - here.X);
+            int dy = Math.Sign(goal.Y - here.Y);
+            Vector2? step = null;
+            if (dx != 0 && dy != 0 && _pathfinder.IsWalkableTile(new Vector2(here.X + dx, here.Y + dy)))
+                step = new Vector2(here.X + dx, here.Y + dy);
+            else if (dx != 0 && _pathfinder.IsWalkableTile(new Vector2(here.X + dx, here.Y)))
+                step = new Vector2(here.X + dx, here.Y);
+            else if (dy != 0 && _pathfinder.IsWalkableTile(new Vector2(here.X, here.Y + dy)))
+                step = new Vector2(here.X, here.Y + dy);
+            if (step == null) return; // окружён — стоим
+            MoveToward(state, step.Value, speed, deltaTime);
         }
 
         // === Утилиты движения ===
@@ -389,6 +535,8 @@ namespace CultivationGame.Modules.NPC
 
         /// <summary>
         /// Генерация случайной точки в радиусе от точки спавна.
+        /// ST13-001: цель блуждания обязана быть ПРОХОДИМЫМ тайлом (до 8
+        /// попыток; не нашли — текущая позиция NPC — стоим, путь не строим).
         /// </summary>
         private Vector2 GenerateRandomPointInRadius(string npcId, float radius)
         {
@@ -407,9 +555,17 @@ namespace CultivationGame.Modules.NPC
                 center = restored != null ? restored.Position : Vector2.zero;
             }
 
-            float angle = (float)(Random.Shared.NextDouble() * 360.0) * ((float)Math.PI / 180f);
-            float dist = (float)(Random.Shared.NextDouble() * (radius - 1.0) + 1.0);
-            return center + new Vector2((int)(MathF.Cos(angle) * dist), (int)(MathF.Sin(angle) * dist));
+            // ST13-001: до 8 попыток найти проходимый тайл в радиусе.
+            for (int attempt = 0; attempt < 8; attempt++)
+            {
+                float angle = (float)(Random.Shared.NextDouble() * 360.0) * ((float)Math.PI / 180f);
+                float dist = (float)(Random.Shared.NextDouble() * (radius - 1.0) + 1.0);
+                var candidate = center + new Vector2((int)(MathF.Cos(angle) * dist), (int)(MathF.Sin(angle) * dist));
+                if (_pathfinder == null || _pathfinder.IsWalkableTile(candidate))
+                    return candidate;
+            }
+            var st = _npcService.GetNPCState(npcId);
+            return st != null ? st.Position : center;
         }
 
         /// <summary>
@@ -453,6 +609,7 @@ namespace CultivationGame.Modules.NPC
             _playerPosChangedSubscription = null;
             _spawnPositions.Clear();
             _wanderTargets.Clear();
+            _pathStates.Clear();
         }
     }
 }
