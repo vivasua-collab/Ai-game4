@@ -335,7 +335,13 @@ namespace CultivationGame.Modules.Interaction
             }
             if (!nodes.TryGetValue(nodeId, out var node))
             {
-                Console.WriteLine($"[DialogueService] GoToNode: узел '{nodeId}' не найден в диалоге '{_currentDialogueId}'");
+                // ST14-004-edge (Этап-14, латентный путь данных): несуществующий
+                // узел БОЛЬШЕ не оставляет старый текст висеть («призрачный»
+                // узел) — диагностика + честное завершение диалога (единый
+                // EndDialogue: сброс, Stop typewriter, DialogueEndedEvent →
+                // окно закрывается, резюм — централизованный гейт).
+                Console.WriteLine($"[DialogueService] GoToNode: узел '{nodeId}' не найден в диалоге '{_currentDialogueId}' → завершение диалога (повреждённая ссылка)");
+                EndDialogue();
                 return;
             }
 

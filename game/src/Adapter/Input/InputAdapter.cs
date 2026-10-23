@@ -63,15 +63,27 @@ public partial class InputAdapter : Node
     {
         _frame++;
 
+        // ---- ST14-001 (Этап-14): владелец клавиатурного фокуса ----
+        // Пока текстовое поле (LineEdit имени сейва и т.п.) держит фокус,
+        // игровые действия от опроса НЕ запускаются: буквы должны печататься
+        // в поле, а не открывать окна/медитацию/экипировку. Проверка —
+        // ФАКТИЧЕСКИЙ фокус Godot (GuiGetFocusOwner), не положение мыши
+        // (SetOverUI — про курсор; поле может держать фокус при уходе
+        // курсора в мир).
+        _textFocusBlocked = IsTextEditingFocusOwner(GetViewport().GuiGetFocusOwner());
+
         // ---- Continuous / held inputs (polling — correct for game movement) ----
         var move = Vector2.Zero;
-        if (GodotInput.IsActionPressed("move_up"))    move.Y -= 1f;
-        if (GodotInput.IsActionPressed("move_down"))  move.Y += 1f;
-        if (GodotInput.IsActionPressed("move_left"))  move.X -= 1f;
-        if (GodotInput.IsActionPressed("move_right")) move.X += 1f;
-        if (move != Vector2.Zero) move = move.Normalized();
+        if (!_textFocusBlocked)
+        {
+            if (GodotInput.IsActionPressed("move_up"))    move.Y -= 1f;
+            if (GodotInput.IsActionPressed("move_down"))  move.Y += 1f;
+            if (GodotInput.IsActionPressed("move_left"))  move.X -= 1f;
+            if (GodotInput.IsActionPressed("move_right")) move.X += 1f;
+            if (move != Vector2.Zero) move = move.Normalized();
+        }
 
-        bool isRun = GodotInput.IsActionPressed("run");
+        bool isRun = !_textFocusBlocked && GodotInput.IsActionPressed("run");
         bool isLmb = GodotInput.IsMouseButtonPressed(MouseButton.Left);
         bool isRmb = GodotInput.IsMouseButtonPressed(MouseButton.Right);
 
@@ -95,6 +107,14 @@ public partial class InputAdapter : Node
 
         // ---- One-shot sticky keys (cleared and rebuilt each frame) ----
         _stickyKeys.Clear();
+        if (_textFocusBlocked)
+        {
+            // ST14-001: фокус в текстовом поле — ВСЕ игровые sticky
+            // заглушены (цифры 1-9/Shift — выделение текста; E/B/J/K/H/T/V —
+            // символы; Esc-закрытие окна обрабатывает UI-слой).
+            PushFrame(move: Vector2.Zero, isRun: false, isLmb, isRmb, hotbarSlot: null);
+            return;
+        }
         if (GodotInput.IsActionJustPressed("interact"))        _stickyKeys.Add("interact");
         if (GodotInput.IsActionJustPressed("inventory"))       _stickyKeys.Add("inventory");
         if (GodotInput.IsActionJustPressed("rest"))            _stickyKeys.Add("rest");
@@ -184,6 +204,14 @@ public partial class InputAdapter : Node
         }
 
         // ---- Build the engine-agnostic InputFrameData (readonly struct) ----
+        PushFrame(move, isRun, isLmb, isRmb, hotbarSlot);
+    }
+
+    /// <summary>Сборка+пуш InputFrameData (ST14: единая точка — обычный
+    /// кадр, глушение текст-фокуса и сброс при потере фокуса приложения).</summary>
+    private void PushFrame(Godot.Vector2 move, bool isRun, bool isLmb, bool isRmb, int? hotbarSlot)
+    {
+        var mousePos = GetViewport().GetMousePosition();
         var frameData = new InputFrameData(
             moveDirection:   new Vector2f(move.X, move.Y),
             isRun:           isRun,
@@ -199,6 +227,45 @@ public partial class InputAdapter : Node
 
         PlayerInput?.UpdateInputState(frameData);
     }
+
+    private bool _textFocusBlocked;
+
+    /// <summary>ST14-001: фокус принадлежит редактору текста?</summary>
+    private static bool IsTextEditingFocusOwner(Godot.Control? c)
+        => c is Godot.LineEdit or Godot.TextEdit or Godot.CodeEdit or Godot.SpinBox;
+
+    /// <summary>ST14-001 QA: текущее состояние глушения (сим-ассерты).</summary>
+    public bool QaTextFocusBlocked => _textFocusBlocked;
+
+    // === ST14-006 (Этап-14): потеря фокуса приложения ===
+    // Прежде при alt-tab/клике в другое окно held-состояния (WASD/Shift-бег,
+    // ЛКМ/ПКМ, длительность ПКМ) оставались «залипшими» до возврата фокуса:
+    // персонаж бежал, держалась стойка защиты, копился rmbHold. Обработка
+    // отсутствовала ВООБЩЕ (0 переопределений _Notification в Adapter).
+    // OS-уровень в headless не проверяется (физический плейтест PT-U06),
+    // но контракт чист: уведомление → мгновенный нулевой кадр.
+    public override void _Notification(int what)
+    {
+        base._Notification(what);
+        if (what == NotificationApplicationFocusOut)
+        {
+            OnApplicationFocusLost();
+        }
+    }
+
+    private void OnApplicationFocusLost()
+    {
+        // Немедленный нулевой кадр: held-состояния сброшены, sticky-набор
+        // пуст (одноразовые флаги пересоберутся только реальным вводом).
+        _stickyKeys.Clear();
+        _rmbHoldDuration = 0f;
+        PushFrame(Godot.Vector2.Zero, isRun: false, isLmb: false, isRmb: false, hotbarSlot: null);
+        GD.Print("[InputAdapter] ST14-006: потеря фокуса приложения — held-ввод сброшен");
+    }
+
+    /// <summary>ST14-006 QA: симуляция потери фокуса (headless не получает
+    /// OS-уведомлений — сим вызывает обработчик напрямую).</summary>
+    public void QaSimulateFocusLoss() => OnApplicationFocusLost();
 
     /// <summary>
     /// Event-based input — used for UI-only events (mouse enter/exit on Control nodes).

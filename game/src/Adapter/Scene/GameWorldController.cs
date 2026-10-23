@@ -325,6 +325,13 @@ public partial class GameWorldController : Node2D
     // R37-c: окно зарядника для headless-симов (GODOT_CHARGERQA_DEBUG).
     public UI.ChargerWindow? ChargerWindowForQA => _chargerWindow;
 
+    // === ST14 QA-аксессоры (Этап-14, Stage14InteractionFocusTruthSimDebug) ===
+    public bool QaAnyModalWindowOpenForQA => AnyModalWindowOpen();
+    public bool QaWorldMouseBlockedForQA => WorldMouseBlockedByModal();
+    public string? QaTopmostModalKeyForQA => TopmostModalKey();
+    public void QaUpdateModalStackForQA() => UpdateModalStack();
+    public UI.SaveLoadMenu? SaveLoadMenuForQA => _saveLoadMenu;
+
     /// <summary>
     /// Открыть диалог с NPC по QA-пути (пауза+окно) — те же действия,
     /// что и HandleNpcTalk, без поиска ближнего NPC (GODOT_DIALOGUE_DEBUG).
@@ -452,7 +459,117 @@ public partial class GameWorldController : Node2D
         || (_saveLoadMenu is { Visible: true });
 
     /// <summary>
-    /// Аудит-0915 A3 (INP1-2): предикат «модальное окно открыто КРОМЕ лавки».
+    /// ST14-002 (Этап-14): единый предикат «мировой мышиный ввод заблокирован
+    /// модальностью». Прежние ТРИ расходящихся списка (AnyModalWindowOpen /
+    /// локальный modalOpen в _UnhandledInput / список SetOverUI) пропускали
+    /// окно зарядника (зум/клики уходили в мир поверх H-окна) и меню сейвов
+    /// (зум при прокрутке каталога). Теперь все три места читают ОДИН
+    /// источник; экран смерти — доп-условие только мыши (ввод игрока мёртв
+    /// по гейтам, но паузу он не ставит).
+    /// </summary>
+    private bool WorldMouseBlockedByModal() => AnyModalWindowOpen() || DeathScreenShown;
+
+    // === ST14-003 (Этап-14): стек модальных окон по фактическому порядку ===
+    // Прежняя Esc-цепочка была жёстким if/else по ИДЕНТИФИКАТОРАМ окон
+    // (инвентарь — последним): при открытии T поверх B Esc закрывал НИЖНЕЕ
+    // окно. Теперь Esc закрывает ФАКТИЧЕСКИ последний открытый (seq — время
+    // открытия), попапы инвентаря — первыми (CloseTopmostPopup), пауза —
+    // только когда стек пуст. Пауза-инвариант INP-1 не изменился
+    // (HandleModalResumeOnClose — централизованный гейт).
+    private readonly Dictionary<string, int> _modalOpenSeq = new();
+    private int _modalOpenCounter;
+
+    private void UpdateModalStack()
+    {
+        TrackModal("inventory", _inventoryWindow is { Visible: true });
+        TrackModal("characterSheet", _characterSheetWindow is { Visible: true });
+        TrackModal("quest", _questWindow is { Visible: true });
+        TrackModal("eventLog", _eventLogWindow is { Visible: true });
+        TrackModal("hotkeys", _hotkeysWindow is { Visible: true });
+        TrackModal("techniqueBook", _techniqueBook is { Visible: true });
+        TrackModal("loot", _lootWindow is { IsOpen: true });
+        TrackModal("trade", _tradeWindow is { IsOpen: true });
+        TrackModal("dialogue", _dialogueWindow is { IsOpen: true });
+        TrackModal("cultivation", _cultivationWindow is { Visible: true });
+        TrackModal("charger", _chargerWindow is { Visible: true });
+        TrackModal("saveLoad", _saveLoadMenu is { Visible: true });
+#if DEBUG
+        TrackModal("cheat", _cheatPanel is { Visible: true });
+#endif
+    }
+
+    private void TrackModal(string key, bool open)
+    {
+        if (open) { if (!_modalOpenSeq.ContainsKey(key)) _modalOpenSeq[key] = ++_modalOpenCounter; }
+        else _modalOpenSeq.Remove(key);
+    }
+
+    /// <summary>Последний открытый ключ стека (null — стек пуст).</summary>
+    private string? TopmostModalKey()
+    {
+        string? best = null; int bestSeq = -1;
+        foreach (var kvp in _modalOpenSeq)
+            if (kvp.Value > bestSeq) { bestSeq = kvp.Value; best = kvp.Key; }
+        return best;
+    }
+
+    private void CloseTopmostModalByKey(string key)
+    {
+        switch (key)
+        {
+            case "inventory":
+                _inventoryWindow?.Toggle();
+                HandleModalResumeOnClose(); // INP-1: как B-close/bg-click
+                break;
+            case "characterSheet":
+                _characterSheetWindow?.Toggle();
+                HandleModalResumeOnClose();
+                break;
+            case "quest":
+                _questWindow?.Toggle();
+                HandleModalResumeOnClose();
+                break;
+            case "eventLog":
+                _eventLogWindow?.Toggle();
+                HandleModalResumeOnClose();
+                break;
+            case "hotkeys":
+                _hotkeysWindow?.Close();
+                HandleModalResumeOnClose();
+                break;
+            case "techniqueBook":
+                _techniqueBook?.Close();
+                HandleModalResumeOnClose();
+                break;
+            case "loot":
+                _lootWindow?.Close(); // резюм — Closed-событием (единая точка)
+                break;
+            case "trade":
+                _tradeWindow?.Close(); // резюм — OnTradeClosed (bus)
+                break;
+            case "dialogue":
+                _dialogueWindow?.Close();
+                HandleModalResumeOnClose();
+                break;
+            case "cultivation":
+                _cultivationWindow?.Toggle();
+                HandleModalResumeOnClose();
+                break;
+            case "charger":
+                _chargerWindow?.Close(); // резюм — Closed-событием
+                break;
+            case "saveLoad":
+                _saveLoadMenu?.Close(); // резюм — Closed-событием
+                break;
+#if DEBUG
+            case "cheat":
+                if (_cheatPanel != null) _cheatPanel.Visible = false;
+                break;
+#endif
+        }
+    }
+
+    /// <summary>Аудит-0915 A3 (INP1-2): предикат «модальное окно открыто КРОМЕ лавки».
     /// Прежнее выражение в OnTradeOpened `AnyModalWindowOpen() &amp;&amp;
     /// _tradeWindow is not { IsOpen: true }` было инвертировано: TradeWindow
     /// подписан на TradeOpenedEvent РАНЬШЕ GWC (EventBus синхронный, порядок
@@ -1960,23 +2077,10 @@ public partial class GameWorldController : Node2D
         // change the camera zoom (user report 2026-08-22).
         // INP-1: + журнал заданий (Q) и журнал событий (J) — их оверлеи не
         // всегда потребляют колесо (утечка зума при открытом окне).
-        bool modalOpen = (_inventoryWindow is { Visible: true })
-                      || (_characterSheetWindow is { Visible: true })
-                      || (_dialogueWindow is { IsOpen: true })
-                      || (_tradeWindow is { IsOpen: true })
-                      || (_lootWindow is { IsOpen: true })
-                      || (_techniqueBook is { Visible: true })
-                      || (_hotkeysWindow is { Visible: true })
-                      || (_questWindow is { Visible: true })
-                      || (_eventLogWindow is { Visible: true })
-#if DEBUG
-                      || (_cheatPanel is { Visible: true })
-#endif
-                      || (_cultivationWindow is { Visible: true })
-                      // АУДИТ-1020 (BUG-009): экран смерти — LMB-движение
-                      // и зум камеры под вуалью мертвы (мир не паузится,
-                      // но ввод игрока заблокирован; см. DeathScreenShown).
-                      || DeathScreenShown;
+        // ST14-002: ЕДИНЫЙ предикат (прежний локальный список пропускал
+        // окно зарядника и меню сейвов — зум/клики уходили в мир поверх
+        // планировочных окон; префикс пойман Stage14-симом).
+        bool modalOpen = WorldMouseBlockedByModal();
 
         if (@event is InputEventMouseButton mb && mb.Pressed)
         {
@@ -2321,107 +2425,41 @@ public partial class GameWorldController : Node2D
                 HandleModalResumeOnClose();
         }
 
-        // 2026-08-28: Esc сначала закрывает окна новой волны (справка/книга/чит).
-        if (PlayerInput.IsPausePressed && _hotkeysWindow is { Visible: true })
+        // === ST14-003 (Этап-14): Esc по ФАКТИЧЕСКОМУ стеку открытых окон ===
+        // Прежняя цепочка закрывала окна в жёстком порядке идентификаторов
+        // (T закрывался раньше B даже когда B открыт ПОВЕРХ T). Семантика
+        // UX-конракта «Esc закрывает верхнее»: попапы инвентаря → последний
+        // открытый → пауза (только при пустом стеке). Резюмы — те же
+        // централизованные пути (INP-1), инвариант паузы сохранён.
+        UpdateModalStack();
+        if (PlayerInput.IsPausePressed)
         {
-            _hotkeysWindow.Close();
-            HandleModalResumeOnClose(); // INP-1: центральный резюм
-        }
-        // 2026-09-04 S1: Esc закрывает журнал событий (J).
-        else if (PlayerInput.IsPausePressed && _eventLogWindow is { Visible: true })
-        {
-            _eventLogWindow.Toggle();
-            HandleModalResumeOnClose(); // INP-1: центральный резюм
-        }
-        // 2026-09-04 S1: Esc закрывает окно квестов (Q).
-        else if (PlayerInput.IsPausePressed && _questWindow is { Visible: true })
-        {
-            _questWindow.Toggle();
-            HandleModalResumeOnClose(); // INP-1: центральный резюм
-        }
-        else if (PlayerInput.IsPausePressed && _techniqueBook is { Visible: true })
-        {
-            _techniqueBook.Close();
-            HandleModalResumeOnClose(); // INP-1: центральный резюм
-        }
-#if DEBUG
-        else if (PlayerInput.IsPausePressed && _cheatPanel is { Visible: true })
-        {
-            _cheatPanel.Visible = false;
-        }
-#endif
-        // Esc while trading → close the shop (Phase 5). Authoritative resume
-        // happens in OnTradeClosed (bus event), like dialogues.
-        else if (PlayerInput.IsPausePressed && _tradeWindow is { IsOpen: true })
-        {
-            _tradeWindow.Close();
-        }
-        // R13 FULL-LOOT: Esc при открытом окне обыска → закрыть (резюм тиков —
-        // в OnLootWindowClosed по Closed-событию, единая точка для всех путей).
-        else if (PlayerInput.IsPausePressed && _lootWindow is { IsOpen: true })
-        {
-            _lootWindow.Close();
-        }
-        // Esc while a dialogue is open → close it and resume ticks (Phase 2).
-        else if (PlayerInput.IsPausePressed && _dialogueWindow is { IsOpen: true })
-        {
-            _dialogueWindow.Close();
-            HandleModalResumeOnClose(); // INP-1: центральный резюм
-        }
-        // INP-1: Esc закрывает лист персонажа (C) — раньше Esc под этим окном
-        // снимал паузу (ветка ниже), окно висело поверх бегущего мира.
-        else if (PlayerInput.IsPausePressed && _characterSheetWindow is { Visible: true })
-        {
-            _characterSheetWindow.Toggle();
-            HandleModalResumeOnClose();
-        }
-        // R20 (баг №6, запрос 09_09_22_40): Esc закрывает окно Культивации (K).
-        // Репорт: «не закрывается по ESC, требует повторного нажатия K».
-        // Правило пользователя: два типа закрытия — повторная клавиша вызова
-        // И классический Esc. П4 (репорт 21.09): K теперь модальное с паузой —
-        // снятие паузы при Esc-закрытии (как у инвентаря).
-        else if (PlayerInput.IsPausePressed && _cultivationWindow is { Visible: true })
-        {
-            _cultivationWindow.Toggle();
-            HandleModalResumeOnClose();
-        }
-        // R37-c: Esc закрывает окно зарядника (H) — правило пользователя
-        // «два типа закрытия: повторная клавиша вызова И классический Esc».
-        // Resume — через Closed-событие окна (единая точка, как у инвентаря).
-        else if (PlayerInput.IsPausePressed && _chargerWindow is { Visible: true })
-        {
-            _chargerWindow.Close();
-        }
-        // Этап-3: Esc закрывает меню сейвов (то же правило «два типа закрытия»;
-        // ветка обязана стоять выше общего Esc-toggle паузы — AnyModalWindowOpen
-        // теперь включает меню, и пауза-ветка его бы «съела»).
-        else if (PlayerInput.IsPausePressed && _saveLoadMenu is { Visible: true })
-        {
-            _saveLoadMenu.Close();
-        }
-        // Esc (sticky "escape") → toggle pause. INP-1: только когда НЕ открыто
-        // ни одного модального окна (раньше гард проверял только инвентарь —
-        // Esc под Q/J/F1/T снимал паузу под висящим окном).
-        else if (PlayerInput.IsPausePressed && !AnyModalWindowOpen())
-        {
-            if (Time.IsPaused) Time.Resume();
-            else               Time.Pause();
-            GD.Print($"[GameWorld] Pause toggled: {Time.IsPaused}");
-        }
-        // If inventory is open and Esc pressed, close it instead of pausing.
-        // 2026-09-09: Esc сначала закрывает верхний попап (диалог разделения
-        // стака → контекстное меню), и только потом — само окно инвентаря.
-        else if (PlayerInput.IsPausePressed && _inventoryWindow != null && _inventoryWindow.Visible)
-        {
-            if (_inventoryWindow.CloseTopmostPopup())
+            bool escHandled = false;
+            // 1) Попапы инвентаря закрываются первыми (2026-09-09 правило:
+            //    сплит-диалог → контекстное меню → окно).
+            if (_inventoryWindow is { Visible: true } && _inventoryWindow.CloseTopmostPopup())
             {
                 GD.Print("[GameWorld] Esc закрыл попап инвентаря (меню/диалог)");
+                escHandled = true;
             }
-            else
+            // 2) Фактически верхнее окно стека.
+            if (!escHandled)
             {
-                _inventoryWindow.Toggle();
-                // INP-1: центральный резюм (то же, что B-close и bg-click).
-                HandleModalResumeOnClose();
+                var topKey = TopmostModalKey();
+                if (topKey != null)
+                {
+                    CloseTopmostModalByKey(topKey);
+                    escHandled = true;
+                }
+            }
+            // 3) Стек пуст → классический toggle паузы (инвариант INP-1:
+            //    Esc-пауза, существовавшая до окна, не снимается закрытием
+            //    окна — гейт в HandleModalResumeOnClose).
+            if (!escHandled && !AnyModalWindowOpen())
+            {
+                if (Time.IsPaused) Time.Resume();
+                else               Time.Pause();
+                GD.Print($"[GameWorld] Pause toggled: {Time.IsPaused}");
             }
         }
 
@@ -2548,6 +2586,16 @@ public partial class GameWorldController : Node2D
                 if (_dialogueWindow is { IsOpen: false })
                     HandleModalResumeOnClose(); // INP-1: центральный резюм
             }
+            // ST14-005 (Этап-14): E над планировочными окнами (меню сейвов,
+            // зарядник, лист персонажа, журналы, книга техник, культивация)
+            // не запускает СКРЫТЫЕ взаимодействия с миром (обыск трупа,
+            // разговор с NPC, подбор) — прежде гейт был только на
+            // trade/loot/dialogue. Проверка после trade/loot/dialogue-веток:
+            // они легитимно потребляют E (модальность своих поверхностей).
+            else if (AnyModalWindowOpen())
+            {
+                // E съедается планировочной модальностью.
+            }
             else if (!HandleCorpseSearchOrNpcTalk())
             {
                 HandlePickup();
@@ -2561,22 +2609,11 @@ public partial class GameWorldController : Node2D
         // диалога/чтения, вопреки HOTKEYS.md §9.2 «Dialogue/Journal: Атака ❌».
         // Движение уже было заблокировано через Time.IsPaused (все эти окна
         // паузят время; Культивация K сознательно НЕ паузит — она уже была здесь).
-        if (_inputAdapter != null && _inventoryWindow != null)
+        if (_inputAdapter != null)
         {
-            _inputAdapter.SetOverUI(_inventoryWindow.Visible
-                || _tradeWindow is { IsOpen: true }
-                || _lootWindow is { IsOpen: true }
-                || _techniqueBook is { Visible: true }
-                || _hotkeysWindow is { Visible: true }
-                || _dialogueWindow is { IsOpen: true }
-                || _characterSheetWindow is { Visible: true }
-                || _eventLogWindow is { Visible: true }
-                || _questWindow is { Visible: true }
-                || _saveLoadMenu is { Visible: true }
-#if DEBUG
-                || _cheatPanel is { Visible: true }
-#endif
-                || _cultivationWindow is { Visible: true });
+            // ST14-002: единый предикат (в списке отсутствовало окно
+            // зарядника — атака/каст/хотбар работали поверх H-окна).
+            _inputAdapter.SetOverUI(AnyModalWindowOpen());
         }
 
         // Этап-3 (директива 20.10, снят режим Q8 «сейвы отложены»): F5/F9 —
