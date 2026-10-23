@@ -958,6 +958,14 @@ public partial class CombatSimDebug : Node
                     // Направление crowd2 → игрок накрывает и crowd1 (клин).
                     if (crowd2 != null)
                     {
+                        // ST13-001a-изоляция (Этап-13, регресс 23.10): после (b)
+                        // толпа мстит и МОБИЛЬНО дособирается к игроку (прежде
+                        // диагональное сближение замирало) — геометрия клина
+                        // разъезжалась до залпа NPC (Cone targets=0). Пин
+                        // канонической геометрии перед каждым залпом.
+                        TeleportPlayer(clean.X, clean.Y);
+                        PinNpcQuiet(crowd1, clean.X + 2, clean.Y);
+                        PinNpcQuiet(crowd2, clean.X + 4, clean.Y + 1);
                         await WaitForOwnCastClearAsync(crowd2, 2.0f);
                         _combatServiceImpl.DebugSetReadinessPermil(crowd2, 1000);
                         if (_combatServiceImpl.IsInCombat)
@@ -980,6 +988,11 @@ public partial class CombatSimDebug : Node
                         {
                             if (volley > 0)
                             {
+                                // ST13-001a-изоляция: повторный пин (за окно
+                                // ожидания кулдауна толпа снова дрейфует).
+                                TeleportPlayer(clean.X, clean.Y);
+                                PinNpcQuiet(crowd1, clean.X + 2, clean.Y);
+                                PinNpcQuiet(crowd2, clean.X + 4, clean.Y + 1);
                                 await WaitForOwnCastClearAsync(crowd2, 2.0f);
                                 _combatServiceImpl.DebugSetReadinessPermil(crowd2, 1000);
                                 if (_combatServiceImpl.IsInCombat)
@@ -2013,6 +2026,16 @@ public partial class CombatSimDebug : Node
     /// шага: multi(b) мерит ОТКРЫТИЕ UI-сессии, а не выживание.
     /// HealPart сплитит 70/30 → даём с запасом, Heal клампит по MaxHP.
     /// </summary>
+    /// <summary>ST13-001a-изоляция: пин NPC (телепорт + Idle — без ветки
+    /// движения) для геометрически-чувствительных секций (мир после
+    /// Этапа-13 подвижен).</summary>
+    private void PinNpcQuiet(string? npcId, int x, int y)
+    {
+        if (npcId == null) return;
+        _npcService?.UpdatePosition(npcId, new Position2D(x, y));
+        _npcService?.SetAIState(npcId, NPCAIState.Idle);
+    }
+
     private void HealPlayerFully()
     {
         if (_bodyService == null) return;

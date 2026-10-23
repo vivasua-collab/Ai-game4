@@ -56,7 +56,8 @@ public sealed class TechniqueGrantPhase : AbstractSceneAssemblyPhase
         int level = (int)_qi.CultivationLevel;
         // Тест-режим: набор случайный при каждой новой игре; seed логируется
         // для воспроизведения (принцип детерминированности SeededRandom).
-        long seed = Environment.TickCount;
+        var qaSeedEnv = Environment.GetEnvironmentVariable("GODOT_QA_SEED");
+        long seed = long.TryParse(qaSeedEnv, out var qs) ? qs + 7 : Environment.TickCount; // +7: не collide с PreGen
         Console.WriteLine($"[TechniqueGrant] seed={seed}");
 
         int granted = 0;

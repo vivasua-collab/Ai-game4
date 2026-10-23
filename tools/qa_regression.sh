@@ -4,6 +4,9 @@
 set -u
 export PATH="/home/z/.dotnet:$PATH"
 export DOTNET_ROOT="/home/z/.dotnet"
+# ST13-001a-изоляция: детерминизм QA (техники/снаряжение; сид мира уже
+# фиксирован) — устраняет флаки харнессов от случайного оружия NPC.
+export GODOT_QA_SEED="${GODOT_QA_SEED:-20261023}"
 GODOT="${GODOT_BIN:-/home/z/my-project/godot/Godot_v4.7.2-stable_mono_linux.x86_64/Godot_v4.7.2-stable_mono_linux.x86_64}"
 # R23-1: my-project/godot периодически «гасится» платформой (dentry-ghost:
 # записи недоступны, exec ENOENT при живом ls). Fallback — стабильная копия

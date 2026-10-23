@@ -100,7 +100,14 @@ public sealed class PreGenTechniquePhase : AbstractSceneAssemblyPhase
     public override Task ExecuteAsync()
     {
         int maxLevel = (int)_qi.CultivationLevel;
-        long sessionSeed = Environment.TickCount;
+        // ST13-001a-изоляция (Этап-13): детерминизм QA-прогонов. Сид мира
+            // фиксирован (test_polygon 12345), но техники/снаряжение сидировались
+            // от времени: случайные луки/мечи у NPC меняют динамику боя от
+            // запуска к запуску (после починки НЕОСЕВОГО движения это стало
+            // источником флаков харнессов). GODOT_QA_SEED — фиксирует прогоны
+            // qa_regression.sh; игровой путь (без env) не изменился.
+            var qaSeedEnv = Environment.GetEnvironmentVariable("GODOT_QA_SEED");
+            long sessionSeed = long.TryParse(qaSeedEnv, out var qs) ? qs : Environment.TickCount;
         Console.WriteLine($"[PreGenTechnique] start — maxLevel={maxLevel} seed={sessionSeed}");
 
         int totalGenerated = 0;

@@ -587,6 +587,14 @@ public partial class Stage8TechniqueTruthSimDebug : Node
             float intBefore = _statService!.GetVirtualDelta(StatType.Intelligence);
             float masteryBefore = melee.Mastery;
             _rejections.Clear(); _castResults.Clear();
+            // ST13-001a-изоляция (Этап-13, регресс 23.10): с починкой
+            // НЕОСЕВОГО движения NPC цель реально убегает/мстит между
+            // телепортом секции и замахом (прежде бегство по диагонали
+            // замирало — NPC стоял на месте). Пин в кадр замаха:
+            // телепорт + Idle (нет ветки движения) — асессор «Цель
+            // исчезла» больше не рвёт pending-мост.
+            Teleport(npc, player.X + 1, player.Y);
+            _npcService!.SetAIState(npc, CultivationGame.Core.Data.NPCAIState.Idle);
             // Тот же синхронный стек: обычный замах (создаёт pending) → спуск техники.
             _attackIntentPub!.Publish(new AttackIntentEvent(PlayerId, npc, "basic_attack", isRanged: false));
             Press(melee.TechniqueId, player.X + 2, player.Y);
