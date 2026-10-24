@@ -294,6 +294,27 @@ for entry in "${SIMS[@]}"; do
     if echo "$D4COLD" | grep -q " PASS "; then :; else
       RESULTS[$name]="FAIL"; FAILED+=("STAGE18-D4-COLD")
       echo "  ❌ D4-COLD провален (план сна теряется в новом процессе)"; fi
+    # FA-1 (final-audit follow-up): crash-целостность — намеренное исключение
+    # сценария H (GODOT_STAGE18_FAULT_INJECT=1) обязано давать VERDICT: FAIL.
+    # Прежде CRASH писался как GAP и вердикт оставался PASS — ложная зелёность
+    # (доказано финальным аудитом). Ожидаемый исход инъекции: FAIL; PASS или
+    # отсутствие вердикта = провал QA-агрегации, а не «пройденный» тест.
+    echo "─── QA: STAGE18-FAULT-INJECT (ожидание: VERDICT: FAIL) ──"
+    : > "$LOG"
+    env GODOT_NEWGAME=1 GODOT_STAGE18_DEBUG=1 GODOT_STAGE18_FAULT_INJECT=1 "$GODOT" --headless --path . scenes/MainMenu.tscn > "$LOG" 2>&1 &
+    PID=$!; SIM_PID="$PID"
+    ( i=0; while kill -0 "$PID" 2>/dev/null; do
+        if grep -q "VERDICT" "$LOG" 2>/dev/null; then sleep 3; kill -9 "$PID" 2>/dev/null; break; fi
+        i=$((i+1)); if [ "$i" -ge "$CEILING" ]; then kill -9 "$PID" 2>/dev/null; break; fi
+        sleep 1
+      done ) &
+    WATCHDOG=$!; wait "$PID" 2>/dev/null || true; SIM_PID=""
+    kill "$WATCHDOG" 2>/dev/null; wait "$WATCHDOG" 2>/dev/null || true
+    FA_VERDICT=$(grep -E "VERDICT: (PASS|FAIL)" "$LOG" | tail -1)
+    echo "$FA_VERDICT"
+    if echo "$FA_VERDICT" | grep -q "VERDICT: FAIL"; then :; else
+      RESULTS[$name]="FAIL"; FAILED+=("STAGE18-FAULT-INJECT")
+      echo "  ❌ fault-inject не покраснел (исключение сценария не даёт FAIL — агрегация врёт)"; fi
   fi
 done
 

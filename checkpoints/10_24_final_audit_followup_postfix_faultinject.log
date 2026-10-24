@@ -1,0 +1,2508 @@
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+
+[InputMap] Registered all input actions.
+[WorldService] Active location: Test Polygon (id=test_polygon)
+[WorldModule] Started — time 1864-01-01 06:00, speed Normal
+[TileService] Generated 50x50 grid, seed=12345, baseTerrain=Grass (noise-based)
+  Water_Shallow: 651 tiles (26%)
+  Sand: 539 tiles (21%)
+  Grass: 1299 tiles (51%)
+  Water_Deep: 11 tiles (0%)
+  Biomes:
+    Sea: 654 tiles (26%)
+    Coast: 536 tiles (21%)
+    Grassland: 1300 tiles (52%)
+    Ocean: 10 tiles (0%)
+[TileModule] Started — generated 50x50 grid in 12 ms
+[AnimalSpawn] Spawned wolf #animal_wolf_1 at (9, 7) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_2 at (44, 34) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_3 at (44, 20) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_4 at (48, 22) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_5 at (20, 39) (body: Quadruped/Medium)
+[AnimalSpawn] test_polygon: spawned 5/5 animals (attempts=5)
+[PlayerService] Player spawned @ (25, 25), hp delegated to BodyService
+[StatProgressProducer] Запущен: продюсеры дельт §5.1/§5.2 (удар/уклонение/блок/урон/техника/медитация)
+[PlayerModule] Started — stat svc wired=True
+[QuestModule] Started
+[TradeModule] Started
+[UIModule] Started — HUD shown
+[SaveModule] Started — 24 ISaveable service(s) registered
+[ItemDatabase] Initialized (no Resources catalogue — populate via Register())
+[GeneratorModule] База данных предметов инициализирована
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[GeneratorModule] Модуль запущен. Зарегистрировано предметов: 4
+[GameEntryPoint] Location catalog registered: 3 locations [test_polygon, large_world, world_map]
+[GameEntryPoint] Started. 19 startables, 18 tickables, session=GameSession
+[GameBoot] Game initialized. Container built and entry point started.
+[MainMenu] GODOT_NEWGAME=1 — auto-starting QA world (test_polygon)
+[MainMenu] New Game (QA) selected — test_polygon
+[GameSession] NewGame variant=1 location=test_polygon (50×50) — assembling scene...
+[WorldModule] ResetWorld: календарные маркеры будут тихо ре-синхронизированы на первом тике (P1-15)
+[ResourceService] ResetWorld: 0 armed-записей очереди респауна очищено (ST10-01)
+[BodyService] ResetWorld: тело пересоздано (Humanoid/Medium, VIT 10) — New Game/LoadGame
+[StorageRingService] ResetWorld: хранилища колец очищены (P1-19)
+[CombatService] ResetWorld: combat state cleared (New Game)
+[TechniqueService] ResetWorld: techniques cleared (New Game)
+[TechniqueChargeService] ResetWorld: charges cleared (New Game)
+[FormationRegistry] ResetWorld: реестр формаций очищен (world-scoped, Этап-15 ST15-008)
+[CorpseService] ResetWorld: 0 трупов очищено
+[NPCSpawnerService] ResetWorld: домен NPC очищен (tracked=0, restored=0)
+[NPCGroupService] ResetWorld: 0 групп очищено
+[StaminaService] Инициализация: Max=100, полный ресурс 1000‰ (сон/бодрствование из PlayerConfig)
+[StaminaService] ResetWorld: ресурс новой сессии (Current=100/100, 1000‰)
+[PlayerCombatAdapter] ResetWorld: стойка/режим оружия/кулдауны сброшены (New Game)
+[AuraHoldService] ResetWorld: hold cleared (New Game)
+[Trade] ResetWorld — сессия закрыта, сток очищен (0 лавок)
+[SaveModule] ResetWorld: отсчёт автосейва сброшен (каденция — мировой тик, P2-26)
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[Phase 0] WorldDomainReset complete — 38 world-scoped доменов сброшено (npc/corpses/groups/animals/formations/charger/player/stats/qi/quests/currency/inventory/equipment/belt/ground/world/time) + weapon-cache
+[Phase 1] CoreValidation complete — Core validated
+[TileService] Generated 50x50 grid, seed=12345, baseTerrain=Grass (noise-based)
+  Water_Shallow: 651 tiles (26%)
+  Sand: 539 tiles (21%)
+  Grass: 1299 tiles (51%)
+  Water_Deep: 11 tiles (0%)
+  Biomes:
+    Sea: 654 tiles (26%)
+    Coast: 536 tiles (21%)
+    Grassland: 1300 tiles (52%)
+    Ocean: 10 tiles (0%)
+[Phase 2] TileMapGen complete — test_polygon: 50×50 tiles, seed=12345
+[WorldService] Active location: Тестовый полигон (id=test_polygon)
+[TileModule] LocationChanged '' → 'test_polygon'
+[Phase 3] WorldInit complete — location=test_polygon, speed=Normal, techniqueRegistry cleared (was world-scoped reset)
+[PlayerService] Player spawned @ (25, 25), hp delegated to BodyService
+[Phase 4] PlayerSpawn complete — player at (25, 25) in test_polygon
+[ItemDatabase] Зарегистрирован предмет: material_wood (Material)
+[ItemDatabase] Зарегистрирован предмет: material_stone (Material)
+[ItemDatabase] Зарегистрирован предмет: material_iron_ore (Material)
+[ItemDatabase] Зарегистрирован предмет: material_fiber (Material)
+[ItemDatabase] Зарегистрирован предмет: consumable_berry (Consumable)
+[ItemDatabase] Зарегистрирован предмет: consumable_herb (Consumable)
+[ItemDatabase] Зарегистрирован предмет: con_pill_healing (Consumable)
+[ItemDatabase] Зарегистрирован предмет: con_pill_qi (Consumable)
+[ItemDatabase] Зарегистрирован предмет: ammo_arrow (Material)
+[ItemDatabase] Зарегистрирован предмет: material_steel_ingot (Material)
+[ItemDatabase] Зарегистрирован предмет: qistone_dust_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_dust_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_pebble_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_pebble_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_shard_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_shard_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_stone_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_stone_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_boulder_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_boulder_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_03e9_000001 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_dagger_L1_03e9_000001 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_03e9_000001 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_03ea_000002 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_bow_L1_03ea_000002 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_03ea_000002 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_03f2_000003 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_greatsword_L1_03f2_000003 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_03f2_000003 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_03f3_000004 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_staff_L1_03f3_000004 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_03f3_000004 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_044c_000005 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_torso_L1_044c_000005 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_044c_000005 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_044d_000006 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_feet_L1_044d_000006 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_044d_000006 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_04b2_000007 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_feet_L1_04b2_000007 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_04b2_000007 (Armor)
+[Phase 5] StartingGear complete — стартовый набор: БД +20, выдано 13 позиций, оружие 4 шт (кинжал надет: True, лук в инвентаре: True), броня 2 шт, стрел 30. Замена сейвов: каждая новая игра = одинаковый старт (сид 1000).
+[AnimalSpawn] Spawned wolf #animal_wolf_6 at (9, 7) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_7 at (44, 34) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_8 at (44, 20) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_9 at (48, 22) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_10 at (20, 39) (body: Quadruped/Medium)
+[AnimalSpawn] test_polygon: spawned 5/5 animals (attempts=5)
+[Phase 6] AnimalSpawn complete — 5 animals on 'test_polygon' (50×50)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_c990_000008 (Weapon)
+[HumanNPCSpawn] Spawned Merchant L0 #npc_9790fed860f0467b at (2, 34)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_f526_000009 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_eb25_00000a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_61d9_00000b (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_8204_00000c (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_dbde_00000d (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_82ca_00000e (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_6bcc5c30_000001 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L3_c9cf_00000f (Weapon)
+[HumanNPCSpawn] Spawned Elder L3 #npc_78fda46587cf4e0e at (30, 35)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L1_b8f2_000010 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_8430_000011 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_8bc5_000012 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_dd77_000013 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_e60f_000014 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_a49f_000015 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_c68a_000016 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_76bcbfbd_000002 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L3_c973_000017 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L3_c975_000018 (Armor)
+[HumanNPCSpawn] Spawned Guard L3 #npc_d532309483c34294 at (43, 48)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_5ada_000019 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_f1d2_00001a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_f6b1_00001b (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_b2bc_00001c (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_f14c_00001d (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_0eff_00001e (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_6a1a79af_000003 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_c974_00001f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_c976_000020 (Armor)
+[HumanNPCSpawn] Spawned Guard L2 #npc_7dff33d5ce2841df at (13, 48)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_ca2f_000021 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_ca31_000022 (Armor)
+[HumanNPCSpawn] Spawned Passerby L1 #npc_f4dddd6b95254117 at (24, 47)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L1_ca30_000023 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_ca32_000024 (Armor)
+[HumanNPCSpawn] Spawned Passerby L0 #npc_98a8350bc3034459 at (45, 19)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_8a0d_000025 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_1b90_000026 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_1465_000027 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_853e_000028 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_0e1c_000029 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_1e36_00002a (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_3630_00002b (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_705caea7_000004 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L3_c9b5_00002c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L3_c9b7_00002d (Armor)
+[HumanNPCSpawn] Spawned Cultivator L3 #npc_b5ccaa32fd96403a at (16, 40)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_d1a5_00002e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_a871_00002f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_4dd1_000030 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_f2ab_000031 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_4af3_000032 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_4074_000033 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_1c94060e_000005 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_c9b6_000034 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_c9b8_000035 (Armor)
+[HumanNPCSpawn] Spawned Cultivator L2 #npc_db267300b3214967 at (30, 34)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L2_ca14_000036 (Weapon)
+[HumanNPCSpawn] Spawned Enemy L1 #npc_0cfeb9acbcb443fd at (47, 40)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_ebfe_000037 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_413c_000038 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_e7b0_000039 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_dce6_00003a (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_611d_00003b (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_79a8_00003c (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_6bbde6b6_000006 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L3_ca15_00003d (Weapon)
+[HumanNPCSpawn] Spawned Enemy L2 #npc_54482512de964025 at (4, 2)
+[Phase 7] HumanNPCSpawn complete — 10/10 generated NPCs on 'test_polygon'
+[NPCGroupService] Created group group_1 (task=HuntingPack, faction=, species=wolf)
+[NPCGroupService] Set patrol route for group_1: 4 waypoints
+[NPCGroupService] Added animal_wolf_11 to group group_1 as Leader
+[NPCGroupService] Added animal_wolf_12 to group group_1 as Follower
+[NPCGroupService] Added animal_wolf_13 to group group_1 as Follower
+[GroupSpawn] Wolf pack 'group_1' — 3 wolves at (45, 15)
+[NPCGroupService] Created group group_2 (task=Patrol, faction=town_guard, species=)
+[NPCGroupService] Set patrol route for group_2: 4 waypoints
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L2_690e_00003e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_7fcc_00003f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_d863_000040 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_62f6_000041 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_7592_000042 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_d175_000043 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_08c41c0c_000007 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_3d7d_000044 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_3d7f_000045 (Armor)
+[NPCGroupService] Added npc_3a5329dbbdad4ed2 to group group_2 as Leader
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_ff7c_000046 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_1497_000047 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_08ba_000048 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_e66b_000049 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_e576_00004a (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_c31c_00004b (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_0b1a20e0_000008 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_3d7e_00004c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_3d80_00004d (Armor)
+[NPCGroupService] Added npc_8e24f701ffbc4a98 to group group_2 as Follower
+[GroupSpawn] Guard patrol 'group_2' — 2 guards at (18, 38)
+[Phase 8] GroupSpawn complete — 2 groups on 'test_polygon' (50×50)
+[Phase 9] FormationInit complete (stub)
+[Phase 10] ChargerInit complete (stub)
+[Phase 11] QuestInit complete (stub)
+[Phase 12] UIInit complete — HUD shown
+[PreGenTechnique] start — maxLevel=1 seed=20261023
+[PreGenTechnique] done — generated=100 valid=100 duplicates=0 registered=100 (registry total=108)
+[PreGenTechnique] grades registered: [Common=30, Refined=30, Perfect=30, Transcendent=10] gradeMismatches=0 registryInvalid=0
+[TechniqueGrant] seed=20261030
+[TechniqueGrant] R25 AoE-набор: 2/3 форм (конус/полукруг/круг — площадные техники)
+[Phase 14] TechniqueGrant complete — granted 8 techniques (cultivation 1, active 3/3, curse, formation, aoe 2) at L1
+[Phase 15] Finalize complete — Scene assembly complete
+[SceneOrchestrator] Assembly complete — mode=NewGame: 16 completed, 0 skipped, 91 ms
+[GameSession] NewGame ready — state=Playing
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_ocean.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_sea.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_coast.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_grassland.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_grassland.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_steppe.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_steppe.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_forest.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_forest.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_forest.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_highlands.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_highlands.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_mountains.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_mountains.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_peak.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_peak.png
+[FormationVisualRenderer] Ready
+[GroundItemRenderer] Ready
+[AnimalSpriteRenderer] Ready — tilePixels=64
+[CorpseSpriteRenderer] Ready
+[NPCSpriteRenderer] Ready
+[DamageNumberRenderer] Ready
+[ProjectileRenderer] Ready
+[StrikeFx] Ready
+[AoeFx] Ready
+[HomingFx] Ready
+[TechniqueEffectRenderer] Ready
+[CharacterDoll] Ready
+[Inventory] Ready
+[CharacterSheet] Ready
+[DialogueWindow] Ready
+[TradeWindow] Ready
+[LootWindow] Ready
+[HotbarPanel] Ready (v2: techniques + cooldowns + belt row + charge/aura R26 + медитация-слот П5)
+[TechniqueBook] Ready
+[HotkeysWindow] Ready
+[EventLogWindow] Ready
+[QuestWindow] Ready
+[CultivationWindow] Ready
+[ChargerWindow] Ready
+[CheatPanel] Ready (F2 to toggle)
+[Stage18Sim] Ready — Этап-18 (интеграция подсистем/длительная сессия) starts in 3s
+[GameWorldController] Ready
+[BiomeTiles] Drew 100 textures, 0 missing (culled to 10×10)
+[SurfaceTransitions] Drew 29 transition sprites (culled to 11×11)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[AnimalService] Tick #1 — 8 animals; sample: wolf#animal_wolf_6 @ (9, 7)
+[AnimalService] Tick #2 — 8 animals; sample: wolf#animal_wolf_6 @ (9, 7)
+── A. ST18-001: New Game → мутации → Save → мутации → Load ──
+[A1] сессия=Playing, позиция=(25, 25), NPC=12, стамина=100/100
+[TimeService] Paused at tick 2
+[GameSession] Paused
+[GameWorld] ⏸ ПАУЗА (Esc)
+[PlayerService] StartSleep(2h)
+[A2] мутации: стамина=37, Ци=850 (+250 от 600), ΔSTR=5.0 (+5 от 0.0), поз=(10,10), сон=Sleeping, бафф=True, наземных=1
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/stage18_rt/main.json (257692 bytes, atomic tmp→rename)
+[SaveService] Save('Manual:stage18_rt') → OK
+[PlayerService] WakeUp: сон 0ч — дельты закреплены (§6)
+[A4] после мутаций: стамина=100, Ци=550, STR=5.0, поз=(30,30), сон=Awake
+[TimeService] Resumed at tick 2 (speed Normal)
+[GameSession] Resumed
+[AnimalService] Tick #3 — 8 animals; sample: wolf#animal_wolf_6 @ (9, 7)
+[SaveService] Validate('Manual:stage18_rt') → OK (формат поддерживается)
+[SaveService] CaptureBackup → OK (24 блоков в памяти)
+[GameSession] LoadGame slot='Manual:stage18_rt' — loading... (backup=yes)
+[WorldModule] ResetWorld: календарные маркеры будут тихо ре-синхронизированы на первом тике (P1-15)
+[ResourceService] ResetWorld: 0 armed-записей очереди респауна очищено (ST10-01)
+[BodyService] ResetWorld: тело пересоздано (Humanoid/Medium, VIT 10) — New Game/LoadGame
+[StorageRingService] ResetWorld: хранилища колец очищены (P1-19)
+[CombatService] ResetWorld: combat state cleared (New Game)
+[TechniqueService] ResetWorld: techniques cleared (New Game)
+[TechniqueChargeService] ResetWorld: charges cleared (New Game)
+[FormationRegistry] ResetWorld: реестр формаций очищен (world-scoped, Этап-15 ST15-008)
+[CorpseService] ResetWorld: 0 трупов очищено
+[NPCSpawnerService] ResetWorld: домен NPC очищен (tracked=12, restored=0)
+[NPCGroupService] ResetWorld: 2 групп очищено
+[StaminaService] Инициализация: Max=100, полный ресурс 1000‰ (сон/бодрствование из PlayerConfig)
+[StaminaService] ResetWorld: ресурс новой сессии (Current=100/100, 1000‰)
+[PlayerCombatAdapter] ResetWorld: стойка/режим оружия/кулдауны сброшены (New Game)
+[AuraHoldService] ResetWorld: hold cleared (New Game)
+[Trade] ResetWorld — сессия закрыта, сток очищен (0 лавок)
+[SaveModule] ResetWorld: отсчёт автосейва сброшен (каденция — мировой тик, P2-26)
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[GameSession] LoadGame: 38 world-scoped доменов сброшено до RestoreState
+[WorldService] Active location: Тестовый полигон (id=test_polygon)
+[TileModule] LocationChanged '' → 'test_polygon'
+[TimeService] RestoreState: 1864-01-01 06:02, tick 2
+[ItemDatabase] RestoreState: 109 предметов восстановлено; счётчики ID: eq=77, gen=8
+[PlayerService] Player spawned @ (10, 10), hp delegated to BodyService
+[PlayerService] RestoreState: позиция (10,10), sleep=Sleeping (план 2ч, проспано 1 мин), stance=Normal, dead=False
+[StatService] RestoreState: base=6, virtual=1, threshold=0
+[QiService] RestoreState: L1.0 Normal, qi 850/1000, heartSevered=False
+[EquipmentService] RestoreState: 1/1 слотов куклы
+[StorageRingService] RestoreState: 0 колец восстановлено (предметов: 0)
+[BeltService] RestoreState: 0/0 слотов пояса
+[NPCRelationshipService] RestoreState: 0 отношений восстановлено (боевые обиды/дружба переживают Load, АУДИТ-0921_2030 Ф4)
+[CorpseService] RestoreState: 0 трупов восстановлено (full-loot переживает Load, AUDIT-0921 A5)
+[AnimalService] RestoreState: 8/8 зверей (живых: 8, враждебных: 0), nextId=14
+[NPCGroupService] RestoreState: 2 групп восстановлено (участников отброшено: 0, групп без состава: 0, промоутов лидера (повышений первого участника): 0); nextGroupId=3
+[QuestService] RestoreState: 3/3 квестов, active=0, rewarded=0, day=0
+[CurrencyService] RestoreState: баланс 50 камней
+[StaminaService] RestoreState: Current=37/100 (370‰)
+[SaveService] Load('Manual:stage18_rt') → OK
+[EquipmentService] OnAfterLoad: кэш блокировок пересобран по телу (0 слотов)
+[NPCSpawnerService] SyncWithRegistry: трекер 0 → 12 (+12 восстановленных, реестр=12)
+[GameSession] LoadGame: 3 IPostLoadSync-доменов синхронизировано после RestoreState
+[SceneOrchestrator] Phase 'WorldDomainReset' (#0) skipped — load-mode (SkipOnLoad)
+[Phase 1] CoreValidation complete — Core validated
+[TileService] Generated 50x50 grid, seed=12345, baseTerrain=Grass (noise-based)
+  Water_Shallow: 651 tiles (26%)
+  Sand: 539 tiles (21%)
+  Grass: 1299 tiles (51%)
+  Water_Deep: 11 tiles (0%)
+  Biomes:
+    Sea: 654 tiles (26%)
+    Coast: 536 tiles (21%)
+    Grassland: 1300 tiles (52%)
+    Ocean: 10 tiles (0%)
+[Phase 2] TileMapGen complete — test_polygon: 50×50 tiles, seed=12345
+[SceneOrchestrator] Phase 'WorldInit' (#3) skipped — load-mode (SkipOnLoad)
+[SceneOrchestrator] Phase 'PlayerSpawn' (#4) skipped — load-mode (SkipOnLoad)
+[SceneOrchestrator] Phase 'StartingGear' (#5) skipped — load-mode (SkipOnLoad)
+[SceneOrchestrator] Phase 'AnimalSpawn' (#6) skipped — load-mode (SkipOnLoad)
+[SceneOrchestrator] Phase 'HumanNPCSpawn' (#7) skipped — load-mode (SkipOnLoad)
+[SceneOrchestrator] Phase 'GroupSpawn' (#8) skipped — load-mode (SkipOnLoad)
+[Phase 9] FormationInit complete (stub)
+[Phase 10] ChargerInit complete (stub)
+[Phase 11] QuestInit complete (stub)
+[Phase 12] UIInit complete — HUD shown
+[SceneOrchestrator] Phase 'PreGenTechnique' (#13) skipped — load-mode (SkipOnLoad)
+[SceneOrchestrator] Phase 'TechniqueGrant' (#14) skipped — load-mode (SkipOnLoad)
+[Phase 15] Finalize complete — Scene assembly complete
+[SceneOrchestrator] Assembly complete — mode=LoadGame: 7 completed, 9 skipped, 3 ms
+[SaveService] DiscardBackup — снимок (24 блоков) освобождён без восстановления
+[GameSession] LoadGame ready — state=Playing
+[A5] после Load: сессия=Playing, стамина=37 (370‰), Ци=850, ΔSTR=5.0, STR=10.0, поз=(10,10), сон=Sleeping, NPC=12 (сейв 12), трупов=0 (сейв 0)
+[A6] бафф после Load=False, наземных предметов=0 (было ≥1 до сейва)
+── B. ST18-001/005: New Game после LoadGame — старый мир не протекает ──
+[GameSession] Quitting (no save)
+[GameSession] NewGame variant=1 location=test_polygon (50×50) — assembling scene...
+[WorldModule] ResetWorld: календарные маркеры будут тихо ре-синхронизированы на первом тике (P1-15)
+[ResourceService] ResetWorld: 0 armed-записей очереди респауна очищено (ST10-01)
+[BodyService] ResetWorld: тело пересоздано (Humanoid/Medium, VIT 10) — New Game/LoadGame
+[StorageRingService] ResetWorld: хранилища колец очищены (P1-19)
+[CombatService] ResetWorld: combat state cleared (New Game)
+[TechniqueService] ResetWorld: techniques cleared (New Game)
+[TechniqueChargeService] ResetWorld: charges cleared (New Game)
+[FormationRegistry] ResetWorld: реестр формаций очищен (world-scoped, Этап-15 ST15-008)
+[CorpseService] ResetWorld: 0 трупов очищено
+[NPCSpawnerService] ResetWorld: домен NPC очищен (tracked=12, restored=0)
+[NPCGroupService] ResetWorld: 2 групп очищено
+[StaminaService] Инициализация: Max=100, полный ресурс 1000‰ (сон/бодрствование из PlayerConfig)
+[StaminaService] ResetWorld: ресурс новой сессии (Current=100/100, 1000‰)
+[PlayerCombatAdapter] ResetWorld: стойка/режим оружия/кулдауны сброшены (New Game)
+[AuraHoldService] ResetWorld: hold cleared (New Game)
+[Trade] ResetWorld — сессия закрыта, сток очищен (0 лавок)
+[SaveModule] ResetWorld: отсчёт автосейва сброшен (каденция — мировой тик, P2-26)
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[Phase 0] WorldDomainReset complete — 38 world-scoped доменов сброшено (npc/corpses/groups/animals/formations/charger/player/stats/qi/quests/currency/inventory/equipment/belt/ground/world/time) + weapon-cache
+[Phase 1] CoreValidation complete — Core validated
+[TileService] Generated 50x50 grid, seed=12345, baseTerrain=Grass (noise-based)
+  Water_Shallow: 651 tiles (26%)
+  Sand: 539 tiles (21%)
+  Grass: 1299 tiles (51%)
+  Water_Deep: 11 tiles (0%)
+  Biomes:
+    Sea: 654 tiles (26%)
+    Coast: 536 tiles (21%)
+    Grassland: 1300 tiles (52%)
+    Ocean: 10 tiles (0%)
+[Phase 2] TileMapGen complete — test_polygon: 50×50 tiles, seed=12345
+[WorldService] Active location: Тестовый полигон (id=test_polygon)
+[TileModule] LocationChanged '' → 'test_polygon'
+[Phase 3] WorldInit complete — location=test_polygon, speed=Normal, techniqueRegistry cleared (was world-scoped reset)
+[PlayerService] Player spawned @ (25, 25), hp delegated to BodyService
+[Phase 4] PlayerSpawn complete — player at (25, 25) in test_polygon
+[ItemDatabase] Зарегистрирован предмет: material_wood (Material)
+[ItemDatabase] Зарегистрирован предмет: material_stone (Material)
+[ItemDatabase] Зарегистрирован предмет: material_iron_ore (Material)
+[ItemDatabase] Зарегистрирован предмет: material_fiber (Material)
+[ItemDatabase] Зарегистрирован предмет: consumable_berry (Consumable)
+[ItemDatabase] Зарегистрирован предмет: consumable_herb (Consumable)
+[ItemDatabase] Зарегистрирован предмет: con_pill_healing (Consumable)
+[ItemDatabase] Зарегистрирован предмет: con_pill_qi (Consumable)
+[ItemDatabase] Зарегистрирован предмет: ammo_arrow (Material)
+[ItemDatabase] Зарегистрирован предмет: material_steel_ingot (Material)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_03e9_000001 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_dagger_L1_03e9_000001 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_03e9_000001 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_03ea_000002 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_bow_L1_03ea_000002 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_03ea_000002 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_03f2_000003 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_greatsword_L1_03f2_000003 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_03f2_000003 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_03f3_000004 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_staff_L1_03f3_000004 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_03f3_000004 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_044c_000005 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_torso_L1_044c_000005 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_044c_000005 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_044d_000006 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_feet_L1_044d_000006 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_044d_000006 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_04b2_000007 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_feet_L1_04b2_000007 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_04b2_000007 (Armor)
+[Phase 5] StartingGear complete — стартовый набор: БД +20, выдано 9 позиций, оружие 4 шт (кинжал надет: True, лук в инвентаре: True), броня 2 шт, стрел 30. Замена сейвов: каждая новая игра = одинаковый старт (сид 1000).
+[AnimalSpawn] Spawned wolf #animal_wolf_14 at (9, 7) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_15 at (44, 34) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_16 at (44, 20) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_17 at (48, 22) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_18 at (20, 39) (body: Quadruped/Medium)
+[AnimalSpawn] test_polygon: spawned 5/5 animals (attempts=5)
+[Phase 6] AnimalSpawn complete — 5 animals on 'test_polygon' (50×50)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_c990_000008 (Weapon)
+[HumanNPCSpawn] Spawned Merchant L0 #npc_6e3761b394e04ffa at (2, 34)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_f526_000009 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_eb25_00000a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_61d9_00000b (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_8204_00000c (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_dbde_00000d (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_82ca_00000e (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_6bcc5c30_000001 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L3_c9cf_00000f (Weapon)
+[HumanNPCSpawn] Spawned Elder L3 #npc_728f6859b2ee4e9c at (30, 35)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L1_b8f2_000010 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_8430_000011 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_8bc5_000012 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_dd77_000013 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_e60f_000014 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_a49f_000015 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_c68a_000016 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_76bcbfbd_000002 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L3_c973_000017 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L3_c975_000018 (Armor)
+[HumanNPCSpawn] Spawned Guard L3 #npc_2d9cc1b26082498e at (43, 48)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_5ada_000019 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_f1d2_00001a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_f6b1_00001b (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_b2bc_00001c (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_f14c_00001d (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_0eff_00001e (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_6a1a79af_000003 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_c974_00001f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_c976_000020 (Armor)
+[HumanNPCSpawn] Spawned Guard L2 #npc_155c29e0f2494bf7 at (13, 48)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_ca2f_000021 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_ca31_000022 (Armor)
+[HumanNPCSpawn] Spawned Passerby L1 #npc_aa1151c3836b4f40 at (24, 47)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L1_ca30_000023 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_ca32_000024 (Armor)
+[HumanNPCSpawn] Spawned Passerby L0 #npc_ec7a8faef29543ad at (45, 19)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_8a0d_000025 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_1b90_000026 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_1465_000027 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_853e_000028 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_0e1c_000029 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_1e36_00002a (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_3630_00002b (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_705caea7_000004 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L3_c9b5_00002c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L3_c9b7_00002d (Armor)
+[HumanNPCSpawn] Spawned Cultivator L3 #npc_c416c92f4de24373 at (16, 40)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_d1a5_00002e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_a871_00002f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_4dd1_000030 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_f2ab_000031 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_4af3_000032 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_4074_000033 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_1c94060e_000005 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_c9b6_000034 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_c9b8_000035 (Armor)
+[HumanNPCSpawn] Spawned Cultivator L2 #npc_cd3609ee84e5437b at (30, 34)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L2_ca14_000036 (Weapon)
+[HumanNPCSpawn] Spawned Enemy L1 #npc_f37ea8bb466b4781 at (47, 40)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_ebfe_000037 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_413c_000038 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_e7b0_000039 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_dce6_00003a (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_611d_00003b (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_79a8_00003c (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_6bbde6b6_000006 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L3_ca15_00003d (Weapon)
+[HumanNPCSpawn] Spawned Enemy L2 #npc_da47a9dea5464331 at (4, 2)
+[Phase 7] HumanNPCSpawn complete — 10/10 generated NPCs on 'test_polygon'
+[NPCGroupService] Created group group_1 (task=HuntingPack, faction=, species=wolf)
+[NPCGroupService] Set patrol route for group_1: 4 waypoints
+[NPCGroupService] Added animal_wolf_19 to group group_1 as Leader
+[NPCGroupService] Added animal_wolf_20 to group group_1 as Follower
+[NPCGroupService] Added animal_wolf_21 to group group_1 as Follower
+[GroupSpawn] Wolf pack 'group_1' — 3 wolves at (45, 15)
+[NPCGroupService] Created group group_2 (task=Patrol, faction=town_guard, species=)
+[NPCGroupService] Set patrol route for group_2: 4 waypoints
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L2_690e_00003e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_7fcc_00003f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_d863_000040 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_62f6_000041 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_7592_000042 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_d175_000043 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_08c41c0c_000007 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_3d7d_000044 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_3d7f_000045 (Armor)
+[NPCGroupService] Added npc_6e79a25d94fb480e to group group_2 as Leader
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_ff7c_000046 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_1497_000047 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_08ba_000048 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_e66b_000049 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_e576_00004a (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_c31c_00004b (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_0b1a20e0_000008 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_3d7e_00004c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_3d80_00004d (Armor)
+[NPCGroupService] Added npc_1e82fe4206014f54 to group group_2 as Follower
+[GroupSpawn] Guard patrol 'group_2' — 2 guards at (18, 38)
+[Phase 8] GroupSpawn complete — 2 groups on 'test_polygon' (50×50)
+[Phase 9] FormationInit complete (stub)
+[Phase 10] ChargerInit complete (stub)
+[Phase 11] QuestInit complete (stub)
+[Phase 12] UIInit complete — HUD shown
+[PreGenTechnique] start — maxLevel=1 seed=20261023
+[PreGenTechnique] done — generated=100 valid=100 duplicates=0 registered=100 (registry total=108)
+[PreGenTechnique] grades registered: [Common=30, Refined=30, Perfect=30, Transcendent=10] gradeMismatches=0 registryInvalid=0
+[TechniqueGrant] seed=20261030
+[TechniqueGrant] R25 AoE-набор: 2/3 форм (конус/полукруг/круг — площадные техники)
+[Phase 14] TechniqueGrant complete — granted 8 techniques (cultivation 1, active 3/3, curse, formation, aoe 2) at L1
+[Phase 15] Finalize complete — Scene assembly complete
+[SceneOrchestrator] Assembly complete — mode=NewGame: 16 completed, 0 skipped, 19 ms
+[GameSession] NewGame ready — state=Playing
+[B1] после NewGame: сессия=Playing
+[B2] утечки NPC: 0 (), животных: 0; трупы=0, наземные=0 (было 0), стамина=100/100 (1000‰), сон=Awake
+[B3] ΔSTR нового мира=0.0 (в загруженном был 5.0); base STR=10.0
+[TimeService] Paused at tick 0
+[GameSession] Paused
+[TimeService] Resumed at tick 0 (speed Normal)
+[GameSession] Resumed
+[GameSession] Quitting (no save)
+[GameSession] NewGame variant=1 location=test_polygon (50×50) — assembling scene...
+[WorldModule] ResetWorld: календарные маркеры будут тихо ре-синхронизированы на первом тике (P1-15)
+[ResourceService] ResetWorld: 0 armed-записей очереди респауна очищено (ST10-01)
+[BodyService] ResetWorld: тело пересоздано (Humanoid/Medium, VIT 10) — New Game/LoadGame
+[StorageRingService] ResetWorld: хранилища колец очищены (P1-19)
+[CombatService] ResetWorld: combat state cleared (New Game)
+[TechniqueService] ResetWorld: techniques cleared (New Game)
+[TechniqueChargeService] ResetWorld: charges cleared (New Game)
+[FormationRegistry] ResetWorld: реестр формаций очищен (world-scoped, Этап-15 ST15-008)
+[CorpseService] ResetWorld: 0 трупов очищено
+[NPCSpawnerService] ResetWorld: домен NPC очищен (tracked=12, restored=0)
+[NPCGroupService] ResetWorld: 2 групп очищено
+[StaminaService] Инициализация: Max=100, полный ресурс 1000‰ (сон/бодрствование из PlayerConfig)
+[StaminaService] ResetWorld: ресурс новой сессии (Current=100/100, 1000‰)
+[PlayerCombatAdapter] ResetWorld: стойка/режим оружия/кулдауны сброшены (New Game)
+[AuraHoldService] ResetWorld: hold cleared (New Game)
+[Trade] ResetWorld — сессия закрыта, сток очищен (0 лавок)
+[SaveModule] ResetWorld: отсчёт автосейва сброшен (каденция — мировой тик, P2-26)
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[Phase 0] WorldDomainReset complete — 38 world-scoped доменов сброшено (npc/corpses/groups/animals/formations/charger/player/stats/qi/quests/currency/inventory/equipment/belt/ground/world/time) + weapon-cache
+[Phase 1] CoreValidation complete — Core validated
+[TileService] Generated 50x50 grid, seed=12345, baseTerrain=Grass (noise-based)
+  Water_Shallow: 651 tiles (26%)
+  Sand: 539 tiles (21%)
+  Grass: 1299 tiles (51%)
+  Water_Deep: 11 tiles (0%)
+  Biomes:
+    Sea: 654 tiles (26%)
+    Coast: 536 tiles (21%)
+    Grassland: 1300 tiles (52%)
+    Ocean: 10 tiles (0%)
+[Phase 2] TileMapGen complete — test_polygon: 50×50 tiles, seed=12345
+[WorldService] Active location: Тестовый полигон (id=test_polygon)
+[TileModule] LocationChanged '' → 'test_polygon'
+[Phase 3] WorldInit complete — location=test_polygon, speed=Normal, techniqueRegistry cleared (was world-scoped reset)
+[PlayerService] Player spawned @ (25, 25), hp delegated to BodyService
+[Phase 4] PlayerSpawn complete — player at (25, 25) in test_polygon
+[ItemDatabase] Зарегистрирован предмет: material_wood (Material)
+[ItemDatabase] Зарегистрирован предмет: material_stone (Material)
+[ItemDatabase] Зарегистрирован предмет: material_iron_ore (Material)
+[ItemDatabase] Зарегистрирован предмет: material_fiber (Material)
+[ItemDatabase] Зарегистрирован предмет: consumable_berry (Consumable)
+[ItemDatabase] Зарегистрирован предмет: consumable_herb (Consumable)
+[ItemDatabase] Зарегистрирован предмет: con_pill_healing (Consumable)
+[ItemDatabase] Зарегистрирован предмет: con_pill_qi (Consumable)
+[ItemDatabase] Зарегистрирован предмет: ammo_arrow (Material)
+[ItemDatabase] Зарегистрирован предмет: material_steel_ingot (Material)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_03e9_000001 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_dagger_L1_03e9_000001 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_03e9_000001 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_03ea_000002 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_bow_L1_03ea_000002 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_03ea_000002 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_03f2_000003 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_greatsword_L1_03f2_000003 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_03f2_000003 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_03f3_000004 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_staff_L1_03f3_000004 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_03f3_000004 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_044c_000005 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_torso_L1_044c_000005 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_044c_000005 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_044d_000006 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_feet_L1_044d_000006 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_044d_000006 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_04b2_000007 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_feet_L1_04b2_000007 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_04b2_000007 (Armor)
+[Phase 5] StartingGear complete — стартовый набор: БД +20, выдано 9 позиций, оружие 4 шт (кинжал надет: True, лук в инвентаре: True), броня 2 шт, стрел 30. Замена сейвов: каждая новая игра = одинаковый старт (сид 1000).
+[AnimalSpawn] Spawned wolf #animal_wolf_22 at (9, 7) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_23 at (44, 34) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_24 at (44, 20) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_25 at (48, 22) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_26 at (20, 39) (body: Quadruped/Medium)
+[AnimalSpawn] test_polygon: spawned 5/5 animals (attempts=5)
+[Phase 6] AnimalSpawn complete — 5 animals on 'test_polygon' (50×50)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_c990_000008 (Weapon)
+[HumanNPCSpawn] Spawned Merchant L0 #npc_2bcd84e2107b4193 at (2, 34)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_f526_000009 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_eb25_00000a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_61d9_00000b (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_8204_00000c (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_dbde_00000d (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_82ca_00000e (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_6bcc5c30_000001 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L3_c9cf_00000f (Weapon)
+[HumanNPCSpawn] Spawned Elder L3 #npc_458bdfb3689c45dc at (30, 35)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L1_b8f2_000010 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_8430_000011 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_8bc5_000012 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_dd77_000013 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_e60f_000014 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_a49f_000015 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_c68a_000016 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_76bcbfbd_000002 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L3_c973_000017 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L3_c975_000018 (Armor)
+[HumanNPCSpawn] Spawned Guard L3 #npc_dc53fcb2154d4886 at (43, 48)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_5ada_000019 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_f1d2_00001a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_f6b1_00001b (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_b2bc_00001c (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_f14c_00001d (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_0eff_00001e (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_6a1a79af_000003 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_c974_00001f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_c976_000020 (Armor)
+[HumanNPCSpawn] Spawned Guard L2 #npc_eec29f5493684db2 at (13, 48)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_ca2f_000021 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_ca31_000022 (Armor)
+[HumanNPCSpawn] Spawned Passerby L1 #npc_ca3a36732df241ba at (24, 47)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L1_ca30_000023 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_ca32_000024 (Armor)
+[HumanNPCSpawn] Spawned Passerby L0 #npc_f11e23c1e01f4912 at (45, 19)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_8a0d_000025 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_1b90_000026 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_1465_000027 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_853e_000028 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_0e1c_000029 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_1e36_00002a (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_3630_00002b (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_705caea7_000004 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L3_c9b5_00002c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L3_c9b7_00002d (Armor)
+[HumanNPCSpawn] Spawned Cultivator L3 #npc_05e2fcb4218349e2 at (16, 40)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_d1a5_00002e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_a871_00002f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_4dd1_000030 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_f2ab_000031 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_4af3_000032 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_4074_000033 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_1c94060e_000005 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_c9b6_000034 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_c9b8_000035 (Armor)
+[HumanNPCSpawn] Spawned Cultivator L2 #npc_8fc12fa4bb5942de at (30, 34)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L2_ca14_000036 (Weapon)
+[HumanNPCSpawn] Spawned Enemy L1 #npc_252455d345c349b2 at (47, 40)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_ebfe_000037 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_413c_000038 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_e7b0_000039 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_dce6_00003a (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_611d_00003b (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_79a8_00003c (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_6bbde6b6_000006 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L3_ca15_00003d (Weapon)
+[HumanNPCSpawn] Spawned Enemy L2 #npc_86eeb8ad08ed4e0c at (4, 2)
+[Phase 7] HumanNPCSpawn complete — 10/10 generated NPCs on 'test_polygon'
+[NPCGroupService] Created group group_1 (task=HuntingPack, faction=, species=wolf)
+[NPCGroupService] Set patrol route for group_1: 4 waypoints
+[NPCGroupService] Added animal_wolf_27 to group group_1 as Leader
+[NPCGroupService] Added animal_wolf_28 to group group_1 as Follower
+[NPCGroupService] Added animal_wolf_29 to group group_1 as Follower
+[GroupSpawn] Wolf pack 'group_1' — 3 wolves at (45, 15)
+[NPCGroupService] Created group group_2 (task=Patrol, faction=town_guard, species=)
+[NPCGroupService] Set patrol route for group_2: 4 waypoints
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L2_690e_00003e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_7fcc_00003f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_d863_000040 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_62f6_000041 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_7592_000042 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_d175_000043 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_08c41c0c_000007 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_3d7d_000044 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_3d7f_000045 (Armor)
+[NPCGroupService] Added npc_3cd4eac3e6c34c2e to group group_2 as Leader
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_ff7c_000046 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_1497_000047 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_08ba_000048 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_e66b_000049 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_e576_00004a (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_c31c_00004b (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_0b1a20e0_000008 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_3d7e_00004c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_3d80_00004d (Armor)
+[NPCGroupService] Added npc_77a79a8ef88849b8 to group group_2 as Follower
+[GroupSpawn] Guard patrol 'group_2' — 2 guards at (18, 38)
+[Phase 8] GroupSpawn complete — 2 groups on 'test_polygon' (50×50)
+[Phase 9] FormationInit complete (stub)
+[Phase 10] ChargerInit complete (stub)
+[Phase 11] QuestInit complete (stub)
+[Phase 12] UIInit complete — HUD shown
+[PreGenTechnique] start — maxLevel=1 seed=20261023
+[PreGenTechnique] done — generated=100 valid=100 duplicates=0 registered=100 (registry total=108)
+[PreGenTechnique] grades registered: [Common=30, Refined=30, Perfect=30, Transcendent=10] gradeMismatches=0 registryInvalid=0
+[TechniqueGrant] seed=20261030
+[TechniqueGrant] R25 AoE-набор: 2/3 форм (конус/полукруг/круг — площадные техники)
+[Phase 14] TechniqueGrant complete — granted 8 techniques (cultivation 1, active 3/3, curse, formation, aoe 2) at L1
+[Phase 15] Finalize complete — Scene assembly complete
+[SceneOrchestrator] Assembly complete — mode=NewGame: 16 completed, 0 skipped, 19 ms
+[GameSession] NewGame ready — state=Playing
+[TimeService] Paused at tick 0
+[GameSession] Paused
+[TimeService] Resumed at tick 0 (speed Normal)
+[GameSession] Resumed
+[GameSession] Quitting (no save)
+[GameSession] NewGame variant=1 location=test_polygon (50×50) — assembling scene...
+[WorldModule] ResetWorld: календарные маркеры будут тихо ре-синхронизированы на первом тике (P1-15)
+[ResourceService] ResetWorld: 0 armed-записей очереди респауна очищено (ST10-01)
+[BodyService] ResetWorld: тело пересоздано (Humanoid/Medium, VIT 10) — New Game/LoadGame
+[StorageRingService] ResetWorld: хранилища колец очищены (P1-19)
+[CombatService] ResetWorld: combat state cleared (New Game)
+[TechniqueService] ResetWorld: techniques cleared (New Game)
+[TechniqueChargeService] ResetWorld: charges cleared (New Game)
+[FormationRegistry] ResetWorld: реестр формаций очищен (world-scoped, Этап-15 ST15-008)
+[CorpseService] ResetWorld: 0 трупов очищено
+[NPCSpawnerService] ResetWorld: домен NPC очищен (tracked=12, restored=0)
+[NPCGroupService] ResetWorld: 2 групп очищено
+[StaminaService] Инициализация: Max=100, полный ресурс 1000‰ (сон/бодрствование из PlayerConfig)
+[StaminaService] ResetWorld: ресурс новой сессии (Current=100/100, 1000‰)
+[PlayerCombatAdapter] ResetWorld: стойка/режим оружия/кулдауны сброшены (New Game)
+[AuraHoldService] ResetWorld: hold cleared (New Game)
+[Trade] ResetWorld — сессия закрыта, сток очищен (0 лавок)
+[SaveModule] ResetWorld: отсчёт автосейва сброшен (каденция — мировой тик, P2-26)
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[Phase 0] WorldDomainReset complete — 38 world-scoped доменов сброшено (npc/corpses/groups/animals/formations/charger/player/stats/qi/quests/currency/inventory/equipment/belt/ground/world/time) + weapon-cache
+[Phase 1] CoreValidation complete — Core validated
+[TileService] Generated 50x50 grid, seed=12345, baseTerrain=Grass (noise-based)
+  Water_Shallow: 651 tiles (26%)
+  Sand: 539 tiles (21%)
+  Grass: 1299 tiles (51%)
+  Water_Deep: 11 tiles (0%)
+  Biomes:
+    Sea: 654 tiles (26%)
+    Coast: 536 tiles (21%)
+    Grassland: 1300 tiles (52%)
+    Ocean: 10 tiles (0%)
+[Phase 2] TileMapGen complete — test_polygon: 50×50 tiles, seed=12345
+[WorldService] Active location: Тестовый полигон (id=test_polygon)
+[TileModule] LocationChanged '' → 'test_polygon'
+[Phase 3] WorldInit complete — location=test_polygon, speed=Normal, techniqueRegistry cleared (was world-scoped reset)
+[PlayerService] Player spawned @ (25, 25), hp delegated to BodyService
+[Phase 4] PlayerSpawn complete — player at (25, 25) in test_polygon
+[ItemDatabase] Зарегистрирован предмет: material_wood (Material)
+[ItemDatabase] Зарегистрирован предмет: material_stone (Material)
+[ItemDatabase] Зарегистрирован предмет: material_iron_ore (Material)
+[ItemDatabase] Зарегистрирован предмет: material_fiber (Material)
+[ItemDatabase] Зарегистрирован предмет: consumable_berry (Consumable)
+[ItemDatabase] Зарегистрирован предмет: consumable_herb (Consumable)
+[ItemDatabase] Зарегистрирован предмет: con_pill_healing (Consumable)
+[ItemDatabase] Зарегистрирован предмет: con_pill_qi (Consumable)
+[ItemDatabase] Зарегистрирован предмет: ammo_arrow (Material)
+[ItemDatabase] Зарегистрирован предмет: material_steel_ingot (Material)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_03e9_000001 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_dagger_L1_03e9_000001 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_03e9_000001 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_03ea_000002 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_bow_L1_03ea_000002 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_03ea_000002 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_03f2_000003 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_greatsword_L1_03f2_000003 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_03f2_000003 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_03f3_000004 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_staff_L1_03f3_000004 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_03f3_000004 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_044c_000005 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_torso_L1_044c_000005 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_044c_000005 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_044d_000006 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_feet_L1_044d_000006 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_044d_000006 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_04b2_000007 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_feet_L1_04b2_000007 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_04b2_000007 (Armor)
+[Phase 5] StartingGear complete — стартовый набор: БД +20, выдано 9 позиций, оружие 4 шт (кинжал надет: True, лук в инвентаре: True), броня 2 шт, стрел 30. Замена сейвов: каждая новая игра = одинаковый старт (сид 1000).
+[AnimalSpawn] Spawned wolf #animal_wolf_30 at (9, 7) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_31 at (44, 34) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_32 at (44, 20) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_33 at (48, 22) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_34 at (20, 39) (body: Quadruped/Medium)
+[AnimalSpawn] test_polygon: spawned 5/5 animals (attempts=5)
+[Phase 6] AnimalSpawn complete — 5 animals on 'test_polygon' (50×50)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_c990_000008 (Weapon)
+[HumanNPCSpawn] Spawned Merchant L0 #npc_7feb0a294e994a6e at (2, 34)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_f526_000009 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_eb25_00000a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_61d9_00000b (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_8204_00000c (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_dbde_00000d (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_82ca_00000e (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_6bcc5c30_000001 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L3_c9cf_00000f (Weapon)
+[HumanNPCSpawn] Spawned Elder L3 #npc_ae8b8d78a2d14750 at (30, 35)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L1_b8f2_000010 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_8430_000011 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_8bc5_000012 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_dd77_000013 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_e60f_000014 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_a49f_000015 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_c68a_000016 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_76bcbfbd_000002 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L3_c973_000017 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L3_c975_000018 (Armor)
+[HumanNPCSpawn] Spawned Guard L3 #npc_68b22c8c5fb0400b at (43, 48)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_5ada_000019 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_f1d2_00001a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_f6b1_00001b (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_b2bc_00001c (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_f14c_00001d (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_0eff_00001e (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_6a1a79af_000003 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_c974_00001f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_c976_000020 (Armor)
+[HumanNPCSpawn] Spawned Guard L2 #npc_c022774ca851431f at (13, 48)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_ca2f_000021 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_ca31_000022 (Armor)
+[HumanNPCSpawn] Spawned Passerby L1 #npc_d291a9c8641842a9 at (24, 47)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L1_ca30_000023 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_ca32_000024 (Armor)
+[HumanNPCSpawn] Spawned Passerby L0 #npc_6dd168dcbddd4430 at (45, 19)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_8a0d_000025 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_1b90_000026 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_1465_000027 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_853e_000028 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_0e1c_000029 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_1e36_00002a (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_3630_00002b (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_705caea7_000004 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L3_c9b5_00002c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L3_c9b7_00002d (Armor)
+[HumanNPCSpawn] Spawned Cultivator L3 #npc_b8622d4096514630 at (16, 40)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_d1a5_00002e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_a871_00002f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_4dd1_000030 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_f2ab_000031 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_4af3_000032 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_4074_000033 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_1c94060e_000005 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_c9b6_000034 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_c9b8_000035 (Armor)
+[HumanNPCSpawn] Spawned Cultivator L2 #npc_7453b06bc47a4f2f at (30, 34)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L2_ca14_000036 (Weapon)
+[HumanNPCSpawn] Spawned Enemy L1 #npc_1e7d02e12d284737 at (47, 40)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_ebfe_000037 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_413c_000038 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_e7b0_000039 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_dce6_00003a (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_611d_00003b (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_79a8_00003c (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_6bbde6b6_000006 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L3_ca15_00003d (Weapon)
+[HumanNPCSpawn] Spawned Enemy L2 #npc_dda60830abe1497e at (4, 2)
+[Phase 7] HumanNPCSpawn complete — 10/10 generated NPCs on 'test_polygon'
+[NPCGroupService] Created group group_1 (task=HuntingPack, faction=, species=wolf)
+[NPCGroupService] Set patrol route for group_1: 4 waypoints
+[NPCGroupService] Added animal_wolf_35 to group group_1 as Leader
+[NPCGroupService] Added animal_wolf_36 to group group_1 as Follower
+[NPCGroupService] Added animal_wolf_37 to group group_1 as Follower
+[GroupSpawn] Wolf pack 'group_1' — 3 wolves at (45, 15)
+[NPCGroupService] Created group group_2 (task=Patrol, faction=town_guard, species=)
+[NPCGroupService] Set patrol route for group_2: 4 waypoints
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L2_690e_00003e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_7fcc_00003f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_d863_000040 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_62f6_000041 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_7592_000042 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_d175_000043 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_08c41c0c_000007 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_3d7d_000044 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_3d7f_000045 (Armor)
+[NPCGroupService] Added npc_41700821225648a2 to group group_2 as Leader
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_ff7c_000046 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_1497_000047 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_08ba_000048 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_e66b_000049 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_e576_00004a (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_c31c_00004b (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_0b1a20e0_000008 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_3d7e_00004c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_3d80_00004d (Armor)
+[NPCGroupService] Added npc_26729af4dc0d4228 to group group_2 as Follower
+[GroupSpawn] Guard patrol 'group_2' — 2 guards at (18, 38)
+[Phase 8] GroupSpawn complete — 2 groups on 'test_polygon' (50×50)
+[Phase 9] FormationInit complete (stub)
+[Phase 10] ChargerInit complete (stub)
+[Phase 11] QuestInit complete (stub)
+[Phase 12] UIInit complete — HUD shown
+[PreGenTechnique] start — maxLevel=1 seed=20261023
+[PreGenTechnique] done — generated=100 valid=100 duplicates=0 registered=100 (registry total=108)
+[PreGenTechnique] grades registered: [Common=30, Refined=30, Perfect=30, Transcendent=10] gradeMismatches=0 registryInvalid=0
+[TechniqueGrant] seed=20261030
+[TechniqueGrant] R25 AoE-набор: 2/3 форм (конус/полукруг/круг — площадные техники)
+[Phase 14] TechniqueGrant complete — granted 8 techniques (cultivation 1, active 3/3, curse, formation, aoe 2) at L1
+[Phase 15] Finalize complete — Scene assembly complete
+[SceneOrchestrator] Assembly complete — mode=NewGame: 16 completed, 0 skipped, 19 ms
+[GameSession] NewGame ready — state=Playing
+[TimeService] Paused at tick 0
+[GameSession] Paused
+[TimeService] Resumed at tick 0 (speed Normal)
+[GameSession] Resumed
+[GameSession] Quitting (no save)
+[GameSession] NewGame variant=1 location=test_polygon (50×50) — assembling scene...
+[WorldModule] ResetWorld: календарные маркеры будут тихо ре-синхронизированы на первом тике (P1-15)
+[ResourceService] ResetWorld: 0 armed-записей очереди респауна очищено (ST10-01)
+[BodyService] ResetWorld: тело пересоздано (Humanoid/Medium, VIT 10) — New Game/LoadGame
+[StorageRingService] ResetWorld: хранилища колец очищены (P1-19)
+[CombatService] ResetWorld: combat state cleared (New Game)
+[TechniqueService] ResetWorld: techniques cleared (New Game)
+[TechniqueChargeService] ResetWorld: charges cleared (New Game)
+[FormationRegistry] ResetWorld: реестр формаций очищен (world-scoped, Этап-15 ST15-008)
+[CorpseService] ResetWorld: 0 трупов очищено
+[NPCSpawnerService] ResetWorld: домен NPC очищен (tracked=12, restored=0)
+[NPCGroupService] ResetWorld: 2 групп очищено
+[StaminaService] Инициализация: Max=100, полный ресурс 1000‰ (сон/бодрствование из PlayerConfig)
+[StaminaService] ResetWorld: ресурс новой сессии (Current=100/100, 1000‰)
+[PlayerCombatAdapter] ResetWorld: стойка/режим оружия/кулдауны сброшены (New Game)
+[AuraHoldService] ResetWorld: hold cleared (New Game)
+[Trade] ResetWorld — сессия закрыта, сток очищен (0 лавок)
+[SaveModule] ResetWorld: отсчёт автосейва сброшен (каденция — мировой тик, P2-26)
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[Phase 0] WorldDomainReset complete — 38 world-scoped доменов сброшено (npc/corpses/groups/animals/formations/charger/player/stats/qi/quests/currency/inventory/equipment/belt/ground/world/time) + weapon-cache
+[Phase 1] CoreValidation complete — Core validated
+[TileService] Generated 50x50 grid, seed=12345, baseTerrain=Grass (noise-based)
+  Water_Shallow: 651 tiles (26%)
+  Sand: 539 tiles (21%)
+  Grass: 1299 tiles (51%)
+  Water_Deep: 11 tiles (0%)
+  Biomes:
+    Sea: 654 tiles (26%)
+    Coast: 536 tiles (21%)
+    Grassland: 1300 tiles (52%)
+    Ocean: 10 tiles (0%)
+[Phase 2] TileMapGen complete — test_polygon: 50×50 tiles, seed=12345
+[WorldService] Active location: Тестовый полигон (id=test_polygon)
+[TileModule] LocationChanged '' → 'test_polygon'
+[Phase 3] WorldInit complete — location=test_polygon, speed=Normal, techniqueRegistry cleared (was world-scoped reset)
+[PlayerService] Player spawned @ (25, 25), hp delegated to BodyService
+[Phase 4] PlayerSpawn complete — player at (25, 25) in test_polygon
+[ItemDatabase] Зарегистрирован предмет: material_wood (Material)
+[ItemDatabase] Зарегистрирован предмет: material_stone (Material)
+[ItemDatabase] Зарегистрирован предмет: material_iron_ore (Material)
+[ItemDatabase] Зарегистрирован предмет: material_fiber (Material)
+[ItemDatabase] Зарегистрирован предмет: consumable_berry (Consumable)
+[ItemDatabase] Зарегистрирован предмет: consumable_herb (Consumable)
+[ItemDatabase] Зарегистрирован предмет: con_pill_healing (Consumable)
+[ItemDatabase] Зарегистрирован предмет: con_pill_qi (Consumable)
+[ItemDatabase] Зарегистрирован предмет: ammo_arrow (Material)
+[ItemDatabase] Зарегистрирован предмет: material_steel_ingot (Material)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_03e9_000001 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_dagger_L1_03e9_000001 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_03e9_000001 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_03ea_000002 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_bow_L1_03ea_000002 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_03ea_000002 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_03f2_000003 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_greatsword_L1_03f2_000003 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_03f2_000003 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_03f3_000004 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_staff_L1_03f3_000004 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_03f3_000004 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_044c_000005 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_torso_L1_044c_000005 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_044c_000005 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_044d_000006 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_feet_L1_044d_000006 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_044d_000006 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_04b2_000007 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_feet_L1_04b2_000007 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_04b2_000007 (Armor)
+[Phase 5] StartingGear complete — стартовый набор: БД +20, выдано 9 позиций, оружие 4 шт (кинжал надет: True, лук в инвентаре: True), броня 2 шт, стрел 30. Замена сейвов: каждая новая игра = одинаковый старт (сид 1000).
+[AnimalSpawn] Spawned wolf #animal_wolf_38 at (9, 7) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_39 at (44, 34) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_40 at (44, 20) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_41 at (48, 22) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_42 at (20, 39) (body: Quadruped/Medium)
+[AnimalSpawn] test_polygon: spawned 5/5 animals (attempts=5)
+[Phase 6] AnimalSpawn complete — 5 animals on 'test_polygon' (50×50)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_c990_000008 (Weapon)
+[HumanNPCSpawn] Spawned Merchant L0 #npc_8e01454533bd47e3 at (2, 34)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_f526_000009 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_eb25_00000a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_61d9_00000b (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_8204_00000c (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_dbde_00000d (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_82ca_00000e (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_6bcc5c30_000001 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L3_c9cf_00000f (Weapon)
+[HumanNPCSpawn] Spawned Elder L3 #npc_4713b5a4a78a4203 at (30, 35)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L1_b8f2_000010 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_8430_000011 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_8bc5_000012 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_dd77_000013 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_e60f_000014 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_a49f_000015 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_c68a_000016 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_76bcbfbd_000002 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L3_c973_000017 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L3_c975_000018 (Armor)
+[HumanNPCSpawn] Spawned Guard L3 #npc_020f1be139ae442c at (43, 48)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_5ada_000019 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_f1d2_00001a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_f6b1_00001b (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_b2bc_00001c (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_f14c_00001d (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_0eff_00001e (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_6a1a79af_000003 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_c974_00001f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_c976_000020 (Armor)
+[HumanNPCSpawn] Spawned Guard L2 #npc_cabe80f839584a43 at (13, 48)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_ca2f_000021 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_ca31_000022 (Armor)
+[HumanNPCSpawn] Spawned Passerby L1 #npc_4fe96aa94e9e4459 at (24, 47)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L1_ca30_000023 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_ca32_000024 (Armor)
+[HumanNPCSpawn] Spawned Passerby L0 #npc_d92bc8f342b344aa at (45, 19)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_8a0d_000025 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_1b90_000026 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_1465_000027 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_853e_000028 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_0e1c_000029 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_1e36_00002a (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_3630_00002b (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_705caea7_000004 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L3_c9b5_00002c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L3_c9b7_00002d (Armor)
+[HumanNPCSpawn] Spawned Cultivator L3 #npc_2f01ab250bfa4ef9 at (16, 40)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_d1a5_00002e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_a871_00002f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_4dd1_000030 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_f2ab_000031 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_4af3_000032 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_4074_000033 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_1c94060e_000005 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_c9b6_000034 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_c9b8_000035 (Armor)
+[HumanNPCSpawn] Spawned Cultivator L2 #npc_2338a181fe5a4c23 at (30, 34)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L2_ca14_000036 (Weapon)
+[HumanNPCSpawn] Spawned Enemy L1 #npc_b9dfe76036f74155 at (47, 40)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_ebfe_000037 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_413c_000038 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_e7b0_000039 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_dce6_00003a (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_611d_00003b (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_79a8_00003c (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_6bbde6b6_000006 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L3_ca15_00003d (Weapon)
+[HumanNPCSpawn] Spawned Enemy L2 #npc_58c85844ee1f4eee at (4, 2)
+[Phase 7] HumanNPCSpawn complete — 10/10 generated NPCs on 'test_polygon'
+[NPCGroupService] Created group group_1 (task=HuntingPack, faction=, species=wolf)
+[NPCGroupService] Set patrol route for group_1: 4 waypoints
+[NPCGroupService] Added animal_wolf_43 to group group_1 as Leader
+[NPCGroupService] Added animal_wolf_44 to group group_1 as Follower
+[NPCGroupService] Added animal_wolf_45 to group group_1 as Follower
+[GroupSpawn] Wolf pack 'group_1' — 3 wolves at (45, 15)
+[NPCGroupService] Created group group_2 (task=Patrol, faction=town_guard, species=)
+[NPCGroupService] Set patrol route for group_2: 4 waypoints
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L2_690e_00003e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_7fcc_00003f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_d863_000040 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_62f6_000041 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_7592_000042 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_d175_000043 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_08c41c0c_000007 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_3d7d_000044 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_3d7f_000045 (Armor)
+[NPCGroupService] Added npc_be497f9d66a64540 to group group_2 as Leader
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_ff7c_000046 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_1497_000047 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_08ba_000048 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_e66b_000049 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_e576_00004a (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_c31c_00004b (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_0b1a20e0_000008 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_3d7e_00004c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_3d80_00004d (Armor)
+[NPCGroupService] Added npc_01a4d6e134864acf to group group_2 as Follower
+[GroupSpawn] Guard patrol 'group_2' — 2 guards at (18, 38)
+[Phase 8] GroupSpawn complete — 2 groups on 'test_polygon' (50×50)
+[Phase 9] FormationInit complete (stub)
+[Phase 10] ChargerInit complete (stub)
+[Phase 11] QuestInit complete (stub)
+[Phase 12] UIInit complete — HUD shown
+[PreGenTechnique] start — maxLevel=1 seed=20261023
+[PreGenTechnique] done — generated=100 valid=100 duplicates=0 registered=100 (registry total=108)
+[PreGenTechnique] grades registered: [Common=30, Refined=30, Perfect=30, Transcendent=10] gradeMismatches=0 registryInvalid=0
+[TechniqueGrant] seed=20261030
+[TechniqueGrant] R25 AoE-набор: 2/3 форм (конус/полукруг/круг — площадные техники)
+[Phase 14] TechniqueGrant complete — granted 8 techniques (cultivation 1, active 3/3, curse, formation, aoe 2) at L1
+[Phase 15] Finalize complete — Scene assembly complete
+[SceneOrchestrator] Assembly complete — mode=NewGame: 16 completed, 0 skipped, 21 ms
+[GameSession] NewGame ready — state=Playing
+[TimeService] Paused at tick 0
+[GameSession] Paused
+[TimeService] Resumed at tick 0 (speed Normal)
+[GameSession] Resumed
+[B4] реестр техник по циклам: [116, 116, 116, 116] (до переходов 116); NPC: [12, 12, 12, 12]
+── C. ST18-002: порча restore НОВОГО домена (stamina) → откат ──
+[TimeService] Paused at tick 0
+[GameSession] Paused
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/stage18_good/main.json (243780 bytes, atomic tmp→rename)
+[SaveService] Save('Manual:stage18_good') → OK
+[TimeService] Resumed at tick 0 (speed Normal)
+[GameSession] Resumed
+[C1] валидный слот stage18_good сохранён=True (стамина 44, поз 12,12)
+[SaveService] Validate('Manual:stage18_good_st18corrupt') → OK (формат поддерживается)
+[SaveService] CaptureBackup → OK (24 блоков в памяти)
+[GameSession] LoadGame slot='Manual:stage18_good_st18corrupt' — loading... (backup=yes)
+[WorldModule] ResetWorld: календарные маркеры будут тихо ре-синхронизированы на первом тике (P1-15)
+[ResourceService] ResetWorld: 0 armed-записей очереди респауна очищено (ST10-01)
+[BodyService] ResetWorld: тело пересоздано (Humanoid/Medium, VIT 10) — New Game/LoadGame
+[StorageRingService] ResetWorld: хранилища колец очищены (P1-19)
+[CombatService] ResetWorld: combat state cleared (New Game)
+[TechniqueService] ResetWorld: techniques cleared (New Game)
+[TechniqueChargeService] ResetWorld: charges cleared (New Game)
+[FormationRegistry] ResetWorld: реестр формаций очищен (world-scoped, Этап-15 ST15-008)
+[CorpseService] ResetWorld: 0 трупов очищено
+[NPCSpawnerService] ResetWorld: домен NPC очищен (tracked=12, restored=0)
+[NPCGroupService] ResetWorld: 2 групп очищено
+[StaminaService] Инициализация: Max=100, полный ресурс 1000‰ (сон/бодрствование из PlayerConfig)
+[StaminaService] ResetWorld: ресурс новой сессии (Current=100/100, 1000‰)
+[PlayerCombatAdapter] ResetWorld: стойка/режим оружия/кулдауны сброшены (New Game)
+[AuraHoldService] ResetWorld: hold cleared (New Game)
+[Trade] ResetWorld — сессия закрыта, сток очищен (0 лавок)
+[SaveModule] ResetWorld: отсчёт автосейва сброшен (каденция — мировой тик, P2-26)
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[GameSession] LoadGame: 38 world-scoped доменов сброшено до RestoreState
+[WorldService] Active location: Тестовый полигон (id=test_polygon)
+[TileModule] LocationChanged '' → 'test_polygon'
+[TimeService] RestoreState: 1864-01-01 06:00, tick 0
+[ItemDatabase] RestoreState: 99 предметов восстановлено; счётчики ID: eq=77, gen=8
+[PlayerService] Player spawned @ (12, 12), hp delegated to BodyService
+[PlayerService] RestoreState: позиция (12,12), sleep=Awake (план 0ч, проспано 0 мин), stance=Normal, dead=False
+[StatService] RestoreState: base=6, virtual=0, threshold=0
+[QiService] RestoreState: L1.0 Normal, qi 1000/1000, heartSevered=False
+[EquipmentService] RestoreState: 1/1 слотов куклы
+[StorageRingService] RestoreState: 0 колец восстановлено (предметов: 0)
+[BeltService] RestoreState: 0/0 слотов пояса
+[NPCRelationshipService] RestoreState: 0 отношений восстановлено (боевые обиды/дружба переживают Load, АУДИТ-0921_2030 Ф4)
+[CorpseService] RestoreState: 0 трупов восстановлено (full-loot переживает Load, AUDIT-0921 A5)
+[AnimalService] RestoreState: 8/8 зверей (живых: 8, враждебных: 0), nextId=46
+[NPCGroupService] RestoreState: 2 групп восстановлено (участников отброшено: 0, групп без состава: 0, промоутов лидера (повышений первого участника): 0); nextGroupId=3
+[QuestService] RestoreState: 3/3 квестов, active=0, rewarded=0, day=0
+[CurrencyService] RestoreState: баланс 50 камней
+[SaveDataAggregator] Load PARTIAL — restore[stamina]: JsonException: The JSON value could not be converted to System.Int64. Path: $.CurrentMilli | LineNumber: 0 | BytePositionInLine: 37.
+[SaveService] Load('Manual:stage18_good_st18corrupt') → FAILED — Load('Manual:stage18_good_st18corrupt') failed: restore[stamina]: JsonException: The JSON value could not be converted to System.Int64. Path: $.CurrentMilli | LineNumber: 0 | BytePositionInLine: 37.
+[GameSession] LoadGame failed: InvalidOperationException: restore failed: Load('Manual:stage18_good_st18corrupt') failed: restore[stamina]: JsonException: The JSON value could not be converted to System.Int64. Path: $.CurrentMilli | LineNumber: 0 | BytePositionInLine: 37.
+[WorldModule] ResetWorld: календарные маркеры будут тихо ре-синхронизированы на первом тике (P1-15)
+[ResourceService] ResetWorld: 0 armed-записей очереди респауна очищено (ST10-01)
+[BodyService] ResetWorld: тело пересоздано (Humanoid/Medium, VIT 10) — New Game/LoadGame
+[StorageRingService] ResetWorld: хранилища колец очищены (P1-19)
+[CombatService] ResetWorld: combat state cleared (New Game)
+[TechniqueService] ResetWorld: techniques cleared (New Game)
+[TechniqueChargeService] ResetWorld: charges cleared (New Game)
+[FormationRegistry] ResetWorld: реестр формаций очищен (world-scoped, Этап-15 ST15-008)
+[CorpseService] ResetWorld: 0 трупов очищено
+[NPCSpawnerService] ResetWorld: домен NPC очищен (tracked=0, restored=12)
+[NPCGroupService] ResetWorld: 2 групп очищено
+[StaminaService] Инициализация: Max=100, полный ресурс 1000‰ (сон/бодрствование из PlayerConfig)
+[StaminaService] ResetWorld: ресурс новой сессии (Current=100/100, 1000‰)
+[PlayerCombatAdapter] ResetWorld: стойка/режим оружия/кулдауны сброшены (New Game)
+[AuraHoldService] ResetWorld: hold cleared (New Game)
+[Trade] ResetWorld — сессия закрыта, сток очищен (0 лавок)
+[SaveModule] ResetWorld: отсчёт автосейва сброшен (каденция — мировой тик, P2-26)
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[WorldService] Active location: Тестовый полигон (id=test_polygon)
+[TileModule] LocationChanged '' → 'test_polygon'
+[TimeService] RestoreState: 1864-01-01 06:00, tick 0
+[ItemDatabase] RestoreState: 99 предметов восстановлено; счётчики ID: eq=77, gen=8
+[PlayerService] Player spawned @ (25, 25), hp delegated to BodyService
+[PlayerService] RestoreState: позиция (25,25), sleep=Awake (план 0ч, проспано 0 мин), stance=Normal, dead=False
+[StatService] RestoreState: base=6, virtual=0, threshold=0
+[QiService] RestoreState: L1.0 Normal, qi 1000/1000, heartSevered=False
+[EquipmentService] RestoreState: 1/1 слотов куклы
+[StorageRingService] RestoreState: 0 колец восстановлено (предметов: 0)
+[BeltService] RestoreState: 0/0 слотов пояса
+[NPCRelationshipService] RestoreState: 0 отношений восстановлено (боевые обиды/дружба переживают Load, АУДИТ-0921_2030 Ф4)
+[CorpseService] RestoreState: 0 трупов восстановлено (full-loot переживает Load, AUDIT-0921 A5)
+[AnimalService] RestoreState: 8/8 зверей (живых: 8, враждебных: 0), nextId=46
+[NPCGroupService] RestoreState: 2 групп восстановлено (участников отброшено: 0, групп без состава: 0, промоутов лидера (повышений первого участника): 0); nextGroupId=3
+[QuestService] RestoreState: 3/3 квестов, active=0, rewarded=0, day=0
+[CurrencyService] RestoreState: баланс 50 камней
+[StaminaService] RestoreState: Current=44/100 (440‰)
+[SaveService] RestoreBackup → OK
+[EquipmentService] OnAfterLoad: кэш блокировок пересобран по телу (0 слотов)
+[NPCSpawnerService] SyncWithRegistry: трекер 0 → 12 (+12 восстановленных, реестр=12)
+[GameWorld] Toast: Загрузка «stage18_good_st18corrupt» не удалась — текущий мир продолжается (restore failed: Load('Manual:stage18_good_st18corrupt') failed: restore[stamina]: JsonException: The JSON value could not be converted to System.Int64. Path: $.CurrentMilli | LineNumber: 0 | BytePositionInLine: 37.)
+[GameSession] LoadGame ROLLED BACK — предыдущий мир восстановлен из снимка, state=Playing
+[C3] битый stamina-restore: outcome=RolledBack, state=Playing; стамина 44→44, поз (25,25)→(25,25)
+[SaveService] Validate('Manual:stage18_good') → OK (формат поддерживается)
+[SaveService] CaptureBackup → OK (24 блоков в памяти)
+[GameSession] LoadGame slot='Manual:stage18_good' — loading... (backup=yes)
+[WorldModule] ResetWorld: календарные маркеры будут тихо ре-синхронизированы на первом тике (P1-15)
+[ResourceService] ResetWorld: 0 armed-записей очереди респауна очищено (ST10-01)
+[BodyService] ResetWorld: тело пересоздано (Humanoid/Medium, VIT 10) — New Game/LoadGame
+[StorageRingService] ResetWorld: хранилища колец очищены (P1-19)
+[CombatService] ResetWorld: combat state cleared (New Game)
+[TechniqueService] ResetWorld: techniques cleared (New Game)
+[TechniqueChargeService] ResetWorld: charges cleared (New Game)
+[FormationRegistry] ResetWorld: реестр формаций очищен (world-scoped, Этап-15 ST15-008)
+[CorpseService] ResetWorld: 0 трупов очищено
+[NPCSpawnerService] ResetWorld: домен NPC очищен (tracked=12, restored=0)
+[NPCGroupService] ResetWorld: 2 групп очищено
+[StaminaService] Инициализация: Max=100, полный ресурс 1000‰ (сон/бодрствование из PlayerConfig)
+[StaminaService] ResetWorld: ресурс новой сессии (Current=100/100, 1000‰)
+[PlayerCombatAdapter] ResetWorld: стойка/режим оружия/кулдауны сброшены (New Game)
+[AuraHoldService] ResetWorld: hold cleared (New Game)
+[Trade] ResetWorld — сессия закрыта, сток очищен (0 лавок)
+[SaveModule] ResetWorld: отсчёт автосейва сброшен (каденция — мировой тик, P2-26)
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[GameSession] LoadGame: 38 world-scoped доменов сброшено до RestoreState
+[WorldService] Active location: Тестовый полигон (id=test_polygon)
+[TileModule] LocationChanged '' → 'test_polygon'
+[TimeService] RestoreState: 1864-01-01 06:00, tick 0
+[ItemDatabase] RestoreState: 99 предметов восстановлено; счётчики ID: eq=77, gen=8
+[PlayerService] Player spawned @ (12, 12), hp delegated to BodyService
+[PlayerService] RestoreState: позиция (12,12), sleep=Awake (план 0ч, проспано 0 мин), stance=Normal, dead=False
+[StatService] RestoreState: base=6, virtual=0, threshold=0
+[QiService] RestoreState: L1.0 Normal, qi 1000/1000, heartSevered=False
+[EquipmentService] RestoreState: 1/1 слотов куклы
+[StorageRingService] RestoreState: 0 колец восстановлено (предметов: 0)
+[BeltService] RestoreState: 0/0 слотов пояса
+[NPCRelationshipService] RestoreState: 0 отношений восстановлено (боевые обиды/дружба переживают Load, АУДИТ-0921_2030 Ф4)
+[CorpseService] RestoreState: 0 трупов восстановлено (full-loot переживает Load, AUDIT-0921 A5)
+[AnimalService] RestoreState: 8/8 зверей (живых: 8, враждебных: 0), nextId=46
+[NPCGroupService] RestoreState: 2 групп восстановлено (участников отброшено: 0, групп без состава: 0, промоутов лидера (повышений первого участника): 0); nextGroupId=3
+[QuestService] RestoreState: 3/3 квестов, active=0, rewarded=0, day=0
+[CurrencyService] RestoreState: баланс 50 камней
+[StaminaService] RestoreState: Current=44/100 (440‰)
+[SaveService] Load('Manual:stage18_good') → OK
+[EquipmentService] OnAfterLoad: кэш блокировок пересобран по телу (0 слотов)
+[NPCSpawnerService] SyncWithRegistry: трекер 0 → 12 (+12 восстановленных, реестр=12)
+[GameSession] LoadGame: 3 IPostLoadSync-доменов синхронизировано после RestoreState
+[SceneOrchestrator] Phase 'WorldDomainReset' (#0) skipped — load-mode (SkipOnLoad)
+[Phase 1] CoreValidation complete — Core validated
+[TileService] Generated 50x50 grid, seed=12345, baseTerrain=Grass (noise-based)
+  Water_Shallow: 651 tiles (26%)
+  Sand: 539 tiles (21%)
+  Grass: 1299 tiles (51%)
+  Water_Deep: 11 tiles (0%)
+  Biomes:
+    Sea: 654 tiles (26%)
+    Coast: 536 tiles (21%)
+    Grassland: 1300 tiles (52%)
+    Ocean: 10 tiles (0%)
+[Phase 2] TileMapGen complete — test_polygon: 50×50 tiles, seed=12345
+[SceneOrchestrator] Phase 'WorldInit' (#3) skipped — load-mode (SkipOnLoad)
+[SceneOrchestrator] Phase 'PlayerSpawn' (#4) skipped — load-mode (SkipOnLoad)
+[SceneOrchestrator] Phase 'StartingGear' (#5) skipped — load-mode (SkipOnLoad)
+[SceneOrchestrator] Phase 'AnimalSpawn' (#6) skipped — load-mode (SkipOnLoad)
+[SceneOrchestrator] Phase 'HumanNPCSpawn' (#7) skipped — load-mode (SkipOnLoad)
+[SceneOrchestrator] Phase 'GroupSpawn' (#8) skipped — load-mode (SkipOnLoad)
+[Phase 9] FormationInit complete (stub)
+[Phase 10] ChargerInit complete (stub)
+[Phase 11] QuestInit complete (stub)
+[Phase 12] UIInit complete — HUD shown
+[SceneOrchestrator] Phase 'PreGenTechnique' (#13) skipped — load-mode (SkipOnLoad)
+[SceneOrchestrator] Phase 'TechniqueGrant' (#14) skipped — load-mode (SkipOnLoad)
+[Phase 15] Finalize complete — Scene assembly complete
+[SceneOrchestrator] Assembly complete — mode=LoadGame: 7 completed, 9 skipped, 3 ms
+[SaveService] DiscardBackup — снимок (24 блоков) освобождён без восстановления
+[GameSession] LoadGame ready — state=Playing
+[C4] ретрай валидного слота: outcome=Success, state=Playing, стамина=44, поз=(12,12)
+[C5] подписки: StaminaChanged 0→0, NPCDeath 4→4
+[SaveFileHandler] Deleted slot stage18_good
+[SaveService] DeleteSave('Manual:stage18_good') → OK
+[SaveFileHandler] Deleted slot stage18_good_st18corrupt
+[SaveService] DeleteSave('Manual:stage18_good_st18corrupt') → OK
+[SaveFileHandler] Deleted slot stage18_rt
+[SaveService] DeleteSave('Manual:stage18_rt') → OK
+── D. ST18-004: граница сна/пробуждения и тарификация интервалов ──
+[PlayerService] StartSleep(0.5h)
+[PlayerService] Авто-пробуждение: проспано 30 мин (план 0.5ч)
+[PlayerService] WakeUp: сон 0.5ч — дельты закреплены (§6)
+[D1] план сна 30 мин @0‰ (PlayerModule.Tick×30): факт=500‰, честно(весь сон)=500‰ (сон 100%/ч, бодрствование 25‰/мин); после цикла сон=Awake
+[TimeService] Paused at tick 0
+[GameSession] Paused
+[PlayerService] StartSleep(0.33333334h)
+[PlayerService] WakeUp: сон 0.2ч — дельты закреплены (§6)
+[D2] 10 мин сон + 10 мин бодрствование @0: факт=416‰, ожидание=416‰
+[D3] пауза: IsPaused=True, DeltaTime-эквивалент 0 → стамина 41→41, событий 0
+[PlayerService] StartSleep(2h)
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/stage18_sleeprt/main.json (243781 bytes, atomic tmp→rename)
+[SaveService] Save('Manual:stage18_sleeprt') → OK
+[TimeService] Resumed at tick 0 (speed Normal)
+[GameSession] Resumed
+[SaveService] Validate('Manual:stage18_sleeprt') → OK (формат поддерживается)
+[SaveService] CaptureBackup → OK (24 блоков в памяти)
+[GameSession] LoadGame slot='Manual:stage18_sleeprt' — loading... (backup=yes)
+[WorldModule] ResetWorld: календарные маркеры будут тихо ре-синхронизированы на первом тике (P1-15)
+[ResourceService] ResetWorld: 0 armed-записей очереди респауна очищено (ST10-01)
+[BodyService] ResetWorld: тело пересоздано (Humanoid/Medium, VIT 10) — New Game/LoadGame
+[StorageRingService] ResetWorld: хранилища колец очищены (P1-19)
+[CombatService] ResetWorld: combat state cleared (New Game)
+[TechniqueService] ResetWorld: techniques cleared (New Game)
+[TechniqueChargeService] ResetWorld: charges cleared (New Game)
+[FormationRegistry] ResetWorld: реестр формаций очищен (world-scoped, Этап-15 ST15-008)
+[CorpseService] ResetWorld: 0 трупов очищено
+[NPCSpawnerService] ResetWorld: домен NPC очищен (tracked=12, restored=0)
+[NPCGroupService] ResetWorld: 2 групп очищено
+[StaminaService] Инициализация: Max=100, полный ресурс 1000‰ (сон/бодрствование из PlayerConfig)
+[StaminaService] ResetWorld: ресурс новой сессии (Current=100/100, 1000‰)
+[PlayerCombatAdapter] ResetWorld: стойка/режим оружия/кулдауны сброшены (New Game)
+[AuraHoldService] ResetWorld: hold cleared (New Game)
+[Trade] ResetWorld — сессия закрыта, сток очищен (0 лавок)
+[SaveModule] ResetWorld: отсчёт автосейва сброшен (каденция — мировой тик, P2-26)
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[GameSession] LoadGame: 38 world-scoped доменов сброшено до RestoreState
+[WorldService] Active location: Тестовый полигон (id=test_polygon)
+[TileModule] LocationChanged '' → 'test_polygon'
+[TimeService] RestoreState: 1864-01-01 06:00, tick 0
+[ItemDatabase] RestoreState: 99 предметов восстановлено; счётчики ID: eq=77, gen=8
+[PlayerService] Player spawned @ (12, 12), hp delegated to BodyService
+[PlayerService] RestoreState: позиция (12,12), sleep=Sleeping (план 2ч, проспано 31 мин), stance=Normal, dead=False
+[StatService] RestoreState: base=6, virtual=0, threshold=0
+[QiService] RestoreState: L1.0 Normal, qi 1000/1000, heartSevered=False
+[EquipmentService] RestoreState: 1/1 слотов куклы
+[StorageRingService] RestoreState: 0 колец восстановлено (предметов: 0)
+[BeltService] RestoreState: 0/0 слотов пояса
+[NPCRelationshipService] RestoreState: 0 отношений восстановлено (боевые обиды/дружба переживают Load, АУДИТ-0921_2030 Ф4)
+[CorpseService] RestoreState: 0 трупов восстановлено (full-loot переживает Load, AUDIT-0921 A5)
+[AnimalService] RestoreState: 8/8 зверей (живых: 8, враждебных: 0), nextId=46
+[NPCGroupService] RestoreState: 2 групп восстановлено (участников отброшено: 0, групп без состава: 0, промоутов лидера (повышений первого участника): 0); nextGroupId=3
+[QuestService] RestoreState: 3/3 квестов, active=0, rewarded=0, day=0
+[CurrencyService] RestoreState: баланс 50 камней
+[StaminaService] RestoreState: Current=10/100 (100‰)
+[SaveService] Load('Manual:stage18_sleeprt') → OK
+[EquipmentService] OnAfterLoad: кэш блокировок пересобран по телу (0 слотов)
+[NPCSpawnerService] SyncWithRegistry: трекер 0 → 12 (+12 восстановленных, реестр=12)
+[GameSession] LoadGame: 3 IPostLoadSync-доменов синхронизировано после RestoreState
+[SceneOrchestrator] Phase 'WorldDomainReset' (#0) skipped — load-mode (SkipOnLoad)
+[Phase 1] CoreValidation complete — Core validated
+[TileService] Generated 50x50 grid, seed=12345, baseTerrain=Grass (noise-based)
+  Water_Shallow: 651 tiles (26%)
+  Sand: 539 tiles (21%)
+  Grass: 1299 tiles (51%)
+  Water_Deep: 11 tiles (0%)
+  Biomes:
+    Sea: 654 tiles (26%)
+    Coast: 536 tiles (21%)
+    Grassland: 1300 tiles (52%)
+    Ocean: 10 tiles (0%)
+[Phase 2] TileMapGen complete — test_polygon: 50×50 tiles, seed=12345
+[SceneOrchestrator] Phase 'WorldInit' (#3) skipped — load-mode (SkipOnLoad)
+[SceneOrchestrator] Phase 'PlayerSpawn' (#4) skipped — load-mode (SkipOnLoad)
+[SceneOrchestrator] Phase 'StartingGear' (#5) skipped — load-mode (SkipOnLoad)
+[SceneOrchestrator] Phase 'AnimalSpawn' (#6) skipped — load-mode (SkipOnLoad)
+[SceneOrchestrator] Phase 'HumanNPCSpawn' (#7) skipped — load-mode (SkipOnLoad)
+[SceneOrchestrator] Phase 'GroupSpawn' (#8) skipped — load-mode (SkipOnLoad)
+[Phase 9] FormationInit complete (stub)
+[Phase 10] ChargerInit complete (stub)
+[Phase 11] QuestInit complete (stub)
+[Phase 12] UIInit complete — HUD shown
+[SceneOrchestrator] Phase 'PreGenTechnique' (#13) skipped — load-mode (SkipOnLoad)
+[SceneOrchestrator] Phase 'TechniqueGrant' (#14) skipped — load-mode (SkipOnLoad)
+[Phase 15] Finalize complete — Scene assembly complete
+[SceneOrchestrator] Assembly complete — mode=LoadGame: 7 completed, 9 skipped, 3 ms
+[SaveService] DiscardBackup — снимок (24 блоков) освобождён без восстановления
+[GameSession] LoadGame ready — state=Playing
+[TimeService] Paused at tick 0
+[GameSession] Paused
+[PlayerService] Авто-пробуждение: проспано 120 мин (план 2ч)
+[PlayerService] WakeUp: сон 2ч — дельты закреплены (§6)
+[D4] сон в сейве=True→после Load=True; тиков до авто-пробуждения=89 (честно ≈89 из остатка плана 2ч−31мин); woke=True; NOTE: in-process проходит и на протухших полях — cross-process истина = D4-COLD (cold-пара раннера)
+[TimeService] Resumed at tick 0 (speed Normal)
+[GameSession] Resumed
+[SaveFileHandler] Deleted slot stage18_sleeprt
+[SaveService] DeleteSave('Manual:stage18_sleeprt') → OK
+[D5] живой луп: 2.2с ≈ 2 игровых минуты → 50‰ (ставка 25‰/мин); до изоляции=100‰
+── E. ST18-005: смерть NPC (DamageAppliedEvent-путь) → реестры/цели/труп ──
+[TimeService] Paused at tick 2
+[GameSession] Paused
+[CorpseService] Труп 'Дарья' (corpse_1) на (2,34): 2 записей лута
+[GameWorld] Toast: ☠ Дарья повержен
+[GameWorld] NPC death: npc_8e01454533bd47e3 'Дарья' by player_0
+[GameWorld] ⏸ ПАУЗА (Esc)
+[E1/E2] жертва npc_8e01454533bd47e3: жив=False, в списке живых=False; трупы 0→1; NPCDeathEvent×1
+[NPCAIService] npc_4713b5a4a78a4203 покидает бой: цель погибла
+[E3] охотник npc_4713b5a4a78a4203: TargetId=— (был npc_8e01454533bd47e3), IsInCombat=False, AIState=Wandering
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/stage18_corpse/main.json (244618 bytes, atomic tmp→rename)
+[SaveService] Save('Manual:stage18_corpse') → OK
+[TimeService] Resumed at tick 2 (speed Normal)
+[GameSession] Resumed
+[SaveService] Validate('Manual:stage18_corpse') → OK (формат поддерживается)
+[SaveService] CaptureBackup → OK (24 блоков в памяти)
+[GameSession] LoadGame slot='Manual:stage18_corpse' — loading... (backup=yes)
+[WorldModule] ResetWorld: календарные маркеры будут тихо ре-синхронизированы на первом тике (P1-15)
+[ResourceService] ResetWorld: 0 armed-записей очереди респауна очищено (ST10-01)
+[BodyService] ResetWorld: тело пересоздано (Humanoid/Medium, VIT 10) — New Game/LoadGame
+[BuffService] ResetWorld: entity buffs cleared (New Game)
+[StorageRingService] ResetWorld: хранилища колец очищены (P1-19)
+[CombatService] ResetWorld: combat state cleared (New Game)
+[TechniqueService] ResetWorld: techniques cleared (New Game)
+[TechniqueChargeService] ResetWorld: charges cleared (New Game)
+[FormationRegistry] ResetWorld: реестр формаций очищен (world-scoped, Этап-15 ST15-008)
+[CorpseService] Труп 'corpse_1' убран (world-reset)
+[CorpseService] ResetWorld: 1 трупов очищено
+[NPCSpawnerService] ResetWorld: домен NPC очищен (tracked=12, restored=0)
+[NPCGroupService] ResetWorld: 2 групп очищено
+[StaminaService] Инициализация: Max=100, полный ресурс 1000‰ (сон/бодрствование из PlayerConfig)
+[StaminaService] ResetWorld: ресурс новой сессии (Current=100/100, 1000‰)
+[PlayerCombatAdapter] ResetWorld: стойка/режим оружия/кулдауны сброшены (New Game)
+[AuraHoldService] ResetWorld: hold cleared (New Game)
+[Trade] ResetWorld — сессия закрыта, сток очищен (0 лавок)
+[SaveModule] ResetWorld: отсчёт автосейва сброшен (каденция — мировой тик, P2-26)
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[GameSession] LoadGame: 38 world-scoped доменов сброшено до RestoreState
+[WorldService] Active location: Тестовый полигон (id=test_polygon)
+[TileModule] LocationChanged '' → 'test_polygon'
+[TimeService] RestoreState: 1864-01-01 06:02, tick 2
+[ItemDatabase] RestoreState: 99 предметов восстановлено; счётчики ID: eq=77, gen=8
+[PlayerService] Player spawned @ (25, 25), hp delegated to BodyService
+[PlayerService] RestoreState: позиция (25,25), sleep=Awake (план 0ч, проспано 0 мин), stance=Normal, dead=False
+[StatService] RestoreState: base=6, virtual=1, threshold=0
+[QiService] RestoreState: L1.0 Normal, qi 1000/1000, heartSevered=False
+[EquipmentService] RestoreState: 1/1 слотов куклы
+[StorageRingService] RestoreState: 0 колец восстановлено (предметов: 0)
+[BeltService] RestoreState: 0/0 слотов пояса
+[NPCRelationshipService] RestoreState: 0 отношений восстановлено (боевые обиды/дружба переживают Load, АУДИТ-0921_2030 Ф4)
+[CorpseService] RestoreState: 1 трупов восстановлено (full-loot переживает Load, AUDIT-0921 A5)
+[AnimalService] RestoreState: 8/8 зверей (живых: 8, враждебных: 0), nextId=46
+[NPCGroupService] RestoreState: 2 групп восстановлено (участников отброшено: 0, групп без состава: 0, промоутов лидера (повышений первого участника): 0); nextGroupId=3
+[QuestService] RestoreState: 3/3 квестов, active=0, rewarded=0, day=0
+[CurrencyService] RestoreState: баланс 50 камней
+[StaminaService] RestoreState: Current=100/100 (1000‰)
+[SaveService] Load('Manual:stage18_corpse') → OK
+[EquipmentService] OnAfterLoad: кэш блокировок пересобран по телу (0 слотов)
+[NPCSpawnerService] SyncWithRegistry: трекер 0 → 12 (+12 восстановленных, реестр=12)
+[GameSession] LoadGame: 3 IPostLoadSync-доменов синхронизировано после RestoreState
+[SceneOrchestrator] Phase 'WorldDomainReset' (#0) skipped — load-mode (SkipOnLoad)
+[Phase 1] CoreValidation complete — Core validated
+[TileService] Generated 50x50 grid, seed=12345, baseTerrain=Grass (noise-based)
+  Water_Shallow: 651 tiles (26%)
+  Sand: 539 tiles (21%)
+  Grass: 1299 tiles (51%)
+  Water_Deep: 11 tiles (0%)
+  Biomes:
+    Sea: 654 tiles (26%)
+    Coast: 536 tiles (21%)
+    Grassland: 1300 tiles (52%)
+    Ocean: 10 tiles (0%)
+[Phase 2] TileMapGen complete — test_polygon: 50×50 tiles, seed=12345
+[SceneOrchestrator] Phase 'WorldInit' (#3) skipped — load-mode (SkipOnLoad)
+[SceneOrchestrator] Phase 'PlayerSpawn' (#4) skipped — load-mode (SkipOnLoad)
+[SceneOrchestrator] Phase 'StartingGear' (#5) skipped — load-mode (SkipOnLoad)
+[SceneOrchestrator] Phase 'AnimalSpawn' (#6) skipped — load-mode (SkipOnLoad)
+[SceneOrchestrator] Phase 'HumanNPCSpawn' (#7) skipped — load-mode (SkipOnLoad)
+[SceneOrchestrator] Phase 'GroupSpawn' (#8) skipped — load-mode (SkipOnLoad)
+[Phase 9] FormationInit complete (stub)
+[Phase 10] ChargerInit complete (stub)
+[Phase 11] QuestInit complete (stub)
+[Phase 12] UIInit complete — HUD shown
+[SceneOrchestrator] Phase 'PreGenTechnique' (#13) skipped — load-mode (SkipOnLoad)
+[SceneOrchestrator] Phase 'TechniqueGrant' (#14) skipped — load-mode (SkipOnLoad)
+[Phase 15] Finalize complete — Scene assembly complete
+[SceneOrchestrator] Assembly complete — mode=LoadGame: 7 completed, 9 skipped, 3 ms
+[SaveService] DiscardBackup — снимок (24 блоков) освобождён без восстановления
+[GameSession] LoadGame ready — state=Playing
+[E4] трупы: сейв=1 → после Load=1 (сохранено=True)
+[GameSession] Quitting (no save)
+[GameSession] NewGame variant=1 location=test_polygon (50×50) — assembling scene...
+[WorldModule] ResetWorld: календарные маркеры будут тихо ре-синхронизированы на первом тике (P1-15)
+[ResourceService] ResetWorld: 0 armed-записей очереди респауна очищено (ST10-01)
+[BodyService] ResetWorld: тело пересоздано (Humanoid/Medium, VIT 10) — New Game/LoadGame
+[StorageRingService] ResetWorld: хранилища колец очищены (P1-19)
+[CombatService] ResetWorld: combat state cleared (New Game)
+[TechniqueService] ResetWorld: techniques cleared (New Game)
+[TechniqueChargeService] ResetWorld: charges cleared (New Game)
+[FormationRegistry] ResetWorld: реестр формаций очищен (world-scoped, Этап-15 ST15-008)
+[CorpseService] Труп 'corpse_1' убран (world-reset)
+[CorpseService] ResetWorld: 1 трупов очищено
+[NPCSpawnerService] ResetWorld: домен NPC очищен (tracked=12, restored=0)
+[NPCGroupService] ResetWorld: 2 групп очищено
+[StaminaService] Инициализация: Max=100, полный ресурс 1000‰ (сон/бодрствование из PlayerConfig)
+[StaminaService] ResetWorld: ресурс новой сессии (Current=100/100, 1000‰)
+[PlayerCombatAdapter] ResetWorld: стойка/режим оружия/кулдауны сброшены (New Game)
+[AuraHoldService] ResetWorld: hold cleared (New Game)
+[Trade] ResetWorld — сессия закрыта, сток очищен (0 лавок)
+[SaveModule] ResetWorld: отсчёт автосейва сброшен (каденция — мировой тик, P2-26)
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[Phase 0] WorldDomainReset complete — 38 world-scoped доменов сброшено (npc/corpses/groups/animals/formations/charger/player/stats/qi/quests/currency/inventory/equipment/belt/ground/world/time) + weapon-cache
+[Phase 1] CoreValidation complete — Core validated
+[TileService] Generated 50x50 grid, seed=12345, baseTerrain=Grass (noise-based)
+  Water_Shallow: 651 tiles (26%)
+  Sand: 539 tiles (21%)
+  Grass: 1299 tiles (51%)
+  Water_Deep: 11 tiles (0%)
+  Biomes:
+    Sea: 654 tiles (26%)
+    Coast: 536 tiles (21%)
+    Grassland: 1300 tiles (52%)
+    Ocean: 10 tiles (0%)
+[Phase 2] TileMapGen complete — test_polygon: 50×50 tiles, seed=12345
+[WorldService] Active location: Тестовый полигон (id=test_polygon)
+[TileModule] LocationChanged '' → 'test_polygon'
+[Phase 3] WorldInit complete — location=test_polygon, speed=Normal, techniqueRegistry cleared (was world-scoped reset)
+[PlayerService] Player spawned @ (25, 25), hp delegated to BodyService
+[Phase 4] PlayerSpawn complete — player at (25, 25) in test_polygon
+[ItemDatabase] Зарегистрирован предмет: material_wood (Material)
+[ItemDatabase] Зарегистрирован предмет: material_stone (Material)
+[ItemDatabase] Зарегистрирован предмет: material_iron_ore (Material)
+[ItemDatabase] Зарегистрирован предмет: material_fiber (Material)
+[ItemDatabase] Зарегистрирован предмет: consumable_berry (Consumable)
+[ItemDatabase] Зарегистрирован предмет: consumable_herb (Consumable)
+[ItemDatabase] Зарегистрирован предмет: con_pill_healing (Consumable)
+[ItemDatabase] Зарегистрирован предмет: con_pill_qi (Consumable)
+[ItemDatabase] Зарегистрирован предмет: ammo_arrow (Material)
+[ItemDatabase] Зарегистрирован предмет: material_steel_ingot (Material)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_03e9_000001 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_dagger_L1_03e9_000001 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_03e9_000001 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_03ea_000002 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_bow_L1_03ea_000002 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_03ea_000002 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_03f2_000003 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_greatsword_L1_03f2_000003 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_03f2_000003 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_03f3_000004 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_staff_L1_03f3_000004 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_03f3_000004 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_044c_000005 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_torso_L1_044c_000005 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_044c_000005 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_044d_000006 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_feet_L1_044d_000006 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_044d_000006 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_04b2_000007 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_feet_L1_04b2_000007 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_04b2_000007 (Armor)
+[Phase 5] StartingGear complete — стартовый набор: БД +20, выдано 9 позиций, оружие 4 шт (кинжал надет: True, лук в инвентаре: True), броня 2 шт, стрел 30. Замена сейвов: каждая новая игра = одинаковый старт (сид 1000).
+[AnimalSpawn] Spawned wolf #animal_wolf_46 at (9, 7) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_47 at (44, 34) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_48 at (44, 20) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_49 at (48, 22) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_50 at (20, 39) (body: Quadruped/Medium)
+[AnimalSpawn] test_polygon: spawned 5/5 animals (attempts=5)
+[Phase 6] AnimalSpawn complete — 5 animals on 'test_polygon' (50×50)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_c990_000008 (Weapon)
+[HumanNPCSpawn] Spawned Merchant L0 #npc_a2c130d575a543c0 at (2, 34)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_f526_000009 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_eb25_00000a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_61d9_00000b (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_8204_00000c (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_dbde_00000d (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_82ca_00000e (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_6bcc5c30_000001 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L3_c9cf_00000f (Weapon)
+[HumanNPCSpawn] Spawned Elder L3 #npc_1a234b7c57e846c8 at (30, 35)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L1_b8f2_000010 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_8430_000011 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_8bc5_000012 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_dd77_000013 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_e60f_000014 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_a49f_000015 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_c68a_000016 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_76bcbfbd_000002 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L3_c973_000017 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L3_c975_000018 (Armor)
+[HumanNPCSpawn] Spawned Guard L3 #npc_543415d5007144b5 at (43, 48)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_5ada_000019 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_f1d2_00001a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_f6b1_00001b (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_b2bc_00001c (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_f14c_00001d (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_0eff_00001e (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_6a1a79af_000003 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_c974_00001f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_c976_000020 (Armor)
+[HumanNPCSpawn] Spawned Guard L2 #npc_6bef0e91eaab436c at (13, 48)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_ca2f_000021 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_ca31_000022 (Armor)
+[HumanNPCSpawn] Spawned Passerby L1 #npc_654f00793b1e4f12 at (24, 47)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L1_ca30_000023 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_ca32_000024 (Armor)
+[HumanNPCSpawn] Spawned Passerby L0 #npc_69b9d21fb48d4a59 at (45, 19)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_8a0d_000025 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_1b90_000026 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_1465_000027 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_853e_000028 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_0e1c_000029 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_1e36_00002a (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_3630_00002b (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_705caea7_000004 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L3_c9b5_00002c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L3_c9b7_00002d (Armor)
+[HumanNPCSpawn] Spawned Cultivator L3 #npc_d14389e2de5c477f at (16, 40)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_d1a5_00002e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_a871_00002f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_4dd1_000030 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_f2ab_000031 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_4af3_000032 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_4074_000033 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_1c94060e_000005 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_c9b6_000034 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_c9b8_000035 (Armor)
+[HumanNPCSpawn] Spawned Cultivator L2 #npc_273210e7aa844543 at (30, 34)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L2_ca14_000036 (Weapon)
+[HumanNPCSpawn] Spawned Enemy L1 #npc_ec4857996b1a43c5 at (47, 40)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_ebfe_000037 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_413c_000038 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_e7b0_000039 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_dce6_00003a (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_611d_00003b (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_79a8_00003c (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_6bbde6b6_000006 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L3_ca15_00003d (Weapon)
+[HumanNPCSpawn] Spawned Enemy L2 #npc_e09675b3376b4d4f at (4, 2)
+[Phase 7] HumanNPCSpawn complete — 10/10 generated NPCs on 'test_polygon'
+[NPCGroupService] Created group group_1 (task=HuntingPack, faction=, species=wolf)
+[NPCGroupService] Set patrol route for group_1: 4 waypoints
+[NPCGroupService] Added animal_wolf_51 to group group_1 as Leader
+[NPCGroupService] Added animal_wolf_52 to group group_1 as Follower
+[NPCGroupService] Added animal_wolf_53 to group group_1 as Follower
+[GroupSpawn] Wolf pack 'group_1' — 3 wolves at (45, 15)
+[NPCGroupService] Created group group_2 (task=Patrol, faction=town_guard, species=)
+[NPCGroupService] Set patrol route for group_2: 4 waypoints
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L2_690e_00003e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_7fcc_00003f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_d863_000040 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_62f6_000041 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_7592_000042 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_d175_000043 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_08c41c0c_000007 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_3d7d_000044 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_3d7f_000045 (Armor)
+[NPCGroupService] Added npc_99205fbdc068483e to group group_2 as Leader
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_ff7c_000046 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_1497_000047 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_08ba_000048 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_e66b_000049 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_e576_00004a (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_c31c_00004b (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_0b1a20e0_000008 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_3d7e_00004c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_3d80_00004d (Armor)
+[NPCGroupService] Added npc_6cf9c107f5ed442c to group group_2 as Follower
+[GroupSpawn] Guard patrol 'group_2' — 2 guards at (18, 38)
+[Phase 8] GroupSpawn complete — 2 groups on 'test_polygon' (50×50)
+[Phase 9] FormationInit complete (stub)
+[Phase 10] ChargerInit complete (stub)
+[Phase 11] QuestInit complete (stub)
+[Phase 12] UIInit complete — HUD shown
+[PreGenTechnique] start — maxLevel=1 seed=20261023
+[PreGenTechnique] done — generated=100 valid=100 duplicates=0 registered=100 (registry total=108)
+[PreGenTechnique] grades registered: [Common=30, Refined=30, Perfect=30, Transcendent=10] gradeMismatches=0 registryInvalid=0
+[TechniqueGrant] seed=20261030
+[TechniqueGrant] R25 AoE-набор: 2/3 форм (конус/полукруг/круг — площадные техники)
+[Phase 14] TechniqueGrant complete — granted 8 techniques (cultivation 1, active 3/3, curse, formation, aoe 2) at L1
+[Phase 15] Finalize complete — Scene assembly complete
+[SceneOrchestrator] Assembly complete — mode=NewGame: 16 completed, 0 skipped, 21 ms
+[GameSession] NewGame ready — state=Playing
+[E5] после NewGame: трупов=0
+[SaveFileHandler] Deleted slot stage18_corpse
+[SaveService] DeleteSave('Manual:stage18_corpse') → OK
+── F. ST18-006: детерминизм полного NewGame-пайплайна (тот же seed) ──
+[GameSession] Quitting (no save)
+[GameSession] NewGame variant=1 location=test_polygon (50×50) — assembling scene...
+[WorldModule] ResetWorld: календарные маркеры будут тихо ре-синхронизированы на первом тике (P1-15)
+[ResourceService] ResetWorld: 0 armed-записей очереди респауна очищено (ST10-01)
+[BodyService] ResetWorld: тело пересоздано (Humanoid/Medium, VIT 10) — New Game/LoadGame
+[StorageRingService] ResetWorld: хранилища колец очищены (P1-19)
+[CombatService] ResetWorld: combat state cleared (New Game)
+[TechniqueService] ResetWorld: techniques cleared (New Game)
+[TechniqueChargeService] ResetWorld: charges cleared (New Game)
+[FormationRegistry] ResetWorld: реестр формаций очищен (world-scoped, Этап-15 ST15-008)
+[CorpseService] ResetWorld: 0 трупов очищено
+[NPCSpawnerService] ResetWorld: домен NPC очищен (tracked=12, restored=0)
+[NPCGroupService] ResetWorld: 2 групп очищено
+[StaminaService] Инициализация: Max=100, полный ресурс 1000‰ (сон/бодрствование из PlayerConfig)
+[StaminaService] ResetWorld: ресурс новой сессии (Current=100/100, 1000‰)
+[PlayerCombatAdapter] ResetWorld: стойка/режим оружия/кулдауны сброшены (New Game)
+[AuraHoldService] ResetWorld: hold cleared (New Game)
+[Trade] ResetWorld — сессия закрыта, сток очищен (0 лавок)
+[SaveModule] ResetWorld: отсчёт автосейва сброшен (каденция — мировой тик, P2-26)
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[Phase 0] WorldDomainReset complete — 38 world-scoped доменов сброшено (npc/corpses/groups/animals/formations/charger/player/stats/qi/quests/currency/inventory/equipment/belt/ground/world/time) + weapon-cache
+[Phase 1] CoreValidation complete — Core validated
+[TileService] Generated 50x50 grid, seed=12345, baseTerrain=Grass (noise-based)
+  Water_Shallow: 651 tiles (26%)
+  Sand: 539 tiles (21%)
+  Grass: 1299 tiles (51%)
+  Water_Deep: 11 tiles (0%)
+  Biomes:
+    Sea: 654 tiles (26%)
+    Coast: 536 tiles (21%)
+    Grassland: 1300 tiles (52%)
+    Ocean: 10 tiles (0%)
+[Phase 2] TileMapGen complete — test_polygon: 50×50 tiles, seed=12345
+[WorldService] Active location: Тестовый полигон (id=test_polygon)
+[TileModule] LocationChanged '' → 'test_polygon'
+[Phase 3] WorldInit complete — location=test_polygon, speed=Normal, techniqueRegistry cleared (was world-scoped reset)
+[PlayerService] Player spawned @ (25, 25), hp delegated to BodyService
+[Phase 4] PlayerSpawn complete — player at (25, 25) in test_polygon
+[ItemDatabase] Зарегистрирован предмет: material_wood (Material)
+[ItemDatabase] Зарегистрирован предмет: material_stone (Material)
+[ItemDatabase] Зарегистрирован предмет: material_iron_ore (Material)
+[ItemDatabase] Зарегистрирован предмет: material_fiber (Material)
+[ItemDatabase] Зарегистрирован предмет: consumable_berry (Consumable)
+[ItemDatabase] Зарегистрирован предмет: consumable_herb (Consumable)
+[ItemDatabase] Зарегистрирован предмет: con_pill_healing (Consumable)
+[ItemDatabase] Зарегистрирован предмет: con_pill_qi (Consumable)
+[ItemDatabase] Зарегистрирован предмет: ammo_arrow (Material)
+[ItemDatabase] Зарегистрирован предмет: material_steel_ingot (Material)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_03e9_000001 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_dagger_L1_03e9_000001 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_03e9_000001 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_03ea_000002 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_bow_L1_03ea_000002 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_03ea_000002 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_03f2_000003 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_greatsword_L1_03f2_000003 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_03f2_000003 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_03f3_000004 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_staff_L1_03f3_000004 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_03f3_000004 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_044c_000005 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_torso_L1_044c_000005 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_044c_000005 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_044d_000006 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_feet_L1_044d_000006 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_044d_000006 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_04b2_000007 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_feet_L1_04b2_000007 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_04b2_000007 (Armor)
+[Phase 5] StartingGear complete — стартовый набор: БД +20, выдано 9 позиций, оружие 4 шт (кинжал надет: True, лук в инвентаре: True), броня 2 шт, стрел 30. Замена сейвов: каждая новая игра = одинаковый старт (сид 1000).
+[AnimalSpawn] Spawned wolf #animal_wolf_54 at (9, 7) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_55 at (44, 34) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_56 at (44, 20) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_57 at (48, 22) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_58 at (20, 39) (body: Quadruped/Medium)
+[AnimalSpawn] test_polygon: spawned 5/5 animals (attempts=5)
+[Phase 6] AnimalSpawn complete — 5 animals on 'test_polygon' (50×50)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_c990_000008 (Weapon)
+[HumanNPCSpawn] Spawned Merchant L0 #npc_be7344abab8c4d6c at (2, 34)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_f526_000009 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_eb25_00000a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_61d9_00000b (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_8204_00000c (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_dbde_00000d (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_82ca_00000e (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_6bcc5c30_000001 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L3_c9cf_00000f (Weapon)
+[HumanNPCSpawn] Spawned Elder L3 #npc_0cdfc840f2784ffa at (30, 35)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L1_b8f2_000010 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_8430_000011 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_8bc5_000012 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_dd77_000013 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_e60f_000014 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_a49f_000015 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_c68a_000016 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_76bcbfbd_000002 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L3_c973_000017 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L3_c975_000018 (Armor)
+[HumanNPCSpawn] Spawned Guard L3 #npc_21c3bcb1c9314205 at (43, 48)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_5ada_000019 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_f1d2_00001a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_f6b1_00001b (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_b2bc_00001c (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_f14c_00001d (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_0eff_00001e (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_6a1a79af_000003 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_c974_00001f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_c976_000020 (Armor)
+[HumanNPCSpawn] Spawned Guard L2 #npc_6a9b4e4ea9db479f at (13, 48)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_ca2f_000021 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_ca31_000022 (Armor)
+[HumanNPCSpawn] Spawned Passerby L1 #npc_2dc0b2c40ac1480e at (24, 47)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L1_ca30_000023 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_ca32_000024 (Armor)
+[HumanNPCSpawn] Spawned Passerby L0 #npc_2f1fd057fa924f7f at (45, 19)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_8a0d_000025 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_1b90_000026 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_1465_000027 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_853e_000028 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_0e1c_000029 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_1e36_00002a (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_3630_00002b (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_705caea7_000004 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L3_c9b5_00002c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L3_c9b7_00002d (Armor)
+[HumanNPCSpawn] Spawned Cultivator L3 #npc_b9b55dae0b0f447f at (16, 40)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_d1a5_00002e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_a871_00002f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_4dd1_000030 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_f2ab_000031 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_4af3_000032 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_4074_000033 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_1c94060e_000005 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_c9b6_000034 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_c9b8_000035 (Armor)
+[HumanNPCSpawn] Spawned Cultivator L2 #npc_80a6b12915834fc7 at (30, 34)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L2_ca14_000036 (Weapon)
+[HumanNPCSpawn] Spawned Enemy L1 #npc_77555ca9c428458b at (47, 40)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_ebfe_000037 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_413c_000038 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_e7b0_000039 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_dce6_00003a (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_611d_00003b (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_79a8_00003c (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_6bbde6b6_000006 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L3_ca15_00003d (Weapon)
+[HumanNPCSpawn] Spawned Enemy L2 #npc_5a0de53ad97045ed at (4, 2)
+[Phase 7] HumanNPCSpawn complete — 10/10 generated NPCs on 'test_polygon'
+[NPCGroupService] Created group group_1 (task=HuntingPack, faction=, species=wolf)
+[NPCGroupService] Set patrol route for group_1: 4 waypoints
+[NPCGroupService] Added animal_wolf_59 to group group_1 as Leader
+[NPCGroupService] Added animal_wolf_60 to group group_1 as Follower
+[NPCGroupService] Added animal_wolf_61 to group group_1 as Follower
+[GroupSpawn] Wolf pack 'group_1' — 3 wolves at (45, 15)
+[NPCGroupService] Created group group_2 (task=Patrol, faction=town_guard, species=)
+[NPCGroupService] Set patrol route for group_2: 4 waypoints
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L2_690e_00003e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_7fcc_00003f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_d863_000040 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_62f6_000041 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_7592_000042 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_d175_000043 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_08c41c0c_000007 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_3d7d_000044 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_3d7f_000045 (Armor)
+[NPCGroupService] Added npc_c1c2eefaa21f429f to group group_2 as Leader
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_ff7c_000046 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_1497_000047 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_08ba_000048 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_e66b_000049 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_e576_00004a (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_c31c_00004b (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_0b1a20e0_000008 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_3d7e_00004c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_3d80_00004d (Armor)
+[NPCGroupService] Added npc_199c838088fc4662 to group group_2 as Follower
+[GroupSpawn] Guard patrol 'group_2' — 2 guards at (18, 38)
+[Phase 8] GroupSpawn complete — 2 groups on 'test_polygon' (50×50)
+[Phase 9] FormationInit complete (stub)
+[Phase 10] ChargerInit complete (stub)
+[Phase 11] QuestInit complete (stub)
+[Phase 12] UIInit complete — HUD shown
+[PreGenTechnique] start — maxLevel=1 seed=20261023
+[PreGenTechnique] done — generated=100 valid=100 duplicates=0 registered=100 (registry total=108)
+[PreGenTechnique] grades registered: [Common=30, Refined=30, Perfect=30, Transcendent=10] gradeMismatches=0 registryInvalid=0
+[TechniqueGrant] seed=20261030
+[TechniqueGrant] R25 AoE-набор: 2/3 форм (конус/полукруг/круг — площадные техники)
+[Phase 14] TechniqueGrant complete — granted 8 techniques (cultivation 1, active 3/3, curse, formation, aoe 2) at L1
+[Phase 15] Finalize complete — Scene assembly complete
+[SceneOrchestrator] Assembly complete — mode=NewGame: 16 completed, 0 skipped, 22 ms
+[GameSession] NewGame ready — state=Playing
+[F1] реестр техник: мир1=116, мир2=116, множества идентичны=True
+[F2] дубликаты ID техник в новом мире: 0
+[F3] cold-пара stage18_coldint: см. GODOT_STAGE18_COLD=save|load (запускается раннером парами процессов)
+── G. ST18-008: повторные окна, пауза времени, настройки, пост-Load UI ──
+[Inventory] Opened
+[Inventory] Closed
+[Inventory] Opened
+[Inventory] Closed
+[Inventory] Opened
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[Inventory] Closed
+[Inventory] Opened
+[Inventory] Closed
+[Inventory] Opened
+[Inventory] Closed
+[CharacterSheet] Opened
+[CharacterSheet] Closed
+[G1] 5 циклов инвентаря OK=5/5; лист персонажа: открытие=True, закрытие=True
+[Inventory] Opened
+[TimeService] Paused at tick 0
+[GameWorld] ⏸ ПАУЗА — B·инвентарь
+[TimeService] Resumed at tick 0 (speed Normal)
+[Inventory] Closed
+[G2] B-нажатие: окно открылось=True, пауза при окне=True, время 360→360 мин; закрыто: пауза снята=True
+[GameSession] Quitting (no save)
+[GameSession] NewGame variant=1 location=test_polygon (50×50) — assembling scene...
+[WorldModule] ResetWorld: календарные маркеры будут тихо ре-синхронизированы на первом тике (P1-15)
+[ResourceService] ResetWorld: 0 armed-записей очереди респауна очищено (ST10-01)
+[BodyService] ResetWorld: тело пересоздано (Humanoid/Medium, VIT 10) — New Game/LoadGame
+[StorageRingService] ResetWorld: хранилища колец очищены (P1-19)
+[CombatService] ResetWorld: combat state cleared (New Game)
+[TechniqueService] ResetWorld: techniques cleared (New Game)
+[TechniqueChargeService] ResetWorld: charges cleared (New Game)
+[FormationRegistry] ResetWorld: реестр формаций очищен (world-scoped, Этап-15 ST15-008)
+[CorpseService] ResetWorld: 0 трупов очищено
+[NPCSpawnerService] ResetWorld: домен NPC очищен (tracked=12, restored=0)
+[NPCGroupService] ResetWorld: 2 групп очищено
+[StaminaService] Инициализация: Max=100, полный ресурс 1000‰ (сон/бодрствование из PlayerConfig)
+[StaminaService] ResetWorld: ресурс новой сессии (Current=100/100, 1000‰)
+[PlayerCombatAdapter] ResetWorld: стойка/режим оружия/кулдауны сброшены (New Game)
+[AuraHoldService] ResetWorld: hold cleared (New Game)
+[Trade] ResetWorld — сессия закрыта, сток очищен (0 лавок)
+[SaveModule] ResetWorld: отсчёт автосейва сброшен (каденция — мировой тик, P2-26)
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[Phase 0] WorldDomainReset complete — 38 world-scoped доменов сброшено (npc/corpses/groups/animals/formations/charger/player/stats/qi/quests/currency/inventory/equipment/belt/ground/world/time) + weapon-cache
+[Phase 1] CoreValidation complete — Core validated
+[TileService] Generated 50x50 grid, seed=12345, baseTerrain=Grass (noise-based)
+  Water_Shallow: 651 tiles (26%)
+  Sand: 539 tiles (21%)
+  Grass: 1299 tiles (51%)
+  Water_Deep: 11 tiles (0%)
+  Biomes:
+    Sea: 654 tiles (26%)
+    Coast: 536 tiles (21%)
+    Grassland: 1300 tiles (52%)
+    Ocean: 10 tiles (0%)
+[Phase 2] TileMapGen complete — test_polygon: 50×50 tiles, seed=12345
+[WorldService] Active location: Тестовый полигон (id=test_polygon)
+[TileModule] LocationChanged '' → 'test_polygon'
+[Phase 3] WorldInit complete — location=test_polygon, speed=Normal, techniqueRegistry cleared (was world-scoped reset)
+[PlayerService] Player spawned @ (25, 25), hp delegated to BodyService
+[Phase 4] PlayerSpawn complete — player at (25, 25) in test_polygon
+[ItemDatabase] Зарегистрирован предмет: material_wood (Material)
+[ItemDatabase] Зарегистрирован предмет: material_stone (Material)
+[ItemDatabase] Зарегистрирован предмет: material_iron_ore (Material)
+[ItemDatabase] Зарегистрирован предмет: material_fiber (Material)
+[ItemDatabase] Зарегистрирован предмет: consumable_berry (Consumable)
+[ItemDatabase] Зарегистрирован предмет: consumable_herb (Consumable)
+[ItemDatabase] Зарегистрирован предмет: con_pill_healing (Consumable)
+[ItemDatabase] Зарегистрирован предмет: con_pill_qi (Consumable)
+[ItemDatabase] Зарегистрирован предмет: ammo_arrow (Material)
+[ItemDatabase] Зарегистрирован предмет: material_steel_ingot (Material)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_03e9_000001 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_dagger_L1_03e9_000001 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_03e9_000001 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_03ea_000002 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_bow_L1_03ea_000002 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_03ea_000002 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_03f2_000003 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_greatsword_L1_03f2_000003 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_03f2_000003 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_03f3_000004 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_staff_L1_03f3_000004 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_03f3_000004 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_044c_000005 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_torso_L1_044c_000005 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_044c_000005 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_044d_000006 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_feet_L1_044d_000006 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_044d_000006 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_04b2_000007 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_feet_L1_04b2_000007 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_04b2_000007 (Armor)
+[Phase 5] StartingGear complete — стартовый набор: БД +20, выдано 9 позиций, оружие 4 шт (кинжал надет: True, лук в инвентаре: True), броня 2 шт, стрел 30. Замена сейвов: каждая новая игра = одинаковый старт (сид 1000).
+[AnimalSpawn] Spawned wolf #animal_wolf_62 at (9, 7) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_63 at (44, 34) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_64 at (44, 20) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_65 at (48, 22) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_66 at (20, 39) (body: Quadruped/Medium)
+[AnimalSpawn] test_polygon: spawned 5/5 animals (attempts=5)
+[Phase 6] AnimalSpawn complete — 5 animals on 'test_polygon' (50×50)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_c990_000008 (Weapon)
+[HumanNPCSpawn] Spawned Merchant L0 #npc_c8f7f492559c47a0 at (2, 34)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_f526_000009 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_eb25_00000a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_61d9_00000b (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_8204_00000c (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_dbde_00000d (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_82ca_00000e (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_6bcc5c30_000001 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L3_c9cf_00000f (Weapon)
+[HumanNPCSpawn] Spawned Elder L3 #npc_4287860252c84f35 at (30, 35)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L1_b8f2_000010 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_8430_000011 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_8bc5_000012 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_dd77_000013 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_e60f_000014 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_a49f_000015 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_c68a_000016 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_76bcbfbd_000002 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L3_c973_000017 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L3_c975_000018 (Armor)
+[HumanNPCSpawn] Spawned Guard L3 #npc_4d826d0c6c424526 at (43, 48)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_5ada_000019 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_f1d2_00001a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_f6b1_00001b (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_b2bc_00001c (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_f14c_00001d (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_0eff_00001e (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_6a1a79af_000003 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_c974_00001f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_c976_000020 (Armor)
+[HumanNPCSpawn] Spawned Guard L2 #npc_bbcfbb5a3993480b at (13, 48)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_ca2f_000021 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_ca31_000022 (Armor)
+[HumanNPCSpawn] Spawned Passerby L1 #npc_2e778936b6624bc7 at (24, 47)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L1_ca30_000023 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_ca32_000024 (Armor)
+[HumanNPCSpawn] Spawned Passerby L0 #npc_68bed1c46ef44b98 at (45, 19)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_8a0d_000025 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_1b90_000026 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_1465_000027 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_853e_000028 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_0e1c_000029 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_1e36_00002a (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_3630_00002b (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_705caea7_000004 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L3_c9b5_00002c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L3_c9b7_00002d (Armor)
+[HumanNPCSpawn] Spawned Cultivator L3 #npc_2a295e9501e9463c at (16, 40)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_d1a5_00002e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_a871_00002f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_4dd1_000030 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_f2ab_000031 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_4af3_000032 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_4074_000033 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_1c94060e_000005 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_c9b6_000034 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_c9b8_000035 (Armor)
+[HumanNPCSpawn] Spawned Cultivator L2 #npc_a1a43f8ffb4e4eec at (30, 34)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L2_ca14_000036 (Weapon)
+[HumanNPCSpawn] Spawned Enemy L1 #npc_c41898b74aa14d78 at (47, 40)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_ebfe_000037 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_413c_000038 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_e7b0_000039 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_dce6_00003a (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_611d_00003b (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_79a8_00003c (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_6bbde6b6_000006 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L3_ca15_00003d (Weapon)
+[HumanNPCSpawn] Spawned Enemy L2 #npc_c3f4f4b21afe46ce at (4, 2)
+[Phase 7] HumanNPCSpawn complete — 10/10 generated NPCs on 'test_polygon'
+[NPCGroupService] Created group group_1 (task=HuntingPack, faction=, species=wolf)
+[NPCGroupService] Set patrol route for group_1: 4 waypoints
+[NPCGroupService] Added animal_wolf_67 to group group_1 as Leader
+[NPCGroupService] Added animal_wolf_68 to group group_1 as Follower
+[NPCGroupService] Added animal_wolf_69 to group group_1 as Follower
+[GroupSpawn] Wolf pack 'group_1' — 3 wolves at (45, 15)
+[NPCGroupService] Created group group_2 (task=Patrol, faction=town_guard, species=)
+[NPCGroupService] Set patrol route for group_2: 4 waypoints
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L2_690e_00003e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_7fcc_00003f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_d863_000040 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_62f6_000041 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_7592_000042 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_d175_000043 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_08c41c0c_000007 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_3d7d_000044 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_3d7f_000045 (Armor)
+[NPCGroupService] Added npc_30a17aef1f894646 to group group_2 as Leader
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_ff7c_000046 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_1497_000047 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_08ba_000048 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_e66b_000049 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_e576_00004a (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_c31c_00004b (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_0b1a20e0_000008 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_3d7e_00004c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_3d80_00004d (Armor)
+[NPCGroupService] Added npc_ee9e4d33ba764aa9 to group group_2 as Follower
+[GroupSpawn] Guard patrol 'group_2' — 2 guards at (18, 38)
+[Phase 8] GroupSpawn complete — 2 groups on 'test_polygon' (50×50)
+[Phase 9] FormationInit complete (stub)
+[Phase 10] ChargerInit complete (stub)
+[Phase 11] QuestInit complete (stub)
+[Phase 12] UIInit complete — HUD shown
+[PreGenTechnique] start — maxLevel=1 seed=20261023
+[PreGenTechnique] done — generated=100 valid=100 duplicates=0 registered=100 (registry total=108)
+[PreGenTechnique] grades registered: [Common=30, Refined=30, Perfect=30, Transcendent=10] gradeMismatches=0 registryInvalid=0
+[TechniqueGrant] seed=20261030
+[TechniqueGrant] R25 AoE-набор: 2/3 форм (конус/полукруг/круг — площадные техники)
+[Phase 14] TechniqueGrant complete — granted 8 techniques (cultivation 1, active 3/3, curse, formation, aoe 2) at L1
+[Phase 15] Finalize complete — Scene assembly complete
+[SceneOrchestrator] Assembly complete — mode=NewGame: 16 completed, 0 skipped, 19 ms
+[GameSession] NewGame ready — state=Playing
+[G3] ShowFpsCounter False→True→NewGame→False→возврат False
+[G4] после NewGame: AnyModal=False, WorldMouseBlocked=False
+── H. ST18-007: длительная сессия — 6 циклов, рост реестров/подписок ──
+[Stage18Sim] сценарий H упал: InvalidOperationException: Stage18 fault-injection: контролируемый сбой сценария H (final-audit FA-1) — вердикт обязан стать FAIL
+   at CultivationGame.Adapter.Scene.Stage18SubsystemIntegrationTruthSimDebug.ScenarioH() in /home/z/my-project/Ai-game4/game/src/Adapter/Scene/Stage18SubsystemIntegrationTruthSimDebug.cs:line 868
+   at CultivationGame.Adapter.Scene.Stage18SubsystemIntegrationTruthSimDebug.RunScenario(String name, Func`1 scenario) in /home/z/my-project/Ai-game4/game/src/Adapter/Scene/Stage18SubsystemIntegrationTruthSimDebug.cs:line 173
+── I. ST18-011: регистрация сима в раннере/правилах ──
+[I1] qa_regression.sh содержит STAGE18=True; TESTING_RULES §0.1 содержит STAGE18=True
+[I2] фактические счётчики прогона: PASS=29, FAIL=1, GAP=1, NOT TESTED=0 — первичные логи коммитятся (whitelist 10_24 в .gitignore, bcc5318)
+
+══════════ Stage18Sim: ИТОГ ══════════
+  PASS       ST18-001/A1 — QA-мир собран путём NewGame, сессия Playing, домены живы
+  PASS       ST18-001/A2 — мутации пяти доменов применены (стамина/Ци/вирт-дельта/позиция/сон + бафф/предмет)
+  PASS       ST18-001/A3 — слот stage18_rt сохранён (агрегатор: все CaptureState успешны)
+  PASS       ST18-001/A4 — пост-сейвовые мутации отличимы от сохранённого состояния во всех доменах
+  PASS       ST18-001/A5 — загрузка вернула СОХРАНЁННОЕ состояние всех сейв-доменов точно (стамина/Ци/вирт-дельта/base/позиция), а не пост-сейвовое
+  GAP        ST18-001/A6 — несейв-домены: бафф health_regen теряется при Load (BuffService не ISaveable — в сейв не входит); наземные предметы: 0 после Load (GroundItemService не ISaveable — известный разрыв, см. §4.2 DEATH_AND_LOOT/INV); решение о включении в сейв — за владельцем (баг-трекер)
+  PASS       ST18-001/B1 — world-transition Quit→NewGame в том же процессе собрал новый мир
+  PASS       ST18-001/B2 — новый мир чист: ни одного старого NPC/животного, трупы/наземные предметы сброшены, стамина новой сессии полная, сон сброшен
+  PASS       ST18-001/B3 — StatService.ResetWorld: виртуальная дельта прошлого мира (прогресс §4.2) не переживает New Game
+  PASS       ST18-001/B4 — повторные NewGame не накапливают реестры (счётчики стабильны, детерминированный seed даёт то же множество)
+  PASS       ST18-002/C3 — ошибка RestoreState домена Этапа-17 (stamina) → откат в ДО-загрузочный мир; сессия Playing, значения прежние
+  PASS       ST18-002/C4 — после отката повторная загрузка успешна: сессия согласована, значения из слота точны
+  PASS       ST18-002/C5 — циклы откат+ретрай не дублируют подписки (счётчики стабильны)
+  PASS       ST18-004/D1 — последняя минута сна тарифицируется сонной скоростью: 30 мин → 500‰ точно (производственный путь модуля)
+  PASS       ST18-004/D2 — смена режима между тиками: интервалы тарифицированы по режиму, действовавшему в каждом
+  PASS       ST18-004/D3 — пауза останавливает игровое время: нулевой интервал = no-op регена (контракт P2-28 IsPaused ⇒ DeltaTime==0)
+  PASS       ST18-004/D4 — частичный сон переживает Save/Load В ПРОЦЕССЕ: авто-пробуждение по остатку плана (60≤тиков≤95); cross-process — D4-COLD
+  PASS       ST18-004/D5 — единицы согласованы: живые тики ведут реген в масштабе игровой минуты (Delta×60000 мс = минута)
+  PASS       ST18-005/E1 — смерть по событию урона: единый путь BodyService→Adapter→NPCDeathEvent (ровно 1 событие)
+  PASS       ST18-005/E2 — труп создан для погибшего NPC (CorpseService подписан на NPCDeathEvent)
+  PASS       ST18-005/E3 — смерть цели вычищается из состояния атакующего (цель/бой) за ≤2 AI-тика
+  PASS       ST18-005/E4 — труп погибшего NPC переживает Save/Load (CorpseService ISaveable)
+  PASS       ST18-005/E5 — New Game сбрасывает реестр трупов (CorpseService IWorldResettable)
+  PASS       ST18-006/F1 — повторный NewGame с тем же seed даёт то же множество техник (детерминизм полного пайплайна)
+  PASS       ST18-006/F2 — внутри одного мира ID техник уникальны (коллизий/молчаливых подмен нет)
+  PASS       ST18-008/G1 — повторные open/close не ломают предикаты модальности и не оставляют фантомных блокировок
+  PASS       ST18-008/G2 — PauseOnModalWindows=true: B-путь останавливает мировое время при окне, возобновляет после закрытия
+  PASS       ST18-008/G3 — пользовательские настройки не сбрасываются New Game (вне world-transition)
+  PASS       ST18-008/G4 — после New Game нет скрытых модалей, блокирующих ввод
+  FAIL       CRASH/H — необработанное исключение: InvalidOperationException: Stage18 fault-injection: контролируемый сбой сценария H (final-audit FA-1) — вердикт обязан стать FAIL
+  PASS       ST18-011/I1 — сим зарегистрирован в раннере и правилах (те же коммиты, что и код)
+  PASS       ST18-011/I2 — счётчики прогона честно агрегированы в VERDICT (29 PASS / 1 FAIL / 1 GAP / 0 NT); логи префикса/постфикса/регрессии — в checkpoints/ (git)
+──────────────────────────────────────
+  PASS=30  FAIL=1  CRASH=1  GAP=1  NOT TESTED=0
+[Stage18Sim] VERDICT: FAIL
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[AnimalService] Tick #30 — 8 animals; sample: wolf#animal_wolf_62 @ (15, 10)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (243785 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[AnimalService] Tick #60 — 8 animals; sample: wolf#animal_wolf_62 @ (15, 14)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (243786 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[AnimalService] Tick #90 — 8 animals; sample: wolf#animal_wolf_62 @ (9, 7)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (243786 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[AnimalService] Tick #120 — 8 animals; sample: wolf#animal_wolf_62 @ (12, 9)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (243788 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[AnimalService] Tick #150 — 8 animals; sample: wolf#animal_wolf_62 @ (22, 19)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (243794 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[AnimalService] Tick #180 — 8 animals; sample: wolf#animal_wolf_62 @ (26, 24)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (243788 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[AnimalService] Tick #210 — 8 animals; sample: wolf#animal_wolf_62 @ (26, 12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (243786 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[AnimalService] Tick #240 — 8 animals; sample: wolf#animal_wolf_62 @ (25, 10)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (243786 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[AnimalService] Tick #270 — 8 animals; sample: wolf#animal_wolf_62 @ (28, 18)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (243786 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[AnimalService] Tick #300 — 8 animals; sample: wolf#animal_wolf_62 @ (33, 29)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (243781 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)

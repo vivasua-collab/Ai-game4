@@ -40,8 +40,15 @@
 //      техник/подписок — нет необъяснённого роста (память — информация).
 //   I. ST18-011 — сам сим печатает VERDICT с фактическими счётчиками;
 //      регистрация в tools/qa_regression.sh проверяется файловым чтением.
+//   FA-1 (final-audit follow-up) — crash-целостность агрегации: GAP — только
+//      для явно задокументированных ограничений окружения (RecordGap по
+//      месту); необработанное исключение сценария = FAIL + fatal-счётчик,
+//      VERDICT: PASS при любом crash невозможен. Инъекция
+//      GODOT_STAGE18_FAULT_INJECT=1 намеренно роняет сценарий H —
+//      доказательство, что вердикт краснеет (раньше CRASH→GAP→PASS).
 //
-// Итог: [Stage18Sim] VERDICT: PASS / FAIL (+ пофазовые PASS/FAIL/GAP/NT).
+// Итог: [Stage18Sim] VERDICT: PASS / FAIL (+ пофазовые PASS/FAIL/GAP/NT;
+// PASS запрещён при любом FAIL или crash сценария — включая cold-фазы).
 using Godot;
 using System;
 using System.Collections.Generic;
@@ -91,6 +98,11 @@ namespace CultivationGame.Adapter.Scene
         // === Результаты ===
         private readonly List<(string Id, string Status, string Detail)> _results = new();
 
+        // FA-1 (final-audit): необработанное исключение сценария — fatal-счётчик.
+        // Любой crash запрещает VERDICT: PASS (прежде CRASH писался как GAP и
+        // мог прятаться за зелёным вердиктом — доказанный ложный PASS).
+        private int _fatalCrashes;
+
         // === Cold-пара (§3 F) ===
         private const string ColdSlot = "stage18_coldint";
         private const int ColdStamina = 61;
@@ -120,7 +132,9 @@ namespace CultivationGame.Adapter.Scene
             string? cold = System.Environment.GetEnvironmentVariable("GODOT_STAGE18_COLD");
             if (cold == "save" || cold == "load")
             {
-                await RunColdPhase(cold == "save");
+                // FA-1: cold-фаза под той же crash-защитой — прежде исключение в
+                // RunColdPhase гасило fire-and-forget RunAsync без итога вовсе.
+                await RunScenario("COLD", () => RunColdPhase(cold == "save"));
                 PrintSummary();
                 return;
             }
@@ -143,7 +157,9 @@ namespace CultivationGame.Adapter.Scene
             await RunScenario("F", ScenarioF);
             await RunScenario("G", ScenarioG);
             await RunScenario("H", ScenarioH);
-            ScenarioI();
+            // FA-1: I тоже под crash-защитой (прежде синхронный вызов без
+            // try/catch мог уронить RunAsync до PrintSummary).
+            await RunScenario("I", () => { ScenarioI(); return Task.CompletedTask; });
 
             PrintSummary();
         }
@@ -158,7 +174,13 @@ namespace CultivationGame.Adapter.Scene
             catch (Exception ex)
             {
                 GD.PrintErr($"[Stage18Sim] сценарий {name} упал: {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
-                RecordGap($"CRASH/{name}", $"необработанное исключение: {ex.GetType().Name}: {ex.Message}");
+                // FA-1 (final-audit): падение сценария — НЕ GAP. GAP оставлен
+                // только для явно задокументированных ограничений окружения
+                // (RecordGap по месту, без исключений). Необработанное
+                // исключение = FAIL + fatal-счётчик: вердикт PASS невозможен.
+                _fatalCrashes++;
+                Record($"CRASH/{name}", false,
+                    $"необработанное исключение: {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -838,6 +860,13 @@ namespace CultivationGame.Adapter.Scene
         private async Task ScenarioH()
         {
             GD.Print("── H. ST18-007: длительная сессия — 6 циклов, рост реестров/подписок ──");
+            // FA-1 fault-injection (final-audit): при GODOT_STAGE18_FAULT_INJECT=1
+            // сценарий НАМЕРЕННО бросает исключение — доказательство crash-
+            // целостности: остальные сценарии зелёные, но вердикт обязан стать
+            // FAIL (раньше CRASH→GAP→ложный PASS). Проверки не ослабляются.
+            if (System.Environment.GetEnvironmentVariable("GODOT_STAGE18_FAULT_INJECT") == "1")
+                throw new InvalidOperationException(
+                    "Stage18 fault-injection: контролируемый сбой сценария H (final-audit FA-1) — вердикт обязан стать FAIL");
             var bus = _resolver!.Resolve<EventBus>();
             var slot = new SaveSlot("stage18_stress", SaveSlotType.Manual);
 
@@ -1036,10 +1065,13 @@ namespace CultivationGame.Adapter.Scene
             int gap = _results.Count(r => r.Status == "GAP");
             int nt = _results.Count(r => r.Status == "NOT TESTED");
             GD.Print("──────────────────────────────────────");
-            GD.Print($"  PASS={pass}  FAIL={fail}  GAP={gap}  NOT TESTED={nt}");
-            // Вердикт: PASS только при 0 FAIL. GAP/NT не маскируются итогом —
-            // перечислены выше и попадают в отчёт.
-            GD.Print($"[Stage18Sim] VERDICT: {(fail == 0 && pass > 0 ? "PASS" : "FAIL")}");
+            GD.Print($"  PASS={pass}  FAIL={fail}  CRASH={_fatalCrashes}  GAP={gap}  NOT TESTED={nt}");
+            // FA-1: PASS запрещён при любом FAIL ИЛИ crash сценария (fatal-
+            // счётчик — защита в глубину: CRASH пишется и как FAIL, и сюда).
+            // GAP/NOT TESTED не маскируются итогом: перечислены выше и
+            // передаются в отчёт отдельным списком (владелец решает по канону).
+            bool verdictPass = fail == 0 && _fatalCrashes == 0 && pass > 0;
+            GD.Print($"[Stage18Sim] VERDICT: {(verdictPass ? "PASS" : "FAIL")}");
         }
     }
 }
