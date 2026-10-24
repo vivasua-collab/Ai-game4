@@ -275,3 +275,55 @@ NEXT: эпизод-2 — префиксный сим Stage16RenderAnimationSyncT
 persist/oneshot Shield-жизненный цикл; ZIndex/порядок сиблингов; кэш-чистка),
 регистрация в qa_regression.sh + TESTING_RULES, префикс-прогон ДО фиксов,
 лог checkpoints/10_23_stage16_render_animation_prefix.log.
+
+## Ч.8: Этап-16 — фиксы ST16-001..007 + постфикс PASS + регрессия 35/35 (24.10, сессия после сброса среды)
+
+- Сбой среды ночью 24.10: `/home/z/.dotnet` утерян (код и ночная работа
+  выжили в рабочем каталоге — обрыв на ST16-006b/c). Восстановлено:
+  .NET 8.0.426+9.0.319 (dotnet-install), Godot 4.7.2 цел, `--headless
+  --import` перезапущен, build 0 err.
+- 65ee7b8: фиксы ST16-001 (one-shot×death/respawn: обнуление
+  _meleeAge/_rangedAge/_hitAge), 003 (animal_{species}_attack — канон
+  SPRITE_DELIVERY §5), 004 (доменный Target != null вместо кадровой
+  дельты: walk-мерцание 1-кадровое; D2a пруф 7.6% vs 99.0%), 005
+  (формация: ZIndex Objects+2=5→Objects(3) + сиблинг-порядок после
+  ObjectLayer — контур над объектами, под телами/игроком), 006a
+  (QiBufferService.EntityId живьём из QiService — снапшот конструктора
+  был пуст: ВСЕ события буфера гасились фильтрами, persistent-щит
+  не появлялся в игре ВООБЩЕ), 006b/c (ActiveVisual.IsPersistent:
+  идемпотентная замена на AbsorbDamage-репаблиш, щадящая деактивация —
+  one-shot каста доигрывает 2.5с), 007 (чистка per-entity кэшей мёртвых
+  в _PhysicsProcess 0.5с, вне _Draw).
+- Постфикс Stage16-сим: **29 PASS / 0 FAIL / 14 GAP / 1 NOT TESTED /
+  1 DISPROVED — VERDICT: PASS** (префикс 3b73482: 16/13). Две
+  постфикс-ревизии D2b: (1) возврат волка в кадр камеры (culling
+  BUG-007 давал stale-idle 0% — артефакт сценария); (2) метрика
+  AnimalAnimInfo.Moving вместо AnimId.Contains("walk") — walk-лист
+  волка недоставленный (G3) легитимно резолвится в процедурный static;
+  итог walk-сигнал 68.9% PASS. ФАКТ: headless _Draw ВЫПОЛНЯЕТСЯ
+  (пруф G2/D2b) — TESTING_RULES-строка исправлена.
+- **Скриншоты Xvfb/opengl3 ЗАБЛОКИРОВАНЫ СРЕДОЙ** (после сброса):
+  движок/GL(llvmpipe)/.NET-модуль живут, main loop итерирует
+  (--quit-after работает), но C#-сцены не инстанцируются (0 строк
+  [GameBoot], GODOT_SCREENSHOT-хук молчит), экран чёрный (дамп
+  фреймбуфера -fbdir → XWD→PNG → VLM: «полностью чёрный»). Испробовано:
+  позиционная сцена/--scene/без сцены, 2 разрешения, +extension GLX
+  (ошибка -extension=DISABLE!), LIBGL_ALWAYS_SOFTWARE, --render-thread
+  unsafe, --log-file, --verbose (editor-шаги D-Bus/EditorTheme),
+  --headless --import. Техника = эталон R37c/R39 (до сброса работала:
+  screenshots/r37_*.png, r39_*.png). I3 (FlipH) остаётся NOT TESTED;
+  визуальные подтверждения — PT-V01..V08 (владелец, planned) и/или
+  восстановление GUI-режима следующим эпизодом.
+- Регрессия: **35/35 PASS / 0 FAIL** (10 foreground-чанков; фон убивается
+  платформой между вызовами — только foreground). COMBAT_SIM (bug012) и
+  STAGE8 (D6a) зелёные; STAGE16 подтверждён раннером повторно.
+- Портал: playtest.json +категория render_animation (PT-V01..V08,
+  planned — аудит §6); bugs.json 70→76 (STAGE16-001..007 verified,
+  волна 6; 006=P1: щит не появлялся+стаки+убийство one-shot);
+  status.json v1.9 (Этап-16 закрыт, GUI-блокировка задокументирована).
+- Отчёт: checkpoints/10_23_stage16_render_animation_report.md (+prefix/
+  report/regression-логи).
+
+NEXT: следующий пакет аудита (ожидание Этап-17) ЛИБО эпизод
+восстановления Godot GUI-режима среды (скриншоты PT-V-тем: I3 FlipH,
+формация+игрок, VFX) — блокировка задокументирована в отчёте §6.

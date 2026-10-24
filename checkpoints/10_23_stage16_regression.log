@@ -1,0 +1,160 @@
+─── QA: COMBAT_SIM (GODOT_COMBAT_SIM) ─────────────────────────────
+─── QA: COMBAT_SIM (GODOT_COMBAT_SIM) ─────────────────────────────
+  ✅ [CombatSim] VERDICT: PASS — обе стороны боя получают урон (melee + ranged + LOS/ammo gates + readiness-gate + multi R24-C + vfx R29 + bug001 каст-эффекты 4 типов + bug012 ранний гейт Support)
+─── QA: COMBATAI (GODOT_COMBATAI_DEBUG) ─────────────────────────────
+  ✅ [CombatAI] VERDICT: PASS — месть/двусторонний бой/селектор защит/бегство/leash/стойка/анимация
+
+══════════ QA-РЕГРЕССИЯ: ИТОГ ══════════
+  PASS  COMBAT_SIM
+  PASS  COMBATAI
+────────────────────────────────────────
+  2/2 PASS
+  ВСЕ СИМЫ ЗЕЛЁНЫЕ
+─── QA: RESPAWN (GODOT_RESPAWN_DEBUG) ─────────────────────────────
+  ✅ [RespawnSim] VERDICT: PASS — resource respawn + honest travel + time delta + death screen (GAP-001 + АУДИТ-1020: BUG-009/010/011) + агро-сброс на смерть (PT-001, плейтест PT-C02)
+─── QA: ANIMALQA (GODOT_ANIMALQA_DEBUG) ─────────────────────────────
+  ✅ [AnimalQA] VERDICT: PASS — таргетинг/урон/месть/смерть→труп/killfeed-имя/de-aggro/мирный вид/HP-бары+тумблер/овекилл-перенос: бой с животными зарегистрирован полностью
+─── QA: LOOT (GODOT_LOOT_DEBUG) ─────────────────────────────
+  ✅ [LootSim] VERDICT: PASS — full-loot: спаун-генерация/трупы/обыск/full-loot/TTL/R14-нет-респауна-в-сессии+ивент-спаун
+─── QA: DOT (GODOT_DOT_DEBUG) ─────────────────────────────
+  ✅ [DotSim] VERDICT: PASS — DoT (Poison/Burn/Bleed/Freeze) наносит реальный урон через единый пайплайн
+
+══════════ QA-РЕГРЕССИЯ: ИТОГ ══════════
+  PASS  RESPAWN
+  PASS  ANIMALQA
+  PASS  LOOT
+  PASS  DOT
+────────────────────────────────────────
+  4/4 PASS
+  ВСЕ СИМЫ ЗЕЛЁНЫЕ
+─── QA: SAVELOAD (GODOT_SAVELOAD_DEBUG) ─────────────────────────────
+  ✅ [SaveLoadSim] VERDICT: PASS — Save/Load round-trip: 20 блоков (R17 полнота + Ф4: corpses/npc_relationships), типизация, IncludeFields, честный success, РЕАЛЬНЫЕ мутации (анти-тривиальность) + Этап-3 (adit_10_20): полнота/версия формата, фантом-каталоги, честное удаление, fail-closed сброс доменов
+─── QA: STAGE4 (GODOT_STAGE4_DEBUG) ─────────────────────────────
+  ✅ [Stage4Sim] VERDICT: PASS — Этап-4: pre-flight до сброса (битые слоты не трогают мир), транзакционный откат (сбой RestoreState возвращает до-загрузочный мир), полнота v2 (quests/npc_groups обязательны), BUG-013 (спавнер==реестр после Load, деспавн/спавн восстановленных), GAP-014 (группы переживают сейв: лидер/состав/маршрут)
+─── QA: STAGE5 (GODOT_STAGE5_DEBUG) ─────────────────────────────
+  ✅ [Stage5Sim] VERDICT: PASS — BUG-015/016/017: тело=истина смерти, сплит сердца 100%, DoT-зачёт квесту + атрибуция
+─── QA: STAGE6 (GODOT_STAGE6_DEBUG) ─────────────────────────────
+  ✅ [Stage6Sim] VERDICT: PASS — BUG-018/019/020/021: инварианты стаков, честные Delta/Price, непредставимые котировки, валидация колец
+
+══════════ QA-РЕГРЕССИЯ: ИТОГ ══════════
+  PASS  SAVELOAD
+  PASS  STAGE4
+  PASS  STAGE5
+  PASS  STAGE6
+────────────────────────────────────────
+  4/4 PASS
+  ВСЕ СИМЫ ЗЕЛЁНЫЕ
+─── QA: STAGE7 (GODOT_STAGE7_DEBUG) ─────────────────────────────
+  ✅ [Stage7Sim] VERDICT: PASS — BUG-022/023/024 + GAP-025: источник предмета решает сбор, снимок итерации, честные награды, talk-гейт
+─── QA: STAGE8 (GODOT_STAGE8_DEBUG) ─────────────────────────────
+  ✅ [Stage8Sim] VERDICT: PASS — ST8-01..06 закрыты
+─── QA: STAGE9 (GODOT_STAGE9_DEBUG) ─────────────────────────────
+  ✅ [Stage9Sim] VERDICT: PASS — ST9-01..03 проверены (крафт/экипировка/переносы; прочность = GAP)
+─── QA: STAGE10 (GODOT_STAGE10_DEBUG) ─────────────────────────────
+  ✅ [Stage10Sim] VERDICT: PASS — ST10-01..04 проверены (GAP: hitched-счёт дней, сохранение состояния тайлов)
+
+══════════ QA-РЕГРЕССИЯ: ИТОГ ══════════
+  PASS  STAGE7
+  PASS  STAGE8
+  PASS  STAGE9
+  PASS  STAGE10
+────────────────────────────────────────
+  4/4 PASS
+  ВСЕ СИМЫ ЗЕЛЁНЫЕ
+─── QA: STAGE11 (GODOT_STAGE11_DEBUG) ─────────────────────────────
+  ✅ [Stage11Sim] VERDICT: PASS
+─── QA: STAGE12 (GODOT_STAGE12_DEBUG) ─────────────────────────────
+  ✅ [Stage12Sim] VERDICT: PASS
+─── QA: STAGE13 (GODOT_STAGE13_DEBUG) ─────────────────────────────
+  ✅ [Stage13Sim] VERDICT: PASS
+
+══════════ QA-РЕГРЕССИЯ: ИТОГ ══════════
+  PASS  STAGE11
+  PASS  STAGE12
+  PASS  STAGE13
+────────────────────────────────────────
+  3/3 PASS
+  ВСЕ СИМЫ ЗЕЛЁНЫЕ
+─── QA: STAGE14 (GODOT_STAGE14_DEBUG) ─────────────────────────────
+  ✅ [Stage14Sim] VERDICT: PASS
+─── QA: STAGE15 (GODOT_STAGE15_DEBUG) ─────────────────────────────
+  ✅ [Stage15Sim] VERDICT: PASS
+─── QA: STAGE15-COLD-SAVE ─────────────────────
+[Stage15Sim] ST15-008/COLD-SAVE     PASS       слот сохранён с маркером в каталоге
+─── QA: STAGE15-COLD-LOAD (НОВЫЙ процесс) ─────
+[Stage15Sim] ST15-008/COLD-LOAD     PASS       cold-load в новом процессе: каталог восстановлен, маркер резолвится, новые ID уникальны
+─── QA: STAGE16 (GODOT_STAGE16_DEBUG) ─────────────────────────────
+  ✅ [Stage16Sim] VERDICT: PASS
+
+══════════ QA-РЕГРЕССИЯ: ИТОГ ══════════
+  PASS  STAGE14
+  PASS  STAGE15
+  PASS  STAGE16
+────────────────────────────────────────
+  3/3 PASS
+  ВСЕ СИМЫ ЗЕЛЁНЫЕ
+─── QA: KILLFEED (GODOT_KILLFEED_DEBUG) ─────────────────────────────
+  ✅ [KillFeedSim] VERDICT: PASS — kill-feed: тост/журнал/дедуп/old_age
+─── QA: QUEST (GODOT_QUEST_DEBUG) ─────────────────────────────
+  ✅ [QuestSim] VERDICT: PASS — все квесты: accept(диалог)→event→complete→reward; гейты работают
+─── QA: STORAGE (GODOT_STORAGE_DEBUG) ─────────────────────────────
+  ✅ [StorageSim] VERDICT: PASS — spirit retrieve/stacking, ring Qi, craft overflow, pickup integrity
+─── QA: HOTBAR (GODOT_HOTBAR_DEBUG) ─────────────────────────────
+  ✅ [HotbarSim] VERDICT: PASS — assign/empty/cooldown/qi-gate/belt-gate/drag&drop-слота/тайл-инспектор-работают
+
+══════════ QA-РЕГРЕССИЯ: ИТОГ ══════════
+  PASS  KILLFEED
+  PASS  QUEST
+  PASS  STORAGE
+  PASS  HOTBAR
+────────────────────────────────────────
+  4/4 PASS
+  ВСЕ СИМЫ ЗЕЛЁНЫЕ
+─── QA: TRASHDROP (GODOT_TRASHDROP_DEBUG) ─────────────────────────────
+  ✅ [TrashDropSim] VERDICT: PASS — материалы draggable, корзина выбрасывает, кукла отклоняет не-экипировку
+─── QA: CONTEXT (GODOT_CONTEXT_DEBUG) ─────────────────────────────
+  ✅ [ContextSim] VERDICT: PASS — ПКМ-свойства, слайдер деления, кучки, слот-адресный выброс работают
+─── QA: MODALQA (GODOT_MODALQA_DEBUG) ─────────────────────────────
+  ✅ [ModalSim] VERDICT: PASS — «×»/bg-click всех 6 окон доходит до резюма; двойной резюм идемпотентен; стек инвентарь+лавка не вешает паузу
+─── QA: MODAL2 (GODOT_MODAL2_DEBUG) ─────────────────────────────
+  ✅ [ModalStackSim] VERDICT: PASS — 30×2 пар стеков: пауза держится до последнего окна и снимается с ним; Esc-пауза переживает окна; тройной стек чист
+
+══════════ QA-РЕГРЕССИЯ: ИТОГ ══════════
+  PASS  TRASHDROP
+  PASS  CONTEXT
+  PASS  MODALQA
+  PASS  MODAL2
+────────────────────────────────────────
+  4/4 PASS
+  ВСЕ СИМЫ ЗЕЛЁНЫЕ
+─── QA: L500 (GODOT_L500_DEBUG) ─────────────────────────────
+  ✅ [L500Sim] VERDICT: PASS — мир 500×500 основной: сетка/NPC/звери/группы интегрированы, пояс жизни у центра, кап не превышен
+─── QA: WEAPONVIS (GODOT_WEAPONVIS_DEBUG) ─────────────────────────────
+  ✅ [WeaponVis] VERDICT: PASS — classId/fallback/sprites/composite/hotbar/npc/facing работают
+─── QA: REASSEMBLY (GODOT_REASSEMBLY_DEBUG) ─────────────────────────────
+  ✅ [ReAssemblySim] VERDICT: PASS — Reset фаз работает (все фазы переисполнены), реестры world-scoped: техники/NPC/трупы/группы/звери/время не переживают пересборку, double-spawn отсутствует
+
+══════════ QA-РЕГРЕССИЯ: ИТОГ ══════════
+  PASS  L500
+  PASS  WEAPONVIS
+  PASS  REASSEMBLY
+────────────────────────────────────────
+  3/3 PASS
+  ВСЕ СИМЫ ЗЕЛЁНЫЕ
+─── QA: CHARGE (GODOT_CHARGE_SIM) ─────────────────────────────
+  ✅ [ChargeSim] VERDICT: PASS — fill model + aura hold + release all wired
+─── QA: AUDIT0922 (GODOT_AUDIT0922_DEBUG) ─────────────────────────────
+  ✅ [Audit0922Sim] VERDICT: PASS — EventBus isolation/re-entrancy, path sanitisation, DI override prune, DeleteSave honesty, Trade/Corpse reset-контракты, ResolveAll registration order, startup fail-closed, cycle detection (Фаза 4: P2-12/P2-13/P2-14), world-reset fail-closed (P1-9), startup retry без дублей (P1-10), Pure без расхода Ци (P1-12), time catch-up/speed/markers (Фаза 11: P1-13/P1-14/P1-15), item identity/DB (Фаза 12: P1-16+P2-31/P2-32), equipment гейты (P1-17/P1-18), storage-ring persistence (P1-19), stat progression (Фаза 14: P1-20+P2-43/P2-49), revive/dash (P2-44/P2-45), time P2-бэклог Фазы 11: автосейв по мировым тикам / pause-authority / DeltaTime / канонизация / валидация даты (P2-26…30), items/trade P2-бэклог Фазы 12: saturating-валюта / честный тотал сделки / валидация Restore / переноска — владельческий канон 50/100 (P2-33/34/35 + P2-36 by-user), EventBus drain re-entrancy (АУДИТ-1020: BUG-004), DI Build snapshot (BUG-005), честный выбор ctor (BUG-006)
+─── QA: CHARGERQA (GODOT_CHARGERQA_DEBUG) ─────────────────────────────
+  ✅ [ChargerSim] VERDICT: PASS — камни Ци вставляются в зарядник (окно H/меню/дроп), анти-дюп жив, пояс ≠ зарядник, домен гейтируется экипировкой
+─── QA: ANIMQA (GODOT_ANIMQA_DEBUG) ─────────────────────────────
+  ✅ [AnimQA] VERDICT: PASS — cache/fallback/loader/animator(one-shot,death)/weapon-keys/npc/animals готовы к доставке PNG
+
+══════════ QA-РЕГРЕССИЯ: ИТОГ ══════════
+  PASS  CHARGE
+  PASS  AUDIT0922
+  PASS  CHARGERQA
+  PASS  ANIMQA
+────────────────────────────────────────
+  4/4 PASS
+  ВСЕ СИМЫ ЗЕЛЁНЫЕ

@@ -1,6 +1,6 @@
 {
   "version": 2.0,
-  "updated": "2026-10-23",
+  "updated": "2026-10-24",
   "format": {
     "purpose": "Реестр находок аудита и волн их исправления. Запуск процесса: директива владельца от 19.10.2026 — «по важным находкам аудита запустить анализ и исправление». Источник находок: аудит-вердикты итерации 2 карты проекта (коммит dfb98d0) + открытые верификации PROJECT_MAP.md §5. Ведёт main-агент Z.ai Code; веб-портал читает файл напрямую (runtime, no-store).",
     "type": {
@@ -1673,6 +1673,120 @@
       "fix": "Предложение владельцу: (а) требование = доля ёмкости следующего уровня (напр. 90%), либо (б) накопление сверх ёмкости (расширяемое ядро в глубокой медитации), либо (в) пересмотр формулы §4.3. Семантика НЕ переписывалась (канон: не переписывать неизвестную семантику до согласования). Плейтест PT-PR06 (до решения невыполним).",
       "progress_pct": 0,
       "qa": "Stage12-сим P5 PASS (требования спец-точны; честный отказ без мутаций), P5-GAP — запись о недостижимости."
+    },
+    {
+      "id": "STAGE16-001",
+      "type": "bug",
+      "severity": "P2",
+      "title": "One-shot-анимации игрока доигрывались после смерти/респавна (старая атака на новой жизни)",
+      "module": "Рендеринг и анимация (PlayerAnimator)",
+      "track_ref": "stage16",
+      "status": "verified",
+      "fix_wave": 6,
+      "assignee": "10-24-stage16",
+      "found": "2026-10-20",
+      "summary": "После melee/атаки/получения урона → смерть → респавн аниматор продолжал доигрывать ПРЕЖНИЙ one-shot (замах/хит) на живом игроке: таймеры _meleeAge/_rangedAge/_hitAge переживали жизненный переход.",
+      "analysis": "NotifyDeath/NotifyRespawn сбрасывали смерть/прогресс/фазу, но не one-shot-таймеры. Префикс-сим A1–A4: AnimId='player_melee'/'player_hit' после респавна.",
+      "fix_plan": "65ee7b8: NotifyDeath/NotifyRespawn обнуляют все one-shot-таймеры. Постфикс A1–A5 PASS ('player_idle').",
+      "refs": [
+        "checkpoints/10_23_stage16_render_animation_report.md",
+        "ST16-001"
+      ]
+    },
+    {
+      "id": "STAGE16-003",
+      "type": "bug",
+      "severity": "P3",
+      "title": "Квадрупед-NPC в атаке резолвил лист animal_{species}_melee вместо канона animal_{species}_attack",
+      "module": "Рендеринг и анимация (NPCSpriteRenderer)",
+      "track_ref": "stage16",
+      "status": "verified",
+      "fix_wave": 6,
+      "assignee": "10-24-stage16",
+      "found": "2026-10-20",
+      "summary": "Замах зверя-NPC искал спрайт-лист 'animal_wolf_melee', тогда как манифест/SPRITE_DELIVERY §5 поставляют 'animal_wolf_attack' — будущая поставка G3 молча промахнулась бы мимо рендера (тихий fallback).",
+      "analysis": "Ключ листа строился из kind='melee'; канон звериных листов — idle/walk/run/attack/death.",
+      "fix_plan": "65ee7b8: маппинг melee→attack для звериных листов. Постфикс C1 PASS ('animal_wolf_attack').",
+      "refs": [
+        "checkpoints/10_23_stage16_render_animation_report.md",
+        "ST16-003"
+      ]
+    },
+    {
+      "id": "STAGE16-004",
+      "type": "bug",
+      "severity": "P2",
+      "title": "Walk-анимация зверей мерцала один кадр из ~15 (кадровая дельта вместо доменного сигнала)",
+      "module": "Рендеринг и анимация (AnimalSpriteRenderer)",
+      "track_ref": "stage16",
+      "status": "verified",
+      "fix_wave": 6,
+      "assignee": "10-24-stage16",
+      "found": "2026-10-20",
+      "summary": "Движение зверя определялось дельтой позиции между 15-Гц редравами; дискретный прыжок 1–2 тайла за тик попадал ровно на один кадр → walk виден ~66мс, остальной путь — idle.",
+      "analysis": "Префикс D2a: кадровая дельта 7.6% пути vs доменный сигнал 99.0% (Target != null живёт весь путь блуждания/погони).",
+      "fix_plan": "65ee7b8: _Draw читает AnimalEntity.Target != null; _animalLastPos удалён; метрика AnimalAnimInfo.Moving. Постфикс D2b: walk-сигнал 68.9% PASS.",
+      "refs": [
+        "checkpoints/10_23_stage16_render_animation_report.md",
+        "ST16-004"
+      ]
+    },
+    {
+      "id": "STAGE16-005",
+      "type": "bug",
+      "severity": "P2",
+      "title": "Контур формации рисовался ПОВЕРХ игрока (ZIndex=5 > Player=4) вопреки спецификации",
+      "module": "Рендеринг и анимация (FormationVisualRenderer/SceneBuilder)",
+      "track_ref": "stage16",
+      "status": "verified",
+      "fix_wave": 6,
+      "assignee": "10-24-stage16",
+      "found": "2026-10-20",
+      "summary": "Класс-комментарий «ниже персонажей» нарушался кодом ZIndex=Objects+2=5: игрок скрывался под контуром активной формации.",
+      "analysis": "Между Objects=3 и Player=4 целого ZIndex нет; канон проекта для «между» — равный Z + порядок сиблингов (паттерн «трупы до NPC»).",
+      "fix_plan": "65ee7b8: ZIndex=Objects(3) + SetupFormationVisuals сразу после SetupObjectLayer (над объектами, под телами/игроком). Постфикс E1/E2 PASS.",
+      "refs": [
+        "checkpoints/10_23_stage16_render_animation_report.md",
+        "ST16-005"
+      ]
+    },
+    {
+      "id": "STAGE16-006",
+      "type": "bug",
+      "severity": "P1",
+      "title": "Ци-щит: persistent-визуал не появлялся вовсе (EntityId-снапшот) + стаки от поглощений + деактивация убивала чужой one-shot",
+      "module": "Ци и боевые VFX (QiBufferService/TechniqueEffectRenderer)",
+      "track_ref": "stage16",
+      "status": "verified",
+      "fix_wave": 6,
+      "assignee": "10-24-stage16",
+      "found": "2026-10-20",
+      "summary": "Три суб-дефекта одного жизненного цикла: (a) ВСЕ события Qi-буфера несли EntityId='' — снапшот конструктора брался до QiService.Initialize('player') → фильтры потребителей гасили их: persistent-щит не появлялся в игре вообще; (b) AbsorbDamage репаблишил IsActive=true на каждый поглощённый удар → рендерер стакал дуги щита; (c) деактивация буфера удаляла ВСЕ VisualKind.Shield, преждевременно убивая одноразовый эффект успешного каста Defense (2.5с).",
+      "analysis": "Префикс F1: событие '[on:]' с пустым id, счётчик 0; F2: стаки. Дубли между 4 VFX-рендерерами DISPROVED (R29-гварьи), координаты DISPROVED (контракт миллипиксели/1000).",
+      "fix_plan": "65ee7b8: EntityId живьём из QiService; ActiveVisual.IsPersistent — идемпотентная замена persistent на повторную активацию, деактивация гасит только persistent. Постфикс F1–F4 PASS (1/2; 2→2→2; деакт→1; 2.5с→0).",
+      "refs": [
+        "checkpoints/10_23_stage16_render_animation_report.md",
+        "ST16-006"
+      ]
+    },
+    {
+      "id": "STAGE16-007",
+      "type": "bug",
+      "severity": "P3",
+      "title": "Per-entity кэши рендереров росли без ограничения в длительной сессии (мёртвые/деспавненные сущности)",
+      "module": "Рендеринг и анимация (NPC/AnimalSpriteRenderer)",
+      "track_ref": "stage16",
+      "status": "verified",
+      "fix_wave": 6,
+      "assignee": "10-24-stage16",
+      "found": "2026-10-20",
+      "summary": "Словари последних позиций/фейсинга/фаз/резолвов по ID не чистились после смерти/удаления: каждый респавн (ID не переиспользуются) оставал записи навсегда.",
+      "analysis": "Префикс G1: NPC-кэш 12→20→20 после деспавна 6; G2: stale-кролики 5/5. ID уникальны на спавн (npc_{Guid}, animal_{species}_{nextId++}) — удаление безопасно.",
+      "fix_plan": "65ee7b8: чистка мёртвых на редком проходе _PhysicsProcess (0.5с), вне _Draw; общие texture-кэши не тронуты. Постфикс G1: 12→20→12; G2: stale 0/5.",
+      "refs": [
+        "checkpoints/10_23_stage16_render_animation_report.md",
+        "ST16-007"
+      ]
     }
   ]
 }
