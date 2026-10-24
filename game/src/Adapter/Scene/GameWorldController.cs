@@ -787,6 +787,13 @@ public partial class GameWorldController : Node2D
             GD.PushWarning("[GameWorld] GameBoot.Container is null — DI not wired.");
         }
 
+        // ST17-004 (Этап-17): настройки — ДО построения HUD: видимость
+        // FPS-виджета устанавливается при создании (SetupHUD), модальная
+        // пауза читается HandleModalPauseOnOpen. EnsureLoaded идемпотентен
+        // (главное меню уже грузило — no-op); прямые заходы в world-сцену
+        // больше не полагаются на порядок чужих _Ready.
+        Persistence.GameSettings.EnsureLoaded();
+
         SetupWorld();
         SetupHUD();
         // Phase 6: subscribe the combat bridge (attack intent → combat module).
