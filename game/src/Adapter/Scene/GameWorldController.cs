@@ -1055,6 +1055,19 @@ public partial class GameWorldController : Node2D
             var stage16Sim = new Stage16RenderAnimationSyncTruthSimDebug { Name = "Stage16RenderAnimationSyncTruthSimDebug" };
             AddChild(stage16Sim);
         }
+        // Этап-17 аудита (24.10, GODOT_STAGE17_DEBUG=1): инициализация,
+        // конфигурация, настройки, полная выносливость — ST17-001 реализация
+        // и DI-проводка IStaminaService, ST17-002 инварианты 1000‰/Spend/
+        // реген-эквивалентность, ST17-003 жизненный цикл (сон, Save/Load,
+        // cold-пара GODOT_STAGE17_COLD=save|load, ResetWorld, death/respawn,
+        // легаси-сейв без stamina-блока), ST17-004 GameSettings (compact JSON,
+        // round-trip, Set-до-загрузки, ретраи), ST17-006 повторный старт,
+        // ST17-010 остатки ST11-006res/ST12-003res.
+        if (System.Environment.GetEnvironmentVariable("GODOT_STAGE17_DEBUG") == "1")
+        {
+            var stage17Sim = new Stage17InitConfigStaminaTruthSimDebug { Name = "Stage17InitConfigStaminaTruthSimDebug" };
+            AddChild(stage17Sim);
+        }
         // 2026-09-08 (баг-репорт пользователя): headless-верификация
         // инвентарного drag&drop в корзину (GODOT_TRASHDROP_DEBUG=1) —
         // материалы draggable, корзина выбрасывает, кукла отклоняет.

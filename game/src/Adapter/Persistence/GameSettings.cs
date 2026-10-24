@@ -108,31 +108,62 @@ namespace CultivationGame.Adapter.Persistence
                 if (!FileAccess.FileExists(SettingsPath)) return;
                 using var f = FileAccess.Open(SettingsPath, FileAccess.ModeFlags.Read);
                 if (f == null) return;
-                string json = f.GetAsText();
-                // Минимальный JSON-парс (флаги — без зависимостей):
-                // ищем "cheatsEnabled"/"showEnemyVitals": true/false
-                if (json.Contains("\"cheatsEnabled\": false", StringComparison.OrdinalIgnoreCase))
-                    CheatsEnabled = false;
-                else if (json.Contains("\"cheatsEnabled\": true", StringComparison.OrdinalIgnoreCase))
-                    CheatsEnabled = true;
-                if (json.Contains("\"showEnemyVitals\": false", StringComparison.OrdinalIgnoreCase))
-                    ShowEnemyVitals = false;
-                else if (json.Contains("\"showEnemyVitals\": true", StringComparison.OrdinalIgnoreCase))
-                    ShowEnemyVitals = true;
-                if (json.Contains("\"pauseOnModalWindows\": false", StringComparison.OrdinalIgnoreCase))
-                    PauseOnModalWindows = false;
-                else if (json.Contains("\"pauseOnModalWindows\": true", StringComparison.OrdinalIgnoreCase))
-                    PauseOnModalWindows = true;
-                if (json.Contains("\"showFpsCounter\": false", StringComparison.OrdinalIgnoreCase))
-                    ShowFpsCounter = false;
-                else if (json.Contains("\"showFpsCounter\": true", StringComparison.OrdinalIgnoreCase))
-                    ShowFpsCounter = true;
+                ApplyParsedFlags(f.GetAsText());
             }
             catch (Exception e)
             {
                 GD.Print($"[GameSettings] Load failed: {e.Message} — using defaults");
             }
         }
+
+        /// <summary>
+        /// Применить флаги из JSON-текста настроек. Извлечено из Load()
+        /// в QA-контракте Этапа-17 (ST17-004): единая точка применения
+        /// флагов — её тестирует Stage17-сим (LoadTextForQa) на произвольных
+        /// вариантах JSON (compact/отступы/порядок/неизвестные поля).
+        /// Поведение НЕ изменено (буквальные Contains-шаблоны — см. ST17-004).
+        /// </summary>
+        private static void ApplyParsedFlags(string json)
+        {
+            // Минимальный JSON-парс (флаги — без зависимостей):
+            // ищем "cheatsEnabled"/"showEnemyVitals": true/false
+            if (json.Contains("\"cheatsEnabled\": false", StringComparison.OrdinalIgnoreCase))
+                CheatsEnabled = false;
+            else if (json.Contains("\"cheatsEnabled\": true", StringComparison.OrdinalIgnoreCase))
+                CheatsEnabled = true;
+            if (json.Contains("\"showEnemyVitals\": false", StringComparison.OrdinalIgnoreCase))
+                ShowEnemyVitals = false;
+            else if (json.Contains("\"showEnemyVitals\": true", StringComparison.OrdinalIgnoreCase))
+                ShowEnemyVitals = true;
+            if (json.Contains("\"pauseOnModalWindows\": false", StringComparison.OrdinalIgnoreCase))
+                PauseOnModalWindows = false;
+            else if (json.Contains("\"pauseOnModalWindows\": true", StringComparison.OrdinalIgnoreCase))
+                PauseOnModalWindows = true;
+            if (json.Contains("\"showFpsCounter\": false", StringComparison.OrdinalIgnoreCase))
+                ShowFpsCounter = false;
+            else if (json.Contains("\"showFpsCounter\": true", StringComparison.OrdinalIgnoreCase))
+                ShowFpsCounter = true;
+        }
+
+        // ── QA-хуки Этапа-17 (ST17-004): тестовый контракт БЕЗ изменения
+        // поведения — Stage17InitConfigStaminaTruthSimDebug управляет
+        // статическим состоянием настроек между проверками.
+
+        /// <summary>QA: сбросить флаг загрузки и вернуть канонические дефолты.</summary>
+        internal static void ResetForQa()
+        {
+            _loaded = false;
+            CheatsEnabled = true;
+            ShowEnemyVitals = true;
+            PauseOnModalWindows = true;
+            ShowFpsCounter = false;
+        }
+
+        /// <summary>Применить флаги из произвольного JSON-текста (QA).</summary>
+        internal static void LoadTextForQa(string json) => ApplyParsedFlags(json);
+
+        /// <summary>Факт «настройки считаны» (QA: порядок EnsureLoaded/ретраи).</summary>
+        internal static bool IsLoadedForQa => _loaded;
 
         private static void Save()
         {

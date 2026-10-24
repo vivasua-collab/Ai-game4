@@ -66,6 +66,9 @@ ALL_SIMS=(
   # Этап-16 аудита (23.10): рендеринг/анимация/синхронизация визуального
   # состояния (ST16-001..009; фактический walk-рейшо зверей — Xvfb-прогон).
   "STAGE16:GODOT_STAGE16_DEBUG"
+  # Этап-17 аудита (24.10): инициализация/конфигурация/настройки/выносливость
+  # (ST17-001..010; cold-пара — GODOT_STAGE17_COLD=save|load).
+  "STAGE17:GODOT_STAGE17_DEBUG"
   "KILLFEED:GODOT_KILLFEED_DEBUG"
   "QUEST:GODOT_QUEST_DEBUG"
   "STORAGE:GODOT_STORAGE_DEBUG"
@@ -207,6 +210,43 @@ for entry in "${SIMS[@]}"; do
     if echo "$COLD_LOAD" | grep -q " PASS "; then :; else
       RESULTS[$name]="FAIL"; FAILED+=("STAGE15-COLD-LOAD")
       echo "  ❌ cold-load провален (холодная загрузка каталога)"; fi
+  fi
+  # STAGE17 cold-пара (ST17-003/F): пара НОВЫХ процессов — SAVE-фаза (частичная
+  # выносливость → слот) и LOAD-фаза (новый процесс → LoadGame → значение
+  # восстановлено из файла, не из памяти). Канон этапа-17 §3 F.
+  if [ "$name" = "STAGE17" ]; then
+    echo "─── QA: STAGE17-COLD-SAVE ─────────────────────"
+    : > "$LOG"
+    env GODOT_NEWGAME=1 GODOT_STAGE17_DEBUG=1 GODOT_STAGE17_COLD=save "$GODOT" --headless --path . scenes/MainMenu.tscn > "$LOG" 2>&1 &
+    PID=$!; SIM_PID="$PID"
+    ( i=0; while kill -0 "$PID" 2>/dev/null; do
+        if grep -q "VERDICT" "$LOG" 2>/dev/null; then sleep 3; kill -9 "$PID" 2>/dev/null; break; fi
+        i=$((i+1)); if [ "$i" -ge "$CEILING" ]; then kill -9 "$PID" 2>/dev/null; break; fi
+        sleep 1
+      done ) &
+    WATCHDOG=$!; wait "$PID" 2>/dev/null || true; SIM_PID=""
+    kill "$WATCHDOG" 2>/dev/null; wait "$WATCHDOG" 2>/dev/null || true
+    COLD_SAVE=$(grep -E "COLD-SAVE" "$LOG" | tail -1)
+    echo "$COLD_SAVE"
+    if echo "$COLD_SAVE" | grep -q " PASS "; then :; else
+      RESULTS[$name]="FAIL"; FAILED+=("STAGE17-COLD-SAVE")
+      echo "  ❌ cold-save провален"; fi
+    echo "─── QA: STAGE17-COLD-LOAD (НОВЫЙ процесс) ─────"
+    : > "$LOG"
+    env GODOT_NEWGAME=1 GODOT_STAGE17_DEBUG=1 GODOT_STAGE17_COLD=load "$GODOT" --headless --path . scenes/MainMenu.tscn > "$LOG" 2>&1 &
+    PID=$!; SIM_PID="$PID"
+    ( i=0; while kill -0 "$PID" 2>/dev/null; do
+        if grep -q "VERDICT" "$LOG" 2>/dev/null; then sleep 3; kill -9 "$PID" 2>/dev/null; break; fi
+        i=$((i+1)); if [ "$i" -ge "$CEILING" ]; then kill -9 "$PID" 2>/dev/null; break; fi
+        sleep 1
+      done ) &
+    WATCHDOG=$!; wait "$PID" 2>/dev/null || true; SIM_PID=""
+    kill "$WATCHDOG" 2>/dev/null; wait "$WATCHDOG" 2>/dev/null || true
+    COLD_LOAD=$(grep -E "COLD-LOAD" "$LOG" | tail -1)
+    echo "$COLD_LOAD"
+    if echo "$COLD_LOAD" | grep -q " PASS "; then :; else
+      RESULTS[$name]="FAIL"; FAILED+=("STAGE17-COLD-LOAD")
+      echo "  ❌ cold-load провален (холодная загрузка выносливости)"; fi
   fi
 done
 
