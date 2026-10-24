@@ -32,6 +32,9 @@ public sealed class PlayerModule : IModule
     // (DamageAppliedEvent/TechniqueUsedEvent/MeditationStateChangedEvent →
     // AddVirtualDelta; медитационный прирост — per-tick ниже в Tick).
     [Inject] private readonly StatProgressProducer? _statProgress = null;
+    // ST17-001 (Этап-17 аудита): полная подсистема выносливости — реген
+    // ведётся из Tick (DeltaTime × 60 000 = игровая минута в ms).
+    [Inject] private readonly IStaminaService _staminaService = null!;
 
     private int _tickCount;
     private Position2D? _mouseDestination;  // null = keyboard movement, non-null = mouse-click movement
@@ -100,6 +103,13 @@ public sealed class PlayerModule : IModule
         // per-tick, только при активной медитации (зеркало состояния —
         // StatProgressProducer по MeditationStateChangedEvent).
         _statProgress?.TickMeditation();
+
+        // ST17-002 (Этап-17): регенерация выносливости — 1 тик = 1 игровая
+        // минута (канон TIME_SYSTEM §5: DeltaTime 1.0/тик), режим скорости
+        // (сон/бодрствование) выбирает сам сервис по IPlayerService.IsSleeping.
+        // Расход действий — будущие потребители (HOTKEYS: «стамина бега» —
+        // запланировано); здесь только честный реген пер-тик.
+        _staminaService?.Regenerate((int)(_timeService.DeltaTime * 60_000f));
 
         // Movement is now handled by GameWorldController.HandleFreeMovement()
         // (pixel-based, continuous). PlayerModule.Tick() no longer moves the player.
@@ -251,6 +261,14 @@ public static class PlayerModuleServices
         builder.Register<PlayerInputService>(Lifetime.Singleton);
         builder.Register<StatService>(Lifetime.Singleton);
         builder.Register<IPlayerService, PlayerService>(Lifetime.Singleton);
+        // ST17-001 (Этап-17 аудита): реализация IStaminaService — полная
+        // подсистема выносливости. Регистрируется ПОСЛЕ PlayerService:
+        // RestoreOrder-хвост агрегатора идёт по порядку регистраций —
+        // player восстанавливается раньше stamina. ISaveable/IWorldResettable
+        // подхватываются ResolveAll по фактическому типу инстанса
+        // (блок "stamina" + сброс при New Game/LoadGame — без отдельных строк).
+        builder.Register<StaminaService>(Lifetime.Singleton);
+        builder.Register<IStaminaService, StaminaService>(Lifetime.Singleton);
         builder.Register<IPlayerInputService, PlayerInputService>(Lifetime.Singleton);
         // NPC_COMBAT_PREP Phase 6: player combat bridge (attack intent with
         // resolved NPC target). Ticked from the Adapter scene controller.

@@ -159,6 +159,10 @@ public sealed class SaveDataAggregator
     private static readonly string[] OptionalBlocksV1 =
     {
         "formation", "item_db", "corpses", "storage_rings", "charger", "npc_groups",
+        //   stamina       — StaminaService (Этап-17, 24.10): в легаси-сейвах
+        //                  выносливости не было — после сброса домен остаётся
+        //                  в дефолте новой сессии (полный ресурс 1000‰)
+        "stamina",
     };
 
     /// <summary>

@@ -32,6 +32,11 @@ public sealed class CoreValidationPhase : AbstractSceneAssemblyPhase
         _ = _resolver.Resolve<ITileService>();
         _ = _resolver.Resolve<ISaveService>();
         _ = _resolver.Resolve<IGameSession>();
+        // ST17-001 (Этап-17 аудита): выносливость — активный игровой контракт
+        // (реализация Modules/Player/StaminaService). Резолв здесь — fail-closed
+        // гарантия DI-проводки на КАЖДОЙ сборке (NewGame и LoadGame: пропуска
+        // фазы нет — SkipOnLoad=false).
+        _ = _resolver.Resolve<IStaminaService>();
 
         Console.WriteLine($"[Phase {PhaseOrder}] {PhaseName} complete — Core validated");
         return Task.CompletedTask;

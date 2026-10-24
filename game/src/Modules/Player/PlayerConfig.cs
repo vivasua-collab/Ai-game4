@@ -36,6 +36,20 @@ namespace CultivationGame.Modules.Player
         /// <summary>Скорость восстановления выносливости во сне (% в час)</summary>
         public float SleepStaminaRecoveryPercentPerHour = 100f;
 
+        /// <summary>
+        /// ST17-001/002 (Этап-17 аудита): максимальная выносливость игрока
+        /// (абсолютные целые единицы). Источник истины для StaminaService.MaxStamina;
+        /// невалидные значения (< 1) — fallback 100, сверх 2 000 000 — кламп.
+        /// </summary>
+        public int StaminaMax = 100;
+
+        /// <summary>
+        /// ST17-002: пассивная регенерация бодрствования — ‰ от максимума за
+        /// игровую минуту (25‰/мин = полное восстановление с нуля за 40 минут).
+        /// Сонная скорость — отдельно (SleepStaminaRecoveryPercentPerHour).
+        /// </summary>
+        public float StaminaAwakeRegenPromillePerMinute = 25f;
+
         /// <summary>Расстояние публикации позиции (минимальное смещение для события)</summary>
         /// <remarks>FIX-MOVEMENT: Снижено с 0.5 до 0.01 для плавного визуального движения.</remarks>
         public float PositionUpdateThreshold = 0.01f;

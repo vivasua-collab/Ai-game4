@@ -33,10 +33,12 @@ namespace CultivationGame.Core.Interfaces
         bool Spend(int amountPromille);
 
         /// <summary>
-        /// Регенерация стамины за тик.
+        /// Регенерация стамины за шаг игрового времени.
         /// Публикует StaminaChangedEvent при изменении.
         /// </summary>
-        /// <param name="deltaTimeSec">Время в миллисекундах (×1000, int)</param>
+        /// <param name="deltaTimeMs">Игровое время в миллисекундах:
+        /// 1 игровая минута = 60 000, 1 игровой час = 3 600 000
+        /// (канон TIME_SYSTEM §5: 1 тик = 1 игровая минута).</param>
         void Regenerate(int deltaTimeMs);
 
         /// <summary>

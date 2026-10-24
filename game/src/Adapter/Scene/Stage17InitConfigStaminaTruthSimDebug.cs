@@ -125,8 +125,10 @@ namespace CultivationGame.Adapter.Scene
                 .Subscribe((in StaminaChangedEvent e) => _staminaEventCount++);
             GD.Print($"[Stage17Sim] stamina-subscribers at start: {bus.SubscriberCount<StaminaChangedEvent>()}");
 
-            await RunScenario("A", ScenarioA);
+            // Порядок сценариев: B ДО A — A2 обнуляет ресурс для проверки
+            // живого тик-лупа, а B фиксирует нетронутый инвариант новой игры.
             await RunScenario("B", ScenarioB);
+            await RunScenario("A", ScenarioA);
             await RunScenario("C", ScenarioC);
             await RunScenario("D", ScenarioD);
             await RunScenario("E", ScenarioE);
