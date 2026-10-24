@@ -327,3 +327,61 @@ persist/oneshot Shield-жизненный цикл; ZIndex/порядок сиб
 NEXT: следующий пакет аудита (ожидание Этап-17) ЛИБО эпизод
 восстановления Godot GUI-режима среды (скриншоты PT-V-тем: I3 FlipH,
 формация+игрок, VFX) — блокировка задокументирована в отчёте §6.
+
+## Ч.9: Этап-17 — инициализация/конфигурация/настройки/полная выносливость (24.10, сессия coder-1024)
+
+- Канон: [STAGE 17 AUDIT] от ревьювера (верификация этапов 15–16: 27/27 и
+  29/29 подтверждены, наблюдаемый HEAD c05bbb9 — совпал со стартом).
+- 223d998: Stage17InitConfigStaminaTruthSimDebug + QA-хуки GameSettings
+  (extract ApplyParsedFlags, поведение не тронуто) + qa_regression STAGE17
+  (+cold-пара по образцу STAGE15) + TESTING_RULES §0.1. ПРЕФИКС: 8 PASS /
+  13 FAIL / 1 NT — VERDICT FAIL (честный: стамина отсутствует 8×, H1/H6/H7
+  GameSettings, J1/J2 остатки; H2–H5 и I1–I3 жили и на префиксе).
+- c0ff043: ST17-001..003 — Modules/Player/StaminaService (milli-модель,
+  аккумулятор «scale-остаток» с НОД+чанкованием: 60×1000мс == 1×60000мс
+  тождественно; баг ревизии-1 найден симом: первая настройка бодрствования
+  пропускалась — флаг _regenConfigured), DI после PlayerService,
+  CoreValidationPhase-резолв, PlayerModule.Tick → Regenerate(DeltaTime×60000),
+  SleepStaminaRecoveryPercentPerHour ожил + новое StaminaAwakeRegenPromillePerMinute,
+  ISaveable "stamina" (OptionalBlocksV1 + "stamina"), IWorldResettable,
+  death/respawn без авто-восстановления (задокументировано).
+- 4ba6d5d: ST17-004 — Json.ParseString (компакт/отступы/порядок/неизвестные
+  поля; ключи регистронезависимо), _loaded только после успешного Load
+  (ретраебельно), EnsureLoaded в Set* (Set-до-загрузки не затирает),
+  EnsureLoaded в GameWorld._Ready до HUD (FPS-виджет).
+- e00094f: ST17-005/006 — WorldConfig DI-синглтон (единый инстанс
+  WorldModule+WorldInitPhase; DefaultSpeed больше не затирается хардкодом),
+  30 мёртвых полей 14 конфигов задокументированы (rg-скан 94 полей;
+  StartLocationId/StartSectorId — LEGACY-пометки), InputMap флаг после
+  регистраций (P1-10-контракт).
+- c06d152: ST17-010 (отдельный блок+тесты): ST11-006res Enum.IsDefined для
+  SizeClass (999 → диагностика+текущий), ST12-003res остаток тика
+  (TickTimer = interval − elapsed%interval; префикс-пруф дрейфа 2 vs 3
+  тика; потолок MaxCatchUpTicks не тронут).
+- ПОСТФИКС: 32 PASS / 0 FAIL / 1 NOT TESTED — VERDICT PASS
+  (ST17-009/K: сообщения выхода — движковый шум, присутствует во всех
+  логах с 22.09 ДО этапа-16 — DISPROVED как дефект приложения).
+  Cold-пара SAVE/LOAD PASS (37/370‰ из файла в новом процессе).
+- Регрессия: 35/36 PASS (36 симов; STAGE15/16 зелёные, регрессий нет);
+  STAGE8 — известная флака: полный прогон 29/0/1NT → вердикт-формула
+  0-NT даёт FAIL; изолированный повтор PASS (артефакт
+  10_24_stage17_regression_stage8_rerun.log; в прерванном платформой
+  первом прогоне успел флакнуть и COMBAT_SIM bug012 — зафиксировано).
+- Урок окружения: ручные `cmd1 && cmd2 &`-фоновые запуски симов порождают
+  сирот-godot (kill убивает subshell, не движок) — сироты тикают и пишут
+  автосейвы в общий user://, заражая регрессию. Лечится pkill + setsid
+  для длинных прогонов. Сироты убиты, регрессия перезапущена чисто.
+- Сборка: 0 errors / 719 warnings (фонд до/после этапа одинаков; 711 у
+  этапа-16 — смена SDK 8.0.426+9.0.319 → 9.0.319-only).
+- GAP/follow-up (отчёт §7): расход действий (бег — HOTKEYS «Запланировано»),
+  бафф-модификаторы StaminaCost/StaminaRegen, HUD-полоса стамины (PT-W01
+  planned), InputMap mid-failure NOT TESTED (API не бросает), 30 мёртвых
+  полей — удаление за владельцем.
+- Портал: bugs.json 76→81 (STAGE17-001 P1..010, волна 7), status.json
+  v2.0 (Этап-17 закрыт, STAGE8-флака честно отражена), playtest.json
+  +категория stamina_hud (PT-W01 planned).
+
+NEXT: ожидание Этапа-18 (аудит ревьювера) ЛИБО эпизод восстановления
+Godot GUI-режима среды (скриншоты PT-V-тем и будущей stamina-HUD:
+блокировка задокументирована в отчёте этапа-16 §6) ЛИБО follow-up
+этапа-17 по решению владельца (расход бега, HUD-полоса, бафф-модификаторы).

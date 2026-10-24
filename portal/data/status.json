@@ -1,16 +1,16 @@
 {
-  "version": 1.9,
-  "updated": "2026-10-24T08:00:00Z",
-  "headline": "Этап-16 (рендеринг/анимация/синхронизация визуального состояния) закрыт: Stage16-сим 29 PASS / 0 FAIL / 14 GAP / 1 NOT TESTED / 1 DISPROVED — VERDICT: PASS (префикс 16/13 — все 13 воспроизведений перевернуты фиксами 65ee7b8: one-shot×респавн, канон attack, доменный Target (walk-мерцание), ZIndex формации, Ци-щит (EntityId+стаки+щадящая деактивация), чистка кэшей) · Ранее: Этап-13 23/0/2, Этап-14 6/0, Этап-15 27/27, плейтест-раунд-1 PT-001..005 verified · Реестр аудита 76 · Плейтест +render_animation (PT-V01..V08, planned)",
+  "version": 2.0,
+  "updated": "2026-10-24T12:30:00Z",
+  "headline": "Этап-17 (инициализация/конфигурация/настройки/полная выносливость) закрыт: Stage17-сим 32 PASS / 0 FAIL / 1 NOT TESTED — VERDICT: PASS (префикс 8/13 — все 13 воспроизведений перевернуты фиксами: StaminaService c0ff043 (подсистема выносливости создана: инварианты 1000‰, точный целочисленный реген-аккумулятор, сон по конфигу, Save/Load+cold-пара), GameSettings JSON 4ba6d5d (compact-JSON/Set-затирание/ретраи), конфиг+InputMap e00094f, остатки ST11-006res/ST12-003res c06d152). Регрессия 35/36 (STAGE8 — известная флака, изолированный повтор PASS). HUD-полоса стамины и расход действий (бег) — задокументированные follow-up.",
   "playtest": {
     "note": "Раунд-1 закрыт (PT-001..005 verified). Раунд-2 владельца: PT-C01..C03 повторно, PT-T01..T07, body/progression (PT-B/PR), НОВЫЕ render_animation PT-V01..V08 (Этап-16: визуальное подтверждение фиксов рендера — формация под персонажем, Ци-щит lifecycle, walk-сигнал зверей, one-shot после респавна). Симуляторные статусы НЕ закрывают физплейтест: 2 passed / 3 failed / 52 planned.",
     "window": "раунд 2 — свободное время владельца; порядок: PT-V06 (формация+персонаж) → PT-V07 (Ци-щит) → PT-V02 (one-shot×респавн) → PT-C01..C03 → PT-T01..T07 → body/progression"
   },
   "build": {
-    "head": "stage16-fixes 65ee7b8 (+docs/portal коммит этой правки)",
+    "head": "stage17-fixes c06d152 (+docs/portal коммит этой правки)",
     "last_verified": "2026-10-24",
-    "result": "dotnet build 0 errors; Stage16-сим 29 PASS/0 FAIL/14 GAP/1 NT/1 DISPROVED — VERDICT PASS (префикс 3b73482: 16/13). Восстановление среды после сброса: .NET 8.0.426+9.0.319 переустановлены, код не потерян. Скриншоты Xvfb/opengl3 ЗАБЛОКИРОВАНЫ средой (Godot GUI-boot: движок/GL/.NET живут, C#-сцены не инстанцируются, экран чёрный — полный протокол в отчёте §6); headless полностью функционален.",
-    "qa": "Этап-16: checkpoints/10_23_stage16_render_animation_report.md + prefix/report-логи. Регрессия qa_regression.sh (34 сима, вкл. STAGE16) — итог в отчёте §7. GAP за владельцем: G3–G5-листы (cast/guard/dash/sleep/breakthrough/npc_hit/animal_run…), Y-sort (E3), I3 FlipH-скриншоты (заблокированы средой)."
+    "result": "dotnet build 0 errors / 719 warnings (фонд этапом не тронут); Stage17-сим 32 PASS / 0 FAIL / 1 NOT TESTED — VERDICT PASS (префикс 223d998: 8/13); cold-пара SAVE/LOAD PASS; полная регрессия 35/36 PASS — STAGE8 флака (29/0/1NT в полном прогоне, вердикт-формула требует 0 NT), изолированный повтор PASS (лог stage8_rerun)",
+    "qa": "Этап-17: checkpoints/10_24_stage17_init_config_stamina_report.md + prefix/report-логи + 10_24_stage17_regression_full.log + 10_24_stage17_regression_stage8_rerun.log. STAGE15/16 в регрессии зелёные — регрессий нет. Плейтесты: раунд-2 владельца, PT-V06→PT-V07; +PT-W01 (stamina HUD, planned)."
   },
   "focus": [
     "Владельцу — раунд-2 физплейтест: PT-V06 (персонаж поверх формации) и PT-V07 (Ци-щит: появление, без стаков, деактивация щадит one-shot) — ключевые визуальные подтверждения Этапа-16",
