@@ -64,6 +64,10 @@ game/saves/*
 !checkpoints/10_20_*.log
 !checkpoints/10_22_*.log
 !checkpoints/10_23_*.log
+# ST18-011 (аудит Этапа-17): дата 10_24 не была в whitelist — первичные
+# логи этапа-17 (prefix/report/regression) молча исключались из git,
+# отчёт ссылался на артефакты, отсутствующие в публичном дереве.
+!checkpoints/10_24_*.log
 *.tmp
 *.bak
 *.swp

@@ -1,0 +1,413 @@
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+
+[InputMap] Registered all input actions.
+[WorldService] Active location: Test Polygon (id=test_polygon)
+[WorldModule] Started — time 1864-01-01 06:00, speed Normal
+[TileService] Generated 50x50 grid, seed=12345, baseTerrain=Grass (noise-based)
+  Water_Shallow: 651 tiles (26%)
+  Sand: 539 tiles (21%)
+  Grass: 1299 tiles (51%)
+  Water_Deep: 11 tiles (0%)
+  Biomes:
+    Sea: 654 tiles (26%)
+    Coast: 536 tiles (21%)
+    Grassland: 1300 tiles (52%)
+    Ocean: 10 tiles (0%)
+[TileModule] Started — generated 50x50 grid in 21 ms
+[AnimalSpawn] Spawned wolf #animal_wolf_1 at (9, 7) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_2 at (44, 34) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_3 at (44, 20) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_4 at (48, 22) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_5 at (20, 39) (body: Quadruped/Medium)
+[AnimalSpawn] test_polygon: spawned 5/5 animals (attempts=5)
+[PlayerService] Player spawned @ (25, 25), hp delegated to BodyService
+[StatProgressProducer] Запущен: продюсеры дельт §5.1/§5.2 (удар/уклонение/блок/урон/техника/медитация)
+[PlayerModule] Started — stat svc wired=True
+[QuestModule] Started
+[TradeModule] Started
+[UIModule] Started — HUD shown
+[SaveModule] Started — 23 ISaveable service(s) registered
+[ItemDatabase] Initialized (no Resources catalogue — populate via Register())
+[GeneratorModule] База данных предметов инициализирована
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[GeneratorModule] Модуль запущен. Зарегистрировано предметов: 4
+[GameEntryPoint] Location catalog registered: 3 locations [test_polygon, large_world, world_map]
+[GameEntryPoint] Started. 19 startables, 18 tickables, session=GameSession
+[GameBoot] Game initialized. Container built and entry point started.
+[MainMenu] GODOT_NEWGAME=1 — auto-starting QA world (test_polygon)
+[MainMenu] New Game (QA) selected — test_polygon
+[GameSession] NewGame variant=1 location=test_polygon (50×50) — assembling scene...
+[WorldModule] ResetWorld: календарные маркеры будут тихо ре-синхронизированы на первом тике (P1-15)
+[ResourceService] ResetWorld: 0 armed-записей очереди респауна очищено (ST10-01)
+[BodyService] ResetWorld: тело пересоздано (Humanoid/Medium, VIT 10) — New Game/LoadGame
+[StorageRingService] ResetWorld: хранилища колец очищены (P1-19)
+[CombatService] ResetWorld: combat state cleared (New Game)
+[TechniqueService] ResetWorld: techniques cleared (New Game)
+[TechniqueChargeService] ResetWorld: charges cleared (New Game)
+[FormationRegistry] ResetWorld: реестр формаций очищен (world-scoped, Этап-15 ST15-008)
+[CorpseService] ResetWorld: 0 трупов очищено
+[NPCSpawnerService] ResetWorld: домен NPC очищен (tracked=0, restored=0)
+[NPCGroupService] ResetWorld: 0 групп очищено
+[PlayerCombatAdapter] ResetWorld: стойка/режим оружия/кулдауны сброшены (New Game)
+[AuraHoldService] ResetWorld: hold cleared (New Game)
+[Trade] ResetWorld — сессия закрыта, сток очищен (0 лавок)
+[SaveModule] ResetWorld: отсчёт автосейва сброшен (каденция — мировой тик, P2-26)
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[Phase 0] WorldDomainReset complete — 37 world-scoped доменов сброшено (npc/corpses/groups/animals/formations/charger/player/stats/qi/quests/currency/inventory/equipment/belt/ground/world/time) + weapon-cache
+[Phase 1] CoreValidation complete — Core validated
+[TileService] Generated 50x50 grid, seed=12345, baseTerrain=Grass (noise-based)
+  Water_Shallow: 651 tiles (26%)
+  Sand: 539 tiles (21%)
+  Grass: 1299 tiles (51%)
+  Water_Deep: 11 tiles (0%)
+  Biomes:
+    Sea: 654 tiles (26%)
+    Coast: 536 tiles (21%)
+    Grassland: 1300 tiles (52%)
+    Ocean: 10 tiles (0%)
+[Phase 2] TileMapGen complete — test_polygon: 50×50 tiles, seed=12345
+[WorldService] Active location: Тестовый полигон (id=test_polygon)
+[TileModule] LocationChanged '' → 'test_polygon'
+[Phase 3] WorldInit complete — location=test_polygon, speed=Normal, techniqueRegistry cleared (was world-scoped reset)
+[PlayerService] Player spawned @ (25, 25), hp delegated to BodyService
+[Phase 4] PlayerSpawn complete — player at (25, 25) in test_polygon
+[ItemDatabase] Зарегистрирован предмет: material_wood (Material)
+[ItemDatabase] Зарегистрирован предмет: material_stone (Material)
+[ItemDatabase] Зарегистрирован предмет: material_iron_ore (Material)
+[ItemDatabase] Зарегистрирован предмет: material_fiber (Material)
+[ItemDatabase] Зарегистрирован предмет: consumable_berry (Consumable)
+[ItemDatabase] Зарегистрирован предмет: consumable_herb (Consumable)
+[ItemDatabase] Зарегистрирован предмет: con_pill_healing (Consumable)
+[ItemDatabase] Зарегистрирован предмет: con_pill_qi (Consumable)
+[ItemDatabase] Зарегистрирован предмет: ammo_arrow (Material)
+[ItemDatabase] Зарегистрирован предмет: material_steel_ingot (Material)
+[ItemDatabase] Зарегистрирован предмет: qistone_dust_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_dust_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_pebble_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_pebble_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_shard_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_shard_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_stone_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_stone_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_boulder_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_boulder_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_03e9_000001 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_dagger_L1_03e9_000001 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_03e9_000001 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_03ea_000002 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_bow_L1_03ea_000002 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_03ea_000002 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_03f2_000003 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_greatsword_L1_03f2_000003 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_03f2_000003 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_03f3_000004 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_staff_L1_03f3_000004 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_03f3_000004 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_044c_000005 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_torso_L1_044c_000005 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_044c_000005 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_044d_000006 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_feet_L1_044d_000006 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_044d_000006 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_04b2_000007 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_feet_L1_04b2_000007 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_04b2_000007 (Armor)
+[Phase 5] StartingGear complete — стартовый набор: БД +20, выдано 13 позиций, оружие 4 шт (кинжал надет: True, лук в инвентаре: True), броня 2 шт, стрел 30. Замена сейвов: каждая новая игра = одинаковый старт (сид 1000).
+[AnimalSpawn] Spawned wolf #animal_wolf_6 at (9, 7) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_7 at (44, 34) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_8 at (44, 20) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_9 at (48, 22) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_10 at (20, 39) (body: Quadruped/Medium)
+[AnimalSpawn] test_polygon: spawned 5/5 animals (attempts=5)
+[Phase 6] AnimalSpawn complete — 5 animals on 'test_polygon' (50×50)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_c990_000008 (Weapon)
+[HumanNPCSpawn] Spawned Merchant L0 #npc_0f1f38f5c21c4198 at (2, 34)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_f526_000009 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_eb25_00000a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_61d9_00000b (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_8204_00000c (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_dbde_00000d (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_82ca_00000e (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_6bcc5c30_000001 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L3_c9cf_00000f (Weapon)
+[HumanNPCSpawn] Spawned Elder L3 #npc_b1a4674d60dd4919 at (30, 35)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L1_b8f2_000010 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_8430_000011 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_8bc5_000012 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_dd77_000013 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_e60f_000014 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_a49f_000015 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_c68a_000016 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_76bcbfbd_000002 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L3_c973_000017 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L3_c975_000018 (Armor)
+[HumanNPCSpawn] Spawned Guard L3 #npc_94b54d277a63439a at (43, 48)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_5ada_000019 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_f1d2_00001a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_f6b1_00001b (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_b2bc_00001c (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_f14c_00001d (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_0eff_00001e (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_6a1a79af_000003 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_c974_00001f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_c976_000020 (Armor)
+[HumanNPCSpawn] Spawned Guard L2 #npc_00f147758bc441dd at (13, 48)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_ca2f_000021 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_ca31_000022 (Armor)
+[HumanNPCSpawn] Spawned Passerby L1 #npc_75cd7524382f4724 at (24, 47)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L1_ca30_000023 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_ca32_000024 (Armor)
+[HumanNPCSpawn] Spawned Passerby L0 #npc_1e5dfc74532c4c4f at (45, 19)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_8a0d_000025 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_1b90_000026 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_1465_000027 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_853e_000028 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_0e1c_000029 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_1e36_00002a (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_3630_00002b (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_705caea7_000004 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L3_c9b5_00002c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L3_c9b7_00002d (Armor)
+[HumanNPCSpawn] Spawned Cultivator L3 #npc_3f78834bb3bc4ce9 at (16, 40)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_d1a5_00002e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_a871_00002f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_4dd1_000030 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_f2ab_000031 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_4af3_000032 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_4074_000033 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_1c94060e_000005 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_c9b6_000034 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_c9b8_000035 (Armor)
+[HumanNPCSpawn] Spawned Cultivator L2 #npc_42eece727d814a4c at (30, 34)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L2_ca14_000036 (Weapon)
+[HumanNPCSpawn] Spawned Enemy L1 #npc_db46a0a0117348d5 at (47, 40)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_ebfe_000037 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_413c_000038 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_e7b0_000039 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_dce6_00003a (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_611d_00003b (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_79a8_00003c (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_6bbde6b6_000006 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L3_ca15_00003d (Weapon)
+[HumanNPCSpawn] Spawned Enemy L2 #npc_9e969580e8454db7 at (4, 2)
+[Phase 7] HumanNPCSpawn complete — 10/10 generated NPCs on 'test_polygon'
+[NPCGroupService] Created group group_1 (task=HuntingPack, faction=, species=wolf)
+[NPCGroupService] Set patrol route for group_1: 4 waypoints
+[NPCGroupService] Added animal_wolf_11 to group group_1 as Leader
+[NPCGroupService] Added animal_wolf_12 to group group_1 as Follower
+[NPCGroupService] Added animal_wolf_13 to group group_1 as Follower
+[GroupSpawn] Wolf pack 'group_1' — 3 wolves at (45, 15)
+[NPCGroupService] Created group group_2 (task=Patrol, faction=town_guard, species=)
+[NPCGroupService] Set patrol route for group_2: 4 waypoints
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L2_690e_00003e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_7fcc_00003f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_d863_000040 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_62f6_000041 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_7592_000042 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_d175_000043 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_08c41c0c_000007 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_3d7d_000044 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_3d7f_000045 (Armor)
+[NPCGroupService] Added npc_bcd72661b2544180 to group group_2 as Leader
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_ff7c_000046 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_1497_000047 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_08ba_000048 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_e66b_000049 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_e576_00004a (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_c31c_00004b (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_0b1a20e0_000008 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_3d7e_00004c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_3d80_00004d (Armor)
+[NPCGroupService] Added npc_7995a0463ecc4bf2 to group group_2 as Follower
+[GroupSpawn] Guard patrol 'group_2' — 2 guards at (18, 38)
+[Phase 8] GroupSpawn complete — 2 groups on 'test_polygon' (50×50)
+[Phase 9] FormationInit complete (stub)
+[Phase 10] ChargerInit complete (stub)
+[Phase 11] QuestInit complete (stub)
+[Phase 12] UIInit complete — HUD shown
+[PreGenTechnique] start — maxLevel=1 seed=7201855
+[PreGenTechnique] done — generated=100 valid=100 duplicates=0 registered=100 (registry total=108)
+[PreGenTechnique] grades registered: [Common=30, Refined=30, Perfect=30, Transcendent=10] gradeMismatches=0 registryInvalid=0
+[TechniqueGrant] seed=7201877
+[TechniqueGrant] R25 AoE-набор: 2/3 форм (конус/полукруг/круг — площадные техники)
+[Phase 14] TechniqueGrant complete — granted 8 techniques (cultivation 1, active 3/3, curse, formation, aoe 2) at L1
+[Phase 15] Finalize complete — Scene assembly complete
+[SceneOrchestrator] Assembly complete — mode=NewGame: 16 completed, 0 skipped, 103 ms
+[GameSession] NewGame ready — state=Playing
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_ocean.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_sea.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_coast.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_grassland.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_grassland.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_steppe.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_steppe.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_forest.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_forest.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_forest.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_highlands.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_highlands.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_mountains.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_mountains.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_peak.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_peak.png
+[FormationVisualRenderer] Ready
+[GroundItemRenderer] Ready
+[AnimalSpriteRenderer] Ready — tilePixels=64
+[CorpseSpriteRenderer] Ready
+[NPCSpriteRenderer] Ready
+[DamageNumberRenderer] Ready
+[ProjectileRenderer] Ready
+[StrikeFx] Ready
+[AoeFx] Ready
+[HomingFx] Ready
+[TechniqueEffectRenderer] Ready
+[CharacterDoll] Ready
+[Inventory] Ready
+[CharacterSheet] Ready
+[DialogueWindow] Ready
+[TradeWindow] Ready
+[LootWindow] Ready
+[HotbarPanel] Ready (v2: techniques + cooldowns + belt row + charge/aura R26 + медитация-слот П5)
+[TechniqueBook] Ready
+[HotkeysWindow] Ready
+[EventLogWindow] Ready
+[QuestWindow] Ready
+[CultivationWindow] Ready
+[ChargerWindow] Ready
+[CheatPanel] Ready (F2 to toggle)
+WARNING: [ContainerAdapter] Resolve<IStaminaService> threw: Exception has been thrown by the target of an invocation.
+     at: void CultivationGame.Adapter.Di.ContainerAdapter.GDLogWarn(string) (res://src/Adapter/Di/ContainerAdapter.cs:124)
+     C# backtrace (most recent call first):
+         [0] void Godot.GD.PushWarning(string) (/root/godot/modules/mono/glue/GodotSharp/GodotSharp/Core/GD.cs:396)
+         [1] void CultivationGame.Adapter.Di.ContainerAdapter.GDLogWarn(string) (/home/z/my-project/Ai-game4/game/src/Adapter/Di/ContainerAdapter.cs:124)
+         [2] object CultivationGame.Adapter.Di.ContainerAdapter.ResolveService(CultivationGame.Core.DI.IResolver, System.Type) (/home/z/my-project/Ai-game4/game/src/Adapter/Di/ContainerAdapter.cs:109)
+         [3] void CultivationGame.Adapter.Di.ContainerAdapter.InjectProperties(object, CultivationGame.Core.DI.IResolver) (/home/z/my-project/Ai-game4/game/src/Adapter/Di/ContainerAdapter.cs:58)
+         [4] void CultivationGame.Adapter.Scene.Stage17InitConfigStaminaTruthSimDebug._Ready() (/home/z/my-project/Ai-game4/game/src/Adapter/Scene/Stage17InitConfigStaminaTruthSimDebug.cs:92)
+         [5] bool Godot.Node.InvokeGodotClassMethod(Godot.NativeInterop.godot_string_name&, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&) (/root/godot/modules/mono/glue/GodotSharp/GodotSharp/Generated/GodotObjects/Node.cs:2660)
+         [6] bool CultivationGame.Adapter.Scene.Stage17InitConfigStaminaTruthSimDebug.InvokeGodotClassMethod(Godot.NativeInterop.godot_string_name&, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&) (/home/z/my-project/Ai-game4/game/.godot/mono/temp/obj/Debug/Godot.SourceGenerators/Godot.SourceGenerators.ScriptMethodsGenerator/CultivationGame.Adapter.Scene.Stage17InitConfigStaminaTruthSimDebug_ScriptMethods.generated.cs:90)
+         [7] Godot.NativeInterop.godot_bool Godot.Bridge.CSharpInstanceBridge.Call(nint, Godot.NativeInterop.godot_string_name*, Godot.NativeInterop.godot_variant**, int, Godot.NativeInterop.godot_variant_call_error*, Godot.NativeInterop.godot_variant*) (/root/godot/modules/mono/glue/GodotSharp/GodotSharp/Core/Bridge/CSharpInstanceBridge.cs:24)
+         [8] void Godot.NativeInterop.NativeFuncs.godotsharp_method_bind_ptrcall(nint, nint, System.Void**, System.Void*) (/root/godot/modules/mono/glue/GodotSharp/GodotSharp/Godot.SourceGenerators.Internal/Godot.SourceGenerators.Internal.UnmanagedCallbacksGenerator/Godot.NativeInterop.NativeFuncs.generated.cs:380)
+         [9] void Godot.NativeCalls.godot_icall_3_912(nint, nint, nint, Godot.NativeInterop.godot_bool, int) (/root/godot/modules/mono/glue/GodotSharp/GodotSharp/Generated/NativeCalls.cs:8061)
+         [10] void Godot.Node.AddChild(Godot.Node, bool, Godot.Node+InternalMode) (/root/godot/modules/mono/glue/GodotSharp/GodotSharp/Generated/GodotObjects/Node.cs:848)
+         [11] void CultivationGame.Adapter.Scene.GameWorldController._Ready() (/home/z/my-project/Ai-game4/game/src/Adapter/Scene/GameWorldController.cs:1069)
+         [12] bool Godot.Node.InvokeGodotClassMethod(Godot.NativeInterop.godot_string_name&, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&) (/root/godot/modules/mono/glue/GodotSharp/GodotSharp/Generated/GodotObjects/Node.cs:2660)
+         [13] bool Godot.CanvasItem.InvokeGodotClassMethod(Godot.NativeInterop.godot_string_name&, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&) (/root/godot/modules/mono/glue/GodotSharp/GodotSharp/Generated/GodotObjects/CanvasItem.cs:1845)
+         [14] bool Godot.Node2D.InvokeGodotClassMethod(Godot.NativeInterop.godot_string_name&, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&) (/root/godot/modules/mono/glue/GodotSharp/GodotSharp/Generated/GodotObjects/Node2D.cs:557)
+         [15] bool CultivationGame.Adapter.Scene.GameWorldController.InvokeGodotClassMethod(Godot.NativeInterop.godot_string_name&, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&) (/home/z/my-project/Ai-game4/game/.godot/mono/temp/obj/Debug/Godot.SourceGenerators/Godot.SourceGenerators.ScriptMethodsGenerator/CultivationGame.Adapter.Scene.GameWorldController_ScriptMethods.generated.cs:490)
+         [16] Godot.NativeInterop.godot_bool Godot.Bridge.CSharpInstanceBridge.Call(nint, Godot.NativeInterop.godot_string_name*, Godot.NativeInterop.godot_variant**, int, Godot.NativeInterop.godot_variant_call_error*, Godot.NativeInterop.godot_variant*) (/root/godot/modules/mono/glue/GodotSharp/GodotSharp/Core/Bridge/CSharpInstanceBridge.cs:24)
+WARNING: [ContainerAdapter] Could not resolve IStaminaService for Stage17InitConfigStaminaTruthSimDebug._stamina
+     at: void CultivationGame.Adapter.Di.ContainerAdapter.GDLogWarn(string) (res://src/Adapter/Di/ContainerAdapter.cs:124)
+     C# backtrace (most recent call first):
+         [0] void Godot.GD.PushWarning(string) (/root/godot/modules/mono/glue/GodotSharp/GodotSharp/Core/GD.cs:396)
+         [1] void CultivationGame.Adapter.Di.ContainerAdapter.GDLogWarn(string) (/home/z/my-project/Ai-game4/game/src/Adapter/Di/ContainerAdapter.cs:124)
+         [2] void CultivationGame.Adapter.Di.ContainerAdapter.InjectProperties(object, CultivationGame.Core.DI.IResolver) (/home/z/my-project/Ai-game4/game/src/Adapter/Di/ContainerAdapter.cs:65)
+         [3] void CultivationGame.Adapter.Scene.Stage17InitConfigStaminaTruthSimDebug._Ready() (/home/z/my-project/Ai-game4/game/src/Adapter/Scene/Stage17InitConfigStaminaTruthSimDebug.cs:92)
+         [4] bool Godot.Node.InvokeGodotClassMethod(Godot.NativeInterop.godot_string_name&, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&) (/root/godot/modules/mono/glue/GodotSharp/GodotSharp/Generated/GodotObjects/Node.cs:2660)
+         [5] bool CultivationGame.Adapter.Scene.Stage17InitConfigStaminaTruthSimDebug.InvokeGodotClassMethod(Godot.NativeInterop.godot_string_name&, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&) (/home/z/my-project/Ai-game4/game/.godot/mono/temp/obj/Debug/Godot.SourceGenerators/Godot.SourceGenerators.ScriptMethodsGenerator/CultivationGame.Adapter.Scene.Stage17InitConfigStaminaTruthSimDebug_ScriptMethods.generated.cs:90)
+         [6] Godot.NativeInterop.godot_bool Godot.Bridge.CSharpInstanceBridge.Call(nint, Godot.NativeInterop.godot_string_name*, Godot.NativeInterop.godot_variant**, int, Godot.NativeInterop.godot_variant_call_error*, Godot.NativeInterop.godot_variant*) (/root/godot/modules/mono/glue/GodotSharp/GodotSharp/Core/Bridge/CSharpInstanceBridge.cs:24)
+         [7] void Godot.NativeInterop.NativeFuncs.godotsharp_method_bind_ptrcall(nint, nint, System.Void**, System.Void*) (/root/godot/modules/mono/glue/GodotSharp/GodotSharp/Godot.SourceGenerators.Internal/Godot.SourceGenerators.Internal.UnmanagedCallbacksGenerator/Godot.NativeInterop.NativeFuncs.generated.cs:380)
+         [8] void Godot.NativeCalls.godot_icall_3_912(nint, nint, nint, Godot.NativeInterop.godot_bool, int) (/root/godot/modules/mono/glue/GodotSharp/GodotSharp/Generated/NativeCalls.cs:8061)
+         [9] void Godot.Node.AddChild(Godot.Node, bool, Godot.Node+InternalMode) (/root/godot/modules/mono/glue/GodotSharp/GodotSharp/Generated/GodotObjects/Node.cs:848)
+         [10] void CultivationGame.Adapter.Scene.GameWorldController._Ready() (/home/z/my-project/Ai-game4/game/src/Adapter/Scene/GameWorldController.cs:1069)
+         [11] bool Godot.Node.InvokeGodotClassMethod(Godot.NativeInterop.godot_string_name&, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&) (/root/godot/modules/mono/glue/GodotSharp/GodotSharp/Generated/GodotObjects/Node.cs:2660)
+         [12] bool Godot.CanvasItem.InvokeGodotClassMethod(Godot.NativeInterop.godot_string_name&, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&) (/root/godot/modules/mono/glue/GodotSharp/GodotSharp/Generated/GodotObjects/CanvasItem.cs:1845)
+         [13] bool Godot.Node2D.InvokeGodotClassMethod(Godot.NativeInterop.godot_string_name&, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&) (/root/godot/modules/mono/glue/GodotSharp/GodotSharp/Generated/GodotObjects/Node2D.cs:557)
+         [14] bool CultivationGame.Adapter.Scene.GameWorldController.InvokeGodotClassMethod(Godot.NativeInterop.godot_string_name&, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&) (/home/z/my-project/Ai-game4/game/.godot/mono/temp/obj/Debug/Godot.SourceGenerators/Godot.SourceGenerators.ScriptMethodsGenerator/CultivationGame.Adapter.Scene.GameWorldController_ScriptMethods.generated.cs:490)
+         [15] Godot.NativeInterop.godot_bool Godot.Bridge.CSharpInstanceBridge.Call(nint, Godot.NativeInterop.godot_string_name*, Godot.NativeInterop.godot_variant**, int, Godot.NativeInterop.godot_variant_call_error*, Godot.NativeInterop.godot_variant*) (/root/godot/modules/mono/glue/GodotSharp/GodotSharp/Core/Bridge/CSharpInstanceBridge.cs:24)
+[Stage17Sim] Ready — Этап-17 (инициализация/конфигурация/настройки/стамина) starts in 3s
+[GameWorldController] Ready
+[BiomeTiles] Drew 100 textures, 0 missing (culled to 10×10)
+[SurfaceTransitions] Drew 29 transition sprites (culled to 11×11)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[AnimalService] Tick #1 — 8 animals; sample: wolf#animal_wolf_6 @ (9, 7)
+[AnimalService] Tick #2 — 8 animals; sample: wolf#animal_wolf_6 @ (9, 7)
+[Stage17Sim] stamina-subscribers at start: 1
+── A. ST17-001: реализация/регистрация/путь вызовов выносливости ──
+[A1] TryResolve<IStaminaService> → NULL
+── B. ST17-002: новая игра начинается с полной выносливости ──
+── C. ST17-002: Spend — расход, граница, недостаток, аргументы ──
+── D. ST17-002: регенерация — разбивки delta, кламп, дегенераты ──
+── E. ST17-003: сон/отдых и конфигурация скорости восстановления ──
+── F. ST17-003: Save/Load — частичная выносливость переживает ──
+── G. ST17-003: New Game/ResetWorld/death-respawn/легаси-сейв ──
+── H. ST17-004: GameSettings — парсинг/round-trip/порядок загрузки ──
+[AnimalService] Tick #3 — 8 animals; sample: wolf#animal_wolf_6 @ (9, 7)
+[H1] compact JSON: cheats=False, vitals=True, pause=False, fps=False
+[H2] pretty/order/unknown: все 4 флага=True
+[H3] corrupted → дефолты без крэша=True
+[H4] mixed-case: cheats=True, vitals=True
+[H5] round-trip 4 флага через user://settings.json: True
+[H6] Set до загрузки: файл после = cheats=True, vitals=True (ожидание true/false)
+[H7] corrupt→EnsureLoaded (дефолты=True); валидный→EnsureLoaded: cheats=False
+[H] настройки восстановлены: файл=возвращён, loaded=True
+── I. ST17-006: старт, повторный старт, дубли подписок, InputMap ──
+[GameEntryPoint] Start() ignored — already initialised
+[I1] double Start: подписки stamina 1→1, qi 12→12, исключений=True
+[I3] InputMap: действия 134 → 134 (идемпотентно)
+── J. ST17-010: ST11-006res (Body size-enum) и ST12-003res (Buff остаток) ──
+[J1] RestoreState(size=9999): было Medium, стало 9999 — валидация=False
+[GameWorld] Toast: 💥 −5 HP — ?
+[BodyModule] DoT тик: st17_qa_dot → player_0, урон=5 (Qi)
+[BodyModule] DoT тик: st17_qa_dot → player_0, урон=5 (Qi)
+[BodyModule] DoT тик: st17_qa_dot → player_0, урон=5 (Qi)
+[BodyModule] DoT тик: st17_qa_dot → player_0, урон=5 (Qi)
+[BodyModule] DoT тик: st17_qa_dot → player_0, урон=5 (Qi)
+[J2] интервал 1.0с: 5×0.6с → 2 тиков; 3×1.0с → 3 тиков (ожидание 3==3)
+[BodyModule] DoT тик: st17_qa_dot → player_0, урон=5 (Qi)
+[BodyModule] DoT тик: st17_qa_dot → player_0, урон=5 (Qi)
+[BodyModule] DoT тик: st17_qa_dot → player_0, урон=5 (Qi)
+[BodyModule] DoT тик: st17_qa_dot → player_0, урон=5 (Qi)
+[BodyModule] DoT тик: st17_qa_dot → player_0, урон=5 (Qi)
+[J3] ProcessTick(100с): 5 тиков (потолок 5)
+
+════════ Stage17InitConfigStaminaTruthSim: ИТОГ ════════
+[Stage17Sim] ST17-001/A1            FAIL       интерфейс IStaminaService существует (Core/Interfaces, 2026-05-28), но реализации/DI-регистрации нет — мёртвый контракт
+[Stage17Sim] ST17-001/A2            FAIL       ST17-001: реализация/регистрация IStaminaService отсутствует (TryResolve=false) — подсистема выносливости не существует
+[Stage17Sim] ST17-002/B             FAIL       ST17-001: реализация/регистрация IStaminaService отсутствует (TryResolve=false) — подсистема выносливости не существует
+[Stage17Sim] ST17-002/C             FAIL       ST17-001: реализация/регистрация IStaminaService отсутствует (TryResolve=false) — подсистема выносливости не существует
+[Stage17Sim] ST17-002/D             FAIL       ST17-001: реализация/регистрация IStaminaService отсутствует (TryResolve=false) — подсистема выносливости не существует
+[Stage17Sim] ST17-003/E             FAIL       ST17-001: реализация/регистрация IStaminaService отсутствует (TryResolve=false) — подсистема выносливости не существует
+[Stage17Sim] ST17-003/F             FAIL       ST17-001: реализация/регистрация IStaminaService отсутствует (TryResolve=false) — подсистема выносливости не существует
+[Stage17Sim] ST17-003/G             FAIL       ST17-001: реализация/регистрация IStaminaService отсутствует (TryResolve=false) — подсистема выносливости не существует
+[Stage17Sim] ST17-004/H1            FAIL       компактный JSON без пробела после двоеточия НЕ парсится (буквальный Contains-шаблон)
+[Stage17Sim] ST17-004/H2            PASS       переносы/отступы/порядок/неизвестные поля не мешают разбору
+[Stage17Sim] ST17-004/H3            PASS       повреждённый файл → диагностика и канонические дефолты, игра не падает
+[Stage17Sim] ST17-004/H4            PASS       регистронезависимый разбор ключей (легаси-толерантность сохранена)
+[Stage17Sim] ST17-004/H5            PASS       все четыре настройки сохраняются и восстанавливаются после повторной загрузки (round-trip)
+[Stage17Sim] ST17-004/H6            FAIL       Set до первой загрузки перезаписал файл дефолтами — пользовательские значения потеряны
+[Stage17Sim] ST17-004/H7            FAIL       флаг _loaded блокирует повторную попытку — валидный файл после повреждённого игнорируется
+[Stage17Sim] ST17-006/I1            PASS       повторный Start() идемпотентен: подписки не дублируются, исключений нет
+[Stage17Sim] ST17-006/I2            PASS       код-реф: GameEntryPoint.Tick гейтен !_initialized (P2-13) — игровые тики до успешного старта невозможны; проваленный бут глушит тик-луп (GameBoot._bootFailed)
+[Stage17Sim] ST17-006/I3            PASS       InputMapInitializer идемпотентен: повторные вызовы не дублируют действия
+[Stage17Sim] ST17-010/J1            FAIL       ST11-006res OPEN: RestoreState слепо кастует size без проверки диапазона enum
+[Stage17Sim] ST17-010/J2            FAIL       ST12-003res OPEN: 5×0.6с даёт 2 тиков вместо 3 — остаток выбрасывается (дрейф сетки)
+[Stage17Sim] ST17-010/J3            PASS       анти-всплеск MaxCatchUpTicks=5 сохранён (документированный контракт Этапа-12)
+[Stage17Sim] ST17-009/K             NOT TESTED поток/RID/строки-выхода — движковый шум Godot 4.7.2 при exit (string_name.cpp/thread.cpp/paged_allocator/RID NavMeshParser): присутствует во ВСЕХ headless-логах с 09.22 (r34/r35/r36/r37c, stage13/15/16) ДО и ПОСЛЕ этапа-16 — не дефект приложения/этапа-16; runtime-проверка в процессе сима неприменима (сообщения появляются при завершении процесса)
+[Stage17Sim] PASS=8 FAIL=13 GAP=0 NOT TESTED=1
+[Stage17Sim] VERDICT: FAIL
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
+[BiomeTiles] Drew 144 textures, 0 missing (culled to 12×12)
+[SurfaceTransitions] Drew 40 transition sprites (culled to 14×14)
+[ObjectLayer] Drew 3 object sprites (culled to 12×12)
