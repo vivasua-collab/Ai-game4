@@ -8,7 +8,9 @@
 //   1 Expanding   — AoE: растущая окружность с затуханием
 //   2 Self        — аура вокруг игрока (Support/Sensory/Movement)
 //   3 Heal        — зелёное расширяющееся кольцо
-//   4 Shield      — щит вокруг игрока (Defense, живёт пока активен Ци-буфер)
+//   4 Shield      — one-shot щит успешного каста Defense (2.5с) ИЛИ
+//                  persistent-щит активного Qi-буфера (ST16-006: это РАЗНЫЕ
+//                  жизненные циклы в одном виде отрисовки — см. OnQiBufferChanged)
 // Плюс: медитация — мягкое пульсирующее кольцо (MeditationStateChangedEvent).
 //
 // Цвета по стихиям — ELEMENTS_SYSTEM.md §2. Пул визуалов — переиспользование.
@@ -52,6 +54,12 @@ public partial class TechniqueEffectRenderer : Node2D
         public float Elapsed;
         public float Duration;
         public bool Used;
+        // ST16-006 (Этап-16 аудита): persistent-визуал Qi-буфера (true) vs
+        // one-shot визуал успешного каста (false). Оба — VisualKind.Shield
+        // (одинаковая отрисовка), но жизненный цикл разный: persistent живёт
+        // до деактивации буфера и ЗАМЕНЯЕТСЯ идемпотентно; one-shot доигрывает
+        // свои 2.5с независимо от буфера.
+        public bool IsPersistent;
     }
 
     private readonly List<ActiveVisual> _active = new(16);
@@ -79,8 +87,8 @@ public partial class TechniqueEffectRenderer : Node2D
     internal int QaActiveVisualCount => _active.Count;
 
     /// <summary>
-    /// ST16-006 QA: активных визуалов щита (VisualKind.Shield — до фикса и
-    /// one-shot каста, и persistent Qi-буфера; после фикса — только one-shot).
+    /// ST16-006 QA: активных визуалов щита (VisualKind.Shield — и one-shot
+    /// каста, и persistent Qi-буфера; различаются ActiveVisual.IsPersistent).
     /// </summary>
     internal int QaShieldVisualCount
     {
@@ -185,6 +193,7 @@ public partial class TechniqueEffectRenderer : Node2D
             _ => 0.5f
         };
         v.Used = true;
+        v.IsPersistent = false; // ST16-006: каст — one-shot (пул переиспользуется)
         _active.Add(v);
         QueueRedraw();
     }
@@ -200,28 +209,50 @@ public partial class TechniqueEffectRenderer : Node2D
         if (e.EntityId != "player") return;
         if (e.IsActive)
         {
+            // ST16-006b (Этап-16 аудита): идемпотентная замена. AbsorbDamage
+            // репаблишит IsActive=true на КАЖДЫЙ поглощённый удар — прежний
+            // код добавлял новый Shield на каждое событие → стакающиеся
+            // дуги вокруг игрока. Теперь повторная активация ЗАМЕНЯЕТ прежний
+            // persistent-визуал, one-shot каста не трогает.
+            RemovePersistentShields();
+
             var v = _pool.Count > 0 ? _pool.Pop() : new ActiveVisual();
             v.Kind = VisualKind.Shield;
             v.Origin = Vector2.Zero;
             v.Target = Vector2.Zero;
             v.Color = new Color(0.4f, 0.7f, 1.0f, 0.8f);
             v.Elapsed = 0f;
-            v.Duration = float.MaxValue; // пока буфер активен (заменяется деактивацией)
+            v.Duration = float.MaxValue; // пока буфер активен (снимается деактивацией)
             v.Used = true;
+            v.IsPersistent = true; // ST16-006: это Qi-буфер, НЕ one-shot каста
             _active.Add(v);
         }
         else
         {
-            // Снять все щиты.
-            for (int i = _active.Count - 1; i >= 0; i--)
-                if (_active[i].Kind == VisualKind.Shield)
-                {
-                    var v = _active[i];
-                    _active.RemoveAt(i);
-                    _pool.Push(v);
-                }
+            // ST16-006c (Этап-16 аудита): щадящая деактивация — гасим ТОЛЬКО
+            // persistent-щит Qi-буфера. Прежний код сносил ВСЕ Shield, убивая
+            // и невиновный one-shot 2.5с успешного каста Defense (аудит:
+            // «деактивация не удаляет несвязанный одноразовый эффект»).
+            RemovePersistentShields();
         }
         QueueRedraw();
+    }
+
+    /// <summary>
+    /// ST16-006b/c: убрать только persistent-щиты Qi-буфера из активного
+    /// списка (в пул). One-shot Shield каста живёт свои 2.5с без внимания.
+    /// </summary>
+    private void RemovePersistentShields()
+    {
+        for (int i = _active.Count - 1; i >= 0; i--)
+        {
+            var v = _active[i];
+            if (v.Kind == VisualKind.Shield && v.IsPersistent)
+            {
+                _active.RemoveAt(i);
+                _pool.Push(v);
+            }
+        }
     }
 
     // === R29: аура удержания ===

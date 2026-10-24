@@ -42,7 +42,15 @@ public class QiBufferService : IQiBufferService, IDisposable
     private QiBufferMode _mode;
     private long _qiInvested;
     private long _qiConsumedDuringActivation; // QI-A05: трекинг потраченного Ци для корректного возврата
-    private string _entityId;
+
+    // ST16-006 (Этап-16 аудита, 23.10): EntityId читается ЖИВЬЁМ из QiService,
+    // не снапшотом конструктора. Снапшот брался при DI-конструкции синглтона
+    // — ДО QiModule.Start → QiService.Initialize("player") — и навсегда
+    // оставался пустым: ВСЕ события буфера несли EntityId="", фильтры
+    // потребителей (визуал щита TechniqueEffectRenderer, UI) их отбрасывали
+    // — persistent-щит не появлялся в игре вовсе (префикс-сим: событие
+    // «on:» с пустым id, QaShieldVisualCount=0 после активации).
+    private string EntityId => _qiService.EntityId;
 
     // === IQiBufferService Properties ===
 
@@ -64,7 +72,7 @@ public class QiBufferService : IQiBufferService, IDisposable
         _activatedPub = activatedPub;
         _deactivatedPub = deactivatedPub;
         _bufferStateChangedPub = bufferStateChangedPub;
-        _entityId = qiService.EntityId;
+        // ST16-006: НЕ снапшотим EntityId — см. свойство EntityId выше.
 
         // EVT-01: подписка на command-события (вместо прямых вызовов от CombatModule)
         _bufferActivateSubscription = bufferActivateReqSub.Subscribe(OnBufferActivateRequest);
@@ -111,15 +119,15 @@ public class QiBufferService : IQiBufferService, IDisposable
             _isActive = false;
             _mode = QiBufferMode.None;
             _qiInvested = 0;
-            _bufferStateChangedPub.Publish(new QiBufferStateChangedEvent(false, QiBufferMode.None, 0, _entityId));
+            _bufferStateChangedPub.Publish(new QiBufferStateChangedEvent(false, QiBufferMode.None, 0, EntityId));
             return;
         }
 
         _mode = mode;
         _isActive = true;
 
-        _activatedPub.Publish(new QiBufferActivatedEvent(_entityId, _mode, _qiInvested));
-        _bufferStateChangedPub.Publish(new QiBufferStateChangedEvent(true, _mode, _qiInvested, _entityId));
+        _activatedPub.Publish(new QiBufferActivatedEvent(EntityId, _mode, _qiInvested));
+        _bufferStateChangedPub.Publish(new QiBufferStateChangedEvent(true, _mode, _qiInvested, EntityId));
     }
 
     public void Deactivate()
@@ -139,8 +147,8 @@ public class QiBufferService : IQiBufferService, IDisposable
         _qiInvested = 0;
         _qiConsumedDuringActivation = 0;
 
-        _deactivatedPub.Publish(new QiBufferDeactivatedEvent(_entityId, returned));
-        _bufferStateChangedPub.Publish(new QiBufferStateChangedEvent(false, QiBufferMode.None, 0, _entityId));
+        _deactivatedPub.Publish(new QiBufferDeactivatedEvent(EntityId, returned));
+        _bufferStateChangedPub.Publish(new QiBufferStateChangedEvent(false, QiBufferMode.None, 0, EntityId));
     }
 
     public QiBufferResult AbsorbDamage(int incomingDamage, DamageType damageType)
@@ -178,7 +186,7 @@ public class QiBufferService : IQiBufferService, IDisposable
                 result.WasShieldActive, result.WasQiDepleted);
 
             // EVT-01: Оповещаем потребителей об изменении состояния буфера
-            _bufferStateChangedPub.Publish(new QiBufferStateChangedEvent(true, _mode, _qiInvested, _entityId));
+            _bufferStateChangedPub.Publish(new QiBufferStateChangedEvent(true, _mode, _qiInvested, EntityId));
         }
 
         return result;

@@ -75,7 +75,15 @@ public partial class FormationVisualRenderer : Node2D
         if (container != null)
             ContainerAdapter.InjectProperties(this, container);
 
-        ZIndex = (int)RenderLayer.Objects + 2; // на земле, выше объектов
+        // ST16-005 (Этап-16 аудита): формация — наземная разметка. Класс-
+        // комментарий «ниже персонажей» (RENDER_LAYERS §3.4-3.5: тела/NPC/звери
+        // на Objects=3, игрок на Player=4) раньше нарушался ZIndex=Objects+2=5
+        // — контур рисовалс поверх игрока (префикс-сим: ZIndex=5, сиблинг #17
+        // ПОСЛЕ тел). Канон проекта для «между Objects и телами»: равный Z
+        // + порядок сиблингов (паттерн «трупы ДО NPC»): ZIndex=Objects, узел
+        // добавлен ПОСЛЕ ObjectLayer (выше объектов) и ДО ground items/
+        // зверей/трупов/NPC (ниже тел) — см. SceneBuilder.SetupFormationVisuals.
+        ZIndex = (int)RenderLayer.Objects; // на земле: выше объектов, ниже тел/игрока
 
         _stageToken = StageSub?.Subscribe(OnStageChanged);
         _poolToken = PoolSub?.Subscribe(OnPoolChanged);

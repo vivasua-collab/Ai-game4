@@ -46,6 +46,12 @@ public partial class SceneBuilder : Node
         SetupSurfaceTransitions();
         // Stratum 3+: environment objects (trees, rocks, bushes, ore).
         SetupObjectLayer();
+        // ST16-005 (Этап-16 аудита): формация — СРАЗУ после объектов: равный
+        // ZIndex (Objects=3) решает порядок сиблингов (кто раньше — ниже;
+        // паттерн «трупы ДО NPC»): контур НАД деревьями/камнями и ПОД ground
+        // items/зверями/трупами/NPC/игроком. Прежнее место (после SetupNPCs) с
+        // ZIndex=Objects+2 рисовало контур поверх персонажей.
+        SetupFormationVisuals();
         // Ground items (dropped from inventory overflow + player throw).
         SetupGroundItems();
         // Phase C: wandering animals (wolf/deer/rabbit) — drawn as coloured circles.
@@ -56,9 +62,8 @@ public partial class SceneBuilder : Node
         SetupCorpses();
         // NPC_COMBAT_PREP Phase 1: human NPCs — coloured circles per role.
         SetupNPCs();
-        // Qi Stage 6: formation visual renderer (contour + runes + progress arc).
-        SetupFormationVisuals();
         // NPC_COMBAT_PREP Phase 7: floating damage numbers (DamageAppliedEvent).
+        // (Формации — см. выше, после SetupObjectLayer: ST16-005.)
         SetupDamageNumbers();
         // Phase 8 ч.3 (2026-09-03): трассер стрел (полёт + вспышка попадания).
         SetupProjectiles();

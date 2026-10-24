@@ -223,6 +223,44 @@ public partial class NPCSpriteRenderer : Node2D
             var weapon = _equipmentProvider.GetEquipped(id, EquipmentSlot.WeaponMain);
             _npcWeaponIds[id] = weapon?.ItemId;
         }
+
+        // ST16-007 (Этап-16 аудита): пер-entity кэши мёртвых/деспавненных NPC не
+        // должны переживать сущность — длительная сессия с респавнами растила
+        // словари без ограничения (префикс: 12→20→20 после деспавна 6 NPC).
+        // Чистка на редком кадре _PhysicsProcess (не в _Draw — записи текущего
+        // прохода не трогаем; кадр _Draw снюзя не рисует IsAlive=false).
+        // ID уникальны на спавн (npc_{Guid} — повторно не выдаются) → удалять
+        // безопасно. Порог — не чаще раза в 0.5с вместе с пересканом.
+        if (_npcLastPos.Count > 0 || _phaseOffsetCache.Count > 0
+            || _npcLastX.Count > 0 || _npcFacingLeft.Count > 0 || _lastAnimInfo.Count > 0)
+        {
+            var alive = new HashSet<string>(_npcService.GetAllNPCIds());
+            RemoveDeadKeys(_npcLastPos, alive);
+            RemoveDeadKeys(_phaseOffsetCache, alive);
+            RemoveDeadKeys(_npcLastX, alive);
+            RemoveDeadKeys(_npcFacingLeft, alive);
+            RemoveDeadKeys(_lastAnimInfo, alive);
+        }
+    }
+
+    /// <summary>
+    /// ST16-007: удалить из per-entity словаря ключи, которых нет в живом
+    /// наборе (обход по ключам копии — модификация словаря в foreach
+    /// запрещена).
+    /// </summary>
+    private static void RemoveDeadKeys<TKey, TValue>(Dictionary<TKey, TValue> dict, HashSet<string> alive)
+        where TKey : notnull
+    {
+        if (dict.Count == 0) return;
+        List<TKey>? dead = null;
+        foreach (var key in dict.Keys)
+        {
+            if (key is string s && alive.Contains(s)) continue;
+            dead ??= new List<TKey>();
+            dead.Add(key);
+        }
+        if (dead == null) return;
+        foreach (var k in dead) dict.Remove(k);
     }
 
     // Cached sprites per role.
@@ -478,7 +516,12 @@ public partial class NPCSpriteRenderer : Node2D
         string animId;
         if (!string.IsNullOrEmpty(beastSpecies))
         {
-            animId = CachedAnimId("animal", beastSpecies!, kind);
+            // ST16-003 (Этап-16 аудита): канон звериных листов —
+            // animal_{species}_{idle|walk|run|attack|death} (манифест /
+            // SPRITE_DELIVERY §5); замах NPC резолвил 'animal_{species}_melee'
+            // — поставка G3 по канону молча промахнулась бы мимо рендера.
+            string sheetKind = kind == "melee" ? "attack" : kind;
+            animId = CachedAnimId("animal", beastSpecies!, sheetKind);
             QaLastTriedSheetKey = animId;
             sheet = SpriteSheetCache.TryGetSheet(animId);
         }

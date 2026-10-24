@@ -106,6 +106,58 @@ public partial class AnimalSpriteRenderer : Node2D
             _redrawAccum = 0f;
             QueueRedraw();
         }
+
+        // ST16-007 (Этап-16 аудита): пер-entity кэши мёртвых зверей не должны
+        // переживать сущность (длительная сессия с респавнами растила словари;
+        // префикс: stale-кролики 5/5 после смертей). Чистка ВНЕ _Draw, на
+        // кадре _PhysicsProcess (0.5с — кадр _Draw не рисует IsAlive=false,
+        // записи текущего прохода не затрагиваются). ID зверей монотонные
+        // (animal_{species}_{_nextId++}) — не переиспользуются → удалять
+        // записи мёртвых безопасно.
+        _pruneCooldown -= (float)delta;
+        if (_pruneCooldown <= 0f)
+        {
+            _pruneCooldown = 0.5f;
+            PruneDeadAnimalCaches();
+        }
+    }
+
+    /// <summary>
+    /// ST16-007: удалить per-entity записи (позиции/фазы/последний резолв)
+    /// зверей, которых больше нет в живом наборе. Кадр _Draw рисует только
+    /// живых — безопасно в любой момент физ-кадра.
+    /// </summary>
+    private void PruneDeadAnimalCaches()
+    {
+        if (_animalService == null) return;
+        if (_phaseOffsetCache.Count == 0 && _lastAnimInfo.Count == 0)
+            return;
+
+        HashSet<string>? alive = null;
+        foreach (var a in _animalService.GetAllAnimals())
+        {
+            alive ??= new HashSet<string>();
+            if (a.IsAlive) alive.Add(a.EntityId);
+        }
+        if (alive == null) return; // пустой мир — чистить нечего
+
+        PruneKeys(_phaseOffsetCache, alive);
+        PruneKeys(_lastAnimInfo, alive);
+    }
+
+    private static void PruneKeys<TKey, TValue>(Dictionary<TKey, TValue> dict, HashSet<string> alive)
+        where TKey : notnull
+    {
+        if (dict.Count == 0) return;
+        List<TKey>? dead = null;
+        foreach (var key in dict.Keys)
+        {
+            if (key is string s && alive.Contains(s)) continue;
+            dead ??= new List<TKey>();
+            dead.Add(key);
+        }
+        if (dead == null) return;
+        foreach (var k in dead) dict.Remove(k);
     }
 
     // Cached sprites per species.
@@ -114,14 +166,16 @@ public partial class AnimalSpriteRenderer : Node2D
     // === G0 (I-7, 2026-09-25): анимация зверей (sprite-swap в _Draw) =====
     // Листы animal_{species}_{anim} (idle/walk; run/attack/death — реестр
     // готов, триггеры — фазы G3+). Нет PNG → процедурный кэш по виду (как
-    // сейчас). Кадры — DrawTextureRegion; движение — дельта позиции между
-    // кадрами (шаг зверя дискретный — 1-2 тайла за тик).
+    // сейчас). Кадры — DrawTextureRectRegion; движение — доменный сигнал
+    // Target != null (ST16-004: вся длительность пути, не 1 кадр прыжка).
     private float _animClock;
-    private readonly Dictionary<string, Vector2> _animalLastPos = new();
+    // ST16-004: _animalLastPos (кэш кадровой дельты) УДАЛЁН — движение читается
+    // из домена (AnimalEntity.Target); ST16-007: остались только фазы/резолвы.
     private readonly Dictionary<string, AnimalAnimInfo> _lastAnimInfo = new();
     // R41-2: троттл редрава + кэши фаз/строк (GC-churn на стаде).
     private const float EntityRedrawIntervalSec = 1f / 15f;
     private float _redrawAccum;
+    private float _pruneCooldown;   // ST16-007: 0.5с-цикл чистки мёртвых
     private readonly Dictionary<string, float> _phaseOffsetCache = new();
     private static readonly Dictionary<(string s, string k), string> _animIdCache = new();
     private static readonly Dictionary<string, string> _speciesLowerCache = new();
@@ -135,6 +189,12 @@ public partial class AnimalSpriteRenderer : Node2D
         public SpriteSheetCache.SpriteSheet? Sheet;
         public Texture2D? Procedural;
         public int Frame;
+        // ST16-004 (Этап-16 аудита): сигнал движения, использованный при
+        // резолве (Target != null). Не выводится из AnimId: недоставленный
+        // walk-лист → процедурный fallback с AnimId '…_static' — визуал
+        // walk-лист остаётся контрактом поставки G3, а сигнал движения —
+        // домен. QA (Stage16Sim D2b) измеряет сигнал, не PNG.
+        public bool Moving;
         public readonly bool IsPng => Sheet != null;
     }
 
@@ -170,16 +230,20 @@ public partial class AnimalSpriteRenderer : Node2D
             // (паттерн ObjectLayerRenderer; R41-2 троттл не уменьшал
             // стоимость обхода). Отсечённый зверь не рисуется вовсе — в т.ч.
             // рамка выбранной цели (Tab): цель вне экрана не видна, рамка
-            // не нужна. Кэш движения (_animalLastPos) у отсечённых не
-            // обновляется — вернувшийся на экран зверь может один кадр
-            // показать walk вместо idle (кэш протух до старой позиции);
-            // безопасно, самокоррекция на следующем кадре.
+            // не нужна. ST16-004: движение теперь от доменного Target —
+            // culling кэш-позиций больше не влияет на признак walk.
             if (!NPCSpriteRenderer.IsEntityOnScreen(cx, cy, in visibleRect,
                     NPCSpriteRenderer.EntityCullMarginPx)) continue;
 
-            // G0 (I-7): анимационный резолв — PNG-лист animal_{species}_{kind}
-            // → регион кадра; нет PNG → процедурный кэш по виду КАК СЕЙЧАС.
-            bool moving = IsAnimalMoving(animal.EntityId, animal.Position);
+            // G0 (I-7)/ST16-004 (Этап-16 аудита): анимационный резолв — PNG-лист
+            // animal_{species}_{kind} → регион кадра; нет PNG → процедурный кэш
+            // по виду КАК СЕЙЧАС. Движение — ДОМЕННЫЙ сигнал (AnimalEntity.Target
+            // != null: цель живёт весь путь блуждания/погони, null = прибыл/
+            // отдых/отказ/смерть — AnimalService:610-627). Прежняя кадровая
+            // дельта видела прыжок 1-2 тайла ровно на 1 кадре 15-Гц редрава —
+            // walk мерцал (префикс: рендер walk 0.0% за 45 кадров пути),
+            // домен говорит «идёт» весь путь (Target 99.0% семплов).
+            bool moving = animal.Target != null;
             var anim = ResolveAnimalAnim(animal.EntityId, animal.Species, animal.Size, moving);
             _lastAnimInfo[animal.EntityId] = anim;
 
@@ -289,35 +353,21 @@ public partial class AnimalSpriteRenderer : Node2D
     // === G0 (I-7): анимационный резолв =====================================
 
     /// <summary>
-    /// G0 (I-7)/ST16-004: чистый предикат «идёт ли зверь» по кадровой дельте
-    /// (тело прежней IsAnimalMoving; вынесен для headless-QA — Stage16Sim
-    /// D2a сравнивает его с доменным сигналом Target != null).
+    /// G0 (I-7)/ST16-004: чистый предикат «идёт ли зверь» по кадровой дельте —
+    /// тело ПРЕЖНЕГО детекта движения (вынесен для headless-QA: Stage16Sim D2a
+    /// сравнивает его с доменным сигналом Target != null; проде больше не
+    /// используется — _Draw читает домен напрямую).
     /// Порог >0.02 тайла: прыжок тика 1-2 тайла ≫ порога, покой = 0.
     /// </summary>
     internal static bool QaFrameDeltaMoving(Vector2 last, Vector2 current)
         => (current - last).LengthSquared() > 0.0004f; // >0.02 тайла
 
     /// <summary>
-    /// Движение зверя: дельта позиции с прошлого кадра отрисовки
-    /// (шаг зверя — телепорт 1-2 тайла за игровой тик → любая дельта > 0
-    /// означает «идёт»; между тиками кадр замирает — это канон D1).
-    /// </summary>
-    private bool IsAnimalMoving(string entityId, Position2D position)
-    {
-        var p = new Vector2(position.X, position.Y);
-        bool moving = true;
-        if (_animalLastPos.TryGetValue(entityId, out var last))
-            moving = QaFrameDeltaMoving(last, p);
-        _animalLastPos[entityId] = p;
-        return moving;
-    }
-
-    /// <summary>
-    /// ST16-007 QA: суммарный размер per-entity кэшей (позиции/фазы/последний
+    /// ST16-007 QA: суммарный размер per-entity кэшей (фазы/последний
     /// резолв). Рост после смерти/деспавна = утечка; чистка держит ~числу живых.
     /// </summary>
     internal int QaPerEntityCacheEntries =>
-        _animalLastPos.Count + _phaseOffsetCache.Count + _lastAnimInfo.Count;
+        _phaseOffsetCache.Count + _lastAnimInfo.Count;
 
     /// <summary>
     /// Резолв анимации зверя: walk (движение) / idle. Лист
@@ -332,6 +382,7 @@ public partial class AnimalSpriteRenderer : Node2D
         var sheet = SpriteSheetCache.TryGetSheet(animId);
 
         var info = new AnimalAnimInfo();
+        info.Moving = moving; // ST16-004: реальный сигнал резолва (QA-видимость)
         if (sheet != null)
         {
             info.AnimId = animId;

@@ -165,6 +165,14 @@ public sealed class PlayerAnimator
     public void NotifyDeath()
     {
         _deathActive = true;
+        // ST16-001 (Этап-16 аудита): смерть прерывает ЛЮБОЙ активный one-shot —
+        // после респавна старая атака/хит не доигрывается (таймеры не наследуют
+        // жизнь). Раньше _meleeAge/_rangedAge/_hitAge выживали death→respawn и
+        // ResolveAnimId доигрывал прежний замах на живом игроке (префикс:
+        // melee→death→respawn → AnimId='player_melee').
+        _meleeAge = -1f;
+        _rangedAge = -1f;
+        _hitAge = -1f;
         _progress = 0f;
         _phase = 0f;
         SetAnim("player_death");
@@ -173,6 +181,11 @@ public sealed class PlayerAnimator
     /// <summary>Респавн — возврат к живым состояниям.</summary>
     public void NotifyRespawn()
     {
+        // ST16-001: новая жизнь — чистый лист one-shot'ов (симметрично смерти;
+        // страховка от путей респавна, минующих NotifyDeath).
+        _meleeAge = -1f;
+        _rangedAge = -1f;
+        _hitAge = -1f;
         _deathActive = false;
         _progress = 0f;
         _phase = 0f;

@@ -473,8 +473,18 @@ namespace CultivationGame.Adapter.Scene
                     ? "ПОДТВЕРЖДЕНО (рендер живёт на кадровой дельте)"
                     : "не воспроизведено"));
 
-            // D2b: фактический рендер (только при живом _Draw — Xvfb/opengl3;
-            // headless _Draw не выполняется — честный NOT TESTED).
+            // D2b: фактический рендер. headless _Draw ВЫПОЛНЯЕТСЯ (пруф — G2:
+            // кролики у камеры заполняют _lastAnimInfo), поэтому метрика
+            // честная — НО (постфикс-ревизия сценария) D2a уводит волка на
+            // (38,30), ЗА видимую область камеры (игрок 25,25; вид ≈x∈[16..34])
+            // → culling (BUG-007) отбраковывает зверя ДО резолва → _lastAnimInfo
+            // хранит СТАРУЮ idle-запись и 45 семплов читают её (walk 0% в
+            // ОБЕИХ фазах — артефакт сценария, не сигнала). Возврат волка в
+            // кадр + короткая цель в границах вида: 2 тика × 2 тайла < 6 —
+            // прибытие не наступает, Target != null весь блок семплов.
+            wolf.Position = new Position2D(27, 28);   // рядом с игроком — в кадре
+            wolf.Target = null;
+            wolf.MoveCooldownTicks = 0;
             int walkFrames = 0, idleFrames = 0, drawn = 0;
             for (int i = 0; i < 45; i++)
             {
@@ -488,7 +498,12 @@ namespace CultivationGame.Adapter.Scene
                 if (info != null)
                 {
                     drawn++;
-                    if (info.Value.AnimId.Contains("walk")) walkFrames++;
+                    // ST16-004: метрика — доменный сигнал движения, использованный
+                    // РЕАЛЬНЫМ _Draw (AnimalAnimInfo.Moving = Target != null).
+                    // НЕ AnimId.Contains("walk"): недоставленный walk-лист —
+                    // процедурный fallback с AnimId '…_static' (доставка PNG —
+                    // отдельный контракт G3, Presence зафиксировано в D3).
+                    if (info.Value.Moving) walkFrames++;
                     else idleFrames++;
                 }
                 await PhysFrames(4);   // 4 физ-кадра ≈ 1 кадр редрава 15Гц
@@ -496,18 +511,19 @@ namespace CultivationGame.Adapter.Scene
             if (drawn == 0)
             {
                 RecordNotTested("ST16-004/D2b walk-ratio",
-                    "headless: _Draw не выполняется — метрика фактического рендера снимается в Xvfb-прогоне");
-                GD.Print("[Stage16Sim] D2b: headless — NOT TESTED (см. Xvfb-артефакты)");
+                    "рендер не дал ни одного кадра по зверю (culling/кадр) — метрика снимается в Xvfb-прогоне");
+                GD.Print("[Stage16Sim] D2b: кадр по зверю не получен — NOT TESTED (см. Xvfb-артефакты)");
             }
             else
             {
                 float walkPct = 100f * walkFrames / drawn;
                 // Путь перезапускается каждый тик-15 — волк в пути почти всегда
-                // (Target перезаказывается), ожидаем walk ≫ idle в живом рендере.
+                // (Target перезаказывается), ожидаем walk-сигнал ≫ idle.
                 bool d2b = walkPct > 50f;
-                GD.Print($"[Stage16Sim] D2b живой рендер: {drawn} кадров, walk {walkPct:F1}% → " +
+                GD.Print($"[Stage16Sim] D2b живой рендер: {drawn} кадров, walk-сигнал {walkPct:F1}% → " +
                          $"{(d2b ? "PASS" : "FAIL — рендер показывает walk редкими кадрами")}");
-                Record("ST16-004/D2b walk-ratio", d2b, $"{drawn} кадров рендера: walk {walkPct:F1}%");
+                Record("ST16-004/D2b walk-ratio", d2b,
+                    $"{drawn} кадров рендера: walk-сигнал {walkPct:F1}% (доменный Target, не PNG)");
             }
 
             // D3: walk/idle резолв (ANIMQA-контракт) на живом звере.
