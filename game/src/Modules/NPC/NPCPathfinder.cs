@@ -128,6 +128,7 @@ namespace CultivationGame.Modules.NPC
             _nodeIndex.Clear();
 
             int startNode = NewNode(start, 0f, Heuristic(start, goal), -1);
+            if (startNode < 0) return null; // GATE-001: ёмкость исчерпана (недостижимо на практике — 1-й узел)
             HeapPush(startNode);
 
             int expanded = 0;
@@ -165,6 +166,7 @@ namespace CultivationGame.Modules.NPC
                     else
                     {
                         int node = NewNode(npos, ng, ng + Heuristic(npos, goal), cur);
+                        if (node < 0) continue; // GATE-001: потолок созданных узлов — пропускаем соседа (поиск завершится по исчерпании кучи/expanded)
                         _stamp[key] = _searchStamp;
                         _nodeIndex[key] = node;
                         HeapPush(node);
@@ -234,8 +236,19 @@ namespace CultivationGame.Modules.NPC
         }
 
         // === Узлы ===
+        // GATE-001 (pre-playtest gate, 24.10): потолок узлов — ЧАСТЬ КОНТРАКТА,
+        // а не только анти-всплеск. Пулы (_pos/_g/_f/_parent/_heap) размером
+        // MaxNodes; прежний guard «++expanded > MaxNodes» считает POP-узлы и
+        // допускает до ~8 созданий на раскрытие → _nodeCount мог пересечь
+        // ёмкость → IndexOutOfRangeException в NewNode (GUI smoke large_world:
+        // 33 исключения за 55с — бродящие NPC исчерпывали бюджет на 500×500,
+        // где достижимых тайлов ≫ 4000; test_polygon 50×50=2500 не мог достичь
+        // потолка — потому headless-QA был слеп). Потолок → «нет пути» (null)
+        // — штатный путь отказа: NPCMovementService переводит NPC в NoPath+
+        // retry 0.5с (жадный шаг как страховка) — контракт §6 сохранён.
         private int NewNode(Position2D p, float g, float f, int parent)
         {
+            if (_nodeCount >= MaxNodes) return -1; // пулы размером MaxNodes — не выходим за ёмкость
             int idx = _nodeCount++;
             _pos[idx] = p;
             _g[idx] = g;

@@ -1,0 +1,976 @@
+Godot Engine v4.7.2.stable.mono.official.ed1daf0bf - https://godotengine.org
+ERROR: Required Vulkan instance extension VK_KHR_surface not found.
+   at: _initialize_instance_extensions (drivers/vulkan/rendering_context_driver_vulkan.cpp:494)
+ERROR: Condition "err != OK" is true. Returning: err
+   at: initialize (drivers/vulkan/rendering_context_driver_vulkan.cpp:915)
+WARNING: Your video card drivers seem not to support the required Vulkan version, switching to OpenGL 3.
+     at: DisplayServerX11 (platform/linuxbsd/x11/display_server_x11.cpp:7124)
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+ALSA lib confmisc.c:855:(parse_card) cannot find card '0'
+ALSA lib conf.c:5205:(_snd_config_evaluate) function snd_func_card_inum returned error: No such file or directory
+ALSA lib confmisc.c:422:(snd_func_concat) error evaluating strings
+ALSA lib conf.c:5205:(_snd_config_evaluate) function snd_func_concat returned error: No such file or directory
+ALSA lib confmisc.c:1342:(snd_func_refer) error evaluating name
+ALSA lib conf.c:5205:(_snd_config_evaluate) function snd_func_refer returned error: No such file or directory
+ALSA lib conf.c:5728:(snd_config_expand) Evaluate error: No such file or directory
+ALSA lib pcm.c:2722:(snd_pcm_open_noupdate) Unknown PCM default
+ERROR: Condition "status < 0" is true. Returning: ERR_CANT_OPEN
+   at: init_output_device (drivers/alsa/audio_driver_alsa.cpp:97)
+WARNING: All audio drivers failed, falling back to the dummy driver.
+     at: initialize (servers/audio/audio_server.cpp:258)
+
+[InputMap] Registered all input actions.
+[WorldService] Active location: Test Polygon (id=test_polygon)
+[WorldModule] Started — time 1864-01-01 06:00, speed Normal
+[TileService] Generated 50x50 grid, seed=12345, baseTerrain=Grass (noise-based)
+  Water_Shallow: 651 tiles (26%)
+  Sand: 539 tiles (21%)
+  Grass: 1299 tiles (51%)
+  Water_Deep: 11 tiles (0%)
+  Biomes:
+    Sea: 654 tiles (26%)
+    Coast: 536 tiles (21%)
+    Grassland: 1300 tiles (52%)
+    Ocean: 10 tiles (0%)
+[TileModule] Started — generated 50x50 grid in 12 ms
+[AnimalSpawn] Spawned wolf #animal_wolf_1 at (9, 7) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_2 at (44, 34) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_3 at (44, 20) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_4 at (48, 22) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_5 at (20, 39) (body: Quadruped/Medium)
+[AnimalSpawn] test_polygon: spawned 5/5 animals (attempts=5)
+[PlayerService] Player spawned @ (25, 25), hp delegated to BodyService
+[StatProgressProducer] Запущен: продюсеры дельт §5.1/§5.2 (удар/уклонение/блок/урон/техника/медитация)
+[PlayerModule] Started — stat svc wired=True
+[QuestModule] Started
+[TradeModule] Started
+[UIModule] Started — HUD shown
+[SaveModule] Started — 24 ISaveable service(s) registered
+[ItemDatabase] Initialized (no Resources catalogue — populate via Register())
+[GeneratorModule] База данных предметов инициализирована
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[GeneratorModule] Модуль запущен. Зарегистрировано предметов: 4
+[GameEntryPoint] Location catalog registered: 3 locations [test_polygon, large_world, world_map]
+[GameEntryPoint] Started. 19 startables, 18 tickables, session=GameSession
+[GameBoot] Game initialized. Container built and entry point started.
+[MainMenu] GODOT_NEWGAME=1 — auto-starting QA world (large_world)
+[MainMenu] New Game (QA) selected — large_world
+[GameSession] NewGame variant=1 location=large_world (500×500) — assembling scene...
+[WorldModule] ResetWorld: календарные маркеры будут тихо ре-синхронизированы на первом тике (P1-15)
+[ResourceService] ResetWorld: 0 armed-записей очереди респауна очищено (ST10-01)
+[BodyService] ResetWorld: тело пересоздано (Humanoid/Medium, VIT 10) — New Game/LoadGame
+[StorageRingService] ResetWorld: хранилища колец очищены (P1-19)
+[CombatService] ResetWorld: combat state cleared (New Game)
+[TechniqueService] ResetWorld: techniques cleared (New Game)
+[TechniqueChargeService] ResetWorld: charges cleared (New Game)
+[FormationRegistry] ResetWorld: реестр формаций очищен (world-scoped, Этап-15 ST15-008)
+[CorpseService] ResetWorld: 0 трупов очищено
+[NPCSpawnerService] ResetWorld: домен NPC очищен (tracked=0, restored=0)
+[NPCGroupService] ResetWorld: 0 групп очищено
+[StaminaService] Инициализация: Max=100, полный ресурс 1000‰ (сон/бодрствование из PlayerConfig)
+[StaminaService] ResetWorld: ресурс новой сессии (Current=100/100, 1000‰)
+[PlayerCombatAdapter] ResetWorld: стойка/режим оружия/кулдауны сброшены (New Game)
+[AuraHoldService] ResetWorld: hold cleared (New Game)
+[Trade] ResetWorld — сессия закрыта, сток очищен (0 лавок)
+[SaveModule] ResetWorld: отсчёт автосейва сброшен (каденция — мировой тик, P2-26)
+[ItemDatabase] Зарегистрирован предмет: material_iron_scrap (Material)
+[ItemDatabase] Зарегистрирован предмет: material_spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_shard (Material)
+[ItemDatabase] Зарегистрирован предмет: spirit_stone_fragment (Material)
+[ClassicLootSeeder] Зарегистрировано 4 классических предмета лута (material_iron_scrap, material_spirit_stone_shard, spirit_stone_shard, spirit_stone_fragment)
+[ItemDatabase] ResetWorld: каталог очищен, счётчики ID обнулены, канон ClassicLoot ре-сеен (4 предметов)
+[Phase 0] WorldDomainReset complete — 38 world-scoped доменов сброшено (npc/corpses/groups/animals/formations/charger/player/stats/qi/quests/currency/inventory/equipment/belt/ground/world/time) + weapon-cache
+[Phase 1] CoreValidation complete — Core validated
+[TileService] Generated 500x500 grid, seed=67890, baseTerrain=Grass (noise-based)
+  Water_Deep: 18640 tiles (7%)
+  Water_Shallow: 44012 tiles (17%)
+  Sand: 31253 tiles (12%)
+  Grass: 102523 tiles (41%)
+  Stone: 34239 tiles (13%)
+  Dirt: 17795 tiles (7%)
+  Snow: 1494 tiles (0%)
+  Ice: 44 tiles (0%)
+  Biomes:
+    Ocean: 18525 tiles (7%)
+    Sea: 44004 tiles (17%)
+    Coast: 31348 tiles (12%)
+    Grassland: 87776 tiles (35%)
+    Highlands: 30141 tiles (12%)
+    Forest: 18927 tiles (7%)
+    Steppe: 17786 tiles (7%)
+    Mountains: 1450 tiles (0%)
+    Peak: 43 tiles (0%)
+[Phase 2] TileMapGen complete — large_world: 500×500 tiles, seed=67890
+[WorldService] Active location: Большой мир (id=large_world)
+[TileModule] LocationChanged '' → 'large_world'
+[Phase 3] WorldInit complete — location=large_world, speed=Normal, techniqueRegistry cleared (was world-scoped reset)
+[PlayerService] Player spawned @ (250, 250), hp delegated to BodyService
+[Phase 4] PlayerSpawn complete — player at (250, 250) in large_world
+[ItemDatabase] Зарегистрирован предмет: material_wood (Material)
+[ItemDatabase] Зарегистрирован предмет: material_stone (Material)
+[ItemDatabase] Зарегистрирован предмет: material_iron_ore (Material)
+[ItemDatabase] Зарегистрирован предмет: material_fiber (Material)
+[ItemDatabase] Зарегистрирован предмет: consumable_berry (Consumable)
+[ItemDatabase] Зарегистрирован предмет: consumable_herb (Consumable)
+[ItemDatabase] Зарегистрирован предмет: con_pill_healing (Consumable)
+[ItemDatabase] Зарегистрирован предмет: con_pill_qi (Consumable)
+[ItemDatabase] Зарегистрирован предмет: ammo_arrow (Material)
+[ItemDatabase] Зарегистрирован предмет: material_steel_ingot (Material)
+[ItemDatabase] Зарегистрирован предмет: qistone_dust_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_dust_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_pebble_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_pebble_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_shard_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_shard_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_stone_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_stone_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_boulder_calm (QiStone)
+[ItemDatabase] Зарегистрирован предмет: qistone_boulder_chaotic (QiStone)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_03e9_000001 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_dagger_L1_03e9_000001 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_03e9_000001 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_03ea_000002 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_bow_L1_03ea_000002 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_03ea_000002 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_03f2_000003 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_greatsword_L1_03f2_000003 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_03f2_000003 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_03f3_000004 (Weapon)
+[ItemDatabase] Предмет с itemId=eq_wep_staff_L1_03f3_000004 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_03f3_000004 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_044c_000005 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_torso_L1_044c_000005 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_044c_000005 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_044d_000006 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_feet_L1_044d_000006 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_044d_000006 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_04b2_000007 (Armor)
+[ItemDatabase] Предмет с itemId=eq_arm_armor_feet_L1_04b2_000007 уже зарегистрирован — замена
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_04b2_000007 (Armor)
+[Phase 5] StartingGear complete — стартовый набор: БД +20, выдано 13 позиций, оружие 4 шт (кинжал надет: True, лук в инвентаре: True), броня 2 шт, стрел 30. Замена сейвов: каждая новая игра = одинаковый старт (сид 1000).
+[AnimalSpawn] Spawned deer #animal_deer_6 at (259, 68) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_7 at (215, 219) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_8 at (192, 252) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_9 at (289, 259) (body: Quadruped/Small)
+[AnimalSpawn] Spawned wolf #animal_wolf_10 at (232, 284) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_11 at (249, 195) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_12 at (239, 242) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_13 at (383, 220) (body: Quadruped/Small)
+[AnimalSpawn] Spawned wolf #animal_wolf_14 at (222, 274) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_15 at (212, 235) (body: Quadruped/Small)
+[AnimalSpawn] Spawned deer #animal_deer_16 at (299, 241) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_17 at (241, 283) (body: Quadruped/Small)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_18 at (204, 190) (body: Quadruped/Small)
+[AnimalSpawn] Spawned deer #animal_deer_19 at (254, 224) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_20 at (294, 225) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_21 at (475, 493) (body: Quadruped/Small)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_22 at (256, 245) (body: Quadruped/Small)
+[AnimalSpawn] Spawned deer #animal_deer_23 at (125, 377) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_24 at (272, 221) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_25 at (253, 297) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_26 at (159, 122) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_27 at (299, 269) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_28 at (285, 246) (body: Quadruped/Small)
+[AnimalSpawn] Spawned deer #animal_deer_29 at (198, 275) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_30 at (239, 262) (body: Quadruped/Small)
+[AnimalSpawn] Spawned wolf #animal_wolf_31 at (236, 306) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_32 at (352, 413) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_33 at (309, 231) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_34 at (416, 256) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_35 at (384, 147) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_36 at (238, 233) (body: Quadruped/Small)
+[AnimalSpawn] Spawned wolf #animal_wolf_37 at (302, 198) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_38 at (209, 238) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_39 at (253, 304) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_40 at (213, 9) (body: Quadruped/Small)
+[AnimalSpawn] Spawned deer #animal_deer_41 at (291, 197) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_42 at (245, 303) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_43 at (86, 418) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_44 at (210, 255) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_45 at (195, 254) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_46 at (407, 14) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_47 at (264, 290) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_48 at (295, 308) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_49 at (309, 190) (body: Quadruped/Small)
+[AnimalSpawn] Spawned wolf #animal_wolf_50 at (95, 264) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_51 at (235, 290) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_52 at (234, 212) (body: Quadruped/Small)
+[AnimalSpawn] Spawned deer #animal_deer_53 at (307, 274) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_54 at (191, 196) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_55 at (277, 247) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_56 at (196, 271) (body: Quadruped/Small)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_57 at (194, 261) (body: Quadruped/Small)
+[AnimalSpawn] Spawned wolf #animal_wolf_58 at (198, 297) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_59 at (235, 222) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_60 at (246, 235) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_61 at (352, 465) (body: Quadruped/Small)
+[AnimalSpawn] Spawned wolf #animal_wolf_62 at (255, 305) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_63 at (223, 277) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_64 at (4, 189) (body: Quadruped/Small)
+[AnimalSpawn] Spawned deer #animal_deer_65 at (472, 95) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_66 at (307, 2) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_67 at (223, 275) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_68 at (274, 240) (body: Quadruped/Small)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_69 at (194, 302) (body: Quadruped/Small)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_70 at (239, 238) (body: Quadruped/Small)
+[AnimalSpawn] Spawned deer #animal_deer_71 at (274, 118) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_72 at (204, 241) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_73 at (259, 206) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_74 at (318, 75) (body: Quadruped/Small)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_75 at (309, 257) (body: Quadruped/Small)
+[AnimalSpawn] Spawned wolf #animal_wolf_76 at (32, 366) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_77 at (42, 348) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_78 at (232, 284) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_79 at (267, 288) (body: Quadruped/Small)
+[AnimalSpawn] Spawned deer #animal_deer_80 at (100, 112) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_81 at (254, 195) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_82 at (261, 210) (body: Quadruped/Small)
+[AnimalSpawn] Spawned deer #animal_deer_83 at (220, 264) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_84 at (247, 239) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_85 at (302, 254) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_86 at (228, 240) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_87 at (271, 290) (body: Quadruped/Small)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_88 at (268, 227) (body: Quadruped/Small)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_89 at (214, 250) (body: Quadruped/Small)
+[AnimalSpawn] Spawned wolf #animal_wolf_90 at (249, 279) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_91 at (254, 227) (body: Quadruped/Small)
+[AnimalSpawn] Spawned wolf #animal_wolf_92 at (244, 297) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned wolf #animal_wolf_93 at (292, 256) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_94 at (231, 272) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_95 at (278, 294) (body: Quadruped/Small)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_96 at (370, 474) (body: Quadruped/Small)
+[AnimalSpawn] Spawned wolf #animal_wolf_97 at (243, 252) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_98 at (210, 247) (body: Quadruped/Small)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_99 at (203, 235) (body: Quadruped/Small)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_100 at (487, 438) (body: Quadruped/Small)
+[AnimalSpawn] Spawned wolf #animal_wolf_101 at (216, 241) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_102 at (245, 250) (body: Quadruped/Small)
+[AnimalSpawn] Spawned rabbit #animal_rabbit_103 at (223, 299) (body: Quadruped/Small)
+[AnimalSpawn] Spawned deer #animal_deer_104 at (176, 349) (body: Quadruped/Medium)
+[AnimalSpawn] Spawned deer #animal_deer_105 at (193, 296) (body: Quadruped/Medium)
+[AnimalSpawn] large_world: spawned 100/100 animals (attempts=113)
+[Phase 6] AnimalSpawn complete — 100 animals on 'large_world' (500×500)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L2_4ff3_000008 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L2_4e93_000009 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_4166_00000a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_6a47_00000b (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_5a56_00000c (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_f693_00000d (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_2cf5_00000e (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_67c6a5ae_000001 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L3_a305_00000f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_a307_000010 (Armor)
+[HumanNPCSpawn] Spawned Enemy L2 #npc_6e3d2c4b34d043f6 at (467, 140)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L2_0ff3_000011 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_e36b_000012 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_ec9e_000013 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_33eb_000014 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_ca25_000015 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_e20e_000016 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_f11e_000017 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_0f24a3be_000002 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L3_a306_000018 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_a308_000019 (Armor)
+[HumanNPCSpawn] Spawned Enemy L2 #npc_d445be1d0dfd4a6a at (442, 214)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_a5d2_00001a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_3f22_00001b (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_30d7_00001c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_a960_00001d (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_c73b_00001e (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_0b8c_00001f (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_fd39_000020 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_47515a6b_000003 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L3_a307_000021 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_a309_000022 (Armor)
+[HumanNPCSpawn] Spawned Enemy L2 #npc_131fb9ca2a84468e at (90, 154)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_a308_000023 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_a30a_000024 (Armor)
+[HumanNPCSpawn] Spawned Enemy L0 #npc_669284b03df34afa at (97, 424)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L2_a309_000025 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_a30b_000026 (Armor)
+[HumanNPCSpawn] Spawned Enemy L1 #npc_a429ff0de6c443a9 at (301, 298)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L2_3b4c_000027 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L2_3345_000028 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_3cb0_000029 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_ffc6_00002a (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_94ca_00002b (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_f957_00002c (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_150b_00002d (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_1baf59d3_000004 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L3_a30a_00002e (Weapon)
+[HumanNPCSpawn] Spawned Enemy L2 #npc_aa22489fbfc64e17 at (234, 273)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_6247_00002f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L1_bc5c_000030 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_8e9a_000031 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_ed2e_000032 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_dfc5_000033 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_347b_000034 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_529e2f04_000005 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L3_a30b_000035 (Weapon)
+[HumanNPCSpawn] Spawned Enemy L2 #npc_b8b5fe2e046e4d89 at (280, 295)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_a30c_000036 (Weapon)
+[HumanNPCSpawn] Spawned Enemy L0 #npc_26767e6ccbe34ddf at (310, 275)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_a30d_000037 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_a30f_000038 (Armor)
+[HumanNPCSpawn] Spawned Enemy L0 #npc_37af592e60d04485 at (297, 287)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_a30e_000039 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_a310_00003a (Armor)
+[HumanNPCSpawn] Spawned Enemy L0 #npc_eca4a696675f4db2 at (100, 87)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_b87e_00003b (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_ccc9_00003c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_c33c_00003d (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_757f_00003e (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_719b_00003f (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_10a3_000040 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_6c9b_000041 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_4cdd1671_000006 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_a30f_000042 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_a311_000043 (Armor)
+[HumanNPCSpawn] Spawned Enemy L1 #npc_f3e5de4502f34d26 at (289, 227)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_a310_000044 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_a312_000045 (Armor)
+[HumanNPCSpawn] Spawned Enemy L1 #npc_d6dacbf9a5394545 at (353, 360)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_18aa28a7_000007 (Consumable)
+[HumanNPCSpawn] Spawned Monster L2 #npc_91ce4718715a449f at (240, 232)
+[HumanNPCSpawn] Spawned Monster L0 #npc_02c84f20085e442b at (67, 333)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_71654037_000008 (Consumable)
+[HumanNPCSpawn] Spawned Monster L2 #npc_0c0555d195174683 at (35, 378)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_5dfaaba5_000009 (Consumable)
+[HumanNPCSpawn] Spawned Monster L2 #npc_ba5d7d809c4743bd at (290, 240)
+[HumanNPCSpawn] Spawned Monster L0 #npc_435b95053f064dd6 at (199, 351)
+[HumanNPCSpawn] Spawned Monster L0 #npc_14a76043da234914 at (277, 244)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_05e66b89_00000a (Consumable)
+[HumanNPCSpawn] Spawned Monster L1 #npc_40726ca6d91c4ad7 at (221, 242)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_32eb8076_00000b (Consumable)
+[HumanNPCSpawn] Spawned Monster L1 #npc_48f3e30fb89d457b at (257, 229)
+[HumanNPCSpawn] Spawned Monster L1 #npc_54aab789e48c4c4d at (303, 306)
+[HumanNPCSpawn] Spawned Monster L0 #npc_05962fc5a1764c1b at (235, 362)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_6b56918a_00000c (Consumable)
+[HumanNPCSpawn] Spawned Monster L2 #npc_71266aa0703f480e at (279, 199)
+[HumanNPCSpawn] Spawned Monster L1 #npc_02dd4e91a68245eb at (469, 127)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_4c11_000046 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L1_e108_000047 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_942b_000048 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_7680_000049 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_58a2_00004a (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_ad92_00004b (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_067feb59_00000d (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_a282_00004c (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_a284_00004d (Armor)
+[HumanNPCSpawn] Spawned Guard L1 #npc_2a49cbd32df14aea at (302, 308)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_613a_00004e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_eda8_00004f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_27f7_000050 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_bc9c_000051 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_1056_000052 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_ec81_000053 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_12e5b327_00000e (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_a283_000054 (Weapon)
+[HumanNPCSpawn] Spawned Guard L1 #npc_e3d52c93b5ab4319 at (236, 284)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L3_9e39_000055 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L3_0ccc_000056 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L3_0339_000057 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L3_02db_000058 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L3_d4e5_000059 (Armor)
+[ItemDatabase] Зарегистрирован предмет: charger_3_7f2c1d11_00000f (Accessory)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L3_56ab_00005a (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L3_2a64_00005b (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_3_4b14b2d7_000010 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L3_a284_00005c (Weapon)
+[HumanNPCSpawn] Spawned Guard L3 #npc_fe7e1082a8b8441a at (211, 197)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_27cf_00005d (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L1_4c43_00005e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_43b6_00005f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_7268_000060 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_b27a_000061 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_1b41_000062 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_aa1b_000063 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_2855f92e_000011 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_a285_000064 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_a287_000065 (Armor)
+[HumanNPCSpawn] Spawned Guard L1 #npc_dcaa406b98d34882 at (217, 217)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_f7e7_000066 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_8592_000067 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_8a67_000068 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_6624_000069 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_11cc_00006a (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_5c0f_00006b (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_b374_00006c (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_1ef960f9_000012 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_a286_00006d (Weapon)
+[HumanNPCSpawn] Spawned Guard L2 #npc_487a38b7c2344850 at (200, 265)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L3_40ef_00006e (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L3_b2f4_00006f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L3_bd01_000070 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L3_cd7a_000071 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L3_4d97_000072 (Armor)
+[ItemDatabase] Зарегистрирован предмет: charger_3_44859d12_000013 (Accessory)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L3_cee3_000073 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L3_9514_000074 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_3_208452d9_000014 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L3_a287_000075 (Weapon)
+[HumanNPCSpawn] Spawned Guard L3 #npc_eb65292cc88c41d3 at (286, 237)
+[Phase 7] HumanNPCSpawn complete — 30/30 generated NPCs on 'large_world'
+[NPCGroupService] Created group group_1 (task=HuntingPack, faction=, species=wolf)
+[NPCGroupService] Set patrol route for group_1: 4 waypoints
+[NPCGroupService] Added animal_wolf_106 to group group_1 as Leader
+[NPCGroupService] Added animal_wolf_107 to group group_1 as Follower
+[NPCGroupService] Added animal_wolf_108 to group group_1 as Follower
+[NPCGroupService] Added animal_wolf_109 to group group_1 as Follower
+[NPCGroupService] Added animal_wolf_110 to group group_1 as Follower
+[GroupSpawn] Wolf pack 'group_1' — 5 wolves at (166, 247)
+[NPCGroupService] Created group group_2 (task=Patrol, faction=town_guard, species=)
+[NPCGroupService] Set patrol route for group_2: 4 waypoints
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L2_72a3_000076 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L2_3f81_000077 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L2_3074_000078 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_8c06_000079 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_57d3_00007a (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_b99e_00007b (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_5816_00007c (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_6183f1b0_000015 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_bow_L2_1676_00007d (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_1678_00007e (Armor)
+[NPCGroupService] Added npc_06dbde489daf495b to group group_2 as Leader
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L1_67f3_00007f (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L1_aeaa_000080 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_93ba_000081 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_c309_000082 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_e045_000083 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_354b_000084 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_211ebdb0_000016 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L2_1677_000085 (Weapon)
+[NPCGroupService] Added npc_d7d8438f16dc44de to group group_2 as Follower
+[GroupSpawn] Guard patrol 'group_2' — 2 guards at (186, 229)
+[NPCGroupService] Created group group_3 (task=TradeCaravan, faction=merchants, species=)
+[NPCGroupService] Set patrol route for group_3: 3 waypoints
+[ItemDatabase] Зарегистрирован предмет: eq_wep_spear_L1_1677_000086 (Weapon)
+[NPCGroupService] Added npc_464e2af2d281462e to group group_3 as Leader
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_ae55_000087 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_a04f_000088 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_afba_000089 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_6302_00008a (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_31e1_00008b (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_3627_00008c (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_49c4_00008d (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_3f1cd509_000017 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_16da_00008e (Weapon)
+[NPCGroupService] Added npc_375a736d630b4a26 to group group_3 as Follower
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_16db_00008f (Weapon)
+[NPCGroupService] Added npc_98105a9a8f35433e to group group_3 as Follower
+[GroupSpawn] Trade caravan 'group_3' — 1 merchant + 2 guards at (216, 227)
+[NPCGroupService] Created group group_4 (task=Patrol, faction=, species=deer)
+[NPCGroupService] Set patrol route for group_4: 3 waypoints
+[NPCGroupService] Added animal_deer_111 to group group_4 as Leader
+[NPCGroupService] Added animal_deer_112 to group group_4 as Follower
+[NPCGroupService] Added animal_deer_113 to group group_4 as Follower
+[NPCGroupService] Added animal_deer_114 to group group_4 as Follower
+[GroupSpawn] Deer herd 'group_4' — 4 deer at (173, 204)
+[NPCGroupService] Created group group_5 (task=HuntingPack, faction=bandits, species=)
+[NPCGroupService] Set patrol route for group_5: 4 waypoints
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_186f_000090 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_1871_000091 (Armor)
+[NPCGroupService] Added npc_e69846a818314372 to group group_5 as Leader
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_7829_000092 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_ec83_000093 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_a1bf_000094 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_594b_000095 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_6643_000096 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_7d6d_000097 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_15bd952d_000018 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L3_1870_000098 (Weapon)
+[NPCGroupService] Added npc_8b3699c96c6c465a to group group_5 as Follower
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_5482_000099 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_cfd8_00009a (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_c02d_00009b (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_3666_00009c (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_08ae_00009d (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_a67b_00009e (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_15f3_00009f (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_39c9fafa_000019 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_1871_0000a0 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_1873_0000a1 (Armor)
+[NPCGroupService] Added npc_426033255b9e4876 to group group_5 as Follower
+[GroupSpawn] Bandit band 'group_5' — 3/3 бандитов at (186, 168) (Hostile, агро 5т)
+[NPCGroupService] Created group group_6 (task=HuntingPack, faction=bandits, species=)
+[NPCGroupService] Set patrol route for group_6: 4 waypoints
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_186f_0000a2 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_1871_0000a3 (Armor)
+[NPCGroupService] Added npc_52f78cc205ba4ae8 to group group_6 as Leader
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_7829_0000a4 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_ec83_0000a5 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_a1bf_0000a6 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_594b_0000a7 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_6643_0000a8 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_7d6d_0000a9 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_15bd952d_00001a (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L3_1870_0000aa (Weapon)
+[NPCGroupService] Added npc_3f501ede92a34c21 to group group_6 as Follower
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_5482_0000ab (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_cfd8_0000ac (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_c02d_0000ad (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_3666_0000ae (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_08ae_0000af (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_a67b_0000b0 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_15f3_0000b1 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_39c9fafa_00001b (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_1871_0000b2 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_1873_0000b3 (Armor)
+[NPCGroupService] Added npc_959336331b8142a8 to group group_6 as Follower
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_7756_0000b4 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_2a95_0000b5 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L2_4d5e_0000b6 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L2_252b_0000b7 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 2 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L2_2bcb_0000b8 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L2_6a1a_0000b9 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_2_665f8095_00001c (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L3_1872_0000ba (Weapon)
+[NPCGroupService] Added npc_d23ac46c653f4a64 to group group_6 as Follower
+[GroupSpawn] Bandit band 'group_6' — 4/4 бандитов at (250, 239) (Hostile, агро 5т)
+[NPCGroupService] Created group group_7 (task=HuntingPack, faction=bandits, species=)
+[NPCGroupService] Set patrol route for group_7: 4 waypoints
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_186f_0000bb (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_1871_0000bc (Armor)
+[NPCGroupService] Added npc_64f7050ab60646ed to group group_7 as Leader
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_7829_0000bd (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_ec83_0000be (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_a1bf_0000bf (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_594b_0000c0 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_6643_0000c1 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_7d6d_0000c2 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_15bd952d_00001d (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L3_1870_0000c3 (Weapon)
+[NPCGroupService] Added npc_22bf330585734f65 to group group_7 as Follower
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_5482_0000c4 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_cfd8_0000c5 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_c02d_0000c6 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_3666_0000c7 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_08ae_0000c8 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_a67b_0000c9 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_15f3_0000ca (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_39c9fafa_00001e (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_1871_0000cb (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_1873_0000cc (Armor)
+[NPCGroupService] Added npc_3f12ae9a83844244 to group group_7 as Follower
+[GroupSpawn] Bandit band 'group_7' — 3/3 бандитов at (412, 295) (Hostile, агро 5т)
+[NPCGroupService] Created group group_8 (task=HuntingPack, faction=bandits, species=)
+[NPCGroupService] Set patrol route for group_8: 4 waypoints
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_186f_0000cd (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_1871_0000ce (Armor)
+[NPCGroupService] Added npc_ddc5039e2a3b4c84 to group group_8 as Leader
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_7829_0000cf (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_ec83_0000d0 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_a1bf_0000d1 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_594b_0000d2 (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_6643_0000d3 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_7d6d_0000d4 (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_15bd952d_00001f (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_sword_L3_1870_0000d5 (Weapon)
+[NPCGroupService] Added npc_48188b4c05d24ef4 to group group_8 as Follower
+[ItemDatabase] Зарегистрирован предмет: eq_wep_staff_L1_5482_0000d6 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_greatsword_L1_cfd8_0000d7 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_dagger_L1_c02d_0000d8 (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_3666_0000d9 (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_torso_L1_08ae_0000da (Armor)
+[ItemGeneratorService] GenerateChargerForLevel: уровень 1 < 3, зарядник недоступен. Возвращаем null.
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_legs_L1_a67b_0000db (Armor)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_feet_L1_15f3_0000dc (Armor)
+[ItemDatabase] Зарегистрирован предмет: consumable_1_39c9fafa_000020 (Consumable)
+[ItemDatabase] Зарегистрирован предмет: eq_wep_axe_L2_1871_0000dd (Weapon)
+[ItemDatabase] Зарегистрирован предмет: eq_arm_armor_head_L1_1873_0000de (Armor)
+[NPCGroupService] Added npc_5eac2682967f49c1 to group group_8 as Follower
+[GroupSpawn] Bandit band 'group_8' — 3/3 бандитов at (233, 335) (Hostile, агро 5т)
+[Phase 8] GroupSpawn complete — 8 groups on 'large_world' (500×500)
+[Phase 9] FormationInit complete (stub)
+[Phase 10] ChargerInit complete (stub)
+[Phase 11] QuestInit complete (stub)
+[Phase 12] UIInit complete — HUD shown
+[PreGenTechnique] start — maxLevel=1 seed=20261023
+[PreGenTechnique] done — generated=100 valid=100 duplicates=0 registered=100 (registry total=126)
+[PreGenTechnique] grades registered: [Common=30, Refined=30, Perfect=30, Transcendent=10] gradeMismatches=0 registryInvalid=0
+[TechniqueGrant] seed=20261030
+[TechniqueGrant] R25 AoE-набор: 2/3 форм (конус/полукруг/круг — площадные техники)
+[Phase 14] TechniqueGrant complete — granted 8 techniques (cultivation 1, active 3/3, curse, formation, aoe 2) at L1
+[Phase 15] Finalize complete — Scene assembly complete
+[SceneOrchestrator] Assembly complete — mode=NewGame: 16 completed, 0 skipped, 472 ms
+[GameSession] NewGame ready — state=Playing
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_ocean.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_sea.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_coast.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_grassland.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_grassland.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_steppe.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_steppe.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_forest.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_forest.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_forest.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_highlands.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_highlands.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_mountains.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_mountains.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_peak.png
+[SceneBuilder] Loaded biome texture: res://resources/tiles/64/biome_peak.png
+[FormationVisualRenderer] Ready
+[GroundItemRenderer] Ready
+[AnimalSpriteRenderer] Ready — tilePixels=64
+[CorpseSpriteRenderer] Ready
+[NPCSpriteRenderer] Ready
+[DamageNumberRenderer] Ready
+[ProjectileRenderer] Ready
+[StrikeFx] Ready
+[AoeFx] Ready
+[HomingFx] Ready
+[TechniqueEffectRenderer] Ready
+[CharacterDoll] Ready
+[Inventory] Ready
+[CharacterSheet] Ready
+[DialogueWindow] Ready
+[TradeWindow] Ready
+[LootWindow] Ready
+[HotbarPanel] Ready (v2: techniques + cooldowns + belt row + charge/aura R26 + медитация-слот П5)
+[TechniqueBook] Ready
+[HotkeysWindow] Ready
+[EventLogWindow] Ready
+[QuestWindow] Ready
+[CultivationWindow] Ready
+[ChargerWindow] Ready
+[CheatPanel] Ready (F2 to toggle)
+[GameWorldController] Ready
+[BiomeTiles] Drew 60 textures, 0 missing (culled to 10×6)
+[SurfaceTransitions] Drew 0 transition sprites (culled to 11×7)
+[ObjectLayer] Drew 4 object sprites (culled to 12×8)
+[AnimalService] Tick #1 — 109 animals; sample: deer#animal_deer_6 @ (259, 68)
+[AnimalService] Tick #2 — 109 animals; sample: deer#animal_deer_6 @ (259, 68)
+[GameEntryPoint] Tickable NPCModule threw at tick 2: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessWandering(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 248
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 197
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[AnimalService] Tick #3 — 109 animals; sample: deer#animal_deer_6 @ (259, 68)
+[GameEntryPoint] Tickable NPCModule threw at tick 3: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessWandering(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 248
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 197
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[GameEntryPoint] Tickable NPCModule threw at tick 4: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessWandering(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 248
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 197
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[GameEntryPoint] Tickable NPCModule threw at tick 5: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessWandering(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 248
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 197
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[BiomeTiles] Drew 96 textures, 0 missing (culled to 12×8)
+[SurfaceTransitions] Drew 28 transition sprites (culled to 14×10)
+[ObjectLayer] Drew 1 object sprites (culled to 12×8)
+[GameEntryPoint] Tickable NPCModule threw at tick 6: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessPatrolling(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 265
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 201
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[GameEntryPoint] Tickable NPCModule threw at tick 7: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessPatrolling(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 265
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 201
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[GameEntryPoint] Tickable NPCModule threw at tick 8: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessPatrolling(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 265
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 201
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[GameEntryPoint] Tickable NPCModule threw at tick 9: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessPatrolling(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 265
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 201
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[GameEntryPoint] Tickable NPCModule threw at tick 10: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessPatrolling(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 265
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 201
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[BiomeTiles] Drew 96 textures, 0 missing (culled to 12×8)
+[SurfaceTransitions] Drew 28 transition sprites (culled to 14×10)
+[GameEntryPoint] Tickable NPCModule threw at tick 11: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessPatrolling(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 265
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 201
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[ObjectLayer] Drew 1 object sprites (culled to 12×8)
+[GameEntryPoint] Tickable NPCModule threw at tick 12: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessPatrolling(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 265
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 201
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[GameEntryPoint] Tickable NPCModule threw at tick 13: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessPatrolling(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 265
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 201
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[GameEntryPoint] Tickable NPCModule threw at tick 14: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessWandering(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 248
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 197
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[GameEntryPoint] Tickable NPCModule threw at tick 15: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessWandering(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 248
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 197
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[GameEntryPoint] Tickable NPCModule threw at tick 16: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessWandering(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 248
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 197
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[BiomeTiles] Drew 96 textures, 0 missing (culled to 12×8)
+[SurfaceTransitions] Drew 28 transition sprites (culled to 14×10)
+[ObjectLayer] Drew 1 object sprites (culled to 12×8)
+[GameEntryPoint] Tickable NPCModule threw at tick 17: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessWandering(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 248
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 197
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[GameEntryPoint] Tickable NPCModule threw at tick 18: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessWandering(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 248
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 197
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[GameEntryPoint] Tickable NPCModule threw at tick 19: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessWandering(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 248
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 197
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[BiomeTiles] Drew 96 textures, 0 missing (culled to 12×8)
+[SurfaceTransitions] Drew 28 transition sprites (culled to 14×10)
+[ObjectLayer] Drew 1 object sprites (culled to 12×8)
+[GameEntryPoint] Tickable NPCModule threw at tick 27: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessWandering(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 248
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 197
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[BiomeTiles] Drew 96 textures, 0 missing (culled to 12×8)
+[SurfaceTransitions] Drew 28 transition sprites (culled to 14×10)
+[GameEntryPoint] Tickable NPCModule threw at tick 28: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessWandering(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 248
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 197
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[ObjectLayer] Drew 1 object sprites (culled to 12×8)
+[GameEntryPoint] Tickable NPCModule threw at tick 29: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessWandering(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 248
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 197
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[AnimalService] Tick #30 — 109 animals; sample: deer#animal_deer_6 @ (254, 60)
+[GameEntryPoint] Tickable NPCModule threw at tick 30: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessWandering(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 248
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 197
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[GameEntryPoint] Tickable NPCModule threw at tick 31: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessWandering(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 248
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 197
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[SaveFileHandler] Written /home/z/.local/share/godot/app_userdata/CultivationGame/saves/autosave/main.json (811285 bytes, atomic tmp→rename)
+[SaveService] Save('AutoSave:autosave') → OK
+[BiomeTiles] Drew 96 textures, 0 missing (culled to 12×8)
+[SurfaceTransitions] Drew 28 transition sprites (culled to 14×10)
+[ObjectLayer] Drew 1 object sprites (culled to 12×8)
+[BiomeTiles] Drew 96 textures, 0 missing (culled to 12×8)
+[SurfaceTransitions] Drew 28 transition sprites (culled to 14×10)
+[ObjectLayer] Drew 1 object sprites (culled to 12×8)
+[GameEntryPoint] Tickable NPCModule threw at tick 40: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessWandering(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 248
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 197
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[GameEntryPoint] Tickable NPCModule threw at tick 41: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessWandering(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 248
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 197
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[GameEntryPoint] Tickable NPCModule threw at tick 42: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessWandering(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 248
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 197
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[GameEntryPoint] Tickable NPCModule threw at tick 43: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessWandering(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 248
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 197
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[GameEntryPoint] Tickable NPCModule threw at tick 44: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessWandering(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 248
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 197
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[BiomeTiles] Drew 96 textures, 0 missing (culled to 12×8)
+[SurfaceTransitions] Drew 28 transition sprites (culled to 14×10)
+[ObjectLayer] Drew 1 object sprites (culled to 12×8)
+[GameEntryPoint] Tickable NPCModule threw at tick 45: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessWandering(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 248
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 197
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[GameEntryPoint] Tickable NPCModule threw at tick 49: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessWandering(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 248
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 197
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[BiomeTiles] Drew 96 textures, 0 missing (culled to 12×8)
+[SurfaceTransitions] Drew 28 transition sprites (culled to 14×10)
+[GameEntryPoint] Tickable NPCModule threw at tick 50: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessWandering(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 248
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 197
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[ObjectLayer] Drew 1 object sprites (culled to 12×8)
+[GameEntryPoint] Tickable NPCModule threw at tick 51: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessWandering(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 248
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 197
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+[GameEntryPoint] Tickable NPCModule threw at tick 52: IndexOutOfRangeException: Index was outside the bounds of the array.
+      at CultivationGame.Modules.NPC.NPCPathfinder.NewNode(Position2D p, Single g, Single f, Int32 parent) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 240
+      at CultivationGame.Modules.NPC.NPCPathfinder.FindPath(Position2D start, Position2D goal) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCPathfinder.cs:line 167
+      at CultivationGame.Modules.NPC.NPCMovementService.MoveTowardSmart(NPCState state, Position2D target, Single speed, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 438
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessWandering(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 248
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessNPCMovement(NPCState state, Single deltaTime) in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 197
+      at CultivationGame.Modules.NPC.NPCMovementService.ProcessMovement() in /home/z/my-project/Ai-game4/game/src/Modules/NPC/NPCMovementService.cs:line 155
+ERROR: BUG: Unreferenced static string to 0: Physics2DConstraintSolveIslands
+   at: unref (core/string/string_name.cpp:118)
+ERROR: BUG: Unreferenced static string to 0: Physics2DConstraintSetup
+   at: unref (core/string/string_name.cpp:118)
+ERROR: BUG: Unreferenced static string to 0: servers
+   at: unref (core/string/string_name.cpp:118)
+WARNING: A Thread object is being destroyed without its completion having been realized.
+Please call wait_to_finish() on it to ensure correct cleanup.
+     at: ~Thread (core/os/thread.cpp:116)
+ERROR: 7 RID allocations of type '23NavMeshGeometryParser2D' were leaked at exit.
+ERROR: 6 RID allocations of type '23NavMeshGeometryParser3D' were leaked at exit.
+ERROR: Pages in use exist at exit in PagedAllocator: N12VariantPools11BucketLargeE
+   at: ~PagedAllocator (./core/templates/paged_allocator.h:170)
+ERROR: Pages in use exist at exit in PagedAllocator: N12VariantPools12BucketMediumE
+   at: ~PagedAllocator (./core/templates/paged_allocator.h:170)
+ERROR: Pages in use exist at exit in PagedAllocator: N12VariantPools11BucketSmallE
+   at: ~PagedAllocator (./core/templates/paged_allocator.h:170)
+ERROR: /root: The caller thread can't call the function `propagate_notification()` on this node. Use `call_deferred()` or `call_deferred_thread_group()` instead.
+   at: propagate_notification (scene/main/node.cpp:2578)
+
+================================================================
+handle_crash: Program crashed with signal 11
+Engine version: Godot Engine v4.7.2.stable.mono.official (ed1daf0bf001b61586d9930840f2f1394092c079)
+Dumping the backtrace. Please include this when reporting the bug on: https://github.com/godotengine/godot/issues
+Load address: 7f861beb5000
+
+ERROR: BUG: Unreferenced static string to 0: _shaped_text_draw
+   at: unref (core/string/string_name.cpp:118)
+ERROR: BUG: Unreferenced static string to 0: _shaped_text_get_carets
+   at: unref (core/string/string_name.cpp:118)
+ERROR: BUG: Unreferenced static string to 0: _shaped_text_get_line_breaks
+   at: unref (core/string/string_name.cpp:118)
+ERROR: BUG: Unreferenced static string to 0: _get_hex_code_box_size
+   at: unref (core/string/string_name.cpp:118)
+ERROR: BUG: Unreferenced static string to 0: _initialize
+   at: unref (core/string/string_name.cpp:118)
+ERROR: BUG: Unreferenced static string to 0: _exists
+   at: unref (core/string/string_name.cpp:118)
+ERROR: BUG: Unreferenced static string to 0: _recognize_path
+   at: unref (core/string/string_name.cpp:118)
+ERROR: BUG: Unreferenced static string to 0: _reset_state
+   at: unref (core/string/string_name.cpp:118)
+ERROR: Pages in use exist at exit in PagedAllocator: N10StringName5_DataE
+   at: ~PagedAllocator (./core/templates/paged_allocator.h:170)

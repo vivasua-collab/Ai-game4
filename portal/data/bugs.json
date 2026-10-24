@@ -1,6 +1,6 @@
 {
  "version": 2.0,
- "updated": "2026-10-24T14:30:00Z",
+ "updated": "2026-10-24T17:15:00Z",
  "format": {
   "purpose": "Реестр находок аудита и волн их исправления. Запуск процесса: директива владельца от 19.10.2026 — «по важным находкам аудита запустить анализ и исправление». Источник находок: аудит-вердикты итерации 2 карты проекта (коммит dfb98d0) + открытые верификации PROJECT_MAP.md §5. Ведёт main-агент Z.ai Code; веб-портал читает файл напрямую (runtime, no-store).",
   "type": {
@@ -1933,6 +1933,33 @@
    "analysis": "ST18-011: правило whitelist датное, добавлялось вручную каждый день; дата 10_24 была пропущена при коммите отчёта этапа-17.",
    "fix_plan": "Исполнено bcc5318: whitelist дополнен 10_24, все 4 первичных лога этапа-17 закоммичены; логи этапа-18 коммитятся тем же правилом (проверено git ls-files).",
    "refs": "checkpoints/10_24_stage17_init_config_stamina_prefix.log (восстановлен); .gitignore"
+  },
+  {
+   "id": "GATE-001",
+   "type": "bug",
+   "severity": "P1",
+   "title": "NPCPathfinder: IndexOutOfRangeException при исчерпании пула узлов на large_world (потолок считал POP-узлы — создания до ~8 на раскрытие пересекали ёмкость)",
+   "module": "NPC (game/src/Modules/NPC/NPCPathfinder.cs)",
+   "track_ref": "pre-playtest-gate",
+   "status": "verified",
+   "fix_wave": 9,
+   "assignee": "10-24-pre-playtest-gate",
+   "found": "2026-10-24",
+   "summary": "GUI smoke pre-playtest gate (large_world, Xvfb+llvmpipe): 33× IndexOutOfRangeException в NPCPathfinder.NewNode (строка 240) за 55с — GameEntryPoint гасил их пер-тиково (мир жил), но аборт прогона ProcessMovement за тик = заикающаяся ходьба ВСЕХ NPC основного мира плейтеста.",
+   "analysis": "Пулы _pos/_g/_f/_parent/_heap размером MaxNodes=4000; guard «++expanded > MaxNodes» считает POP-узлы, но NewNode создаётся до 8 на раскрытие → _nodeCount пересекал ёмкость. large_world 500×500: достижимых тайлов ≫4000 (бродящие NPC исчерпывали бюджет); test_polygon 50×50=2500 потолка достичь не мог — headless-QA был структурно слеп (L500 не гоняет свободное блуждание NPC).",
+   "fix_plan": "Исполнено gate-коммитом: NewNode возвращает -1 при _nodeCount>=MaxNodes (потолок — часть контракта); вызовы FindPath обрабатывают -1 (skip соседа / null на старте). Потолок → штатный «нет пути» → NPCMovementService: NoPath + retry 0.5с (жадный шаг как страховка) — контракт NPC_AI_SYSTEM §6 сохранён, детерминизм tie-break не тронут. Пруфы: GUI префикс 33 исключения / постфикс 0 (55с); STAGE13+COMBATAI+L500 зелёные; полная регрессия 37/37 (2 известные флаки — изолированные повторы зелёные).",
+   "progress_pct": 100,
+   "refs": "checkpoints/10_24_pre_playtest_gate_gui_smoke_prefix.log; checkpoints/10_24_pre_playtest_gate_gui_smoke_postfix.log; screenshots/gate001_gui_frame{164,328}_world.png; game/src/Modules/NPC/NPCPathfinder.cs",
+   "history": [
+    {
+     "date": "2026-10-24",
+     "event": "Обнаружено GUI smoke-ом pre-playtest gate (первый успешный GUI-прогон после разблокировки среды: Xvfb + OpenGL3/llvmpipe, C# инстанцируется — сравни с блокировкой Этапа-16 §6)"
+    },
+    {
+     "date": "2026-10-24",
+     "event": "Фикс + префикс/постфикс-пруфы + полная регрессия — та же сессия gate"
+    }
+   ]
   }
  ]
 }
