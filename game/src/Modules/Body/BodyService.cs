@@ -873,8 +873,23 @@ namespace CultivationGame.Modules.Body
                 return;
             }
 
-            // P1-02 FIX: Восстанавливаем SizeClass
-            _size = (SizeClass)data.size;
+            // P1-02 FIX + ST17-010/ST11-006res (Этап-17 аудита, 24.10):
+            // восстановление SizeClass — ТОЛЬКО валидное значение enum.
+            // Прежде — слепой каст `_size = (SizeClass)data.size`: битое
+            // значение из сейва (999) молча становилось невалидным размером
+            // (рутайм-пруф префикса Stage17-сима J1). Несуществующий размер —
+            // диагностика + сохранение текущего (HP частей восстанавливаются
+            // независимо: их абсолютные значения не зависят от SizeClass).
+            if (Enum.IsDefined(typeof(SizeClass), data.size))
+            {
+                _size = (SizeClass)data.size;
+            }
+            else
+            {
+                Console.WriteLine(
+                    $"[BodyService.RestoreState] Несуществующий SizeClass в сейве: {data.size} — " +
+                    $"сохранён текущий {_size} (валидные: {string.Join(",", Enum.GetNames(typeof(SizeClass)))})");
+            }
 
             // Восстанавливаем HP каждой части тела
             if (data.parts != null)

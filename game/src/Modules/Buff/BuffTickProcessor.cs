@@ -41,6 +41,14 @@ namespace CultivationGame.Modules.Buff
         /// ST12-003: deltaTime, кратный интервалу, даёт пропорциональное
         /// число тиков (раньше — один, таймер сбрасывался на полный интервал:
         /// 5 шагов по 1с давали 5 тиков, а 1 шаг 5с — только 1).
+        /// ST17-010/ST12-003res (Этап-17 аудита, 24.10): дробный остаток
+        /// СОХРАНЯЕТСЯ — таймер устанавливается на (интервал − остаток),
+        /// а не на полный интервал. Прежнее присвоение `TickTimer = TickInterval`
+        /// выбрасывало дробный «перелёт» (пруф префикса Stage17-сима J2:
+        /// интервал 1.0с — 5 шагов по 0.6с давали 2 тика вместо 3; сетка
+        /// дрейфовала на +0.6с на каждые два интервала). Потолок
+        /// MaxCatchUpTicks — задокументированное исключение: при кэпе долг
+        /// сознательно отбрасывается, таймер синхронизируется (анти-всплеск).
         /// </summary>
         public bool ProcessTick(ActiveBuff buff, float deltaTime)
         {
@@ -53,12 +61,23 @@ namespace CultivationGame.Modules.Buff
 
             // Сколько полных интервалов накопилось (>= 1).
             float elapsed = -buff.TickTimer;
-            int dueTicks = (int)(elapsed / buff.TickInterval) + 1;
-            if (dueTicks > MaxCatchUpTicks)
-                dueTicks = MaxCatchUpTicks; // анти-всплеск: долг не копится
-
-            // BF-I04 (сохранён): синхронизация с сеткой интервалов — без дрифта.
-            buff.TickTimer = buff.TickInterval;
+            int dueTicksRaw = (int)(elapsed / buff.TickInterval) + 1;
+            int dueTicks;
+            if (dueTicksRaw > MaxCatchUpTicks)
+            {
+                // Анти-всплеск: долг отбрасывается, таймер синхронизируется
+                // (документированный контракт Этапа-12 — без накопления).
+                dueTicks = MaxCatchUpTicks;
+                buff.TickTimer = buff.TickInterval;
+            }
+            else
+            {
+                dueTicks = dueTicksRaw;
+                // BF-I04 (сохранён) + ST12-003res: синхронизация с сеткой
+                // интервалов БЕЗ дрейфа — вычитаем дробный остаток elapsed
+                // из нового периода: следующий тик — ровно на границе сетки.
+                buff.TickTimer = buff.TickInterval - (elapsed % buff.TickInterval);
+            }
 
             bool anyTicked = false;
             for (int i = 0; i < dueTicks; i++)
