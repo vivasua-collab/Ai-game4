@@ -1075,6 +1075,20 @@ public partial class GameWorldController : Node2D
             var stage17Sim = new Stage17InitConfigStaminaTruthSimDebug { Name = "Stage17InitConfigStaminaTruthSimDebug" };
             AddChild(stage17Sim);
         }
+        // Этап-18 аудита (24.10, GODOT_STAGE18_DEBUG=1): интеграция подсистем
+        // и длительная сессия — ST18-001 New Game→Save→Load→New Game (точное
+        // восстановление сейв-доменов, чистота нового мира), ST18-002 откат
+        // при порче restore нового домена + ретрай, ST18-004 граница сна/
+        // пробуждения (последняя минута плана, частичный сон через Save/Load),
+        // ST18-005 смерть NPC интеграционным путём урона, ST18-006 детерминизм
+        // полного пайплайна + cold-пара GODOT_STAGE18_COLD=save|load,
+        // ST18-007 6 циклов стресса (реестры/подписки), ST18-008 модальные
+        // окна/настройки, ST18-011 доказательность QA.
+        if (System.Environment.GetEnvironmentVariable("GODOT_STAGE18_DEBUG") == "1")
+        {
+            var stage18Sim = new Stage18SubsystemIntegrationTruthSimDebug { Name = "Stage18SubsystemIntegrationTruthSimDebug" };
+            AddChild(stage18Sim);
+        }
         // 2026-09-08 (баг-репорт пользователя): headless-верификация
         // инвентарного drag&drop в корзину (GODOT_TRASHDROP_DEBUG=1) —
         // материалы draggable, корзина выбрасывает, кукла отклоняет.

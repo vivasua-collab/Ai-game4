@@ -69,6 +69,9 @@ ALL_SIMS=(
   # Этап-17 аудита (24.10): инициализация/конфигурация/настройки/выносливость
   # (ST17-001..010; cold-пара — GODOT_STAGE17_COLD=save|load).
   "STAGE17:GODOT_STAGE17_DEBUG"
+  # Этап-18 аудита (24.10): интеграция подсистем/длительная сессия
+  # (ST18-001..011; cold-пара — GODOT_STAGE18_COLD=save|load).
+  "STAGE18:GODOT_STAGE18_DEBUG"
   "KILLFEED:GODOT_KILLFEED_DEBUG"
   "QUEST:GODOT_QUEST_DEBUG"
   "STORAGE:GODOT_STORAGE_DEBUG"
@@ -247,6 +250,43 @@ for entry in "${SIMS[@]}"; do
     if echo "$COLD_LOAD" | grep -q " PASS "; then :; else
       RESULTS[$name]="FAIL"; FAILED+=("STAGE17-COLD-LOAD")
       echo "  ❌ cold-load провален (холодная загрузка выносливости)"; fi
+  fi
+  # STAGE18 cold-пара (ST18-006/F): НОВЫЙ процесс на фазу — SAVE (интеграционная
+  # метка: стамина+позиция → слот) и LOAD (новый процесс → LoadGame → метка
+  # восстановлена из файла). Канон этапа-18 §3 F (как STAGE15/17).
+  if [ "$name" = "STAGE18" ]; then
+    echo "─── QA: STAGE18-COLD-SAVE ─────────────────────"
+    : > "$LOG"
+    env GODOT_NEWGAME=1 GODOT_STAGE18_DEBUG=1 GODOT_STAGE18_COLD=save "$GODOT" --headless --path . scenes/MainMenu.tscn > "$LOG" 2>&1 &
+    PID=$!; SIM_PID="$PID"
+    ( i=0; while kill -0 "$PID" 2>/dev/null; do
+        if grep -q "VERDICT" "$LOG" 2>/dev/null; then sleep 3; kill -9 "$PID" 2>/dev/null; break; fi
+        i=$((i+1)); if [ "$i" -ge "$CEILING" ]; then kill -9 "$PID" 2>/dev/null; break; fi
+        sleep 1
+      done ) &
+    WATCHDOG=$!; wait "$PID" 2>/dev/null || true; SIM_PID=""
+    kill "$WATCHDOG" 2>/dev/null; wait "$WATCHDOG" 2>/dev/null || true
+    COLD_SAVE=$(grep -E "COLD-SAVE" "$LOG" | tail -1)
+    echo "$COLD_SAVE"
+    if echo "$COLD_SAVE" | grep -q " PASS "; then :; else
+      RESULTS[$name]="FAIL"; FAILED+=("STAGE18-COLD-SAVE")
+      echo "  ❌ cold-save провален"; fi
+    echo "─── QA: STAGE18-COLD-LOAD (НОВЫЙ процесс) ─────"
+    : > "$LOG"
+    env GODOT_NEWGAME=1 GODOT_STAGE18_DEBUG=1 GODOT_STAGE18_COLD=load "$GODOT" --headless --path . scenes/MainMenu.tscn > "$LOG" 2>&1 &
+    PID=$!; SIM_PID="$PID"
+    ( i=0; while kill -0 "$PID" 2>/dev/null; do
+        if grep -q "VERDICT" "$LOG" 2>/dev/null; then sleep 3; kill -9 "$PID" 2>/dev/null; break; fi
+        i=$((i+1)); if [ "$i" -ge "$CEILING" ]; then kill -9 "$PID" 2>/dev/null; break; fi
+        sleep 1
+      done ) &
+    WATCHDOG=$!; wait "$PID" 2>/dev/null || true; SIM_PID=""
+    kill "$WATCHDOG" 2>/dev/null; wait "$WATCHDOG" 2>/dev/null || true
+    COLD_LOAD=$(grep -E "COLD-LOAD" "$LOG" | tail -1)
+    echo "$COLD_LOAD"
+    if echo "$COLD_LOAD" | grep -q " PASS "; then :; else
+      RESULTS[$name]="FAIL"; FAILED+=("STAGE18-COLD-LOAD")
+      echo "  ❌ cold-load провален (холодная загрузка интеграционной метки)"; fi
   fi
 done
 
