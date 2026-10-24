@@ -1,6 +1,6 @@
 {
  "version": 2.0,
- "updated": "2026-10-24",
+ "updated": "2026-10-24T14:30:00Z",
  "format": {
   "purpose": "Реестр находок аудита и волн их исправления. Запуск процесса: директива владельца от 19.10.2026 — «по важным находкам аудита запустить анализ и исправление». Источник находок: аудит-вердикты итерации 2 карты проекта (коммит dfb98d0) + открытые верификации PROJECT_MAP.md §5. Ведёт main-агент Z.ai Code; веб-портал читает файл напрямую (runtime, no-store).",
   "type": {
@@ -1885,6 +1885,54 @@
     "checkpoints/10_24_stage17_init_config_stamina_report.md",
     "ST17-010"
    ]
+  },
+  {
+   "id": "STAGE18-001",
+   "type": "bug",
+   "severity": "P1",
+   "title": "Граница сна: последняя минута запланированного сна тарифицировалась скоростью бодрствования",
+   "module": "Player (PlayerModule.Tick ↔ PlayerService.Tick ↔ StaminaService)",
+   "track_ref": "stage18",
+   "status": "verified",
+   "fix_wave": 8,
+   "assignee": "10-24-stage18",
+   "found": "2026-10-24",
+   "summary": "Прогноз ревьювера Этапа-18: порядок PlayerService.Tick() → StaminaService.Regenerate() в PlayerModule.Tick авто-будил игрока на последнем интервале плана ДО выбора скорости регена → минута сна оплачивалась ставкой бодрствования (25‰/мин вместо сонной 100%/ч).",
+   "analysis": "Префикс Stage18-сима D1 FAIL: план 30 мин @0‰ → факт 508‰ ≠ честные 500‰ (разница = ставка бодрствования на последнем интервале). D2/D3/D5 (смена режима между тиками, пауза, единицы) зелёные на префиксе — дефект именно границы авто-пробуждения.",
+   "fix_plan": "Исполнено b031887: PlayerModule.Tick — Regenerate перенесён ДО PlayerService.Tick (интервал принадлежит режиму его начала; первый интервал сна корректен: FallingAsleep даёт IsSleeping=true). Скорости сна/бодрствования НЕ менялись. Харнесс D1 вызывает НАСТОЯЩИЙ PlayerModule.Tick (регрессия порядка поймается). Постфикс: 500‰ точно.",
+   "refs": "checkpoints/10_24_stage18_subsystem_integration_prefix.log (D1 FAIL 508≠500); checkpoints/10_24_stage18_subsystem_integration_report.log (D1 PASS 500); game/src/Modules/Player/PlayerModule.cs"
+  },
+  {
+   "id": "STAGE18-002",
+   "type": "bug",
+   "severity": "P1",
+   "title": "План сна не сохранялся: спящий в сейве игрок навсегда оставался во сне после cold-load (вечный сон)",
+   "module": "Player (PlayerSaveState / ResetWorld)",
+   "track_ref": "stage18",
+   "status": "verified",
+   "fix_wave": 8,
+   "assignee": "10-24-stage18",
+   "found": "2026-10-24",
+   "summary": "PlayerSaveState хранил SleepState, но не _plannedSleepHours/_sleptMinutes: в НОВОМ процессе SleepState=Sleeping + план 0 → PlayerService.Tick не ведёт счёт → авто-пробуждение невозможно в принципе (140 тиков пруфа). In-process LoadGame проходил ЛОЖНО: протухшие поля инстанса (ResetWorld их не чистил) маскировали потерю.",
+   "analysis": "Префикс cold-пары D4-COLD FAIL: сейв при 31/120 мин сна → новый процесс → 140 тиков без пробуждения. Дополнительно: ConsolidateSleep терял все проспанные часы (slept=0 при загрузке).",
+   "fix_plan": "Исполнено b031887: PlayerSaveState +PlannedSleepHours/SleptMinutes; RestoreState восстанавливает план спящему (легаси-сейв со сном без плана → честный fallback 8ч с диагностикой в лог); ResetWorld чистит сон-конвейер (протухшие поля больше не маскируют). Постфикс: пробуждение ровно на 89-м тике (остаток 120−31).",
+   "refs": "checkpoints/10_24_stage18_subsystem_integration_prefix.log (D4-COLD FAIL); checkpoints/10_24_stage18_subsystem_integration_report.log (D4-COLD PASS 89 тиков); game/src/Modules/Player/PlayerService.cs"
+  },
+  {
+   "id": "STAGE18-003",
+   "type": "evidence-gap",
+   "severity": "P2",
+   "title": "Доказательность этапа-17: первичные логи отсутствовали в публичном дереве (gitignore-whitelist без 10_24)",
+   "module": "Репозиторий (.gitignore / checkpoints)",
+   "track_ref": "stage18",
+   "status": "verified",
+   "fix_wave": 8,
+   "assignee": "10-24-stage18",
+   "found": "2026-10-24",
+   "summary": "GAP из верификации ревьювера: отчёт этапа-17 ссылался на 4 лог-файла, отсутствовавших в git. Первопричина: .gitignore (*.log + whitelist 09_22..10_23) не содержал !checkpoints/10_24_*.log — логи существовали на диске, но молча исключались.",
+   "analysis": "ST18-011: правило whitelist датное, добавлялось вручную каждый день; дата 10_24 была пропущена при коммите отчёта этапа-17.",
+   "fix_plan": "Исполнено bcc5318: whitelist дополнен 10_24, все 4 первичных лога этапа-17 закоммичены; логи этапа-18 коммитятся тем же правилом (проверено git ls-files).",
+   "refs": "checkpoints/10_24_stage17_init_config_stamina_prefix.log (восстановлен); .gitignore"
   }
  ]
 }
