@@ -1,0 +1,204 @@
+# [FINAL AUDIT FOLLOW-UP] сводный лог сессии (FA-1 crash-целостность) — 2026-10-24T15:11Z
+# Полные первичные логи каждого запуска — в checkpoints/10_24_final_audit_followup_*.log
+
+══ 1. Сборка (dotnet build --no-incremental, фиксированный код f129408) ══
+    735 Warning(s)
+    0 Error(s)
+Time Elapsed 00:00:08.07
+
+══ 2. ПРЕФИКС: инъекция на БАЗЕ b04ef54 (старая агрегация) ══
+  GAP        CRASH/H — необработанное исключение: InvalidOperationException: Stage18 fault-injection: контролируемый сбой сценария H (final-audit FA-1 prefix) — вердикт обязан стать FAIL
+  PASS=30  FAIL=0  GAP=2  NOT TESTED=0
+[Stage18Sim] VERDICT: PASS
+
+══ 3. ПОСТФИКС: норма (новая агрегация) ══
+  PASS=31  FAIL=0  CRASH=0  GAP=1  NOT TESTED=0
+[Stage18Sim] VERDICT: PASS
+
+══ 4. ПОСТФИКС: инъекция (новая агрегация) ══
+  FAIL       CRASH/H — необработанное исключение: InvalidOperationException: Stage18 fault-injection: контролируемый сбой сценария H (final-audit FA-1) — вердикт обязан стать FAIL
+  PASS=30  FAIL=1  CRASH=1  GAP=1  NOT TESTED=0
+[Stage18Sim] VERDICT: FAIL
+
+══ 5. Cold-пара (отдельные процессы) ══
+  PASS       ST18-006/COLD-SAVE — слот stage18_coldint сохранён (стамина 61 + позиция + Ци + частичный сон 31/120 мин)
+[Stage18Sim] VERDICT: PASS
+---
+[ColdInt18][D4-COLD] сон после Load=True; тиков до пробуждения=89 (честно ≈89); woke=True
+  PASS       ST18-006/COLD-LOAD — cold-load в новом процессе: интеграционное состояние (стамина+позиция) восстановлено из файла
+  PASS       ST18-004/D4-COLD — cross-process: план частичного сна восстановлен из сейва — авто-пробуждение по остатку (60≤тиков≤95)
+[Stage18Sim] VERDICT: PASS
+
+══ 6. Раннер: bash tools/qa_regression.sh STAGE18 ══
+─── QA: STAGE18 (GODOT_STAGE18_DEBUG) ─────────────────────────────
+  ✅ [Stage18Sim] VERDICT: PASS
+─── QA: STAGE18-COLD-SAVE ─────────────────────
+  PASS       ST18-006/COLD-SAVE — слот stage18_coldint сохранён (стамина 61 + позиция + Ци + частичный сон 31/120 мин)
+─── QA: STAGE18-COLD-LOAD (НОВЫЙ процесс) ─────
+  PASS       ST18-006/COLD-LOAD — cold-load в новом процессе: интеграционное состояние (стамина+позиция) восстановлено из файла
+  PASS       ST18-004/D4-COLD — cross-process: план частичного сна восстановлен из сейва — авто-пробуждение по остатку (60≤тиков≤95)
+─── QA: STAGE18-FAULT-INJECT (ожидание: VERDICT: FAIL) ──
+[Stage18Sim] VERDICT: FAIL
+
+══════════ QA-РЕГРЕССИЯ: ИТОГ ══════════
+  PASS  STAGE18
+────────────────────────────────────────
+  1/1 PASS
+  ВСЕ СИМЫ ЗЕЛЁНЫЕ
+
+══ 7.1. Полная регрессия — прогон №1 (сводка; полные чанки в _regression_run1.log) ══
+══════════ QA-РЕГРЕССИЯ: ИТОГ ══════════
+  FAIL  COMBAT_SIM
+  PASS  COMBATAI
+  PASS  RESPAWN
+  PASS  ANIMALQA
+  PASS  LOOT
+  PASS  DOT
+  PASS  SAVELOAD
+  PASS  STAGE4
+  PASS  STAGE5
+  8/9 PASS
+  FAILED: COMBAT_SIM
+══════════ QA-РЕГРЕССИЯ: ИТОГ ══════════
+  PASS  STAGE6
+  PASS  STAGE7
+  PASS  STAGE8
+  PASS  STAGE9
+  PASS  STAGE10
+  PASS  STAGE11
+  PASS  STAGE12
+  7/7 PASS
+  ВСЕ СИМЫ ЗЕЛЁНЫЕ
+  PASS       ST18-006/COLD-SAVE — слот stage18_coldint сохранён (стамина 61 + позиция + Ци + частичный сон 31/120 мин)
+  PASS       ST18-006/COLD-LOAD — cold-load в новом процессе: интеграционное состояние (стамина+позиция) восстановлено из файла
+  PASS       ST18-004/D4-COLD — cross-process: план частичного сна восстановлен из сейва — авто-пробуждение по остатку (60≤тиков≤95)
+══════════ QA-РЕГРЕССИЯ: ИТОГ ══════════
+  PASS  STAGE13
+  FAIL  STAGE14
+  PASS  STAGE15
+  PASS  STAGE16
+  PASS  STAGE17
+  PASS  STAGE18
+  5/6 PASS
+  FAILED: STAGE14
+══════════ QA-РЕГРЕССИЯ: ИТОГ ══════════
+  PASS  KILLFEED
+  PASS  QUEST
+  PASS  STORAGE
+  PASS  HOTBAR
+  PASS  TRASHDROP
+  PASS  CONTEXT
+  PASS  MODALQA
+  PASS  MODAL2
+  8/8 PASS
+  ВСЕ СИМЫ ЗЕЛЁНЫЕ
+══════════ QA-РЕГРЕССИЯ: ИТОГ ══════════
+  PASS  L500
+  PASS  WEAPONVIS
+  PASS  REASSEMBLY
+  PASS  CHARGE
+
+══ 7.2. Полная регрессия — прогон №2 (сводка; полные чанки в _regression_run2.log) ══
+══════════ QA-РЕГРЕССИЯ: ИТОГ ══════════
+  FAIL  COMBAT_SIM
+  PASS  COMBATAI
+  PASS  RESPAWN
+  PASS  ANIMALQA
+  PASS  LOOT
+  PASS  DOT
+  PASS  SAVELOAD
+  PASS  STAGE4
+  PASS  STAGE5
+  8/9 PASS
+  FAILED: COMBAT_SIM
+══════════ QA-РЕГРЕССИЯ: ИТОГ ══════════
+  PASS  STAGE6
+  PASS  STAGE7
+  FAIL  STAGE8
+  PASS  STAGE9
+  PASS  STAGE10
+  PASS  STAGE11
+  PASS  STAGE12
+  6/7 PASS
+  FAILED: STAGE8
+  PASS       ST18-006/COLD-SAVE — слот stage18_coldint сохранён (стамина 61 + позиция + Ци + частичный сон 31/120 мин)
+  PASS       ST18-006/COLD-LOAD — cold-load в новом процессе: интеграционное состояние (стамина+позиция) восстановлено из файла
+  PASS       ST18-004/D4-COLD — cross-process: план частичного сна восстановлен из сейва — авто-пробуждение по остатку (60≤тиков≤95)
+══════════ QA-РЕГРЕССИЯ: ИТОГ ══════════
+  PASS  STAGE13
+  PASS  STAGE14
+  PASS  STAGE15
+  PASS  STAGE16
+  PASS  STAGE17
+  PASS  STAGE18
+  6/6 PASS
+  ВСЕ СИМЫ ЗЕЛЁНЫЕ
+══════════ QA-РЕГРЕССИЯ: ИТОГ ══════════
+  PASS  KILLFEED
+  PASS  QUEST
+  PASS  STORAGE
+  PASS  HOTBAR
+  PASS  TRASHDROP
+  PASS  CONTEXT
+  PASS  MODALQA
+  PASS  MODAL2
+  8/8 PASS
+  ВСЕ СИМЫ ЗЕЛЁНЫЕ
+══════════ QA-РЕГРЕССИЯ: ИТОГ ══════════
+  PASS  L500
+  PASS  WEAPONVIS
+  PASS  REASSEMBLY
+  PASS  CHARGE
+
+══ 7.3. Полная регрессия — прогон №3 (сводка; полные чанки в _regression_run3.log) ══
+══════════ QA-РЕГРЕССИЯ: ИТОГ ══════════
+  PASS  COMBAT_SIM
+  PASS  COMBATAI
+  PASS  RESPAWN
+  PASS  ANIMALQA
+  PASS  LOOT
+  PASS  DOT
+  PASS  SAVELOAD
+  PASS  STAGE4
+  PASS  STAGE5
+  9/9 PASS
+  ВСЕ СИМЫ ЗЕЛЁНЫЕ
+══════════ QA-РЕГРЕССИЯ: ИТОГ ══════════
+  PASS  STAGE6
+  PASS  STAGE7
+  PASS  STAGE8
+  PASS  STAGE9
+  PASS  STAGE10
+  PASS  STAGE11
+  PASS  STAGE12
+  7/7 PASS
+  ВСЕ СИМЫ ЗЕЛЁНЫЕ
+  PASS       ST18-006/COLD-SAVE — слот stage18_coldint сохранён (стамина 61 + позиция + Ци + частичный сон 31/120 мин)
+  PASS       ST18-006/COLD-LOAD — cold-load в новом процессе: интеграционное состояние (стамина+позиция) восстановлено из файла
+  PASS       ST18-004/D4-COLD — cross-process: план частичного сна восстановлен из сейва — авто-пробуждение по остатку (60≤тиков≤95)
+══════════ QA-РЕГРЕССИЯ: ИТОГ ══════════
+  PASS  STAGE13
+  PASS  STAGE14
+  PASS  STAGE15
+  PASS  STAGE16
+  PASS  STAGE17
+  PASS  STAGE18
+  6/6 PASS
+  ВСЕ СИМЫ ЗЕЛЁНЫЕ
+══════════ QA-РЕГРЕССИЯ: ИТОГ ══════════
+  PASS  KILLFEED
+  PASS  QUEST
+  PASS  STORAGE
+  PASS  HOTBAR
+  PASS  TRASHDROP
+  PASS  CONTEXT
+  PASS  MODALQA
+  PASS  MODAL2
+  8/8 PASS
+  ВСЕ СИМЫ ЗЕЛЁНЫЕ
+══════════ QA-РЕГРЕССИЯ: ИТОГ ══════════
+  PASS  L500
+  PASS  WEAPONVIS
+  PASS  REASSEMBLY
+  PASS  CHARGE
+
