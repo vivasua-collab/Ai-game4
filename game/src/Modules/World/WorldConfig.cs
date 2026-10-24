@@ -26,10 +26,16 @@ namespace CultivationGame.Modules.World
         public TimeSpeed DefaultSpeed = TimeSpeed.Normal;
 
         // === Локации ===
-        /// <summary>Начальная локация</summary>
+        // ST17-005 (Этап-17): МЁРТВЫЕ ПОЛЯ — нулевое число читателей во всём
+        // дереве (rg по game/src: выбор стартовой локации реально идёт через
+        // GameSessionData.WorldId ← LocationCatalog ← PlayerSpawnPhase/
+        // TileMapGenPhase/…; TestPolygon — fallback). УДАЛЕНИЕ — за владельцем:
+        // поля документированы в историческом контракте конфига; помечены как
+        // legacy, не влияющие на поведение (не читаются).
+        /// <summary>Начальная локация (LEGACY: не читается — источник истины GameSessionData.WorldId)</summary>
         public string StartLocationId = "start_village";
 
-        /// <summary>Начальный сектор</summary>
+        /// <summary>Начальный сектор (LEGACY: не читается — секторы не реализованы)</summary>
         public string StartSectorId = "0_0";
 
         // === Фракции ===

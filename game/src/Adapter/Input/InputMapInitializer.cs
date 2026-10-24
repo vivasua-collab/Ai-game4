@@ -17,7 +17,13 @@ public static class InputMapInitializer
     public static void EnsureInitialized()
     {
         if (_initialized) return;
-        _initialized = true;
+
+        // ST17-006 (Этап-17): флаг — только ПОСЛЕ успешного завершения всех
+        // регистраций (контракт P1-10/P2-13: провал остаётся ретраимым).
+        // Прежде флаг выставлялся ДО регистраций: обрыв посередине оставлял бы
+        // последующие вызовы EnsureInitialized навсегда пропускающими
+        // недорегистрированные действия. Отдельные Add*-вызовы идемпотентны
+        // (HasAction-гвард), поэтому ретрай безопасно докладывает недостающее.
 
         // Movement (WASD + arrows). Use physical keycodes for layout-independent input.
         AddPhysicalKeyAction("move_up", Key.W);
@@ -136,6 +142,7 @@ public static class InputMapInitializer
         AddPhysicalKeyAction("time_speed_up", Key.Pageup);
         AddPhysicalKeyAction("time_speed_down", Key.Pagedown);
 
+        _initialized = true; // ST17-006: только после успешного завершения
         GD.Print("[InputMap] Registered all input actions.");
     }
 

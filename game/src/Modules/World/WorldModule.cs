@@ -36,7 +36,9 @@ public sealed class WorldModule : IModule, IWorldResettable
     [Inject] private readonly ISubscriber<SaveRequestedEvent> _saveSub = null!;
 
     private IDisposable? _saveSubToken;
-    private WorldConfig _config = new();
+    // ST17-005: конфиг инъектируется (DI-синглтон) — тот же инстанс, что у
+    // WorldInitPhase; прежде — собственный new WorldConfig().
+    [Inject] private readonly WorldConfig _config = null!;
     private int _lastDay = -1, _lastMonth = -1, _lastYear = -1;
     // R35 (P1-15): маркеры требуют тихой ре-синхронизации (см. ResetWorld).
     private bool _calendarMarkersDirty;
@@ -189,6 +191,11 @@ public static class WorldModuleServices
 {
     public static void Register(IContainerBuilder builder)
     {
+        // ST17-005 (Этап-17): WorldConfig — DI-синглтон (единый источник
+        // истины стартовой скорости для WorldModule.Start и WorldInitPhase;
+        // прежде WorldModule держал собственный new WorldConfig(), а фаза 3
+        // хардкожила Normal — конфиг фактически не управлял поведением).
+        builder.Register<WorldConfig>(Lifetime.Singleton);
         builder.Register<TimeService>(Lifetime.Singleton);
         builder.Register<WorldService>(Lifetime.Singleton);
         builder.Register<ITimeService, TimeService>(Lifetime.Singleton);
