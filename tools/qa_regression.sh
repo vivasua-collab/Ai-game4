@@ -287,6 +287,13 @@ for entry in "${SIMS[@]}"; do
     if echo "$COLD_LOAD" | grep -q " PASS "; then :; else
       RESULTS[$name]="FAIL"; FAILED+=("STAGE18-COLD-LOAD")
       echo "  ❌ cold-load провален (холодная загрузка интеграционной метки)"; fi
+    # ST18-004/D4-COLD: план частичного сна переживает cold-load (иначе —
+    # вечный сон в новом процессе; in-process тест слеп из-за протухших полей).
+    D4COLD=$(grep -E "D4-COLD" "$LOG" | tail -1)
+    echo "$D4COLD"
+    if echo "$D4COLD" | grep -q " PASS "; then :; else
+      RESULTS[$name]="FAIL"; FAILED+=("STAGE18-D4-COLD")
+      echo "  ❌ D4-COLD провален (план сна теряется в новом процессе)"; fi
   fi
 done
 

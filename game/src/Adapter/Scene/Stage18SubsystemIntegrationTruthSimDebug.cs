@@ -59,6 +59,7 @@ using CultivationGame.Entry;
 using CultivationGame.Entry.Phases;
 using CultivationGame.Modules.Player;
 using CultivationGame.Modules.NPC;
+using GodotInput = Godot.Input;
 
 namespace CultivationGame.Adapter.Scene
 {
@@ -106,7 +107,7 @@ namespace CultivationGame.Adapter.Scene
             if (container != null)
                 ContainerAdapter.InjectProperties(this, container);
 
-            _world = GetTree().Root.FindChild("GameWorldController", true, false) as GameWorldController;
+            _world = GetParent() as GameWorldController ?? FindChild("GameWorldController", true, false) as GameWorldController;
 
             GD.Print("[Stage18Sim] Ready — Этап-18 (интеграция подсистем/длительная сессия) starts in 3s");
             _ = RunAsync();
@@ -196,6 +197,7 @@ namespace CultivationGame.Adapter.Scene
             public int StaminaPromille;
             public long Qi;
             public float Str;
+            public float Vd;      // виртуальная дельта STR (контур прогрессии §4.2)
             public int PosX, PosY;
             public int NpcCount;
             public int CorpseCount;
@@ -208,6 +210,7 @@ namespace CultivationGame.Adapter.Scene
             StaminaPromille = _stamina.CurrentPromille,
             Qi = _qi!.CurrentQi,
             Str = _statSvc!.GetStat(StatType.Strength),
+            Vd = _statSvc.GetVirtualDelta(StatType.Strength),
             PosX = _playerSvc!.Position.X,
             PosY = _playerSvc.Position.Y,
             NpcCount = NpcAliveCount(),
@@ -232,10 +235,15 @@ namespace CultivationGame.Adapter.Scene
             await PhysFrames(2);
 
             // A2: мутации нескольких доменов от НОВОЙ игры.
+            // Ци игрока стартует ПОЛНЫМ — сначала расход (TryConsumeQi),
+            // иначе AddQi клампится на капе и мутация невидима.
+            _qi!.TryConsumeQi(400);
             st.SetCurrent(37);
-            long qiBase = _qi!.CurrentQi;
+            long qiBase = _qi.CurrentQi;
             _qi.AddQi(250);
-            float strBase = _statSvc!.GetStat(StatType.Strength);
+            // Виртуальная дельта — отдельный контур прогрессии (GetStat —
+            // только base; дельта читается GetVirtualDelta, канон §4.2).
+            float vdBase = _statSvc!.GetVirtualDelta(StatType.Strength);
             _statSvc.AddVirtualDelta(StatType.Strength, 5f);
             _playerSvc.MoveTo(10, 10);
             _playerSvc.StartSleep(2f);
@@ -243,13 +251,14 @@ namespace CultivationGame.Adapter.Scene
             _buffs?.ApplyBuff("player", "health_regen", 60f, 5f, "stage18_qa");
             _ground?.DropItem("stage18_qa_marker", 1, 400f, 400f);
             var saved = Snap();
+            saved.Vd = _statSvc.GetVirtualDelta(StatType.Strength);
             bool a2 = saved.Stamina == 37 && saved.Qi == qiBase + 250
-                      && Math.Abs(saved.Str - (strBase + 5f)) < 0.01f
+                      && Math.Abs(saved.Vd - (vdBase + 5f)) < 0.01f
                       && saved.PosX == 10 && saved.PosY == 10 && saved.Sleep == PlayerSleepState.Sleeping;
-            GD.Print($"[A2] мутации: стамина={saved.Stamina}, Ци={saved.Qi} (+250 от {qiBase}), STR={saved.Str} (+5 от {strBase}), " +
+            GD.Print($"[A2] мутации: стамина={saved.Stamina}, Ци={saved.Qi} (+250 от {qiBase}), ΔSTR={saved.Vd:F1} (+5 от {vdBase:F1}), " +
                      $"поз=({saved.PosX},{saved.PosY}), сон={saved.Sleep}, бафф={_buffs?.HasBuff("player", "health_regen")}, " +
                      $"наземных={GroundCount()}");
-            Record("ST18-001/A2", a2, a2 ? "мутации пяти доменов применены (стамина/Ци/стат/позиция/сон + бафф/предмет)"
+            Record("ST18-001/A2", a2, a2 ? "мутации пяти доменов применены (стамина/Ци/вирт-дельта/позиция/сон + бафф/предмет)"
                 : "мутации не применились — проверяемые домены не меняются");
 
             // A3: Save.
@@ -260,8 +269,8 @@ namespace CultivationGame.Adapter.Scene
 
             // A4: изменить состояние мира так, чтобы отличалось от сохранённого.
             st.SetCurrent(st.MaxStamina);
-            _qi.AddQi(-111);
-            _statSvc.AddVirtualDelta(StatType.Strength, -5f);
+            _qi.TryConsumeQi(300);
+            _statSvc.ModifyStat(StatType.Strength, -5f); // base STR — прямой контур
             _playerSvc.MoveTo(30, 30);
             _playerSvc.WakeUp();
             _buffs?.RemoveAllBuffs("player");
@@ -279,18 +288,20 @@ namespace CultivationGame.Adapter.Scene
             await PhysFrames(2);
             _session.LoadGame(slot);
             var restored = Snap();
+            restored.Vd = _statSvc.GetVirtualDelta(StatType.Strength);
             bool a5 = _session.State == SessionState.Playing
                       && restored.Stamina == saved.Stamina && restored.StaminaPromille == saved.StaminaPromille
                       && restored.Qi == saved.Qi
+                      && Math.Abs(restored.Vd - saved.Vd) < 0.01f
                       && Math.Abs(restored.Str - saved.Str) < 0.01f
                       && restored.PosX == saved.PosX && restored.PosY == saved.PosY;
             GD.Print($"[A5] после Load: сессия={_session.State}, стамина={restored.Stamina} ({restored.StaminaPromille}‰), Ци={restored.Qi}, " +
-                     $"STR={restored.Str:F1}, поз=({restored.PosX},{restored.PosY}), сон={restored.Sleep}, NPC={restored.NpcCount} (сейв {saved.NpcCount}), " +
+                     $"ΔSTR={restored.Vd:F1}, STR={restored.Str:F1}, поз=({restored.PosX},{restored.PosY}), сон={restored.Sleep}, NPC={restored.NpcCount} (сейв {saved.NpcCount}), " +
                      $"трупов={restored.CorpseCount} (сейв {saved.CorpseCount})");
             Record("ST18-001/A5", a5,
-                a5 ? "загрузка вернула СОХРАНЁННОЕ состояние всех сейв-доменов точно (стамина/Ци/стат/позиция), а не пост-сейвовое"
+                a5 ? "загрузка вернула СОХРАНЁННОЕ состояние всех сейв-доменов точно (стамина/Ци/вирт-дельта/base/позиция), а не пост-сейвовое"
                    : $"загрузка вернула не сохранённое состояние: стамина={restored.Stamina}/{saved.Stamina}, Ци={restored.Qi}/{saved.Qi}, " +
-                     $"STR={restored.Str:F1}/{saved.Str:F1}, поз=({restored.PosX},{restored.PosY})/({saved.PosX},{saved.PosY})");
+                     $"ΔSTR={restored.Vd:F1}/{saved.Vd:F1}, STR={restored.Str:F1}/{saved.Str:F1}, поз=({restored.PosX},{restored.PosY})/({saved.PosX},{saved.PosY})");
 
             // A6: несейв-домены — задокументированное поведение (не маскируем):
             // баффы и наземные предметы НЕ входят в сейв (BuffService/
@@ -345,12 +356,13 @@ namespace CultivationGame.Adapter.Scene
                    : $"протечка старого мира: NPC {leakedNpc.Count}, животных {leakedAnimals.Count}, трупы={after.CorpseCount}, " +
                      $"наземные={GroundCount()}, стамина={after.Stamina}‰{after.StaminaPromille}");
 
-            // B3: статы пересоздаются (виртуальная дельта STR+5 из A не переживает NewGame).
-            float newStr = _statSvc!.GetStat(StatType.Strength);
-            bool b3 = Math.Abs(newStr - before.Str) >= 4.9f;
-            GD.Print($"[B3] STR нового мира={newStr:F1} (в загруженном был {before.Str:F1} с дельтой +5)");
-            Record("ST18-001/B3", b3, b3 ? "StatService.ResetWorld: прогресс прошлого мира (виртуальные дельты) не переживает New Game"
-                : "статы протекают между мирами (виртуальная дельта пережила New Game)");
+            // B3: статы пересоздаются (виртуальная дельта STR+5 из A не
+            // переживает NewGame; base — врождённые, остаются).
+            float newVd = _statSvc!.GetVirtualDelta(StatType.Strength);
+            bool b3 = Math.Abs(newVd) < 0.01f && Math.Abs(before.Vd - 5f) < 0.01f;
+            GD.Print($"[B3] ΔSTR нового мира={newVd:F1} (в загруженном был {before.Vd:F1}); base STR={_statSvc.GetStat(StatType.Strength):F1}");
+            Record("ST18-001/B3", b3, b3 ? "StatService.ResetWorld: виртуальная дельта прошлого мира (прогресс §4.2) не переживает New Game"
+                : $"прогресс протекает между мирами: ΔSTR={newVd:F1} после NewGame (в прошлом мире {before.Vd:F1})");
 
             // B4: реестры не растут — 3 цикла NewGame подряд.
             _session.Pause();
@@ -489,19 +501,21 @@ namespace CultivationGame.Adapter.Scene
             long sleepMilliPerMin = (long)(sleepPct * 10f) * max * 60_000L / 3_600_000L;
 
             // D1: ГЛАВНЫЙ кандидат (прогноз аудита): последняя минута
-            // запланированного сна. План 30 минут; на 30-м тике
-            // PlayerService.Tick авто-будит ДО Regenerate → интервал
-            // тарифицируется скоростью БОДРСТВОВАНИЯ.
+            // запланированного сна. План 30 минут, 30 производственных
+            // интервалов {ps.Tick; Regenerate} (порядок строк PlayerModule.Tick):
+            // на 30-м интервале PlayerService.Tick авто-будит ДО Regenerate →
+            // последняя минута сна тарифицируется скоростью БОДРСТВОВАНИЯ.
+            // БЕЗ прелюдиального тика: первый интервал сам обрабатывает
+            // FallingAsleep (IsSleeping=true с момента StartSleep).
             const int planMin = 30;
             ps.StartSleep(planMin / 60f);
-            ps.Tick(1f); // FallingAsleep → Sleeping
             st.SetCurrent(0);
             for (int i = 0; i < planMin; i++)
             {
                 ps.Tick(1f);                 // ПРОИЗВОДСТВЕННЫЙ порядок №1
                 st.Regenerate(60_000);       // ПРОИЗВОДСТВЕННЫЙ порядок №2
             }
-            long honestMilli = sleepMilliPerMin * planMin; // весь интервал — сон
+            long honestMilli = (long)(sleepPct * 10f) * max * planMin * 60_000L / 3_600_000L; // весь интервал — сон, БЕЗ по-минутного floor
             int honestPromille = (int)Math.Min(honestMilli / max, 1000);
             int gotPromille = st.CurrentPromille;
             bool d1 = gotPromille == honestPromille;
@@ -518,11 +532,12 @@ namespace CultivationGame.Adapter.Scene
             st.SetCurrent(0);
             const int asleepMin = 10, awakeMin2 = 10;
             ps.StartSleep((asleepMin + awakeMin2) / 60f);
-            ps.Tick(1f);
             for (int i = 0; i < asleepMin; i++) { ps.Tick(1f); st.Regenerate(60_000); }
             ps.WakeUp();
             for (int i = 0; i < awakeMin2; i++) { ps.Tick(1f); st.Regenerate(60_000); }
-            int expectD2 = (int)((sleepMilliPerMin * asleepMin + (long)(awakeProm * 10f) * max * awakeMin2 / 10) / max);
+            long sleepExact = (long)(sleepPct * 10f) * max * asleepMin * 60_000L / 3_600_000L;
+            long awakeExact = (long)awakeProm * max * awakeMin2;
+            int expectD2 = (int)((sleepExact + awakeExact) / max);
             int gotD2 = st.CurrentPromille;
             bool d2 = gotD2 == expectD2;
             GD.Print($"[D2] {asleepMin} мин сон + {awakeMin2} мин бодрствование @0: факт={gotD2}‰, ожидание={expectD2}‰");
@@ -547,7 +562,9 @@ namespace CultivationGame.Adapter.Scene
             // D4: сохранение ЧАСТИЧНОГО сна → LoadGame → авто-пробуждение по
             // ОСТАТКУ плана. План 2ч, проспано 30 мин, сейв, загрузка:
             // PlayerSaveState хранит SleepState, но НЕ _plannedSleepHours/
-            // _sleptMinutes → план теряется.
+            // _sleptMinutes → план теряется. ВНУТРИ ПРОЦЕССА тест проходит
+            // ЛОЖНО (протухшие поля инстанса: ResetWorld не чистит план —
+            // Cross-process-истина: cold-пара D4-COLD ниже/в раннере).
             const string sleepSlot = "stage18_sleeprt";
             var slot = new SaveSlot(sleepSlot, SaveSlotType.Manual);
             st.SetCurrent(10);
@@ -561,7 +578,7 @@ namespace CultivationGame.Adapter.Scene
             _session.LoadGame(slot);
             _session.Pause();
             bool sleepRestored = ps.SleepState == PlayerSleepState.Sleeping;
-            // Ожидание: проспано 30 из 120 мин → ещё 90 тиков обязаны добудить.
+            // Ожидание: проспано 31 из 120 мин → ≈89 тиков обязаны добудить.
             int ticksToWake = -1;
             for (int i = 0; i < 120; i++)
             {
@@ -569,13 +586,14 @@ namespace CultivationGame.Adapter.Scene
                 ps.Tick(1f);
             }
             bool woke = ps.SleepState == PlayerSleepState.Awake;
-            bool d4 = sleepRestored && woke && ticksToWake >= 0 && ticksToWake <= 95;
+            bool d4 = sleepRestored && woke && ticksToWake >= 60 && ticksToWake <= 95;
             GD.Print($"[D4] сон в сейве={stillSleeping}→после Load={sleepRestored}; тиков до авто-пробуждения={ticksToWake} " +
-                     $"(честно ≈90 из остатка плана 2ч−30мин); woke={woke}");
+                     $"(честно ≈89 из остатка плана 2ч−31мин); woke={woke}; NOTE: in-process проходит и на протухших полях — " +
+                     "cross-process истина = D4-COLD (cold-пара раннера)");
             Record("ST18-004/D4", d4,
-                d4 ? "частичный сон переживает Save/Load: состояние И план пробуждения восстановлены, авто-пробуждение по остатку"
+                d4 ? "частичный сон переживает Save/Load В ПРОЦЕССЕ: авто-пробуждение по остатку плана (60≤тиков≤95); cross-process — D4-COLD"
                    : $"план сна теряется при Save/Load: PlayerSaveState хранит SleepState={sleepRestored}, но не planned/slept-минуты — " +
-                     $"авто-пробуждение {(woke ? $"на {ticksToWake}-м тике" : "НЕ наступило за 120 тиков")} (ожидание ≤95)");
+                     $"авто-пробуждение {(woke ? $"на {ticksToWake}-м тике" : "НЕ наступило за 120 тиков")} (ожидание 60..95)");
 
             _session.Resume();
             try { _save.DeleteSave(slot); } catch { /* чистка */ }
@@ -762,22 +780,32 @@ namespace CultivationGame.Adapter.Scene
                    : $"деградация после повторов: инвентарь {cyclesOk}/5, лист ({sheetOpen},{sheetClosed})");
 
             // G2: PauseOnModalWindows — время стоит при открытом окне.
+            // ПРОИЗВОДСТВЕННЫЙ путь: реальное действие ввода «inventory» (B)
+            // → GameWorldController → Toggle + HandleModalPauseOnOpen.
+            // Прямой inv.Toggle() обходит хендлер ввода и паузу НЕ ставит
+            // (проверено префиксом — тест-артефакт, не дефект продукта).
             if (Persistence.GameSettings.PauseOnModalWindows)
             {
                 var timeBefore = _time!.CurrentTime;
-                inv?.Toggle();
+                GodotInput.ActionPress("inventory");
+                await PhysFrames(4);
+                GodotInput.ActionRelease("inventory");
+                await PhysFrames(2);
+                bool opened = inv is { Visible: true };
                 await ToSignal(GetTree().CreateTimer(2.5), SceneTreeTimer.SignalName.Timeout);
                 bool pausedWhileModal = _time.IsPaused;
                 var timeDuring = _time.CurrentTime;
-                inv?.Toggle();
+                GodotInput.ActionPress("inventory");
+                await PhysFrames(4);
+                GodotInput.ActionRelease("inventory");
                 await PhysFrames(2);
                 bool resumedAfter = !_time.IsPaused;
-                bool g2 = pausedWhileModal && resumedAfter && timeDuring.TotalMinutes == timeBefore.TotalMinutes;
-                GD.Print($"[G2] окно открыто: пауза={pausedWhileModal}, время {timeBefore.TotalMinutes}→{timeDuring.TotalMinutes} мин; " +
+                bool g2 = opened && pausedWhileModal && resumedAfter && timeDuring.TotalMinutes == timeBefore.TotalMinutes;
+                GD.Print($"[G2] B-нажатие: окно открылось={opened}, пауза при окне={pausedWhileModal}, время {timeBefore.TotalMinutes}→{timeDuring.TotalMinutes} мин; " +
                          $"закрыто: пауза снята={resumedAfter}");
                 Record("ST18-008/G2", g2,
-                    g2 ? "PauseOnModalWindows=true: мировое время стоит при окне, возобновляется после закрытия"
-                       : "время не остановлено при модальном окне / не возобновлено после");
+                    g2 ? "PauseOnModalWindows=true: B-путь останавливает мировое время при окне, возобновляет после закрытия"
+                       : $"B-путь не остановил время при модальном окне (opened={opened}, пауза={pausedWhileModal}, резюм={resumedAfter})");
             }
             else
             {
@@ -928,14 +956,22 @@ namespace CultivationGame.Adapter.Scene
                     await Task.CompletedTask;
                     return;
                 }
-                // Интеграционная метка: стамина + позиция + Ци.
+                // Интеграционная метка: стамина + позиция + Ци + ЧАСТИЧНЫЙ СОН
+                // (D4-COLD: план 2ч, проспано 31 мин — новый процесс обязан
+                // добудить игрока по остатку ≈89 тиков; потеря плана в
+                // PlayerSaveState = вечный сон после cold-load).
                 _stamina.SetCurrent(ColdStamina);
                 _qi?.AddQi(77);
                 _playerSvc?.MoveTo(15, 15);
+                _playerSvc?.StartSleep(2f);
+                _playerSvc?.Tick(1f);
+                for (int i = 0; i < 30; i++) _playerSvc?.Tick(1f);
+                bool sleepingAtSave = _playerSvc?.SleepState == PlayerSleepState.Sleeping;
                 bool saved = _save.Save(new SaveSlot(ColdSlot, SaveSlotType.Manual));
-                GD.Print($"[ColdInt18][SAVE] стамина={_stamina.CurrentStamina}, поз=({_playerSvc?.Position.X},{_playerSvc?.Position.Y}), сейв={saved}");
-                Record("ST18-006/COLD-SAVE", saved && _stamina.CurrentStamina == ColdStamina,
-                    saved ? $"слот {ColdSlot} сохранён (стамина {ColdStamina} + позиция + Ци)"
+                GD.Print($"[ColdInt18][SAVE] стамина={_stamina.CurrentStamina}, поз=({_playerSvc?.Position.X},{_playerSvc?.Position.Y}), " +
+                         $"сон={_playerSvc?.SleepState} (проспано 31/120 мин), сейв={saved}");
+                Record("ST18-006/COLD-SAVE", saved && _stamina.CurrentStamina == ColdStamina && sleepingAtSave,
+                    saved ? $"слот {ColdSlot} сохранён (стамина {ColdStamina} + позиция + Ци + частичный сон 31/120 мин)"
                         : "сейв не удался");
                 await Task.CompletedTask;
                 return;
@@ -961,6 +997,29 @@ namespace CultivationGame.Adapter.Scene
             Record("ST18-006/COLD-LOAD", ok,
                 ok ? "cold-load в новом процессе: интеграционное состояние (стамина+позиция) восстановлено из файла"
                     : $"cold-load провален: стамина={_stamina.CurrentStamina}, поз=({_playerSvc?.Position.X},{_playerSvc?.Position.Y})");
+
+            // D4-COLD: частичный сон в СЕЙВЕ → новый процесс → авто-пробуждение
+            // по остатку плана (31/120 проспано → ≈89 тиков до пробуждения).
+            // В новом процессе протухшие поля инстанса НЕ существуют — только
+            // сейв; потеря плана = вечный сон (120 тиков без пробуждения).
+            var ps = _playerSvc!;
+            _session.Pause();
+            bool sleepingAfterLoad = ps.SleepState == PlayerSleepState.Sleeping;
+            int ticksToWakeCold = -1;
+            for (int i = 0; i < 140; i++)
+            {
+                if (ps.SleepState == PlayerSleepState.Awake) { ticksToWakeCold = i; break; }
+                ps.Tick(1f);
+            }
+            _session.Resume();
+            bool wokeCold = ps.SleepState == PlayerSleepState.Awake;
+            bool d4cold = sleepingAfterLoad && wokeCold && ticksToWakeCold >= 60 && ticksToWakeCold <= 95;
+            GD.Print($"[ColdInt18][D4-COLD] сон после Load={sleepingAfterLoad}; тиков до пробуждения={ticksToWakeCold} " +
+                     $"(честно ≈89); woke={wokeCold}");
+            Record("ST18-004/D4-COLD", d4cold,
+                d4cold ? "cross-process: план частичного сна восстановлен из сейва — авто-пробуждение по остатку (60≤тиков≤95)"
+                    : $"cross-process потеря плана сна: сон={sleepingAfterLoad}, пробуждение={(wokeCold ? $"на {ticksToWakeCold}-м тике" : "НЕ наступило за 140 тиков")} — " +
+                    "PlayerSaveState не сохраняет planned/slept-минуты: в новом процессе игрок спит вечно");
             try { _save.DeleteSave(slot); } catch { /* чистка */ }
         }
 
