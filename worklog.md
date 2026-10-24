@@ -385,3 +385,57 @@ NEXT: ожидание Этапа-18 (аудит ревьювера) ЛИБО э
 Godot GUI-режима среды (скриншоты PT-V-тем и будущей stamina-HUD:
 блокировка задокументирована в отчёте этапа-16 §6) ЛИБО follow-up
 этапа-17 по решению владельца (расход бега, HUD-полоса, бафф-модификаторы).
+
+## Ч.10: Этап-18 — интеграция подсистем/длительная сессия (24.10, сессия coder-1024)
+
+- Канон: [STAGE 18 AUDIT] от ревьювера (верификация этапа-17: код PASS,
+  артефакты GAP — логи 10_24 не в git; HEAD d3b4999 совпал).
+- Восстановление среды после сброса платформы: .NET 8.0.426
+  (dotnet-install), Godot 4.7.2 mono (→ /home/z/godot +
+  /home/z/my-project/godot + /home/z/godot_bin — канонические пути
+  раннера), credential store из /home/z/my-project/.auth/github.token,
+  dotnet build 0 err / 719 warn (база этапа-17).
+- bcc5318 (ST18-011pre): первопричина GAP этапа-17 — .gitignore
+  whitelist `!checkpoints/*.log` без даты 10_24; 4 первичных лога
+  этапа-17 закоммичены.
+- 3f8f0dd: Stage18SubsystemIntegrationTruthSimDebug (сценарии A–I
+  канона §3) + регистрация qa_regression STAGE18 (+cold-пара
+  GODOT_STAGE18_COLD=save|load + D4-COLD-гейт) + TESTING_RULES §0.1.
+- d3f7900: ПРЕФИКС 29 PASS / 1 FAIL / 1 GAP + cold-пара (COLD-SAVE
+  PASS, D4-COLD FAIL). Доказаны 2 дефекта ST18-004: (1) D1 — прогноз
+  ревьювера: последняя минута сна тарифицируется ставкой бодрствования
+  (508‰≠500‰, порядок PlayerService.Tick→Regenerate в PlayerModule);
+  (2) D4-COLD — сверх прогноза: PlayerSaveState без
+  PlannedSleepHours/SleptMinutes → вечный сон после cold-load (140
+  тиков); in-process D4 ложно зелёный (протухшие поля инстанса:
+  ResetWorld не чистил сон-конвейер). Ревизии харнесса (тест-дефекты):
+  Ци на капе→TryConsumeQi, GetVirtualDelta (контур §4.2), Vd в
+  снапшоте, G2 через производственный B-путь (GodotInput.ActionPress),
+  точная арифметика honest-модели.
+- b031887: ФИКСЫ — PlayerModule.Tick: Regenerate ДО PlayerService.Tick
+  (интервал принадлежит режиму его начала; D1-харнесс гоняет НАСТОЯЩИЙ
+  PlayerModule.Tick — регрессия порядка ловится); PlayerSaveState
+  +PlannedSleepHours/SleptMinutes (легаси-сейв со сном без плана →
+  fallback 8ч с диагностикой); ResetWorld чистит сон-конвейер.
+  ПОСТФИКС: 30 PASS / 0 FAIL / 1 GAP — VERDICT PASS; cold-пара PASS,
+  D4-COLD: пробуждение ровно на 89-м тике (остаток 120−31).
+- Регрессия: 37/37 PASS — 7 foreground-чанков (фоновый прогон убит
+  платформой между вызовами — известное поведение; COMBAT_SIM bug012
+  успел флакнуть в фоне, НЕ воспроизвёлся в foreground-чанке 1;
+  STAGE8 зелёный; STAGE17/STAGE15/STAGE16 с cold-парами зелёные —
+  фиксы не регрессировали стамину/сон/сейвы). Лог:
+  checkpoints/10_24_stage18_regression_full.log (+ фиксация сбоя фона).
+- 7067001: отчёт 10_24_stage18_subsystem_integration_report.md (статусы
+  ST18-001..011: 2 CONFIRMED_FIXED, 7 CONFIRMED-works, ST18-003 PART,
+  ST18-009 NOT TESTED-визуал; GAP: баффы/наземные предметы не в сейве —
+  за владельцем) + портал: bugs.json 81→84 (волна 8: STAGE18-001 P1
+  граница сна, STAGE18-002 P1 вечный сон cold-load, STAGE18-003 P2
+  доказательность), status.json v2.1.
+- GitHub main = 7067001; все 4 артефакта этапа-18 в git ls-files.
+
+NEXT: ожидание Этапа-19 (аудит ревьювера) ЛИБО follow-up по решению
+владельца: (а) баффы/наземные предметы в сейве (ST18-001/A6 GAP —
+BuffService/GroundItemService ISaveable), (б) эпизод восстановления
+Godot GUI-режима (скриншоты PT-V01..V08 + будущей stamina-HUD,
+блокировка в отчёте этапа-16 §6), (в) расход выносливости действиями
+(бег) + HUD-полоса (PT-W01, HOTKEYS «Запланировано»).
