@@ -1,6 +1,6 @@
 {
-  "version": 1.1,
-  "updated": "2026-10-24T12:30:00Z",
+  "version": 1.2,
+  "updated": "2026-10-24T16:20:00Z",
   "format": {
     "purpose": "Чек-лист физического плейтеста владельца. Директива 22.10: до 25.10 физического плейтеста нет — все плановые проверки живут здесь, чтобы не держать детали в памяти. Данные ведёт main-агент по запросу владельца («отметь PT-C03 выполненным»); портал читает в рантайме (no-store). Проваленные пункты уходят в реестр portal/data/bugs.json.",
     "item_status": {
@@ -104,7 +104,7 @@
             "BUG-010",
             "BUG-011",
             "stage11",
-            "ST11-001",
+            "STAGE11-001",
             "3c5643f"
           ],
           "steps": [
@@ -125,8 +125,8 @@
           "priority": "high",
           "status": "failed",
           "refs": [
-            "BUG-015",
-            "BUG-017",
+            "STAGE5-001",
+            "STAGE5-003",
             "stage5"
           ],
           "steps": [
@@ -146,7 +146,7 @@
           "priority": "high",
           "status": "planned",
           "refs": [
-            "BUG-017",
+            "STAGE5-003",
             "stage5"
           ],
           "steps": [
@@ -163,8 +163,8 @@
           "priority": "optional",
           "status": "planned",
           "refs": [
-            "BUG-015",
-            "BUG-016",
+            "STAGE5-001",
+            "STAGE5-002",
             "stage5"
           ],
           "steps": [
@@ -253,7 +253,7 @@
           "priority": "high",
           "status": "planned",
           "refs": [
-            "BUG-022",
+            "STAGE7-001",
             "stage7"
           ],
           "steps": [
@@ -274,7 +274,7 @@
           "priority": "high",
           "status": "planned",
           "refs": [
-            "GAP-025",
+            "STAGE7-004",
             "stage7"
           ],
           "steps": [
@@ -293,7 +293,7 @@
           "priority": "normal",
           "status": "planned",
           "refs": [
-            "BUG-024",
+            "STAGE7-003",
             "stage7"
           ],
           "steps": [
@@ -311,7 +311,7 @@
           "priority": "optional",
           "status": "planned",
           "refs": [
-            "BUG-023",
+            "STAGE7-002",
             "stage7"
           ],
           "steps": [
@@ -352,8 +352,8 @@
           "priority": "optional",
           "status": "planned",
           "refs": [
-            "BUG-019",
-            "BUG-020",
+            "STAGE6-002",
+            "STAGE6-003",
             "stage6"
           ],
           "steps": [
@@ -371,7 +371,7 @@
           "priority": "normal",
           "status": "planned",
           "refs": [
-            "BUG-021",
+            "STAGE6-004",
             "inv-s6"
           ],
           "steps": [
@@ -430,7 +430,7 @@
           "priority": "normal",
           "status": "planned",
           "refs": [
-            "GAP-014",
+            "STAGE4-004",
             "R41"
           ],
           "steps": [
@@ -717,7 +717,7 @@
       "title": "Техники / Ци / Ауры (Этап-8 аудита, ST8-01..06)",
       "items": [
         {
-          "id": "PT-T01",
+          "id": "PT-K01",
           "title": "Направленная AoE не взрывается кругом «в свою грудь» (ST8-01)",
           "priority": "high",
           "status": "planned",
@@ -736,7 +736,7 @@
           ]
         },
         {
-          "id": "PT-T02",
+          "id": "PT-K02",
           "title": "Удержанная техника не исчезает при отказе — выпуск повторяем (ST8-02)",
           "priority": "high",
           "status": "planned",
@@ -755,7 +755,7 @@
           ]
         },
         {
-          "id": "PT-T03",
+          "id": "PT-K03",
           "title": "Лечение при целом теле отказывает и ждёт рану (ST8-02/Support)",
           "priority": "normal",
           "status": "planned",
@@ -772,7 +772,7 @@
           ]
         },
         {
-          "id": "PT-T04",
+          "id": "PT-K04",
           "title": "Мастерство/прогресс: одно применение = один прирост (ST8-03)",
           "priority": "normal",
           "status": "planned",
@@ -791,7 +791,7 @@
           ]
         },
         {
-          "id": "PT-T05",
+          "id": "PT-K05",
           "title": "Смерть/стюн/медитация срывают зарядку и удержание с честным возвратом (ST8-04)",
           "priority": "high",
           "status": "planned",
@@ -810,7 +810,7 @@
           ]
         },
         {
-          "id": "PT-T06",
+          "id": "PT-K06",
           "title": "Щит честен при пустом ядре Ци (ST8-05)",
           "priority": "high",
           "status": "planned",
@@ -829,7 +829,7 @@
           ]
         },
         {
-          "id": "PT-T07",
+          "id": "PT-K07",
           "title": "Рассеивание ауры на пороге: возврат Ци честный (ST8-06)",
           "priority": "normal",
           "status": "planned",
@@ -859,7 +859,7 @@
           "priority": "high",
           "status": "planned",
           "refs": [
-            "ST11-002",
+            "STAGE11-002",
             "3c5643f",
             "stage11"
           ],
@@ -882,7 +882,7 @@
           "status": "planned",
           "refs": [
             "ST11-006",
-            "ST11-007",
+            "STAGE11-007",
             "stage11"
           ],
           "steps": [
@@ -902,7 +902,7 @@
           "priority": "normal",
           "status": "planned",
           "refs": [
-            "ST11-004",
+            "STAGE11-004",
             "GAP",
             "stage11"
           ],
@@ -921,7 +921,7 @@
           "priority": "normal",
           "status": "planned",
           "refs": [
-            "ST11-005",
+            "STAGE11-005",
             "GAP",
             "stage11"
           ],
@@ -940,7 +940,7 @@
           "priority": "high",
           "status": "planned",
           "refs": [
-            "ST11-007",
+            "STAGE11-007",
             "901c40d",
             "stage11"
           ],
@@ -961,7 +961,7 @@
           "priority": "high",
           "status": "planned",
           "refs": [
-            "ST11-003",
+            "STAGE11-003",
             "3c5643f",
             "stage11"
           ],
@@ -988,7 +988,7 @@
           "priority": "high",
           "status": "planned",
           "refs": [
-            "ST12-002",
+            "STAGE12-002",
             "97ecb5b",
             "stage12"
           ],
@@ -1028,8 +1028,8 @@
           "priority": "normal",
           "status": "planned",
           "refs": [
-            "ST12-003",
-            "ST12-004",
+            "STAGE12-003",
+            "STAGE12-004",
             "678d5b2",
             "stage12"
           ],
@@ -1050,7 +1050,7 @@
           "priority": "high",
           "status": "planned",
           "refs": [
-            "ST12-005",
+            "STAGE12-005",
             "678d5b2",
             "stage12"
           ],
@@ -1090,7 +1090,7 @@
           "priority": "high",
           "status": "planned",
           "refs": [
-            "ST12-007",
+            "STAGE12-007",
             "GAP",
             "stage12"
           ],
@@ -1262,7 +1262,7 @@
           "priority": "high",
           "status": "planned",
           "refs": [
-            "ST16-001"
+            "STAGE16-001"
           ],
           "steps": [
             "Melee-атака (ЛКМ) → сразу умереть (F-чит/зверь).",
@@ -1277,11 +1277,11 @@
         {
           "id": "PT-V03",
           "title": "NPC и звери: атака, ранение, смерть → переход к трупу",
-          "priority": "medium",
+          "priority": "normal",
           "status": "planned",
           "refs": [
-            "ST16-003",
-            "ST16-004"
+            "STAGE16-003",
+            "STAGE16-004"
           ],
           "steps": [
             "Зверь (волк) идёт/бежит к игроку — наблюдать walk vs idle.",
@@ -1296,7 +1296,7 @@
         {
           "id": "PT-V04",
           "title": "Экипировка: снятие/смена оружия, зеркалирование, положение в руке",
-          "priority": "medium",
+          "priority": "normal",
           "status": "planned",
           "refs": [
             "ST16-009"
@@ -1314,10 +1314,10 @@
         {
           "id": "PT-V05",
           "title": "Персонаж/NPC/зверь перекрывают объекты по Y",
-          "priority": "medium",
+          "priority": "normal",
           "status": "planned",
           "refs": [
-            "ST16-005"
+            "STAGE16-005"
           ],
           "steps": [
             "Встать рядом с деревом/камнем выше и ниже его по Y."
@@ -1333,7 +1333,7 @@
           "priority": "high",
           "status": "planned",
           "refs": [
-            "ST16-005"
+            "STAGE16-005"
           ],
           "steps": [
             "Начертить формацию, встать внутрь контура.",
@@ -1351,7 +1351,7 @@
           "priority": "high",
           "status": "planned",
           "refs": [
-            "ST16-006"
+            "STAGE16-006"
           ],
           "steps": [
             "Активировать Ци-буфер (щит); получить удары (поглощения); кастовать Defense.",
@@ -1366,10 +1366,10 @@
         {
           "id": "PT-V08",
           "title": "Длительная сессия: spawn/despawn, culling — визуал не застревает, кэши под контролем",
-          "priority": "low",
+          "priority": "optional",
           "status": "planned",
           "refs": [
-            "ST16-007"
+            "STAGE16-007"
           ],
           "steps": [
             "Долгая сессия с зачисткой зверей/NPC и возвратом в зону."
@@ -1388,10 +1388,10 @@
         {
           "id": "PT-W01",
           "title": "HUD-полоса выносливости: расход/регенерация/сон визуально",
-          "priority": "medium",
+          "priority": "normal",
           "status": "planned",
           "refs": [
-            "ST17-001",
+            "STAGE17-001",
             "ST17-003"
           ],
           "steps": [
