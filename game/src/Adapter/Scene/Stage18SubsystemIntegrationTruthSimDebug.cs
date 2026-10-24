@@ -489,43 +489,41 @@ namespace CultivationGame.Adapter.Scene
             var st = _stamina!;
             var ps = _playerSvc!;
 
-            // Живой тик-луп глушим: точные тарифы считаем вручную в порядке
-            // ПРОИЗВОДСТВЕННОГО PlayerModule.Tick: ps.Tick(DeltaTime) →
-            // st.Regenerate(DeltaTime×60000) (строки 99→112 модуля).
-            _session!.Pause();
-
             float sleepPct = _playerConfig?.SleepStaminaRecoveryPercentPerHour ?? 100f;
             float awakeProm = _playerConfig?.StaminaAwakeRegenPromillePerMinute ?? 25f;
             // Точная целочисленная модель (milli): сон num=pct×10×max / 3.6e6 ms.
             long max = st.MaxStamina;
-            long sleepMilliPerMin = (long)(sleepPct * 10f) * max * 60_000L / 3_600_000L;
 
             // D1: ГЛАВНЫЙ кандидат (прогноз аудита): последняя минута
-            // запланированного сна. План 30 минут, 30 производственных
-            // интервалов {ps.Tick; Regenerate} (порядок строк PlayerModule.Tick):
-            // на 30-м интервале PlayerService.Tick авто-будит ДО Regenerate →
-            // последняя минута сна тарифицируется скоростью БОДРСТВОВАНИЯ.
-            // БЕЗ прелюдиального тика: первый интервал сам обрабатывает
-            // FallingAsleep (IsSleeping=true с момента StartSleep).
+            // запланированного сна. ПРОИЗВОДСТВЕННЫЙ путь — вызываем НАСТОЯЩИЙ
+            // PlayerModule.Tick (реальный порядок Regenerate↔PlayerService.Tick
+            // внутри модуля, а не зеркалирование строк тестом): 30 синхронных
+            // вызовов без await — живой луп (1 тик/с) не интерливится.
+            // Прежний порядок (Tick→Regenerate) на 30-м интервале авто-будил
+            // ДО Regenerate → минута сна тарифицировалась ставкой бодрствования
+            // (пруф префикса: 508‰ ≠ 500‰). DeltaTime=1.0 за тик (контракт
+            // TIME_SYSTEM §5; WorldService ставит 1f каждому тику).
             const int planMin = 30;
+            var playerModule = _resolver!.Resolve<PlayerModule>();
             ps.StartSleep(planMin / 60f);
             st.SetCurrent(0);
             for (int i = 0; i < planMin; i++)
-            {
-                ps.Tick(1f);                 // ПРОИЗВОДСТВЕННЫЙ порядок №1
-                st.Regenerate(60_000);       // ПРОИЗВОДСТВЕННЫЙ порядок №2
-            }
+                playerModule.Tick(i); // НАСТОЯЩИЙ производственный тик модуля
             long honestMilli = (long)(sleepPct * 10f) * max * planMin * 60_000L / 3_600_000L; // весь интервал — сон, БЕЗ по-минутного floor
             int honestPromille = (int)Math.Min(honestMilli / max, 1000);
             int gotPromille = st.CurrentPromille;
             bool d1 = gotPromille == honestPromille;
-            GD.Print($"[D1] план сна {planMin} мин @0‰: факт={gotPromille}‰, честно(весь сон)={honestPromille}‰ " +
+            GD.Print($"[D1] план сна {planMin} мин @0‰ (PlayerModule.Tick×{planMin}): факт={gotPromille}‰, честно(весь сон)={honestPromille}‰ " +
                      $"(сон {sleepPct}%/ч, бодрствование {awakeProm}‰/мин); после цикла сон={ps.SleepState}");
             Record("ST18-004/D1", d1,
-                d1 ? $"последняя минута сна тарифицируется сонной скоростью: {planMin} мин → {honestPromille}‰ точно"
+                d1 ? $"последняя минута сна тарифицируется сонной скоростью: {planMin} мин → {honestPromille}‰ точно (производственный путь модуля)"
                    : $"ГРАНИЦА СНА: последняя минута запланированного сна тарифицирована НЕ сонной скоростью " +
                      $"(факт {gotPromille}‰ ≠ честные {honestPromille}‰; разница = ставка бодрствования {awakeProm}‰/мин на последнем интервале — " +
                      "PlayerService.Tick авто-будит раньше, чем Regenerate выбирает режим)");
+
+            // Дальнейшие точные тесты — вручную на сервисах: живой тик-луп
+            // глушим паузой (DeltaTime==0 при паузе, контракт P2-28).
+            _session!.Pause();
 
             // D2: смена режима МЕЖДУ тиками — каждый интервал по своему режиму.
             ps.WakeUp();

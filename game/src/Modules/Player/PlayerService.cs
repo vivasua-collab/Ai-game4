@@ -311,6 +311,13 @@ public sealed class PlayerService : IPlayerService, ISaveable, IWorldResettable,
         public int SleepState;
         public int Stance;
         public bool DeathAnnounced;
+        // ST18-004/D4-COLD (Этап-18): план сна и фактические минуты — БЕЗ них
+        // спящий в сейве игрок в НОВОМ процессе не может авто-проснуться
+        // (SleepState=Sleeping + plan=0 → счётчик не ведётся → вечный сон;
+        // пруф префикса cold-пары: 140 тиков без пробуждения). Отсутствие
+        // полей в легаси-сейвах → 0 → fallback-ветка RestoreState ниже.
+        public float PlannedSleepHours;
+        public int SleptMinutes;
     }
 
     public string SaveKey => "player";
@@ -327,6 +334,10 @@ public sealed class PlayerService : IPlayerService, ISaveable, IWorldResettable,
             SleepState = (int)SleepState,
             Stance = (int)Stance,
             DeathAnnounced = _deathAnnounced,
+            // ST18-004: сон-конвейер (план+факт) — для авто-пробуждения
+            // остатка после загрузки и честного ConsolidateSleep.
+            PlannedSleepHours = _plannedSleepHours,
+            SleptMinutes = _sleptMinutes,
         };
     }
 
@@ -357,8 +368,35 @@ public sealed class PlayerService : IPlayerService, ISaveable, IWorldResettable,
             Stance = (PlayerStance)data.Stance;
         _deathAnnounced = data.DeathAnnounced;
 
+        // ST18-004/D4-COLD: план сна + фактические минуты. Спящему игроку —
+        // восстановленный план (авто-пробуждение по остатку; счёт минут
+        // продолжается с сохранённого значения). Легаси-сейв (полей нет → 0)
+        // со SleepState=Sleeping: без плана игрок спал бы вечно — честный
+        // fallback: канонический дефолт сна 8ч с момента загрузки
+        // (диагностика в лог; бодрствующему план не нужен — 0).
+        if (SleepState != PlayerSleepState.Awake)
+        {
+            if (data.PlannedSleepHours > 0f)
+            {
+                _plannedSleepHours = data.PlannedSleepHours;
+                _sleptMinutes = Math.Max(0, data.SleptMinutes);
+            }
+            else
+            {
+                _plannedSleepHours = 8f;
+                _sleptMinutes = 0;
+                Console.WriteLine("[PlayerService] RestoreState: легаси-сейв со сном БЕЗ плана (PlannedSleepHours=0) — " +
+                                  "fallback: канонический план 8ч с момента загрузки (иначе — вечный сон)");
+            }
+        }
+        else
+        {
+            _plannedSleepHours = 0f;
+            _sleptMinutes = 0;
+        }
+
         Console.WriteLine($"[PlayerService] RestoreState: позиция ({data.PosX},{data.PosY}), " +
-                          $"sleep={SleepState}, stance={Stance}, dead={_deathAnnounced}");
+                          $"sleep={SleepState} (план {_plannedSleepHours:0.#}ч, проспано {_sleptMinutes} мин), stance={Stance}, dead={_deathAnnounced}");
     }
 
     // R17 (E-1): IWorldResettable — пересборка мира = аватар не заспавнен
@@ -374,6 +412,11 @@ public sealed class PlayerService : IPlayerService, ISaveable, IWorldResettable,
         _deathAnnounced = false;
         SleepState = PlayerSleepState.Awake;
         Stance = PlayerStance.Normal;
+        // ST18-004: сон-конвейер чистится ВМЕСТЕ с состоянием — прежде поля
+        // переживали сброс и «помогали» in-process LoadGame протухшими
+        // значениями прошлого мира (маскировка потери плана в сейве).
+        _plannedSleepHours = 0f;
+        _sleptMinutes = 0;
         _assignedTechniques.Clear();
         _cachedCultivationLevel = CultivationLevel.None;
         _cachedCurrentQi = 0;

@@ -92,6 +92,16 @@ public sealed class PlayerModule : IModule
         // (1% QiCost/тик; рассеяние при < QiCost/2 с возвратом 50%).
         _auraHold?.Tick(_timeService.DeltaTime);
 
+        // ST18-004/D1 (Этап-18 аудита, прогноз ревьювера): реген выносливости —
+        // ДО PlayerService.Tick. Интервал [тик N-1 → тик N] принадлежит режиму,
+        // действовавшему В НЕГО: прежний порядок (Tick → Regenerate) на
+        // ПОСЛЕДНЕЙ минуте запланированного сна авто-будил игрока ДО выбора
+        // скорости → минута сна тарифицировалась ставкой бодрствования
+        // (пруф префикса: план 30 мин → 508‰ вместо честных 500‰). Первый
+        // интервал сна корректен и в новом порядке: FallingAsleep даёт
+        // IsSleeping=true с момента StartSleep.
+        _staminaService?.Regenerate((int)(_timeService.DeltaTime * 60_000f));
+
         // R35 (Фаза 14 / P1-20): сон-конвейер — PlayerService.Tick ведёт счёт
         // фактических минут сна/авто-пробуждение (WakeUp → ConsolidateSleep).
         // Ранее PlayerService.Tick вообще никем не вызывался (сон-машина
@@ -103,13 +113,6 @@ public sealed class PlayerModule : IModule
         // per-tick, только при активной медитации (зеркало состояния —
         // StatProgressProducer по MeditationStateChangedEvent).
         _statProgress?.TickMeditation();
-
-        // ST17-002 (Этап-17): регенерация выносливости — 1 тик = 1 игровая
-        // минута (канон TIME_SYSTEM §5: DeltaTime 1.0/тик), режим скорости
-        // (сон/бодрствование) выбирает сам сервис по IPlayerService.IsSleeping.
-        // Расход действий — будущие потребители (HOTKEYS: «стамина бега» —
-        // запланировано); здесь только честный реген пер-тик.
-        _staminaService?.Regenerate((int)(_timeService.DeltaTime * 60_000f));
 
         // Movement is now handled by GameWorldController.HandleFreeMovement()
         // (pixel-based, continuous). PlayerModule.Tick() no longer moves the player.
