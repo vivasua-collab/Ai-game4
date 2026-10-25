@@ -485,4 +485,4 @@ game/resources/sprites/
 | `SPRITE_CATALOG.md` | каталог имён/размеров/зеркалирования (§16/§17) |
 | `PROCEDURAL_SPRITES.md` §5 | контракт PNG-миграции по ключу кэша |
 | `RENDER_LAYERS.md` §3.5 | порядок слоёв игрока (Shadow→Visual→Equipped→Effects) |
-| `2.5d-project-with-c#-demo/assets/player/` | эталон листов (run.png 5×6, 15 fps) |
+| 2.5D-демо (зеркало удалено 2026-10-25) | эталон листов (run.png 5×6, 15 fps — параметры в SPRITE_ANIMATION_PLAN.md §3.5) |

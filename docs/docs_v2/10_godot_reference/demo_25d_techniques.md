@@ -1,7 +1,7 @@
 # 2.5D Demo — Visual Techniques Reference (IDX-3)
 
-> **Source:** `godotengine/godot-demo-projects` → `mono/2.5d/` (also locally mirrored at
-> `Ai-game4/2.5d-project-with-c#-demo/`).
+> **Source:** `godotengine/godot-demo-projects` → `mono/2.5d/` (локальное зеркало
+> удалено из репо 2026-10-25 — идеи выжаты в этот файл; upstream на GitHub).
 > **Purpose:** Study how the official Godot 2.5D demo achieves **"наглядность"** (visual clarity
 > and depth perception) without using a true 3D camera, and extract techniques applicable to our
 > pure-2D top-down game (no Z coordinate yet).
@@ -362,4 +362,5 @@ All findings are from the official `godotengine/godot-demo-projects` repository,
 - `assets/player/PlayerSprite.cs` (SetViewMode, frame indexing, direction×progress)
 - `project.godot` (clear color, filter, physics tick, renderer)
 
-Local mirror at `Ai-game4/2.5d-project-with-c#-demo/` for offline re-reading.
+Локальное зеркало удалено из репо 2026-10-25 (генеральная уборка); ключевые
+параметры сохранены в этом файле, upstream — `godotengine/godot-demo-projects`.

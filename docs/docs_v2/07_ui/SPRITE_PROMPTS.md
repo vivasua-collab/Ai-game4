@@ -199,7 +199,7 @@ no text, no borders
 ## 3. Референсное изображение
 
 Прилагается скриншот Heroes of Might and Magic 3 как референс:
-- `docs/screenshots/heroes3_reference.png` (или из upload)
+- референс из upload (старые скрипны purgятся; путь `docs/screenshots/` упразднён 2026-10-25)
 - Стиль: pre-rendered 2D, top-down
 - Переходы: edge sprites между биомами
 
