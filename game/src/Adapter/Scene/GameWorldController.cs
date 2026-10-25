@@ -67,6 +67,10 @@ public partial class GameWorldController : Node2D
     [Inject] private ISubscriber<Core.Messaging.Contracts.TradeOpenedEvent> TradeOpenedSub { get; set; } = null!;
     [Inject] private ISubscriber<Core.Messaging.Contracts.TradeClosedEvent> TradeClosedSub { get; set; } = null!;
     [Inject] private ISubscriber<Core.Messaging.Contracts.ToastShownEvent> ToastShownSub { get; set; } = null!;
+    // PT2-003 (плейтест-2, 25.10): фидбек Tab-таргетинга (тост «🎯 Цель: …»).
+    [Inject] private ISubscriber<Core.Messaging.Contracts.PlayerTargetChangedEvent> PlayerTargetChangedSub { get; set; } = null!;
+    // PT2-003: имя зверя-цели для тоста (NPC — через Npcs.GetNPCState).
+    [Inject] private Core.Interfaces.IAnimalService Animals { get; set; } = null!;
     // M2 (2026-09-03): отклонение атаки игрока (C-5 аудита-3) → тост причины
     // («Каст уже идёт: …») вместо удалённого polling-тоста «⚔ Атака!».
     [Inject] private ISubscriber<Core.Messaging.Contracts.AttackRejectedEvent> AttackRejectedSub { get; set; } = null!;
@@ -167,6 +171,7 @@ public partial class GameWorldController : Node2D
     private Label _meditationLabel = null!;
     private bool _meditationActive;           // кэш из MeditationStateChangedEvent
     private System.IDisposable? _meditationStateToken;
+    private System.IDisposable? _playerTargetChangedToken; // PT2-003: тост Tab-таргетинга
     private System.IDisposable? _techniqueCastResultToken;
     private System.IDisposable? _formationStageToken;
     private System.IDisposable? _formationActivatedToken2;
@@ -848,6 +853,13 @@ public partial class GameWorldController : Node2D
         _tradeClosedToken = TradeClosedSub?.Subscribe(OnTradeClosed);
         // Этап 1 внедрения ЦИ: индикация медитации (V).
         _meditationStateToken = MeditationStateSub?.Subscribe(OnMeditationStateChanged);
+        // PT2-003 (плейтест-2, 25.10): смена цели Tab-циклом → тост с именем.
+        // Репорт: «при нажатии tab на него не перемещается фокус» — логика
+        // CycleTarget отрабатывала всегда, но в упор (0-1 тайл) спрайт игрока
+        // перекрывает янтарную рамку (ZIndex Objects 3 < Player 4) и владелец
+        // не видел НИ рамки, НИ какого-либо фидбека. Теперь смена цели
+        // дублируется тостом «🎯 Цель: …».
+        _playerTargetChangedToken = PlayerTargetChangedSub?.Subscribe(OnPlayerTargetChanged);
         // Этап 2 внедрения ЦИ: результат каста техники (тосты).
         _techniqueCastResultToken = TechniqueCastResultSub?.Subscribe(OnTechniqueCastResult);
         // Этап 5 внедрения ЦИ: стадии формации (тосты).
@@ -2739,9 +2751,23 @@ public partial class GameWorldController : Node2D
             // разговор с NPC, подбор) — прежде гейт был только на
             // trade/loot/dialogue. Проверка после trade/loot/dialogue-веток:
             // они легитимно потребляют E (модальность своих поверхностей).
+            //
+            // PT2-005 (плейтест-2, 25.10): окно ИНВЕНТАРЯ — исключение для
+            // ПОДБОРА предметов: единственный UI выброса (drag→корзина,
+            // ПКМ «Выбросить») живёт ВНУТРИ инвентаря, окно после выброса
+            // остаётся открытым, а молчаливый ST14-005-гейт делал drop→
+            // pickup невозможным («выбросил вещи — не могу поднять обратно»).
+            // Подбор — операция инвентаря, не «скрытое взаимодействие»;
+            // обыск/диалог по-прежнему гейтятся (ниже — только HandlePickup).
+            else if (_inventoryWindow is { Visible: true })
+            {
+                HandlePickup();
+            }
             else if (AnyModalWindowOpen())
             {
-                // E съедается планировочной модальностью.
+                // E съедается планировочной модальностью — PT2-005: с видимым
+                // фидбеком (немая ветка = субъективное «E не работает»).
+                ShowToast("Окно открыто — взаимодействие с миром (E) после закрытия");
             }
             else if (!HandleCorpseSearchOrNpcTalk())
             {
@@ -3311,6 +3337,13 @@ public partial class GameWorldController : Node2D
         {
             if (corpse.IsEmpty)
             {
+                // PT2-005 (плейтест-2, 25.10): ПУСТОЙ труп больше не глушит
+                // подбор — рядом с полем боя почти всегда трупы, и E на
+                // выброшенные у ног вещи не доходит до HandlePickup
+                // («выбросил — не могу поднять»). Нет предметов рядом —
+                // прежний тост-фидбек.
+                if (HasGroundItemNearby())
+                    return false; // проваливаемся в HandlePickup
                 ShowToast($"☠ {corpse.DisplayName} — уже обобран");
                 return true; // труп в радиусе — E не падает в подбор предметов
             }
@@ -3492,6 +3525,40 @@ public partial class GameWorldController : Node2D
     }
 
     /// <summary>
+    /// PT2-005 (плейтест-2, 25.10): есть ли наземный предмет в радиусе
+    /// подбора (1.5 тайла от визуальной позиции игрока). Используется
+    /// пустым трупом — не съедать E, если у ног лежит предмет.
+    /// </summary>
+    private bool HasGroundItemNearby()
+    {
+        if (GroundItems == null || GroundItems.Count == 0) return false;
+
+        const float pickupDistance = 1.5f * GameConstants.TILE_PIXELS;
+        foreach (var item in GroundItems.GetAllGroundItems())
+        {
+            float dx = item.WorldX - _visualPosition.X;
+            float dy = item.WorldY - _visualPosition.Y;
+            if (dx * dx + dy * dy <= pickupDistance * pickupDistance) return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// PT2-003 (плейтест-2, 25.10): тост при Tab-смене цели — «🎯 Цель:
+    /// {имя} · {дист} т». Сброс цели — тихий (рамку снимают рендеры;
+    /// тост на каждое исчезновение — шум).
+    /// </summary>
+    private void OnPlayerTargetChanged(in Core.Messaging.Contracts.PlayerTargetChangedEvent e)
+    {
+        if (string.IsNullOrEmpty(e.TargetId)) return;
+
+        string name = Npcs?.GetNPCState(e.TargetId)?.DisplayName
+            ?? Animals?.GetDisplayName(e.TargetId)
+            ?? "цель";
+        ShowToast($"🎯 Цель: {name} · {e.DistanceTiles} т");
+    }
+
+    /// <summary>
     /// 2026-09-04 S2: показать тост в стеке (top-center). Новые сообщения
     /// НЕ затирают предыдущие: стек до MaxToastLines строк, повтор подряд
     /// агрегируется в «×N» с продлением показа.
@@ -3626,6 +3693,9 @@ public partial class GameWorldController : Node2D
         // Медитация (Этап 1 внедрения ЦИ).
         _meditationStateToken?.Dispose();
         _meditationStateToken = null;
+        // Tab-таргетинг (PT2-003).
+        _playerTargetChangedToken?.Dispose();
+        _playerTargetChangedToken = null;
         // Результаты каста техник (Этап 2).
         _techniqueCastResultToken?.Dispose();
         _techniqueCastResultToken = null;

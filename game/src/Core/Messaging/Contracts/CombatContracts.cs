@@ -53,6 +53,14 @@ public readonly struct DamageAppliedEvent
     public readonly string? OriginalAttackerId;
 
     /// <summary>
+    /// PT2-004 (плейтест-2, 25.10): Ци, поглощённая щитом цели в этом ударе
+    /// (RawQi-буфер R21-4). 0 = буфера не было. Даёт UI честный фидбек
+    /// «−5 (Ци −45)»: без него игрок видит только HP-урон и воспринимает
+    /// атаку как «не проходит» (репорт: «на NPC не отрабатывают техники»).
+    /// </summary>
+    public readonly int AbsorbedByQi;
+
+    /// <summary>
     /// Обратная совместимость — без Element.
     /// </summary>
     public DamageAppliedEvent(string sourceId, string targetId, int damage, DamageType type,
@@ -84,6 +92,16 @@ public readonly struct DamageAppliedEvent
     public DamageAppliedEvent(string sourceId, string targetId, int damage, DamageType type,
         Element element, BodyPartType hitPart, CombatAttackResult result, CombatSubtype attackSubtype,
         string? originalAttackerId)
+        : this(sourceId, targetId, damage, type, element, hitPart, result, attackSubtype,
+              originalAttackerId, 0) { }
+
+    /// <summary>
+    /// Супер-полный конструктор (PT2-004): + AbsorbedByQi — Ци, снятая
+    /// щитом цели в этом ударе, для фидбека цифр урона («−5 (Ци −45)»).
+    /// </summary>
+    public DamageAppliedEvent(string sourceId, string targetId, int damage, DamageType type,
+        Element element, BodyPartType hitPart, CombatAttackResult result, CombatSubtype attackSubtype,
+        string? originalAttackerId, int absorbedByQi)
     {
         SourceId = sourceId;
         TargetId = targetId;
@@ -94,6 +112,7 @@ public readonly struct DamageAppliedEvent
         Result = result;
         AttackSubtype = attackSubtype;
         OriginalAttackerId = originalAttackerId;
+        AbsorbedByQi = absorbedByQi;
     }
 }
 

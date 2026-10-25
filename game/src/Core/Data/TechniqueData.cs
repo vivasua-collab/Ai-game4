@@ -57,6 +57,17 @@ namespace CultivationGame.Core.Data
         /// <summary>Стихия (Fire, Water, Earth и т.д.)</summary>
         public Element Element;
 
+        // === PT2-000 (плейтест-2, 25.10): тип формации техники-Formation ===
+        // Прежде тип проявления (Barrier/Amplification/Suppression/Gathering)
+        // бросался кубиком В МОМЕНТ КАСТА (PlayerTechniqueCaster) — техника
+        // не знала, ЧТО создаст: книга техник показывала мёртвые статы
+        // («Урон: 80» не потребляется) и владелец не мог понять, что делает
+        // «Молниевая Формация» («в описании нет ничего по ней»). Теперь генератор
+        // ФИКСИРУЕТ тип по сиду (детерминизм сохранён), кастер наследует.
+        // int вместо enum для сейв-совместимости: -1 = не задан (легаси),
+        // иначе (FormationType)FormationKind.
+        public int FormationKind = -1;
+
         // === Уровень и мощь ===
 
         /// <summary>Уровень техники (1..cultivationLevel)</summary>

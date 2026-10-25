@@ -48,6 +48,16 @@ public sealed class HumanNPCSpawnPhase : AbstractSceneAssemblyPhase
     private const int MaxSpawnAttempts = 200;
     private const int MinDistanceFromPlayer = 5;
 
+    // PT2-002 (плейтест-2, 25.10): враждебные роли — дальше от старта.
+    // Репорт: «на стартовой локации агрессивный NPC… пока писал отчёт меня
+    // убили». Раньше Enemy/Monster спаунились в 5 тайлах от центра = в
+    // радиусе мгновенного агро (AggroRadius=5, NPCConfig) — бандит входил
+    // в Attacking с первого AI-тика. Мирные роли — прежние 5 тайлов.
+    // 40 тайлов (80 м): leash 30 и patrol-радиус банды 9 не дотягиваются.
+    // ТОЛЬКО на больших картах (clustered): малые (QA test_polygon)
+    // сохраняют прежний радиус — rng-стрим и состав не меняются.
+    private const int HostileMinDistanceFromPlayer = 40;
+
     // L500 (2026-09-15): кластерный спавн на больших картах — 60% NPC в
     // «поясе жизни» у центра (игрок тестирует боевку, не марширует по
     // пустыне 1×1 км), 40% — по всей карте (ощущение обитаемого мира).
@@ -75,7 +85,13 @@ public sealed class HumanNPCSpawnPhase : AbstractSceneAssemblyPhase
 
         foreach (var request in requests)
         {
-            var pos = FindWalkablePosition(rng, loc.Width, loc.Height, clustered);
+            // PT2-002: Hostile-роли на больших картах — за HostileMinDistance
+            // от центра (старта игрока); малые карты/мирные — прежние 5.
+            bool hostile = request.Role is NPCRole.Enemy or NPCRole.Monster;
+            int minDist = clustered && hostile
+                ? HostileMinDistanceFromPlayer
+                : MinDistanceFromPlayer;
+            var pos = FindWalkablePosition(rng, loc.Width, loc.Height, clustered, minDist);
             if (pos is null)
             {
                 Console.WriteLine($"[HumanNPCSpawn] No walkable tile for {request.Role} — skipped");
@@ -112,7 +128,8 @@ public sealed class HumanNPCSpawnPhase : AbstractSceneAssemblyPhase
         _                  => null, // Enemy/Monster — только бой
     };
 
-    private Position2D? FindWalkablePosition(SeededRandom rng, int width, int height, bool clustered)
+    private Position2D? FindWalkablePosition(SeededRandom rng, int width, int height, bool clustered,
+        int minDistFromPlayer)
     {
         int cx = width / 2, cy = height / 2;
         // L500: радиус «пояса жизни» — от центра, с запасом до края карты.
@@ -120,7 +137,7 @@ public sealed class HumanNPCSpawnPhase : AbstractSceneAssemblyPhase
         for (int attempt = 0; attempt < MaxSpawnAttempts; attempt++)
         {
             int x, y;
-            if (clustered && nearRadius > MinDistanceFromPlayer + 3
+            if (clustered && nearRadius > minDistFromPlayer + 3
                 && rng.NextDouble() < NearRingFraction)
             {
                 // Пояс жизни: квадрат ±nearRadius вокруг центра (кламп в границы).
@@ -137,7 +154,7 @@ public sealed class HumanNPCSpawnPhase : AbstractSceneAssemblyPhase
             if (!_tiles.IsWalkable(x, y)) continue;
 
             int dist = Math.Max(Math.Abs(x - cx), Math.Abs(y - cy));
-            if (dist < MinDistanceFromPlayer) continue;
+            if (dist < minDistFromPlayer) continue;
 
             return new Position2D(x, y);
         }

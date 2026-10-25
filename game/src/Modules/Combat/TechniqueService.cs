@@ -305,7 +305,11 @@ namespace CultivationGame.Modules.Combat
 
                 // R28: хоуминг-снаряды
                 IsHoming = data.IsHoming,
-                ProjectileSpeedTilesPerSec = data.ProjectileSpeedTilesPerSec
+                ProjectileSpeedTilesPerSec = data.ProjectileSpeedTilesPerSec,
+
+                // PT2-000: описание + тип формации — больше не теряются при изучении
+                Description = data.Description,
+                FormationKind = data.FormationKind
             };
 
             // Эхо мастерства: «осмысление» профиля (тип+стихия) даёт новой
@@ -817,6 +821,9 @@ namespace CultivationGame.Modules.Combat
         public bool IsHoming { get; set; }
         public int ProjectileSpeedTilesPerSec { get; set; }
 
+        // PT2-000: описание + тип формации (сейв изученной техники; -1 = легаси)
+        public int FormationKind { get; set; } = -1;
+
         public static TechniqueSnapshotDto FromLearned(LearnedTechnique t) => new()
         {
             TechniqueId = t.TechniqueId,
@@ -847,6 +854,10 @@ namespace CultivationGame.Modules.Combat
             // R28: хоуминг
             IsHoming = t.IsHoming,
             ProjectileSpeedTilesPerSec = t.ProjectileSpeedTilesPerSec,
+
+            // PT2-000: описание + тип формации
+            Description = t.Description,
+            FormationKind = t.FormationKind,
         };
 
         public static TechniqueSnapshotDto FromData(string scrollId, TechniqueData d) => new()
@@ -881,6 +892,9 @@ namespace CultivationGame.Modules.Combat
             // R28: хоуминг
             IsHoming = d.IsHoming,
             ProjectileSpeedTilesPerSec = d.ProjectileSpeedTilesPerSec,
+
+            // PT2-000: тип формации (Description копируется выше — уже было)
+            FormationKind = d.FormationKind,
         };
 
         public LearnedTechnique ToLearned() => new()
@@ -913,6 +927,10 @@ namespace CultivationGame.Modules.Combat
             // R28: хоуминг
             IsHoming = IsHoming,
             ProjectileSpeedTilesPerSec = ProjectileSpeedTilesPerSec,
+
+            // PT2-000: описание + тип формации (сейв изученной техники)
+            Description = Description,
+            FormationKind = FormationKind,
         };
 
         public TechniqueData ToData() => new()
@@ -947,6 +965,9 @@ namespace CultivationGame.Modules.Combat
             // R28: хоуминг
             IsHoming = IsHoming,
             ProjectileSpeedTilesPerSec = ProjectileSpeedTilesPerSec,
+
+            // PT2-000: тип формации (Description — выше, уже было)
+            FormationKind = FormationKind,
         };
     }
 
@@ -988,5 +1009,15 @@ namespace CultivationGame.Modules.Combat
         // R28: самонаводящиеся снаряды (копия из TechniqueData)
         public bool IsHoming;
         public int ProjectileSpeedTilesPerSec;
+
+        // === PT2-000 (плейтест-2, 25.10): описание и тип формации ==================
+        // Описание генерируется (TechniqueGeneratorService.GenerateDescription)
+        // и РАНЬШЕ терялось при изучении: LearnedTechnique не хранил его → книга
+        // техник показывала только статы, а для формаций (BaseDamage не
+        // потребляется) — мёртвые цифры («в описании нет ничего по ней»).
+        public string Description = "";
+
+        /// <summary>Тип формации (-1 = не задан, легаси; иначе FormationType).</summary>
+        public int FormationKind = -1;
     }
 }

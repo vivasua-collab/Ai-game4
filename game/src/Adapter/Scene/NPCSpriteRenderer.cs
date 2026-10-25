@@ -379,6 +379,20 @@ public partial class NPCSpriteRenderer : Node2D
             {
                 DrawRect(new Rect2(pos.X - 3f, pos.Y - 3f, spriteSize + 6f, spriteSize + 6f),
                     SelectedTargetColour, false, 2.5f);
+
+                // PT2-003 (плейтест-2, 25.10): маркер-стрелка НАД головой цели.
+                // Репорт: «при нажатии tab на него не перемещается фокус» —
+                // логика работала, но при дистанции 0-1 тайл спрайт игрока
+                // (ZIndex Player=4) полностью перекрывает и рамку, и спрайт
+                // NPC (Objects=3) → переключение ВИЗУАЛЬНО незаметно.
+                // Маркер выше верха спрайта игрока (~+8px) — читается всегда.
+                float mTop = pos.Y - 14f;
+                DrawLine(new Vector2(cx - 5f, mTop - 8f), new Vector2(cx + 5f, mTop - 8f),
+                    SelectedTargetColour, 2f);
+                DrawLine(new Vector2(cx - 5f, mTop - 8f), new Vector2(cx, mTop - 1f),
+                    SelectedTargetColour, 2f);
+                DrawLine(new Vector2(cx + 5f, mTop - 8f), new Vector2(cx, mTop - 1f),
+                    SelectedTargetColour, 2f);
             }
 
             // R15: overlay оружия в руке — hand-спрайт поверх тела.

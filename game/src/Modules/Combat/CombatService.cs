@@ -1429,8 +1429,8 @@ namespace CultivationGame.Modules.Combat
                 attackSubtype,                                       // P2-7.3: подтип атаки (для кровотечения)
                 clashParry,                                          // R21-2: одновременная атака → парирование
                 attackDistanceTiles,                                 // R39-4: дистанция атаки (для Miss дальнего оружия)
-                rangedRangeTiles                                     // R39-4: дальность оружия (0 = атака не дальнобойная)
-            );
+                rangedRangeTiles,                                    // R39-4: дальность оружия (0 = атака не дальнобойная)
+                fromTechnique: _techniqueService.GetTechnique(techniqueId) != null); // PT2-004: техника → колонка technique при подавлении
 
             // Единый пайплайн урона
             var result = _damageService.CalculateDamage(request);

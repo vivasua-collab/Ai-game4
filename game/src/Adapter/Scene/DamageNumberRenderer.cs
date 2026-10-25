@@ -134,16 +134,23 @@ public partial class DamageNumberRenderer : Node2D
         if (worldPos == null) return;
 
         // Текст и цвет по результату атаки (CombatAttackResult).
+        // PT2-004 (плейтест-2): при поглощении Ци-щитом (RawQi R21-4) к
+        // числу добавляется «(Ци −N)» — без этого игрок видит 1-2 HP-урона
+        // и решает, что «техника не работает», хотя щит честно ест 90%.
         string text;
         Color colour;
         switch (e.Result)
         {
             case CombatAttackResult.CriticalHit:
-                text = $"КРИТ −{e.Damage}";
+                text = e.AbsorbedByQi > 0
+                    ? $"КРИТ −{e.Damage} (Ци −{e.AbsorbedByQi})"
+                    : $"КРИТ −{e.Damage}";
                 colour = CritColour;
                 break;
             case CombatAttackResult.Hit:
-                text = $"−{e.Damage}";
+                text = e.AbsorbedByQi > 0
+                    ? $"−{e.Damage} (Ци −{e.AbsorbedByQi})"
+                    : $"−{e.Damage}";
                 colour = IsPlayer(e.TargetId) ? PlayerHurtColour : DamageColour;
                 break;
             case CombatAttackResult.Dodge:

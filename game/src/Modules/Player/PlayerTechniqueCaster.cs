@@ -642,7 +642,13 @@ public sealed class PlayerTechniqueCaster : IDisposable
                     PublishFail(tech.TechniqueId, "Формация уже создаётся");
                     return false;
                 }
-                var type = FormationTypePool[_formationRng.Next(FormationTypePool.Length)];
+                // PT2-000 (плейтест-2, 25.10): тип проявления ФИКСИРОВАН в
+                // технике генератором (детерминированно по сиду) — кастер
+                // наследует. Рандом-пул остаётся для легаси-техник (-1:
+                // сейвы/свитки до фикса, QA-гранты старых сессий).
+                var type = tech.FormationKind >= 0
+                    ? (FormationType)tech.FormationKind
+                    : FormationTypePool[_formationRng.Next(FormationTypePool.Length)];
                 var data = _formationGenerator.GenerateSpecified(
                     type, FormationSize.Small, tech.Level, _formationRng.NextInt64());
                 bool started = _formations.StartDrawing(data.Id, _player.PlayerId,

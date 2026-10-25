@@ -196,6 +196,46 @@ public partial class UIShotSimDebug : Node
             GD.Print("[UIShot] PT1-003: QA-слоты вычищены");
         }
 
+        // ── PT2-000 (плейтест-2 №0): формация в книге — «Действие»-блок.
+        // Репорт: «мне выпала формация молнии… в описании нет ничего по ней».
+        // Грант-фаза старта УЖЕ выдала формацию (лимит 1) — берём ЕЁ
+        // (та же, что видел владелец); свежесгенерированная — fallback.
+        if (_gwc?.TechniqueBookWindowForQA is { } book2 && Techniques != null)
+        {
+            // Существующая формация игрока (грант при сборке мира) или новая.
+            CultivationGame.Modules.Combat.LearnedTechnique? form = null;
+            foreach (var kvp in Techniques.GetAllTechniques())
+                if (kvp.Value.Type == CultivationGame.Core.Data.TechniqueType.Formation) { form = kvp.Value; break; }
+            if (form == null && TechniqueGenerator != null)
+            {
+                int pt2Level = Qi == null ? 1 : System.Math.Max(1, (int)Qi.CultivationLevel);
+                var fresh = TechniqueGenerator.GenerateSpecified(
+                    CultivationGame.Core.Data.TechniqueType.Formation, pt2Level, pt2Level, 909090);
+                if (fresh != null && Techniques.LearnTechnique(fresh))
+                    form = Techniques.GetTechnique(fresh.TechniqueId);
+            }
+            GD.Print($"[UIShot] PT2-000: формация id={form?.TechniqueId ?? "—"}, kind={form?.FormationKind ?? -1}, " +
+                     $"desc=\"{form?.Description ?? "?"}\"");
+            if (form != null)
+            {
+                // Книга ЗАКРЫТА сценарием №6. Порядок: открыть (refresh со
+                // старым выбором) → SelectTechnique (OnSelectionChanged при
+                // видимом окне обновит _selectedTechId) → закрыть-открыть
+                // (Open → полный refresh деталей УЖЕ с формацией) → Snap.
+                book2.Toggle(); // открыть
+                await ToSignal(GetTree().CreateTimer(0.4), SceneTreeTimer.SignalName.Timeout);
+                Techniques.SelectTechnique(form.TechniqueId);
+                await ToSignal(GetTree().CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
+                book2.Toggle(); // закрыть
+                await ToSignal(GetTree().CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
+                book2.Toggle(); // открыть → refresh деталей с формацией
+                await ToSignal(GetTree().CreateTimer(0.6), SceneTreeTimer.SignalName.Timeout);
+                Snap(prefix + "_formation.png");
+                book2.Toggle();
+                await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+            }
+        }
+
         GD.Print("[UIShot] done");
         GetTree().Quit();
     }

@@ -848,11 +848,20 @@ public partial class TechniqueBookWindow : Control
         string cdInfo = cd > 0f ? $"  ⏳{cd:F0}с" : "";
         bool inArchive = tech.Level < (Techniques?.ResonanceMinLevel ?? 1);
 
+        // PT2-000 (плейтест-2, 25.10): блок «Действие» — ЧТО ДЕЛАЕТ техника.
+        // Прежде окно показывало ТОЛЬКО статы; для формации это мёртвые
+        // цифры (BaseDamage не потребляется) — репорт: «мне выпала формация
+        // молнии… в описании нет ничего по ней». Источники: описание
+        // генератора (LearnedTechnique.Description — теперь пробрасывается
+        // в книгу) + тип формации из данных техники.
+        string actionBlock = BuildActionBlock(tech);
+
         _detailsLabel.Text =
             $"{ElementStyle.ElementEmoji(tech.Element)} {tech.Name} L{tech.Level}" +
             (inArchive ? "  [АРХИВ]" : "") + "\n" +
             $"Тип: {ElementStyle.TypeName(tech.Type)}   Грейд: {ElementStyle.GradeName(tech.Grade)}\n" +
             $"Стихия: {ElementStyle.ElementName(tech.Element)}   Ultimate: {(tech.IsUltimate ? "да" : "нет")}\n" +
+            actionBlock +
             $"Урон: {tech.BaseDamage}   Пробитие: {tech.ArmorPenetration}   Дальность: {tech.Range:F1}м\n" +
             $"Ци: {tech.QiCost}   Кулдаун: {tech.Cooldown:F1}с{cdInfo}   Каст: {tech.CastTime:F1}с\n" +
             $"Мастерство: {tech.Mastery:F1}/100   Слот: {slotInfo}";
@@ -960,6 +969,46 @@ public partial class TechniqueBookWindow : Control
 
     // === Helpers ===
 
+    /// <summary>
+    /// PT2-000 (плейтест-2, 25.10): человекочитаемый блок «Действие» для
+    /// деталей техники. Приоритет — описание генератора (оно объясняет
+    /// механику, в т.ч. для формаций — какой тип проявления создаст
+    /// техника); для легаси-записей без описания — краткая строка по
+    /// типу/подтипу (статы типа «Урон: 80» для формации мёртвые).
+    /// </summary>
+    private static string BuildActionBlock(LearnedTechnique tech)
+    {
+        // Формация: тип проявления — из данных (fixed генератором) или
+        // честная пометка для легаси (-1: сейвы до PT2-000).
+        if (tech.Type == TechniqueType.Formation)
+        {
+            string kind = tech.FormationKind >= 0
+                ? $"{CultivationGame.Modules.Formation.FormationDescriptions.TypeLabel((FormationType)tech.FormationKind)} — " +
+                  $"{CultivationGame.Modules.Formation.FormationDescriptions.TypeAction((FormationType)tech.FormationKind)}"
+                : "тип проявления определится при применении (легаси)";
+            string desc = string.IsNullOrWhiteSpace(tech.Description)
+                ? "Начертает контур формации на земле; зарядка Ци — медитацией рядом с контуром."
+                : tech.Description;
+            return $"Действие: {kind}\n{desc}\n";
+        }
+
+        // Генераторское описание (есть у всех новых техник).
+        if (!string.IsNullOrWhiteSpace(tech.Description))
+            return $"Действие: {tech.Description}\n";
+
+        // Легаси-фолбэк по подтипу (описание потеряно в старых сейвах).
+        string fallback = tech.Subtype switch
+        {
+            CombatSubtype.MeleeStrike => "Ближний удар по цели",
+            CombatSubtype.MeleeWeapon => "Ближняя атака оружием",
+            CombatSubtype.RangedProjectile => "Ци-снаряд в цель",
+            CombatSubtype.RangedBeam => "Луч в цель",
+            CombatSubtype.RangedAoe => "Площадная атака (AoE)",
+            _ => "Действие — по типу техники"
+        };
+        return $"Действие: {fallback}\n";
+    }
+
     private static string ChipTitle(LearnedTechnique tech)
     {
         string grade = tech.Grade switch
@@ -970,6 +1019,15 @@ public partial class TechniqueBookWindow : Control
             _ => ""
         };
         string ulti = tech.IsUltimate ? "⚡" : "";
+        // PT2-000: формации не показывают мёртвый «⚔урон» (BaseDamage
+        // формации не потребляется) — вместо него тип проявления.
+        if (tech.Type == TechniqueType.Formation)
+        {
+            string kind = tech.FormationKind >= 0
+                ? CultivationGame.Modules.Formation.FormationDescriptions.TypeLabel((FormationType)tech.FormationKind)
+                : "Формация";
+            return $"{ulti}{tech.Name} L{tech.Level}{grade} | {kind} Ци:{tech.QiCost} М:{tech.Mastery:F0}%";
+        }
         return $"{ulti}{tech.Name} L{tech.Level}{grade} | ⚔{tech.BaseDamage} Ци:{tech.QiCost} М:{tech.Mastery:F0}%";
     }
 

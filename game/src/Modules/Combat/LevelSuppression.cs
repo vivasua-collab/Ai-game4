@@ -32,6 +32,22 @@ namespace CultivationGame.Modules.Combat
         /// 1000 = ×1.0, 500 = ×0.5, 100 = ×0.1, 0 = ×0.0.
         /// </summary>
         public static int CalculateSuppressionPermil(int attackerLevel, int defenderLevel, AttackType attackType)
+            => CalculateSuppressionPermil(attackerLevel, defenderLevel, attackType, fromTechniqueAttack: false);
+
+        /// <summary>
+        /// PT2-004 (плейтест-2, 25.10): перегрузка с признаком «атака — техника».
+        /// КОЛОНКА НЕ РАВНА ТИПУ СКЕЙЛИНГА: GetTechniqueAttackType мапит
+        /// Combat-подтипы в MeleeStrike/MeleeWeapon/Ranged для stat scaling
+        /// (STR/AGI/INT, DamageCalculator), но подавление по канону
+        /// (Constants.LevelSuppressionTablePermil: 0=normal, 1=technique,
+        /// 2=ultimate) должно читать технику по КОЛОНКЕ technique
+        /// (750/250/50 против 500/100/0) — иначе любой удар техникой по цели
+        /// на 3+ уровней выше гасится в ноль (репорт: «на NPC не отрабатывают
+        /// техники»). fromTechniqueAttack=true → виртуальная колонка technique
+        /// (кроме Ultimate — у него своя, мягче). Базовые атаки — прежняя логика.
+        /// </summary>
+        public static int CalculateSuppressionPermil(int attackerLevel, int defenderLevel,
+            AttackType attackType, bool fromTechniqueAttack)
         {
             // Защита: некорректные уровни
             if (attackerLevel <= 0) attackerLevel = 1;
@@ -48,8 +64,9 @@ namespace CultivationGame.Modules.Combat
             // Индекс типа атаки
             int typeIndex = attackType switch
             {
-                AttackType.Technique => 1,
                 AttackType.Ultimate => 2,
+                _ when fromTechniqueAttack => 1, // PT2-004: техника → колонка technique
+                AttackType.Technique => 1,
                 _ => 0
             };
 

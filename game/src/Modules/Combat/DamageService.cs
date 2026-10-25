@@ -179,8 +179,11 @@ namespace CultivationGame.Modules.Combat
 
             // === СЛОЙ 2: Подавление уровнем (CMB-A02) ===
             // P1-4.1 FIX: integer math — промилле вместо float (ЗАПРЕТ 3.9)
+            // PT2-004: техники читают колонку technique (маппинг подтипов
+            // в Melee/Ranged оставлен для stat scaling — см. перегрузку).
             int suppressionPermil = LevelSuppression.CalculateSuppressionPermil(
-                request.AttackerLevel, request.DefenderLevel, request.AttackType);
+                request.AttackerLevel, request.DefenderLevel, request.AttackType,
+                fromTechniqueAttack: request.FromTechnique);
 
             // === СЛОЙ 3: Стихийный множитель (CMB-A07: DefenderElement из запроса) ===
             // P1-5.1 FIX: integer math — промилле вместо float (ЗАПРЕТ 3.9)
@@ -458,7 +461,8 @@ namespace CultivationGame.Modules.Combat
             _damageAppliedPub.Publish(new DamageAppliedEvent(
                 request.AttackerId, request.TargetId,
                 finalDamage, request.Type, request.Element,
-                hitPart, attackResult, attackSubtype));
+                hitPart, attackResult, attackSubtype,
+                request.AttackerId, absorbedByQi));
 
             // === Определение фатальности ===
             // BUG-015 FIX (Этап-5 аудита боя): единый источник истины смерти —

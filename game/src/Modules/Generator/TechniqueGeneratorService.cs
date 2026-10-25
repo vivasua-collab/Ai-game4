@@ -14,6 +14,7 @@ using System.Collections.Generic;
 using CultivationGame.Core;
 using CultivationGame.Core.Data;
 using CultivationGame.Core.Interfaces;
+using CultivationGame.Modules.Formation;
 
 namespace CultivationGame.Modules.Generator
 {
@@ -273,19 +274,31 @@ namespace CultivationGame.Modules.Generator
                 qiCost = (long)(qiCost * GameConstants.ULTIMATE_QI_COST_MULTIPLIER); // ×2.0 стоимость Ци для Ultimate
             }
 
+            // PT2-000 (плейтест-2, 25.10): формация — фиксируем тип проявления
+            // в ДАННЫХ техники (детерминированно по сиду; прежде тип бросался
+            // кубиком в момент каста — книга не могла объяснить, что делает
+            // «Молниевая Формация»). Ролл ПОСЛЕ Ultimate: rng-стром прочих
+            // типов и последующие значения не сдвигаются.
+            int formationKind = -1;
+            if (techniqueType == TechniqueType.Formation)
+                formationKind = (int)PickFormationKind(rng);
+
             // === Шаг 6.9: Сборка TechniqueData ===
             var technique = new TechniqueData
             {
                 TechniqueId = GenerateTechniqueId(techniqueType, element, grade, level, seed),
                 NameRu = GenerateNameRu(techniqueType, element, grade, level, isUltimate),
                 NameEn = GenerateNameEn(techniqueType, element, grade, level, isUltimate),
-                Description = GenerateDescription(techniqueType, element, grade, level, isUltimate),
+                Description = GenerateDescription(techniqueType, element, grade, level, isUltimate, formationKind),
 
                 // Классификация
                 Type = techniqueType,
                 Subtype = subtype,
                 Grade = grade,
                 Element = element,
+
+                // PT2-000: тип формации (для не-формаций — -1)
+                FormationKind = formationKind,
 
                 // Уровень и мощь
                 Level = level,
@@ -466,17 +479,26 @@ namespace CultivationGame.Modules.Generator
                 qiCost = (long)(qiCost * GameConstants.ULTIMATE_QI_COST_MULTIPLIER);
             }
 
+            // PT2-000: формация — фиксируем тип проявления в данных техники
+            // (ролл после Ultimate — rng-стром прочих типов не сдвигается).
+            int formationKind = -1;
+            if (type == TechniqueType.Formation)
+                formationKind = (int)PickFormationKind(rng);
+
             var technique = new TechniqueData
             {
                 TechniqueId = GenerateTechniqueId(type, element, grade, level, seed),
                 NameRu = GenerateNameRu(type, element, grade, level, isUltimate),
                 NameEn = GenerateNameEn(type, element, grade, level, isUltimate),
-                Description = GenerateDescription(type, element, grade, level, isUltimate),
+                Description = GenerateDescription(type, element, grade, level, isUltimate, formationKind),
 
                 Type = type,
                 Subtype = subtype,
                 Grade = grade,
                 Element = element,
+
+                // PT2-000: тип формации (для не-формаций — -1)
+                FormationKind = formationKind,
 
                 Level = level,
                 CapacityCost = capacity,
@@ -802,21 +824,30 @@ namespace CultivationGame.Modules.Generator
 
         /// <summary>
         /// Сгенерировать описание техники.
+        /// PT2-000: для формации описание объясняет ЧТО создаст техника —
+        /// по зафиксированному типу проявления (FormationDescriptions —
+        /// канон UI-текстов о формациях; репорт плейтеста-2: «в описании
+        /// нет ничего по ней»).
         /// </summary>
-        private string GenerateDescription(TechniqueType type, Element element, TechniqueGrade grade, int level, bool isUltimate)
+        private string GenerateDescription(TechniqueType type, Element element, TechniqueGrade grade, int level,
+            bool isUltimate, int formationKind = -1)
         {
             string desc = type switch
             {
                 TechniqueType.Combat => "Наносит урон противнику",
                 TechniqueType.Defense => "Защищает от атак",
-                TechniqueType.Support => "Усиливает союзников",
+                TechniqueType.Support => "Подлечивает тело (слабее Healing-техники)",
                 TechniqueType.Healing => "Восстанавливает здоровье",
                 TechniqueType.Cultivation => "Ускоряет культивацию",
-                TechniqueType.Movement => "Увеличивает скорость перемещения",
+                TechniqueType.Movement => "Рывок в направлении движения",
                 TechniqueType.Sensory => "Расширяет восприятие",
                 TechniqueType.Curse => "Накладывает проклятие на противника",
                 TechniqueType.Poison => "Отравляет противника",
-                TechniqueType.Formation => "Создаёт формацию",
+                TechniqueType.Formation => formationKind >= 0
+                    ? $"Создаёт малую формацию «{FormationDescriptions.TypeLabel((FormationType)formationKind)}» — " +
+                      $"{FormationDescriptions.TypeAction((FormationType)formationKind)}. " +
+                      "Каст Z начертает контур; зарядка Ци — медитацией рядом с контуром"
+                    : "Создаёт формацию. Каст Z начертает контур; зарядка Ци — медитацией рядом с контуром",
                 _ => "Неизвестная техника"
             };
 
@@ -824,6 +855,23 @@ namespace CultivationGame.Modules.Generator
                 desc += ". Предельная техника — усиленный урон и стоимость";
 
             return desc;
+        }
+
+        /// <summary>
+        /// PT2-000: пул типов проявления для техники-формации — ТЕ ЖЕ четыре
+        /// типа, что бросал кубиком PlayerTechniqueCaster (совместимость
+        /// существующих сейвов/свитков; расширяется вместе с кастером).
+        /// </summary>
+        private static FormationType PickFormationKind(SeededRandom rng)
+        {
+            // Индекс по rng — детерминированно от сида техники.
+            switch (rng.Next(0, 4))
+            {
+                case 0: return FormationType.Barrier;
+                case 1: return FormationType.Amplification;
+                case 2: return FormationType.Suppression;
+                default: return FormationType.Gathering;
+            }
         }
     }
 }

@@ -178,6 +178,15 @@ namespace CultivationGame.Core.Interfaces
         public readonly int RangedRangeTiles;     // Дальнобойность оружия (0 = атака не дальнобойная → Miss не роллится)
 
         /// <summary>
+        /// PT2-004 (плейтест-2, 25.10): атака выполнена ИГРОВОЙ техникой
+        /// (Combat/Ultimate и др. из книги) — подавление уровнем читает
+        /// колонку technique (LevelSuppression), при этом AttackType
+        /// сохраняет свой скейлинг-тип (MeleeStrike/MeleeWeapon/Ranged).
+        /// Базовые атаки — false.
+        /// </summary>
+        public readonly bool FromTechnique;
+
+        /// <summary>
         /// Обратная совместимость — старый конструктор.
         /// Новые поля получают значения по умолчанию.
         /// CRIT-1: potency float→промилле (potency * 1000).
@@ -215,7 +224,8 @@ namespace CultivationGame.Core.Interfaces
             CombatSubtype attackSubtype = CombatSubtype.None, // P2-7.3: подтип атаки
             bool forceClashParry = false, // R21-2: одновременная атака → парирование
             int attackDistanceTiles = -1, // R39-4: дистанция атаки (Чебышёв-тайлы; −1 = неизвестна)
-            int rangedRangeTiles = 0)     // R39-4: дальность дальнобойного оружия (0 = не дальнее)
+            int rangedRangeTiles = 0,     // R39-4: дальность дальнобойного оружия (0 = не дальнее)
+            bool fromTechnique = false)   // PT2-004: урон от игровой техники (колонка technique)
         {
             AttackerId = attackerId;
             TargetId = targetId;
@@ -247,6 +257,7 @@ namespace CultivationGame.Core.Interfaces
             ForceClashParry = forceClashParry; // R21-2: clash-парирование
             AttackDistanceTiles = attackDistanceTiles; // R39-4: дистанция для Miss
             RangedRangeTiles = rangedRangeTiles;       // R39-4: дальность оружия
+            FromTechnique = fromTechnique;             // PT2-004: колонка technique для подавления
         }
     }
 

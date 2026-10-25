@@ -53,6 +53,13 @@ public sealed class GroupSpawnPhase : AbstractSceneAssemblyPhase
     private const int MinDistanceFromPlayer = 8;
     private const int MaxGroupSpacingAttempts = 30;
 
+    // PT2-002 (плейтест-2, 25.10): враждебные группы (банды бандитов) —
+    // центры не ближе 40 тайлов от старта игрока: члены группы спаунятся
+    // ±2 тайла от центра, а прежние 8 тайлов + patrol-радиус 9 кладут
+    // бандита прямо у спины владельца (агро 5). Мирные группы
+    // (волки/стражи/караван/олени) — прежние 8: они не проявляют агро.
+    private const int HostileGroupMinDistanceFromPlayer = 40;
+
     // Track centres of already-placed groups so new groups don't overlap.
     private readonly List<Position2D> _placedGroupCentres = new();
 
@@ -190,7 +197,10 @@ public sealed class GroupSpawnPhase : AbstractSceneAssemblyPhase
     private int SpawnBanditBand(SeededRandom rng, LocationData loc, int mapW, int mapH)
     {
         int n = rng.Next(3, 6);  // 3-5 бандитов
-        var center = FindGroupCenter(rng, mapW, mapH, minSpacing: 20);
+        // PT2-002: банда — враждебная группа → центр за 40 тайлов от старта
+        // (только большие карты: R41-5 банды спавнятся лишь на large).
+        var center = FindGroupCenter(rng, mapW, mapH, minSpacing: 20,
+            minDistFromPlayer: HostileGroupMinDistanceFromPlayer);
         if (center is null)
         {
             Console.WriteLine("[GroupSpawn] Bandit band — no walkable centre found, skipped");
@@ -301,7 +311,8 @@ public sealed class GroupSpawnPhase : AbstractSceneAssemblyPhase
     /// Найти walkable-точку для центра группы: далеко от игрока и от других
     /// уже размещённых групп (минимум minSpacing тайлов по Чебышеву).
     /// </summary>
-    private Position2D? FindGroupCenter(SeededRandom rng, int mapW, int mapH, int minSpacing)
+    private Position2D? FindGroupCenter(SeededRandom rng, int mapW, int mapH, int minSpacing,
+        int minDistFromPlayer = MinDistanceFromPlayer)
     {
         int cx = mapW / 2, cy = mapH / 2;
         // L500 (2026-09-15): на больших картах 60% групп — «пояс жизни» ±90
@@ -309,7 +320,7 @@ public sealed class GroupSpawnPhase : AbstractSceneAssemblyPhase
         // пустыне 1×1 км), 40% — вся карта. Малые карты: прежний равномерный
         // спавн — rng-стрим идентичен (QA-детерминизм).
         int nearRadius = Math.Min(90, Math.Min(mapW, mapH) / 2 - 2);
-        bool clusterNearCentre = mapW * mapH >= 100_000 && nearRadius > MinDistanceFromPlayer + 5;
+        bool clusterNearCentre = mapW * mapH >= 100_000 && nearRadius > minDistFromPlayer + 5;
         for (int attempt = 0; attempt < MaxSpawnAttempts; attempt++)
         {
             int x, y;
@@ -326,7 +337,7 @@ public sealed class GroupSpawnPhase : AbstractSceneAssemblyPhase
             if (!_tiles.IsWalkable(x, y)) continue;
 
             int distToPlayer = Math.Max(Math.Abs(x - cx), Math.Abs(y - cy));
-            if (distToPlayer < MinDistanceFromPlayer) continue;
+            if (distToPlayer < minDistFromPlayer) continue;
 
             // Check spacing against previously placed groups.
             bool tooClose = false;
@@ -348,7 +359,7 @@ public sealed class GroupSpawnPhase : AbstractSceneAssemblyPhase
             int y = rng.Next(1, mapH - 1);
             if (!_tiles.IsWalkable(x, y)) continue;
             int distToPlayer = Math.Max(Math.Abs(x - cx), Math.Abs(y - cy));
-            if (distToPlayer < MinDistanceFromPlayer) continue;
+            if (distToPlayer < minDistFromPlayer) continue;
             _placedGroupCentres.Add(new Position2D(x, y));
             return new Position2D(x, y);
         }
