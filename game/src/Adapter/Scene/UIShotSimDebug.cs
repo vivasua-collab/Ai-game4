@@ -15,6 +15,7 @@
 using Godot;
 using System.Threading.Tasks;
 using CultivationGame.Core.DI;
+using CultivationGame.Core.Data;
 using CultivationGame.Core.Interfaces;
 using CultivationGame.Adapter.Di;
 
@@ -28,6 +29,11 @@ public partial class UIShotSimDebug : Node
     // PT0-2: гранты в открытое окно книги (проверка вкладок после фикса).
     [Inject] private ITechniqueGeneratorService? TechniqueGenerator;
     [Inject] private Modules.Combat.TechniqueService? Techniques;
+    // PT1 (плейтест-1, 25.10): пруфы фиксов — медитация×клик-движение,
+    // walkability-гейт, меню сейвов с легаси-мусором.
+    [Inject] private Core.Events.IPublisher<Core.Messaging.Contracts.MeditationToggleRequestedEvent>? MeditationTogglePub;
+    [Inject] private ITileService? TilesForQA;
+    [Inject] private ISaveService? SaveSvc;
 
     private GameWorldController? _gwc;
 
@@ -106,6 +112,88 @@ public partial class UIShotSimDebug : Node
             await ToSignal(GetTree().CreateTimer(0.6), SceneTreeTimer.SignalName.Timeout);
             Snap(prefix + "_character.png");
             sheet.Toggle();
+        }
+
+        // ── PT1-001 (плейтест-1 №2): медитация + КЛИК-движение → прерывание.
+        // Прежний гейт ловил только клавиатурный moveVec — клик-цель шла мимо;
+        // владелец ходил кликами при формации и медитация «не сбрасывалась».
+        // План: включить медитацию → убедиться в активном кэше → поставить
+        // клик-цель на +20px (в пределах текущего тайла — без влияния гейта
+        // проходимости) → после кадров движения кэш обязан погаснуть.
+        if (_gwc != null && MeditationTogglePub != null)
+        {
+            MeditationTogglePub.Publish(new Core.Messaging.Contracts.MeditationToggleRequestedEvent(true));
+            await ToSignal(GetTree().CreateTimer(0.4), SceneTreeTimer.SignalName.Timeout); // событие → кэш
+            bool wasActive = _gwc.MeditationActiveForQA;
+            var pos = _gwc.VisualPositionForQA;
+            _gwc.SetMouseTargetForQA(new Vector2(pos.X + 20f, pos.Y)); // клик-движение, без клавиатуры
+            await ToSignal(GetTree().CreateTimer(0.8), SceneTreeTimer.SignalName.Timeout); // кадры движения
+            bool interrupted = !_gwc.MeditationActiveForQA;
+            GD.Print($"[UIShot] PT1-001: медитация включена={wasActive}; после клик-движения прервана={interrupted} " +
+                     $"(ожидание: True/True; до фикса прерывание ловило только WASD — клик шёл мимо)");
+        }
+
+        // ── PT1-002 (плейтест-1 №7): walkability-гейт — глубокая вода/лава
+        // непроходимы (владелец ходил по океану со «скоростью травы»).
+        // План: найти в полигоне непроходимый тайл → гейт обязан не пустить
+        // в его центр (осевое скольжение или стоп); проходимый сосед — пускать.
+        if (_gwc != null && TilesForQA != null && TilesForQA.MapWidth > 0)
+        {
+            int blockedX = -1, blockedY = -1;
+            for (int y = 0; y < TilesForQA.MapHeight && blockedX < 0; y++)
+                for (int x = 0; x < TilesForQA.MapWidth; x++)
+                    if (!TilesForQA.GetTile(x, y).IsWalkable) { blockedX = x; blockedY = y; break; }
+            if (blockedX >= 0)
+            {
+                float t = GameConstants.TILE_PIXELS;
+                var player = _gwc.VisualPositionForQA;
+                // Игрок стоит на проходимом тайле — центр непроходимого далековат:
+                // проверяем семантику гейта напрямую (candidate=центр воды, current=игрок).
+                var waterCenter = new Vector2(blockedX * t + t / 2f, blockedY * t + t / 2f);
+                var gated = _gwc.ApplyWalkabilityGateForQA(waterCenter, player);
+                bool blocked = gated != waterCenter;
+                // Контроль-ветвь: шаг на +20px в своём тайле — гейт обязан пропустить.
+                var step = new Vector2(player.X + 20f, player.Y);
+                bool passable = _gwc.ApplyWalkabilityGateForQA(step, player) == step;
+                GD.Print($"[UIShot] PT1-002: непроходимый тайл ({blockedX},{blockedY}); гейт блокирует вход={blocked}; " +
+                         $"шаг по проходимому пропускает={passable} (ожидание: True/True; до фикса — свободное плавание по океану)");
+            }
+            else
+            {
+                GD.Print("[UIShot] PT1-002: SKIP — в полигоне нет непроходимых тайлов (гейт проверен регрессией/ревью)");
+            }
+        }
+
+        // ── PT1-003 (плейтест-1, PT-S02): меню сейвов — свежий ручной слот
+        // СВЕРХУ, легаси-мусор (автосейвы старых билдов без save_meta) — на
+        // дне; валидация при выборе ещё в UI-слое (скриншот фиксирует порядок).
+        if (_gwc?.SaveLoadMenuForQA is { } saveMenu && SaveSvc != null)
+        {
+            // 1) Настоящий ручной слот (текущее состояние — валиден).
+            bool savedSlot = SaveSvc.Save(new CultivationGame.Core.Data.SaveSlot("slot_pt1_proof", CultivationGame.Core.Data.SaveSlotType.Manual));
+            // 2) Легаси-фантомы: файлы БЕЗ save_meta — как ротация autosave_000N
+            //    прошлых билдов на диске владельца (PRE-REJECT на загрузке).
+            var saveRoot = Godot.ProjectSettings.GlobalizePath("user://saves");
+            var legacyNames = new[] { "autosave_0001", "autosave_0002", "autosave_0003", "autosave_0004" };
+            foreach (var ln in legacyNames)
+            {
+                var dir = System.IO.Path.Combine(saveRoot, ln);
+                System.IO.Directory.CreateDirectory(dir);
+                System.IO.File.WriteAllText(System.IO.Path.Combine(dir, "main.json"), "{\"legacy\":\"no_meta\"}");
+            }
+            GD.Print($"[UIShot] PT1-003: ручной слот сохранён={savedSlot}; легаси-фантомов={legacyNames.Length}");
+
+            saveMenu.Open(CultivationGame.Adapter.UI.SaveLoadMenuMode.Full);
+            await ToSignal(GetTree().CreateTimer(0.8), SceneTreeTimer.SignalName.Timeout);
+            Snap(prefix + "_savemenu.png");
+            saveMenu.Close();
+            await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+
+            // Чистим за собой: фантомы + proof-слот (не мусорим диску владельца/CI).
+            foreach (var ln in legacyNames)
+                SaveSvc.DeleteSave(new CultivationGame.Core.Data.SaveSlot(ln, CultivationGame.Core.Data.SaveSlotType.Manual));
+            SaveSvc.DeleteSave(new CultivationGame.Core.Data.SaveSlot("slot_pt1_proof", CultivationGame.Core.Data.SaveSlotType.Manual));
+            GD.Print("[UIShot] PT1-003: QA-слоты вычищены");
         }
 
         GD.Print("[UIShot] done");

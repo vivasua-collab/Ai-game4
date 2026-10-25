@@ -337,6 +337,17 @@ public partial class GameWorldController : Node2D
     public void QaUpdateModalStackForQA() => UpdateModalStack();
     public UI.SaveLoadMenu? SaveLoadMenuForQA => _saveLoadMenu;
 
+    // === PT1 QA-аксессоры (плейтест-1, 25.10 — UIShot-пруфы фиксов) ===
+    /// <summary>PT1-001: кэш состояния медитации (зеркало MeditationStateChangedEvent).</summary>
+    public bool MeditationActiveForQA => _meditationActive;
+    /// <summary>PT1-001/PT1-002: визуальная пиксельная позиция игрока.</summary>
+    public Vector2 VisualPositionForQA => _visualPosition;
+    /// <summary>PT1-001: цель клик-движения (то же поле, что ставит LMB по миру).</summary>
+    public void SetMouseTargetForQA(Vector2 worldPixel) => _mouseTarget = worldPixel;
+    /// <summary>PT1-002: гейт проходимости напрямую (проверка блокировки воды/лавы).</summary>
+    public Vector2 ApplyWalkabilityGateForQA(Vector2 candidate, Vector2 current)
+        => ApplyWalkabilityGate(candidate, current);
+
     /// <summary>
     /// Открыть диалог с NPC по QA-пути (пауза+окно) — те же действия,
     /// что и HandleNpcTalk, без поиска ближнего NPC (GODOT_DIALOGUE_DEBUG).
