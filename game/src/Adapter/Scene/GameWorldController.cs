@@ -2231,7 +2231,18 @@ public partial class GameWorldController : Node2D
         Vector2 moveVec = Godot.Input.GetVector("move_left", "move_right", "move_up", "move_down");
 
         // Этап 1 внедрения ЦИ: движение прерывает медитацию (концентрация).
-        if (_meditationActive && moveVec != Vector2.Zero)
+        // PT1-001 (плейтест-1 №2, 25.10): прерывание ловило ТОЛЬКО
+        // клавиатурный moveVec — клик-движение (_mouseTarget ниже) шло мимо:
+        // владелец ходил кликами при активной формации и медитация не
+        // сбрасывалась (повторное V её «завершало» вместо повторного старта).
+        // Формация оказалась ни при чём — реальная переменная: способ
+        // движения. Теперь прерывает любое фактическое перемещение; порог
+        // 4px — тот же, что snap-ветка клик-движения (микродвижение к цели —
+        // не «походка»).
+        bool movingNow = moveVec != Vector2.Zero
+            || (_mouseTarget.HasValue
+                && (_mouseTarget.Value - _visualPosition).Length() >= 4f);
+        if (_meditationActive && movingNow)
         {
             MeditationTogglePub.Publish(
                 new Core.Messaging.Contracts.MeditationToggleRequestedEvent(false));
@@ -2317,7 +2328,9 @@ public partial class GameWorldController : Node2D
         {
             // Keyboard movement — clear mouse target.
             _mouseTarget = null;
-            _visualPosition += moveVec * MoveSpeedPixels * speedMult * (float)delta;
+            var candidate = _visualPosition + moveVec * MoveSpeedPixels * speedMult * (float)delta;
+            // PT1-002: гейт проходимости — по глубокой воде/лаве не ходим.
+            _visualPosition = ApplyWalkabilityGate(candidate, _visualPosition);
 
             // R15: направление взгляда по горизонтальной компоненте ввода.
             if (moveVec.X > 0.15f) _facingLeft = false;
@@ -2358,7 +2371,18 @@ public partial class GameWorldController : Node2D
             else
             {
                 var dir = diff.Normalized();
-                _visualPosition += dir * MoveSpeedPixels * speedMult * (float)delta;
+                var candidate = _visualPosition + dir * MoveSpeedPixels * speedMult * (float)delta;
+                // PT1-002: берег/препятствие — стоп у кромки (не молотим
+                // кадры в заблокированный тайл), цель сбрасываем.
+                var gated = ApplyWalkabilityGate(candidate, _visualPosition);
+                if (gated == _visualPosition)
+                {
+                    _mouseTarget = null;
+                }
+                else
+                {
+                    _visualPosition = gated;
+                }
                 // R15: клик-движение — взгляд по направлению к цели.
                 if (Mathf.Abs(diff.X) > 8f) _facingLeft = diff.X < 0f;
             }
@@ -2384,6 +2408,40 @@ public partial class GameWorldController : Node2D
         {
             Player.MoveTo(tileX, tileY);
         }
+    }
+
+    // ── PT1-002 (плейтест-1 №7, 25.10): гейт проходимости свободного движения ──
+
+    /// <summary>
+    /// Канон TILE_SYSTEM §2: Water_Deep/Lava/Void непроходимы — но пиксельное
+    /// свободное движение никогда не проверяло IsWalkable: владелец ходил
+    /// по глубокой воде (EffectiveMoveCost=0 → терраин-фактор 1.0 = «скорость
+    /// травы»), т.е. фактически по поверхности океана. Гейт: кандидата → тайл;
+    /// непроходимо → скольжение по осям (сначала X, потом Y) вдоль берега;
+    /// обе оси закрыты — стоять. Если ТЕКУЩИЙ тайл уже непроходим (сейв/спавн
+    /// посреди океана) — движение разрешено без гейта (иначе игрок заперт
+    /// в воде навсегда), а вот зайти обратно нельзя. NPC-пасфайнинг уважает
+    /// IsWalkable уже давно — теперь и ручное движение честно.
+    /// </summary>
+    private Vector2 ApplyWalkabilityGate(Vector2 candidate, Vector2 current)
+    {
+        if (Tiles == null) return candidate;
+        if (IsWalkablePixel(candidate)) return candidate;
+        if (!IsWalkablePixel(current)) return candidate; // escape-режим: уйти из воды можно
+        var slideX = new Vector2(candidate.X, current.Y);
+        if (slideX != current && IsWalkablePixel(slideX)) return slideX;
+        var slideY = new Vector2(current.X, candidate.Y);
+        if (slideY != current && IsWalkablePixel(slideY)) return slideY;
+        return current;
+    }
+
+    /// <summary>PT1-002: проходимость тайла под пиксельной позицией.</summary>
+    private bool IsWalkablePixel(Vector2 pos)
+    {
+        if (Tiles == null || Tiles.MapWidth <= 0 || Tiles.MapHeight <= 0) return true;
+        int tx = Mathf.Clamp((int)(pos.X / GameConstants.TILE_PIXELS), 0, Tiles.MapWidth - 1);
+        int ty = Mathf.Clamp((int)(pos.Y / GameConstants.TILE_PIXELS), 0, Tiles.MapHeight - 1);
+        return Tiles.GetTile(tx, ty).IsWalkable;
     }
 
     // HandleMouseClick() REMOVED — replaced by _UnhandledInput override above.

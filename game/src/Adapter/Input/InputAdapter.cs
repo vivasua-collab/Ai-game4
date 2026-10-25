@@ -109,9 +109,16 @@ public partial class InputAdapter : Node
         _stickyKeys.Clear();
         if (_textFocusBlocked)
         {
-            // ST14-001: фокус в текстовом поле — ВСЕ игровые sticky
-            // заглушены (цифры 1-9/Shift — выделение текста; E/B/J/K/H/T/V —
-            // символы; Esc-закрытие окна обрабатывает UI-слой).
+            // ST14-001: фокус в текстовом поле — игровые sticky заглушены
+            // (цифры 1-9/Shift — выделение текста; E/B/J/K/H/T/V — символы).
+            // PT1-004 (плейтест-1, 25.10): Esc — СОЗНАТЕЛЬНОЕ исключение.
+            // Прежний комментарий «Esc-закрытие окна обрабатывает UI-слой»
+            // был неверен для меню сейвов: SaveLoadMenu своего Esc-обработчика
+            // не имеет, единственный путь закрытия — GWC-стек по этому sticky.
+            // LineEdit имени сейва держал фокус → sticky глохли → Esc «умирал»,
+            // окно не закрывалось (репорт владельца). Esc — не текстовый ввод:
+            // пропускаем; GWC CloseTopmostModalByKey закрывает верхнее окно.
+            if (GodotInput.IsActionJustPressed("pause")) _stickyKeys.Add("escape");
             PushFrame(move: Vector2.Zero, isRun: false, isLmb, isRmb, hotbarSlot: null);
             return;
         }

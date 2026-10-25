@@ -149,20 +149,23 @@ public partial class ProjectileRenderer : Node2D
 
     private void DrawTriangle(Vector2 a, Vector2 b, Vector2 c, Color colour)
     {
-        // PT0-6 (плейтест-0, 24.10): нативная триангуляция canvas_item_add_polygon
-        // падает «Invalid polygon data» на NaN/Inf или вырожденном (нулевой
-        // площади) треугольнике — вершины приходят из ResolvePixelPos без
-        // валидации. Guard: пропускаем не-конечные и коллинеарные полигоны
-        // (наконечник — косметика, пропуск безопасен; ошибки больше нет).
+        // PT0-6 (плейтест-0) + PT1-005 (плейтест-1, 25.10): ошибка отладчика
+        // «Invalid polygon data, triangulation failed. indices.is_empty()»
+        // пришла СНОВА на билде УЖЕ С guard PT0-6 — конечность и коллинеарность
+        // проходили (треугольник-наконечник 6×5px геометрически корректен),
+        // но нативный триангулятор canvas_item_add_polygon падает на малых
+        // полигонах при больших мировых координатах (мир 500×500 тайлов —
+        // пиксели до ~32 000; фиксированная точка триангулятора деградирует).
+        // Решение класса: наконечник — ШТРИХ из трёх линий (визуально тот же
+        // силуэт, ширина = древко 2.5px); DrawPolygon не вызывается вовсе —
+        // ошибка невозможна по построению. Guard конечности оставлен.
         if (!Mathf.IsFinite(a.X) || !Mathf.IsFinite(a.Y)
             || !Mathf.IsFinite(b.X) || !Mathf.IsFinite(b.Y)
             || !Mathf.IsFinite(c.X) || !Mathf.IsFinite(c.Y))
             return;
-        // Удвоенная площадь = векторное произведение (b−a)×(c−a); |2S| < ε —
-        // вырожденный (все точки на одной прямой/слиплись в float-точности).
-        float cross = (b.X - a.X) * (c.Y - a.Y) - (b.Y - a.Y) * (c.X - a.X);
-        if (Mathf.Abs(cross) < 0.01f) return;
-        DrawPolygon(new Vector2[] { a, b, c }, new Color[] { colour, colour, colour });
+        DrawLine(a, b, colour, 2.5f, antialiased: true);
+        DrawLine(b, c, colour, 2.5f, antialiased: true);
+        DrawLine(c, a, colour, 2.5f, antialiased: true);
     }
 
     /// <summary>Попадание стрелой → запуск полёта от атакующего к цели.</summary>

@@ -168,7 +168,11 @@ public sealed partial class SaveLoadMenu : Control
         _slotScroll = new ScrollContainer
         {
             Name = "SlotScroll",
-            CustomMinimumSize = new Vector2(440, 240),
+            // PT1-003 (плейтест-1, 25.10): 240 → 320 — при 6+ строках (автосейв +
+            // ручные + легаси-мусор старых билдов) свежий ручной слот выталкивался
+            // за кромку скролла; вместе с сортировкой «новые сверху» (RefreshSlots)
+            // видны все актуальные строки без прокрутки.
+            CustomMinimumSize = new Vector2(440, 320),
             HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
         };
         box.AddChild(_slotScroll);
@@ -262,7 +266,7 @@ public sealed partial class SaveLoadMenu : Control
         _loadBtn.Disabled = true;
         _deleteBtn.Disabled = true;
 
-        List<(string Name, string When)> slots = new();
+        List<(string Name, string When, long Unix)> slots = new();
         if (SaveService != null)
         {
             foreach (var info in SaveService.GetAllSaves())
@@ -280,12 +284,22 @@ public sealed partial class SaveLoadMenu : Control
                         when = "";
                     }
                 }
-                slots.Add((info.Slot.Name, when));
+                slots.Add((info.Slot.Name, when, info.CreatedUnixSeconds));
             }
         }
 
+        // PT1-003 (плейтест-1, 25.10): свежие — СВЕРХУ. Алфавитный порядок
+        // ФС ставил легаси-мусор autosave_0001..0004 (ротация прошлых билдов,
+        // без save_meta — грузить нельзя) ВЫШЕ свежесохранённого slot_1 и
+        // выталкивал его за кромку скролла: владелец «не мог выбрать слот для
+        // загрузки» — строки ручного слота не было видно, кликабельны были
+        // только автосейвы. Unix=0 (легаси без меты) — тонут на дно списка.
+        slots.Sort((a, b) => a.Unix != b.Unix
+            ? b.Unix.CompareTo(a.Unix)
+            : string.CompareOrdinal(a.Name, b.Name));
+
         _emptyHint.Visible = slots.Count == 0;
-        foreach (var (name, when) in slots)
+        foreach (var (name, when, _) in slots)
         {
             var text = string.IsNullOrEmpty(when) ? name : $"{name}  —  {when}";
             var btn = UIFactory.CreateButton($"slot_{name}", text, 440, 38);
@@ -300,9 +314,20 @@ public sealed partial class SaveLoadMenu : Control
     private void SelectSlot(string name)
     {
         _selectedSlot = name;
-        _loadBtn.Disabled = false;
+        // PT1-003 (плейтест-1, 25.10): валидация формата В МОМЕНТ выбора.
+        // Легаси-слоты старых билдов (ротация autosave_000N, файлы без
+        // save_meta) видны в списке, но грузить их нельзя — прежде строка
+        // выглядела рабочей, «Загрузить» уходил в сессию и PRE-REJECT'ился
+        // тостом Validate failed. Теперь честно сразу: Load мёртв для
+        // невалидного слота, Delete жив (мусор можно почистить), статус
+        // объясняет причину. Validate — без побочных эффектов (Этап-4 P1).
+        bool loadable = SaveService != null
+            && SaveService.Validate(new SaveSlot(name, SaveSlotType.Manual));
+        _loadBtn.Disabled = !loadable;
         _deleteBtn.Disabled = false;
-        ShowStatus($"Выбрано: «{name}»");
+        ShowStatus(loadable
+            ? $"Выбрано: «{name}»"
+            : $"«{name}» — старый/повреждённый формат: загрузка недоступна (можно удалить)");
         // Подсветка выбранной строки.
         foreach (var (slotName, btn) in _slotButtons)
             btn.Modulate = slotName == name ? new Color(1f, 0.95f, 0.7f) : Colors.White;
