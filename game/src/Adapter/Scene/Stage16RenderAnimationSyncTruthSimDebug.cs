@@ -305,19 +305,26 @@ namespace CultivationGame.Adapter.Scene
             Record("ST16-002/B2 sweep", sweepOk && noFuture,
                 "walk/run/idle/meditate достижимы; cast/guard/dash/sleep/breakthrough — нет");
 
-            // B3: PNG-семантика по диску (G1/G2 доставлены: idle+walk — PNG;
-            // остальные — процедурный fallback, состояние не ломается).
+            // B3: PNG-семантика — DUAL по диску (G0.2, PT3): доставки поэтапные
+            // (PT3: run/melee/cast/hit/meditate/death добавлены) — ожидание
+            // зондит диск, сим валиден ДО и ПОСЛЕ доставки каждого листа.
             anim.Update(1f / 60f, PlayerAnimator.FrameState.Default);
             bool idlePng = anim.AnimId == "player_idle" && anim.IsPng && anim.FrameCount == 4;
             anim.Update(1f / 60f, new PlayerAnimator.FrameState(true, false, 1f, false));
             bool walkPng = anim.AnimId == "player_walk" && anim.IsPng && anim.FrameCount == 6;
+            bool meleeDelivered = FileAccess.FileExists(
+                $"{SpriteSheetCache.Root}/characters/player/player_melee.png");
             anim.NotifyMeleeAttack();
             anim.Update(1f / 60f, PlayerAnimator.FrameState.Default);
-            bool meleeFallback = anim.AnimId == "player_melee" && !anim.IsPng && anim.FrameCount == 0;
-            GD.Print($"[Stage16Sim] B3 диск: idle png={idlePng}, walk png={walkPng}, melee fallback={meleeFallback} → " +
-                     $"{(idlePng && walkPng && meleeFallback ? "PASS" : "FAIL")}");
-            Record("ST16-002/B3 png-vs-fallback", idlePng && walkPng && meleeFallback,
-                "доставленные idle/walk=PNG(4/6 кадров), недоставленный melee=procedural-состояние живо");
+            bool meleeOk = meleeDelivered
+                ? anim.AnimId == "player_melee" && anim.IsPng && anim.FrameCount == 6
+                : anim.AnimId == "player_melee" && !anim.IsPng && anim.FrameCount == 0;
+            GD.Print($"[Stage16Sim] B3 диск: idle png={idlePng}, walk png={walkPng}, " +
+                     $"melee {(meleeDelivered ? "png" : "fallback")}={meleeOk} → " +
+                     $"{(idlePng && walkPng && meleeOk ? "PASS" : "FAIL")}");
+            Record("ST16-002/B3 png-vs-fallback", idlePng && walkPng && meleeOk,
+                "PNG-vs-fallback по диску (G0.2 dual): доставленный melee=PNG(6к), " +
+                "недоставленный — procedural-состояние живо");
 
             // B4: D2-ряд — FrameAt(row) индексация и клэмп.
             var grid = SpriteSheetCache.LoadSheetDirect("res://resources/sprites/_qa/qa_grid_5x6.png", 10, false);
