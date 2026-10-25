@@ -91,6 +91,11 @@ public partial class GameWorldController : Node2D
     // тост стойки защиты (DefenseIntentEvent, клавиша G).
     [Inject] private ISubscriber<Core.Messaging.Contracts.AttackIntentEvent> AttackIntentSub { get; set; } = null!;
     [Inject] private ISubscriber<Core.Messaging.Contracts.DefenseIntentEvent> DefenseIntentSub { get; set; } = null!;
+    // PT3-005 (плейтест-2-рестарт): гейт дальнего боя (стрелы/дистанция) —
+    // санкционированная кросс-модульная инъекция (паттерн BeltService/
+    // PlayerCombatAdapter): поза лука и дистанция в логах читают колчан
+    // БЕЗ мутаций; списание остаётся у CombatModule (авторитет).
+    [Inject] private Modules.Combat.CombatRangeGateService RangeGate { get; set; } = null!;
 
     private Node2D        _worldRoot     = null!;
     private Camera2D      _camera        = null!;
@@ -716,6 +721,45 @@ public partial class GameWorldController : Node2D
                 $"Загрузка «{slotName}» не удалась — вернулись в главное меню", 4f));
             GetTree().ChangeSceneToFile(MainMenuScenePath);
         }
+    }
+
+    /// <summary>
+    /// PT-S03 (плейтест-2-рестарт): «⌂ В главное меню» в меню сейвов.
+    /// Репорт: «а как выйти в главное меню?» — выхода из игры не было
+    /// вовсе, процесс убивали извне (внутриигровые логи терялись).
+    /// Путь: сейв-на-выход (стабильный слот autosave_exit, перезапись —
+    /// прямым синхронным вызовом SaveService: честный bool, файл пишется
+    /// ДО смены сцены) → Session.QuitWithoutSaving (машина состояний
+    /// принимает Quitting → NewGame/LoadGame в меню) → смена сцены на
+    /// MainMenu (паттерн 714-722; GameBoot-гейт останавливает тики,
+    /// подписки диспозятся в _ExitTree).
+    /// </summary>
+    private const string ExitSaveSlotName = "autosave_exit";
+
+    private void HandleExitToMainMenu()
+    {
+        GD.Print("[GameWorld] Выход в главное меню: сейв-на-выход + Quit (PT-S03)");
+        bool saved = false;
+        try
+        {
+            saved = SaveService != null
+                && SaveService.Save(new SaveSlot(ExitSaveSlotName, SaveSlotType.AutoSave));
+        }
+        catch (System.Exception ex)
+        {
+            GD.PrintErr($"[GameWorld] Exit-save crashed: {ex.GetType().Name}: {ex.Message}");
+        }
+        if (!saved)
+        {
+            // Сейв не прошёл — владельцу решать: тихо выйти нельзя (data-loss).
+            // Продолжаем игру, меню уже закрыто — тост объясняет причину.
+            GD.PrintErr($"[GameWorld] Exit-save FAILED ({SaveService?.LastError}) — выход ОТМЕНЁН, игра продолжается");
+            ToastPub?.Publish(new Core.Messaging.Contracts.ToastShownEvent(
+                $"Не удалось сохранить перед выходом: {SaveService?.LastError ?? "ошибка записи"} — выход отменён", 5f));
+            return;
+        }
+        Session?.QuitWithoutSaving();
+        GetTree().ChangeSceneToFile(MainMenuScenePath);
     }
 
     /// <summary>
@@ -1811,6 +1855,9 @@ public partial class GameWorldController : Node2D
         _saveLoadMenu = new UI.SaveLoadMenu { Name = "SaveLoadMenu" };
         _saveLoadMenu.Closed += HandleModalResumeOnClose;
         _saveLoadMenu.LoadRequested += HandleSaveMenuLoadRequested;
+        // PT-S03 (плейтест-2-рестарт): «⌂ В главное меню» — сейв-на-выход +
+        // Quit + смена сцены (выполняет хост — здесь).
+        _saveLoadMenu.ExitToMainMenuRequested += HandleExitToMainMenu;
         _hudCanvas.AddChild(_saveLoadMenu);
 
 #if DEBUG
@@ -2464,8 +2511,24 @@ public partial class GameWorldController : Node2D
         if (Tiles == null || Tiles.MapWidth <= 0 || Tiles.MapHeight <= 0) return true;
         int tx = Mathf.Clamp((int)(pos.X / GameConstants.TILE_PIXELS), 0, Tiles.MapWidth - 1);
         int ty = Mathf.Clamp((int)(pos.Y / GameConstants.TILE_PIXELS), 0, Tiles.MapHeight - 1);
-        return Tiles.GetTile(tx, ty).IsWalkable;
+        var tile = Tiles.GetTile(tx, ty);
+        if (tile.IsWalkable) return true;
+        // PT3-полёт (плейтест-2-рестарт №5): «L9 не может летать над морем,
+        // а должен начиная с L5» — глубокая вода проходима для игрока L5+
+        // («познание мира» — тот же порог, что у R41-6 терраин-штрафов).
+        // Лава/Void закрыты для всех; NPC-пасфайндинг не затронут (он читает
+        // ITileService.IsWalkable, а этот гейт — только свободное движение
+        // игрока). Скорость — фактор 1.0 (cost=0 → гейт без множителя).
+        return tile.Terrain == TerrainType.Water_Deep
+            && GameConstants.CanFlyOverDeepWater(PlayerCultivationLevel);
     }
+
+    /// <summary>
+    /// PT3-полёт: уровень культивации игрока (int; 1 — если сервис недоступен).
+    /// Чтение свойства — дёшево (HUD читает каждый кадр, паттерн R41-6:2298).
+    /// </summary>
+    private int PlayerCultivationLevel
+        => QiService != null ? (int)QiService.CultivationLevel : 1;
 
     // HandleMouseClick() REMOVED — replaced by _UnhandledInput override above.
     // Old impl used Godot.Input.IsActionJustPressed (polling) which bypassed
@@ -2970,14 +3033,25 @@ public partial class GameWorldController : Node2D
     /// </summary>
     private void OnNpcDied(in Core.Messaging.Contracts.NPCDeathEvent e)
     {
-        string name = Npcs?.GetNPCState(e.NpcId)?.DisplayName ?? "Существо";
+        // PT3-009 (плейтест-2-рестарт): имя зверя — как в EventLogWindow
+        // (журнал резолвит «Волк», движковый лог писал безликое «Существо»:
+        // «animal_wolf_97 'Существо'» — репорт владельца «волк убит, кто?»).
+        string name = Npcs?.GetNPCState(e.NpcId)?.DisplayName
+            ?? Animals?.GetDisplayName(e.NpcId)
+            ?? "Существо";
+        // PT3-009: дистанция убийства в лог — «Волк, убит через 2 клетки»:
+        // удар с 2 кл. — штатно (AttackRangeTiles=2.5 Чебышёв), но без
+        // числа в логе дистанцию нельзя проверить из репорта.
+        string dist = "";
+        int distTiles = RangeGate?.GetChebyshevDistanceTiles(e.KillerId, e.NpcId) ?? -1;
+        if (distTiles >= 0) dist = $" dist={distTiles} кл.";
         if (e.KillerId is ("player_0" or "player"))
             ShowToast($"☠ {name} повержен", 3.0f);
         else if (e.KillerId == "old_age")
             ShowToast($"✝ {name} ушёл из мира (старость)", 2.5f);
         // Смерть от другого NPC — без тоста (анти-спам npc-npc боя),
         // но в EventLogWindow пишется (см. OnNpcDeathFeed).
-        GD.Print($"[GameWorld] NPC death: {e.NpcId} '{name}' by {e.KillerId}");
+        GD.Print($"[GameWorld] NPC death: {e.NpcId} '{name}' by {e.KillerId}{dist}");
     }
 
     /// <summary>Этап 7: тост от модуля (QiStone use, чит-меню и т.д.).
@@ -3002,12 +3076,15 @@ public partial class GameWorldController : Node2D
         string qi = e.QiBufferActive
             ? $"ON(qi={e.DefenderQi}) absorb={e.AbsorbedByQi}"
             : "OFF";
+        // PT3-009: дистанция удара в трейс — проверяема из лога без домыслов
+        // (владелец не мог понять, с какого расстояния пришёл урон по волку).
+        int distTiles = RangeGate?.GetChebyshevDistanceTiles(e.AttackerId, e.DefenderId) ?? -1;
         GD.Print($"[DMG] {e.AttackerId}(L{e.AttackerLevel}) → {e.DefenderId}(L{e.DefenderLevel}) " +
                  $"| {e.AttackSubtype}/{e.Type}/{e.Element} base={e.BaseDamage} raw={e.RawDamage} " +
                  $"| suppr={e.SuppressionPermil}‰ elem={e.ElementPermil}‰ atkBuff={e.AtkBuffPermil}‰ form={e.FormationDmgPermil}‰ → preDef={e.PreDefenseDamage} " +
                  $"| roll={e.Result}({e.HitPart}) defP={e.DefensePermil}‰ → {e.PostActionDamage} " +
                  $"| Qi:{qi} | armor={e.ArmorValue} cov={e.ArmorCoverage}% covered={e.ArmorCoversHit} defBuff={e.DefenseBuffPermil}‰ absorb={e.AbsorbedByArmor} " +
-                 $"| FINAL={e.FinalDamage}{(e.Fatal ? " FATAL" : "")} | HP {e.DefenderHpBefore}→{e.DefenderHpAfter}");
+                 $"| FINAL={e.FinalDamage}{(e.Fatal ? " FATAL" : "")}{(distTiles >= 0 ? $" dist={distTiles} кл." : "")} | HP {e.DefenderHpBefore}→{e.DefenderHpAfter}");
     }
 
     /// <summary>
@@ -3249,10 +3326,20 @@ public partial class GameWorldController : Node2D
     private void OnAttackIntentForSwing(in Core.Messaging.Contracts.AttackIntentEvent e)
     {
         // G0: поза атаки игрока — melee (0.42с, синх замаху) или bow (G4).
+        // PT-C08 (плейтест-2-рестарт): при ПУСТОМ колчане позу лука НЕ играем —
+        // авторитетный гейт CombatModule отклоняет выстрел (тост «нет стрел —
+        // колчан пуст»), а этот визуальный подписчик работал по сырому интенту
+        // ДО гейта: анимация выстрела играла без урона и расхода («стрельба
+        // вхолостую»). Колчан читаем без списывания — расход остаётся у гейта.
         if (Core.Helpers.PlayerIdResolver.IsPlayer(e.AttackerId))
         {
-            if (e.IsRanged) _playerAnimator?.NotifyRangedAttack();
-            else            _playerAnimator?.NotifyMeleeAttack();
+            bool rangedPoseAllowed = !e.IsRanged
+                || (RangeGate?.HasRangedAmmo(e.AttackerId) ?? true);
+            if (rangedPoseAllowed)
+            {
+                if (e.IsRanged) _playerAnimator?.NotifyRangedAttack();
+                else            _playerAnimator?.NotifyMeleeAttack();
+            }
         }
 
         if (e.IsRanged) return;

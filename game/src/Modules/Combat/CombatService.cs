@@ -1653,6 +1653,23 @@ namespace CultivationGame.Modules.Combat
                             }
                         }
 
+                        // PT3-003 (плейтест-2-рестарт): гейт ЖИВОСТИ цели на
+                        // резолве — интент принят при живой цели, за окно каста
+                        // (~0.5с) её добил DoT/союзник/ второй удар — прежде
+                        // замах доигрывался по трупу полным damage-пайплайном
+                        // (фантомная цифра урона над трупом, репорт владельца).
+                        // Образец — хоуминг-гейт UpdateProjectiles (TryResolveAliveTile);
+                        // здесь мягкий предикат IsKnownDeadTarget: неизвестные
+                        // сущности/игрок не блокируются (паттерн LOS-гейта).
+                        if (!string.IsNullOrEmpty(pt.TargetId)
+                            && _aoeResolver != null
+                            && _aoeResolver.IsKnownDeadTarget(pt.TargetId))
+                        {
+                            PublishRejection(pt.AttackerId, pt.TechniqueId,
+                                "цель уже пала — удар срывается");
+                            continue;
+                        }
+
                         // M1: цель на момент старта каста; potency кастера;
                         // Phase 8 ч.2: ranged-флаг.
                         // R25: aim-тайл — прицел AoE пережил каст.

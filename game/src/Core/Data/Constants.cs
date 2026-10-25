@@ -53,6 +53,27 @@ namespace CultivationGame.Core.Data
 
         #endregion
 
+        #region PT3: полёт над глубокой водой (L5+)
+
+        /// <summary>
+        /// PT3-полёт (плейтест-2-рестарт, 25.10, №5): «L9 не может летать над
+        /// морем, а должен начиная с L5». Порог сознательно равен порогу
+        /// R41-6 терраин-штрафов («далеко продвинулись в познании мира» —
+        /// один и тот же уровень мастерства, два следствия: не замедляется
+        /// И летает над водой). Гейт — только свободное движение игрока
+        /// (GameWorldController.IsWalkablePixel); ITileService.IsWalkable и
+        /// NPC-пасфайндинг НЕ затронуты (NPC по океану не ходят).
+        /// Pure-функция для QA (L500Sim): L4 — блок, L5 — полёт.
+        /// </summary>
+        public const int FlightOverWaterMinLevel = 5;
+
+        /// <summary>PT3-полёт: может ли культиватор данного уровня летать над
+        /// глубокой водой (море/океан). Лава/Void — закрыты для всех.</summary>
+        public static bool CanFlyOverDeepWater(int cultivationLevel)
+            => cultivationLevel >= FlightOverWaterMinLevel;
+
+        #endregion
+
         #region Character Base Stats
 
         /// <summary>Базовое значение характеристик</summary>

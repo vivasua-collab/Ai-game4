@@ -252,12 +252,91 @@ public sealed class StartingGearPhase : AbstractSceneAssemblyPhase
             _inventory.TryAddItem(eq, 1, ItemSources.StartingGear);
         }
 
+        // === 4f. PT-T03 (плейтест-2-рестарт): зарядник Ци новичка — НАДЕТЬ ===
+        // Репорт владельца: «на старте нет… зарядника, переделать стартовый
+        // лут». Гейт генератора GenerateChargerForLevel — «доступен с L3»
+        // (дизайн мира: зарядники падают с NPC L3+), но стартовый набор —
+        // исключение по прямому указанию владельца: лёгкий зарядник L1
+        // (RequiredCultivationLevel=1 — надевается сразу, окно H оживает:
+        // камни Ци на старте уже есть, п.3). Слот Belt; ItemType="Charger"
+        // НЕ активирует хотбар пояса (R37-c различает пояс-броню и зарядник).
+        var charger = new EquipmentData
+        {
+            ItemId = "starter_qi_charger",
+            NameRu = "Зарядник Ци новичка",
+            NameEn = "Novice Qi Charger",
+            Description = "Простой зарядник Ци: ускоряет накачку техник. Стартовый подарок наставника.",
+            ItemType = "Charger",
+            Category = ItemCategory.Accessory,
+            Rarity = ItemRarity.Common,
+            Stackable = false,
+            MaxStack = 1,
+            Weight = 0.7f,
+            Volume = 1.0f,
+            Value = 28,
+            HasDurability = true,
+            MaxDurability = 120,
+            Slot = EquipmentSlot.Belt,
+            HandType = WeaponHandType.None,
+            Damage = 0,
+            Defense = 0,
+            ChargeSpeedBonus = 10f, // лёгкий бонус (+10% скорость накачки)
+            Grade = EquipmentGrade.Common,
+            ItemLevel = 1,
+            MaterialTier = 1,
+            MaterialCategory = MaterialCategory.Spirit,
+            RequiredCultivationLevel = 1,
+        };
+        _itemDb.Register(charger);
+        bool chargerEquipped = _equipment.TryEquip(EquipmentSlot.Belt, charger);
+
+        // === 4g. PT-T03: кольцо хранения Т1 — НАДЕТЬ ===
+        // Система колец (StorageRingService) активируется при экипировке
+        // (EquipmentChangedEvent → StorageRingTier > 0); Т1 = 5л объёма,
+        // Qi-стоимость помещения/извлечения — из таблиц сервиса. Предмет
+        // прежде НЕ генерировался никем (StorageRingTier не присваивался
+        // ни в одном генераторе — система была мертва). UI помещения/
+        // извлечения — отложенная задача (см. баг PT3-006: кольцо носится,
+        // тултип показывает тир/объём; действия контекстного меню —
+        // отдельная волна).
+        var storageRing = new EquipmentData
+        {
+            ItemId = "starter_storage_ring_t1",
+            NameRu = "Кольцо хранения Т1",
+            NameEn = "Storage Ring T1",
+            Description = "Малое кольцо хранения (5 л): вмещает предметы в своём микропространстве.",
+            ItemType = "Accessory",
+            Category = ItemCategory.Accessory,
+            Rarity = ItemRarity.Uncommon,
+            Stackable = false,
+            MaxStack = 1,
+            Weight = 0.05f,
+            Volume = 0.1f,
+            Value = 60,
+            HasDurability = true,
+            MaxDurability = 200,
+            Slot = EquipmentSlot.RingLeft1,
+            HandType = WeaponHandType.None,
+            Damage = 0,
+            Defense = 0,
+            Grade = EquipmentGrade.Common,
+            ItemLevel = 1,
+            MaterialTier = 1,
+            MaterialCategory = MaterialCategory.Spirit,
+            RequiredCultivationLevel = 1,
+            StorageRingTier = 1,
+            StorageMaxVolume = 5f,
+        };
+        _itemDb.Register(storageRing);
+        bool ringEquipped = _equipment.TryEquip(EquipmentSlot.RingLeft1, storageRing);
+
         bool daggerEquipped = _equipment.GetEquipped(EquipmentSlot.WeaponMain) != null;
         Console.WriteLine(
             $"[Phase {PhaseOrder}] {PhaseName} complete — стартовый набор: " +
             $"БД +{registered}, выдано {granted} позиций, оружие {weapons} шт " +
             $"(кинжал надет: {daggerEquipped}, лук в инвентаре: {bow != null}), " +
-            $"броня {armors} шт, стрел {ArrowQuiverSize}. " +
+            $"броня {armors} шт, стрел {ArrowQuiverSize}, " +
+            $"зарядник надет: {chargerEquipped}, кольцо хранения надето: {ringEquipped} (PT-T03). " +
             $"Замена сейвов: каждая новая игра = одинаковый старт (сид {Seed}).");
 
         return Task.CompletedTask;

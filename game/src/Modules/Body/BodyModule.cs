@@ -46,6 +46,17 @@ public class BodyModule : IModule
     // NPCCombatAdapter/PlayerService обрабатывают смерть, kill-feed стреляет).
     [Inject] private readonly IPublisher<DamageAppliedEvent> _damageAppliedPub = null!;
 
+    // PT3-003 (плейтест-2-рестарт): смерть NPC/зверя → снять ВСЕ баффы
+    // сущности. Прежде RemoveAllBuffs вызывался ТОЛЬКО при деспавне
+    // (NPCSpawnerService), а труп жил в реестрах с позицией смерти:
+    // burn/poison (ElementalEffectService, 3 тика) продолжали тикать,
+    // BodyModule честно публиковал DamageAppliedEvent по мёртвому — над
+    // трупом всплывали фантомные «−N» (репорт владельца). NPCDeathEvent
+    // публикуется и для зверей (AnimalService) — гейт покрывает всех.
+    [Inject] private readonly ISubscriber<NPCDeathEvent> _npcDeathSub = null!;
+    [Inject] private readonly IBuffService _buffService = null!;
+    private IDisposable? _npcDeathSubscription;
+
     // П.24: Подписка на изменение Vitality → пересчёт HP
     [Inject] private readonly ISubscriber<StatChangedEvent> _statChangedSub = null!;
     private IDisposable? _statChangedSubscription;
@@ -75,6 +86,9 @@ public class BodyModule : IModule
 
         // B5-E02: Подписка на BuffTickedEvent — обработка тиков HoT/DoT
         _buffTickedSubscription = _buffTickedSub.Subscribe(OnBuffTicked);
+
+        // PT3-003: смерть сущности → чистка баффов (анти-фантомные DoT-тики)
+        _npcDeathSubscription = _npcDeathSub.Subscribe(OnNpcDeathClearBuffs);
 
         // П.24: Подписка на StatChangedEvent (VIT) — пересчёт HP
         _statChangedSubscription = _statChangedSub.Subscribe(OnStatChanged);
@@ -149,12 +163,25 @@ public class BodyModule : IModule
     }
 
     /// <summary>
+    /// PT3-003: чистка баффов умершей сущности — зеркально деспавну
+    /// (NPCSpawnerService.RemoveAllBuffs): DoT/HoT перестают тикать по
+    /// трупу. Комментарий BuffService.cs:340 («RemoveAllBuffs при смерти
+    /// от DoT») обещал это поведение — но подписки на смерть не было.
+    /// </summary>
+    private void OnNpcDeathClearBuffs(in NPCDeathEvent e)
+    {
+        _buffService.RemoveAllBuffs(e.NpcId);
+    }
+
+    /// <summary>
     /// B5-E02: Освобождение подписок.
     /// </summary>
     public void Dispose()
     {
         _buffTickedSubscription?.Dispose();
         _buffTickedSubscription = null;
+        _npcDeathSubscription?.Dispose();
+        _npcDeathSubscription = null;
         _statChangedSubscription?.Dispose();
         _statChangedSubscription = null;
     }

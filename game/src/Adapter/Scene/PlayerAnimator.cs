@@ -36,6 +36,15 @@ public sealed class PlayerAnimator
     private float _progress;          // 0..1 — позиция в цикле
     private float _phase;             // непрерывная фаза loop-анимаций
 
+    // PT3-002 (плейтест-2-рестарт): последний ДОСТАВЛЕННЫЙ PNG-лист. Когда
+    // целевой one-shot лист не доставлен (сейчас player_bow G4 — владелец
+    // упёрся в лимит генерации), НЕ деградируем спрайт до процедурной
+    // текстуры 48×48: PNG-кадры 64×64 с силуэтом 52px — подмена на 48px
+    // выглядела как «персонаж усох на выстреле» (репорт владельца). Держим
+    // последний хороший лист (idle/walk) — персонаж сохраняет рост, поза
+    // просто не меняется до доставки bow-листа.
+    private SpriteSheetCache.SpriteSheet? _lastGoodSheet;
+
     // one-shot-таймеры (реальное время; <0 — неактивны).
     private float _meleeAge = -1f;
     private float _rangedAge = -1f;
@@ -261,9 +270,29 @@ public sealed class PlayerAnimator
     private void ApplyTexture()
     {
         var sheet = ActiveSheet;
-        _sprite.Texture = sheet?.Texture ?? _proceduralTex;
-        _sprite.Hframes = sheet?.FrameCount ?? 1;
-        _sprite.Vframes = sheet?.Rows ?? 1;
+        if (sheet != null)
+        {
+            _lastGoodSheet = sheet;
+            _sprite.Texture = sheet.Texture;
+            _sprite.Hframes = sheet.FrameCount;
+            _sprite.Vframes = sheet.Rows;
+        }
+        else if (_lastGoodSheet != null)
+        {
+            // PT3-002: лист целевой анимации не доставлен — держим последний
+            // PNG (без деградации до 48×48); кадр статичен (Frame=0).
+            _sprite.Texture = _lastGoodSheet.Texture;
+            _sprite.Hframes = _lastGoodSheet.FrameCount;
+            _sprite.Vframes = _lastGoodSheet.Rows;
+        }
+        else
+        {
+            // Контракт G0 «нулевая регрессия до доставки PNG» нетронут:
+            // если НИ ОДИН лист не доставлен — процедурная статика КАК СЕЙЧАС.
+            _sprite.Texture = _proceduralTex;
+            _sprite.Hframes = 1;
+            _sprite.Vframes = 1;
+        }
         _sprite.Frame = 0;
     }
 }

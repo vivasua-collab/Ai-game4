@@ -86,6 +86,20 @@ public partial class ChargerSimDebug : Node
         int stonesBefore = _inventory.GetItemCount(StoneId);
         GD.Print($"[ChargerSim] B0. Камней в инвентаре: {stonesBefore} (стартовый набор + 3 добавленных; отсчёт от факта)");
 
+        // PT-T03 (плейтест-2-рестарт): стартовый набор теперь НАДЕВАЕТ
+        // зарядник новичка (Belt) — харнесс снимает его ДО шага B1, чтобы
+        // проверка «вставка без зарядника → честный отказ» сохранила смысл
+        // (прецедент STAGE16-B3: харнесс следует за реальностью игры, а не
+        // зашилывает её ожидания). Шаг C ниже надевает свой L3-зарядник —
+        // как раньше; стартовый возвращается в инвентарь (TryUnequip).
+        if (_equipment.GetEquipped(EquipmentSlot.Belt) != null)
+        {
+            bool starterRemoved = _equipment.TryUnequip(EquipmentSlot.Belt, out _);
+            GD.Print($"[ChargerSim] B0b. Стартовый зарядник снят (PT-T03): {starterRemoved} — " +
+                     $"IsChargerEquipped={_bridge.IsChargerEquipped} (ожидаем false)");
+            pass &= starterRemoved && !_bridge.IsChargerEquipped;
+        }
+
         // B1: вставка без зарядника → честный отказ с причиной (не молчание).
         string refuseMsg = "";
         var slots = _inventory.GetAllSlots();

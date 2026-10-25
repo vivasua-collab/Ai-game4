@@ -42,6 +42,11 @@ public sealed class SaveModule : IModule, IWorldResettable
     // первый автосейв мог прийти через 1/7/18 минут — остаток процессного
     // счётчика ломал контракт «каждые 30 ИГРОВЫХ минут».
     [Inject] private readonly ITimeService _timeService = null!;
+    // PT3-001: дешёвый перечень имён слотов (без парсинга main.json) — для
+    // ротации и чистки легаси. SaveDataAggregator держит тот же инстанс
+    // хендлера (Adapter-перерегистрация — синглтон), метa-таймстемпы берём
+    // только для ≤10 ротационных слотов через _aggregator.TryGetSlotMeta.
+    [Inject] private readonly ISaveFileHandler _fileHandler = null!;
 
     private IDisposable? _saveSubToken;
     private IDisposable? _loadSubToken;
@@ -49,8 +54,96 @@ public sealed class SaveModule : IModule, IWorldResettable
     /// <summary>Мировой тик последнего автосейва (null — отсчёт ещё не начат).</summary>
     private int? _lastAutosaveWorldTick;
 
-    /// <summary>R17: единый слот автосейва (перезапись, не autosave_NNNN-плодовение).</summary>
+    /// <summary>R17: слот эпохи «перезапись одного файла» — больше НЕ пишется
+    /// (PT3-001: ротация autosave_01..10); старый каталог остаётся на диске
+    /// как валидный сейв предыдущей сессии (виден в меню, грузится).</summary>
     private const string AutoSaveSlotName = "autosave";
+
+    // ── PT3-001 (плейтест-2-рестарт, 25.10): ротация + чистка легаси ──
+
+    /// <summary>Имена ротационных слотов: autosave_01..autosave_10.</summary>
+    private static string RotationSlotName(int i) => $"autosave_{i:D2}";
+
+    /// <summary>Индекс ротационного слота (1..N) по имени; 0 — не ротационный.</summary>
+    private int ParseRotationIndex(string name)
+    {
+        if (name.Length != "autosave_XX".Length
+            || !name.StartsWith("autosave_", StringComparison.Ordinal)) return 0;
+        char d1 = name[^2], d2 = name[^1];
+        if (!char.IsDigit(d1) || !char.IsDigit(d2)) return 0;
+        int idx = (d1 - '0') * 10 + (d2 - '0');
+        return idx >= 1 && idx <= Math.Max(1, _config.AutoSaveRotationSlots) ? idx : 0;
+    }
+
+    /// <summary>
+    /// PT3-001: выбор слота автосейва — «принцип слотов + ротация»:
+    /// 1) слот без save_meta (пустой/битый ротационный) → перезаписываем его;
+    /// 2) есть свободный индекс → первый свободный (заполняем по порядку);
+    /// 3) все заняты → САМЫЙ СТАРЫЙ по save_meta.SavedAt (ticks UTC).
+    /// Состояние НЕ в памяти — ротация честно переживает рестарт процесса.
+    /// </summary>
+    private string PickRotationSlot()
+    {
+        int slots = Math.Max(1, _config.AutoSaveRotationSlots);
+        var taken = new bool[slots + 1];
+        int noMetaIdx = 0, oldestIdx = 0;
+        long oldestTicks = long.MaxValue;
+        foreach (var name in _fileHandler.GetAllSaves())
+        {
+            int idx = ParseRotationIndex(name);
+            if (idx <= 0) continue;
+            taken[idx] = true;
+            if (_aggregator.TryGetSlotMeta(name, out long ticks, out _) && ticks > 0)
+            {
+                if (ticks < oldestTicks) { oldestTicks = ticks; oldestIdx = idx; }
+            }
+            else if (noMetaIdx == 0)
+            {
+                noMetaIdx = idx; // битый ротационный — лучший кандидат на перезапись
+            }
+        }
+        if (noMetaIdx > 0) return RotationSlotName(noMetaIdx);
+        for (int i = 1; i <= slots; i++)
+            if (!taken[i]) return RotationSlotName(i);
+        return oldestIdx > 0 ? RotationSlotName(oldestIdx) : RotationSlotName(1);
+    }
+
+    /// <summary>
+    /// PT3-001: чистка легаси-автосейвов старых билдов (схема до R17 плодила
+    /// слоты autosave_NNNN — у владельца их накопилось 601: меню загрузки
+    /// строило 601 кнопку и парсило 601 × main.json ≈ 600MB — фриз съедал
+    /// клики и Esc, «слот не выбирается» (репорт плейтест-2-рестарт).
+    /// Критерий: autosave_ + 3+ цифр — ровно старая схема; ручные slot_N,
+    /// quicksave, одиночный R17-autosave и новые ротационные autosave_XX
+    /// НЕ трогаются. Один проход на Start (идемпотентно, _startCompleted).
+    /// </summary>
+    private void CleanupLegacyAutosaves()
+    {
+        try
+        {
+            int removed = 0, failed = 0;
+            foreach (var name in _fileHandler.GetAllSaves())
+            {
+                if (name.Length < "autosave_XXX".Length
+                    || !name.StartsWith("autosave_", StringComparison.Ordinal)) continue;
+                bool allDigits = true;
+                for (int i = "autosave_".Length; i < name.Length; i++)
+                    if (!char.IsDigit(name[i])) { allDigits = false; break; }
+                // 3+ цифр после префикса = легаси (новая ротация — ровно 2)
+                if (!allDigits || name.Length - "autosave_".Length < 3) continue;
+                if (_saveService.DeleteSave(new SaveSlot(name, SaveSlotType.AutoSave))) removed++;
+                else failed++;
+            }
+            if (removed > 0 || failed > 0)
+                Console.WriteLine($"[SaveModule] PT3-001: легаси-автосейвы удалены: {removed}" +
+                    (failed > 0 ? $", НЕ удалось удалить: {failed} (файл занят/нет прав)" : ""));
+        }
+        catch (Exception ex)
+        {
+            // Чистка — гигиена диска: сбой не должен ронять старт модуля.
+            Console.WriteLine($"[SaveModule] PT3-001: чистка легаси-автосейвов НЕ удалась: {ex.Message}");
+        }
+    }
 
         // P1-10 (аудит 09.22, Фазы 7/10): идемпотентный Start — повторный вызов
     // (прямой вызов вне GameEntryPoint / повторная инстанциация сцены) не
@@ -80,6 +173,10 @@ public sealed class SaveModule : IModule, IWorldResettable
             registered++;
         }
         Console.WriteLine($"[SaveModule] Started — {registered} ISaveable service(s) registered");
+
+        // PT3-001: чистка легаси-мусора autosave_NNNN (601 каталог у владельца
+        // ломал меню загрузки) — ДО первого автосейва и любого открытия меню.
+        CleanupLegacyAutosaves();
     
         _startCompleted = true;
     }
@@ -113,7 +210,10 @@ public sealed class SaveModule : IModule, IWorldResettable
         }
         if (worldTick - last < interval) return;
 
-        var slot = new SaveSlot(AutoSaveSlotName, SaveSlotType.AutoSave);
+        // PT3-001: ротационный слот (autosave_01..10, перезапись старейшего)
+        // вместо единого R17-слота — указание владельца «максимум 10
+        // автосейвов, ротация или слоты».
+        var slot = new SaveSlot(PickRotationSlot(), SaveSlotType.AutoSave);
         // R11 P1-Save: результат автосейва не глотаем — лог при провале.
         if (!_saveService.Save(slot))
             Console.WriteLine($"[SaveModule] Autosave FAILED: {_saveService.LastError}");
@@ -124,9 +224,10 @@ public sealed class SaveModule : IModule, IWorldResettable
     /// <summary>
     /// Пересборка мира (NewGame ИЛИ LoadGame — сброс выполняет
     /// WorldDomainResetPhase/GameSession ДО RestoreState): отсчёт каденции
-    /// автосейва сбрасывается — новый мир начинает с чистыми 30 минутами
+    /// автосейва сбрасывается — новый мир начинает с чистым интервалом PT3
     /// (TickCount нового мира = 0/восстановленный из сейва, процессный
-    /// счётчик продолжает расти и НЕ влияет).
+    /// счётчик продолжает расти и НЕ влияет). Ротационный индекс НЕ
+    /// сбрасывается — он вычисляется по save_meta на каждом автосейве.
     /// </summary>
     public void ResetWorld()
     {

@@ -35,6 +35,11 @@ public partial class EventLogWindow : Control
     // раньше — «??? повержен»).
     [Inject] private readonly IAnimalService? _animalService = null;
     [Inject] private readonly ITimeService? _timeService = null;
+    // PT3-009 (плейтест-2-рестарт): дистанция удара/убийства в записях —
+    // «Волк, убит через 2 клетки» без числа в журнале был не проверяем.
+    // DI-синглтон (паттерн ChargerWindow: кросс-модульная инъекция в UI);
+    // чтение позиций без мутаций, -1 = не резолвится (не пишем).
+    [Inject] private readonly Modules.Combat.CombatRangeGateService? _rangeGate = null;
     [Inject] private readonly ISubscriber<CombatStartedEvent> _combatStartedSub = null!;
     [Inject] private readonly ISubscriber<CombatEndedEvent> _combatEndedSub = null!;
     [Inject] private readonly ISubscriber<DamageAppliedEvent> _damageSub = null!;
@@ -129,11 +134,11 @@ public partial class EventLogWindow : Control
     {
         if (!InvolvesPlayer(e.SourceId, e.TargetId)) return;
         if (IsPlayer(e.SourceId))
-            Add($"🗡 Вы нанесли {e.Damage} урона → {Name(e.TargetId)}" +
+            Add($"🗡 Вы нанесли {e.Damage} урона → {Name(e.TargetId)}{DistSuffix(e.SourceId, e.TargetId)}" +
                 (e.Result != CombatAttackResult.Hit ? $" ({RuResult(e.Result)})" : ""),
                 new Godot.Color(0.85f, 0.75f, 0.45f));
         else
-            Add($"💥 {Name(e.SourceId)} → вам {e.Damage} урона ({RuPart(e.HitPart)})",
+            Add($"💥 {Name(e.SourceId)} → вам {e.Damage} урона ({RuPart(e.HitPart)}){DistSuffix(e.SourceId, e.TargetId)}",
                 new Godot.Color(0.9f, 0.4f, 0.3f));
     }
 
@@ -158,7 +163,7 @@ public partial class EventLogWindow : Control
         _lastKillLog = (name, now);
 
         if (e.KillerId is ("player_0" or "player"))
-            Add($"☠ {name} повержен (руками)", new Godot.Color(0.55f, 0.85f, 0.4f));
+            Add($"☠ {name} повержен (руками){DistSuffix(e.KillerId, e.NpcId)}", new Godot.Color(0.55f, 0.85f, 0.4f));
         else if (e.KillerId == "old_age")
             Add($"✝ {name} ушёл из мира (старость)", new Godot.Color(0.7f, 0.65f, 0.55f));
         else
@@ -210,6 +215,16 @@ public partial class EventLogWindow : Control
     }
 
     // === Helpers ===
+
+    /// <summary>
+    /// PT3-009: суффикс дистанции « · N кл.» между двумя сущностями
+    /// (пусто — когда дистанция не резолвится: DoT-источник «dot:…», old_age).
+    /// </summary>
+    private string DistSuffix(string a, string b)
+    {
+        int d = _rangeGate?.GetChebyshevDistanceTiles(a, b) ?? -1;
+        return d >= 0 ? $" · {d} кл." : "";
+    }
 
     private static bool IsPlayer(string id) => id == "player" || id == "player_0";
 

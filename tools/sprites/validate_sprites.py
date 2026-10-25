@@ -37,6 +37,28 @@ BASELINE_TOL = 2   # ±px базовой линии стоп
 BODY_W_MAX = 56    # 48-бокс + допуск полей
 QA_DIR = "_qa"     # QA-плейсхолдеры не валидируются
 
+# PT3 (плейтест-2-рестарт): политика РОСТА силуэта игрока. Репорт:
+# «статичный спрайт больше спрайта бега — персонаж уменьшается» — листы
+# были разноразмерны (idle/walk 52, run 44, melee 40, hit 36), а валидатор
+# молчал: гейты были только по базовой линии и ширине. Канон чекпоинта
+# PT3: стоячий рост 52 (±4 на позу/боб бега), сидячий (медитация) 48,
+# смерть — первый кадр стоячий, дальше падение. NPC/звери — канон не
+# зафиксирован, без политики (только их собственные гейты выше).
+STANDING_ANIMS = {"player_idle", "player_walk", "player_run",
+                  "player_melee", "player_cast", "player_hit"}
+SITTING_ANIMS = {"player_meditate"}
+# PT3: атакующие позы НЕсут декоративные дуги замаха (меч/энергия) шире
+# тела — гейт «48-бокс+8» писался для ходячих поз. Дуги и ДО нормализации
+# были ~49px (проходили впритык), после подъёма к канону 52 — до 64-65px
+# (клип по канве). Тело при этом в норме; допустимый предел для
+# дуговых листов — вся ширина кадра.
+ARC_WIDE_ANIMS = {"player_melee", "player_cast"}
+BODY_W_MAX_ARC = 64
+STANDING_MED_MIN, STANDING_MED_MAX = 48, 56
+STANDING_HARD_MAX = 58
+SITTING_MIN, SITTING_MAX = 40, 52
+DEATH_FIRST_MIN = 46
+
 
 def check_file(entry):
     """Проверка одной позиции. Возвращает список дефектов (пустой = OK)."""
@@ -81,11 +103,11 @@ def check_file(entry):
         if w // FRAME != frames:
             defects.append(f"кадров в ряду {w // FRAME} ≠ манифест {frames} (рядов {rows})")
 
-    # Базовая линия стоп + ширина тела — для листов 64×N (персонажи/звери).
+    # Базовая линия стоп + ширина тела + рост силуэта — для листов 64×N.
     if h % FRAME == 0 and w % FRAME == 0 and w >= FRAME:
         fsize = FRAME
         cols, rows = w // fsize, h // fsize
-        bottoms, widths = [], []
+        bottoms, widths, heights = [], [], []
         for r in range(rows):
             for c in range(cols):
                 cell = img.crop((c * fsize, r * fsize, (c + 1) * fsize, (r + 1) * fsize))
@@ -95,14 +117,51 @@ def check_file(entry):
                     continue
                 bottoms.append(b[3])
                 widths.append(b[2] - b[0])
+                # PT3: bbox по альфе >16 (getbbox ловит и альфу-ореол 1-2px)
+                px = cell.load()
+                miny, maxy = fsize, -1
+                for y in range(fsize):
+                    for x in range(fsize):
+                        if px[x, y][3] > 16:
+                            miny = min(miny, y)
+                            maxy = max(maxy, y)
+                            break
+                if maxy >= miny:
+                    heights.append(maxy - miny + 1)
         if bottoms:
             spread = max(bottoms) - min(bottoms)
             if spread > BASELINE_TOL:
                 defects.append(f"базовая линия стоп: разброс {spread}px > ±{BASELINE_TOL}")
-        if widths and max(widths) > BODY_W_MAX:
-            defects.append(f"ширина тела {max(widths)}px > {BODY_W_MAX} (48-бокс+допуск)")
+        if widths and max(widths) > (BODY_W_MAX_ARC if entry["id"] in ARC_WIDE_ANIMS else BODY_W_MAX):
+            limit = BODY_W_MAX_ARC if entry["id"] in ARC_WIDE_ANIMS else BODY_W_MAX
+            defects.append(f"ширина тела {max(widths)}px > {limit} (48-бокс+допуск"
+                           + ("; дуговые листы — до кадра" if entry["id"] in ARC_WIDE_ANIMS else "") + ")")
         if widths and max(widths) < 8:
             defects.append("силуэт подозрительно узкий (<8px)")
+        # PT3: рост силуэта — политика по id (см. константы вверху).
+        if heights:
+            sid = entry["id"]
+            if sid in STANDING_ANIMS:
+                hs = sorted(heights)
+                med = hs[len(hs) // 2]
+                if not (STANDING_MED_MIN <= med <= STANDING_MED_MAX):
+                    defects.append(
+                        f"рост силуэта: медиана {med}px вне канона "
+                        f"{STANDING_MED_MIN}..{STANDING_MED_MAX} (стоячий 52) — "
+                        f"разноразмерная поставка: tools/sprites/normalize_heights.py")
+                if max(heights) > STANDING_HARD_MAX:
+                    defects.append(
+                        f"рост силуэта: max {max(heights)}px > {STANDING_HARD_MAX} — кадр выше канона")
+            elif sid in SITTING_ANIMS:
+                if not (SITTING_MIN <= min(heights) and max(heights) <= SITTING_MAX):
+                    defects.append(
+                        f"рост силуэта: сидячий канон {SITTING_MIN}..{SITTING_MAX}px, "
+                        f"фактически {min(heights)}..{max(heights)}")
+            elif sid == "player_death":
+                if heights[0] < DEATH_FIRST_MIN:
+                    defects.append(
+                        f"рост силуэта: первый кадр смерти {heights[0]}px < {DEATH_FIRST_MIN} "
+                        "(падение должно начинаться с стоячего роста)")
 
     return defects
 

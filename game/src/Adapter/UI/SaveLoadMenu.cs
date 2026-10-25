@@ -43,19 +43,39 @@ public sealed partial class SaveLoadMenu : Control
     /// <summary>Закрытие окна (Esc/кнопка/клик по фону) — хост резюмит паузу (INP-1).</summary>
     public event Action? Closed;
 
+    /// <summary>
+    /// PT-S03 (плейтест-2-рестарт): запрос выхода в главное меню — хост (GWC)
+    /// делает сейв-на-выход + Quit + смену сцены (смена сессии — не зона UI).
+    /// </summary>
+    public event Action? ExitToMainMenuRequested;
+
     private SaveLoadMenuMode _mode = SaveLoadMenuMode.Full;
     private VBoxContainer _slotListBox = null!;
     private ScrollContainer _slotScroll = null!;
     private Label _emptyHint = null!;
+    private Label _overflowHint = null!;
     private LineEdit _newSlotEdit = null!;
     private Button _saveBtn = null!;
     private Button _loadBtn = null!;
     private Button _deleteBtn = null!;
+    private Button _exitMenuBtn = null!;
     private Label _statusLabel = null!;
     private readonly Dictionary<string, Button> _slotButtons = new();
 
     /// <summary>Выбранный слот (null — ничего не выбрано).</summary>
     private string? _selectedSlot;
+
+    // PT3-001 (плейтест-2-рестарт): защита меню от каталога-гиганта (у
+    // владельца 601 легаси-автосейв строил 601 кнопку и парсил 601 ×
+    // main.json ≈ 600MB — фриз съедал клики и Esc). Легаси чистится при
+    // старте (SaveModule), но ручные слоты тоже могут накопиться — список
+    // ограничен свежайшими N, остаток виден подсказкой.
+    private const int MaxDisplayedSlots = 30;
+
+    // PT3-001: double-click по слоту = загрузка (жалоба «слот не выбирается»
+    // — второй жест после выбора не нужен, лишний клик не мешает).
+    private const double DoubleClickSec = 0.45;
+    private (string Name, System.DateTime At)? _lastSlotClick;
 
     private const string TitleFull = "СИЯНЬ КНИГА — СОХРАНЕНИЕ И ЗАГРУЗКА";
     private const string TitleLoadOnly = "СИЯНЬ КНИГА — ЗАГРУЗКА МИРА";
@@ -82,6 +102,9 @@ public sealed partial class SaveLoadMenu : Control
         _mode = mode;
         _saveBtn.Visible = mode == SaveLoadMenuMode.Full;
         _newSlotEdit.Visible = mode == SaveLoadMenuMode.Full;
+        // PT-S03: кнопка «В главное меню» — только из игры (в главном меню
+        // — некуда выходить, кнопка бессмысленна).
+        _exitMenuBtn.Visible = mode == SaveLoadMenuMode.Full;
         RefreshSlots();
         SetTitle(mode == SaveLoadMenuMode.Full ? TitleFull : TitleLoadOnly);
         Visible = true;
@@ -191,6 +214,18 @@ public sealed partial class SaveLoadMenu : Control
         _emptyHint.AddThemeColorOverride("font_color", new Color(0.65f, 0.58f, 0.45f));
         _slotListBox.AddChild(_emptyHint);
 
+        // PT3-001: подсказка «показаны не все» — когда каталог больше лимита.
+        _overflowHint = new Label
+        {
+            Text = "",
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Visible = false,
+        };
+        _overflowHint.AddThemeFontSizeOverride("font_size", 12);
+        _overflowHint.AddThemeColorOverride("font_color", new Color(0.70f, 0.62f, 0.48f));
+        _overflowHint.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        box.AddChild(_overflowHint);
+
         // ---- Имя нового слота + «Сохранить» (только режим Full) ----
         _newSlotEdit = new LineEdit
         {
@@ -241,6 +276,19 @@ public sealed partial class SaveLoadMenu : Control
         closeBtn.Pressed += Close;
         UIFactory.AddHoverLift(closeBtn);
         box.AddChild(closeBtn);
+
+        // ---- PT-S03 (плейтест-2-рестарт): выход в главное меню ----
+        // Репорт владельца: «а как выйти в главное меню?» — из игры выхода
+        // не было вовсе (Esc — только пауза, процесс убивали с потерей
+        // логов). Сейв-на-выход и смену сцены делает хост (GWC).
+        _exitMenuBtn = UIFactory.CreateButton("ExitMenuBtn", "⌂ В главное меню (сэйв и выход)", 440, 36);
+        _exitMenuBtn.Pressed += () =>
+        {
+            Close();
+            ExitToMainMenuRequested?.Invoke();
+        };
+        UIFactory.AddHoverLift(_exitMenuBtn);
+        box.AddChild(_exitMenuBtn);
     }
 
     private void SetTitle(string text) => _titleLabel.Text = text;
@@ -298,6 +346,19 @@ public sealed partial class SaveLoadMenu : Control
             ? b.Unix.CompareTo(a.Unix)
             : string.CompareOrdinal(a.Name, b.Name));
 
+        // PT3-001: каталог-гигант не строит гигантский список — свежайшие
+        // MaxDisplayedSlots строк + подсказка об остатке (анти-фриз меню;
+        // легаси-автосейвы дополнительно чистятся при старте — SaveModule).
+        int total = slots.Count;
+        if (total > MaxDisplayedSlots)
+        {
+            _overflowHint.Text = $"Показаны свежие {MaxDisplayedSlots} из {total} — " +
+                "старые автосейвы удаляются при запуске игры";
+            _overflowHint.Visible = true;
+            slots.RemoveRange(MaxDisplayedSlots, total - MaxDisplayedSlots);
+        }
+        else _overflowHint.Visible = false;
+
         _emptyHint.Visible = slots.Count == 0;
         foreach (var (name, when, _) in slots)
         {
@@ -331,6 +392,20 @@ public sealed partial class SaveLoadMenu : Control
         // Подсветка выбранной строки.
         foreach (var (slotName, btn) in _slotButtons)
             btn.Modulate = slotName == name ? new Color(1f, 0.95f, 0.7f) : Colors.White;
+
+        // PT3-001: double-click по уже выбранной строке = сразу загрузка
+        // (второй жест после выбора не нужен; невалидный слот не грузим).
+        var now = System.DateTime.UtcNow;
+        if (loadable
+            && _lastSlotClick is { } lastClick
+            && lastClick.Name == name
+            && (now - lastClick.At).TotalSeconds <= DoubleClickSec)
+        {
+            _lastSlotClick = null;
+            OnLoadPressed();
+            return;
+        }
+        _lastSlotClick = (name, now);
     }
 
     // ──────────────────────────────────────────────────────────────────

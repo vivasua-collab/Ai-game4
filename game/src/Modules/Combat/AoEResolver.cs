@@ -166,6 +166,24 @@ public sealed class AoEResolver
     }
 
     /// <summary>
+    /// PT3-003 (плейтест-2-рестарт): цель — ИЗВЕСТНЫЙ мёртвый NPC/зверь.
+    /// false — жив, игрок или неизвестная сущность (не блокируем — паттерн
+    /// LOS-гейта). Для гейта резолва pending-каста: цель умерла В ОКНЕ
+    /// замаха (~0.5с) → удар срывается тихим отклонением, а не доигрывается
+    /// по трупу с фантомной цифрой урона.
+    /// </summary>
+    public bool IsKnownDeadTarget(string entityId)
+    {
+        var npc = _npcs?.GetNPC(entityId);
+        if (npc != null)
+            return !_npcs!.IsAlive(entityId);
+        var animal = _animals?.TryGetAnimal(entityId);
+        if (animal.HasValue && animal.Value.IsValid)
+            return !animal.Value.IsAlive;
+        return false;
+    }
+
+    /// <summary>
     /// Собрать цели в форме. Порядок: сортировка по Чебышёв-дистанции от
     /// источника спада (круг — эпицентр, прочие — кастер), срез MaxTargets.
     /// Friendly-fire: НЕЙТРАЛЫ ЗАДЕВАЮТСЯ (решение пользователя — месть

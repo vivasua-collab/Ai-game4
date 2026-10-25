@@ -130,6 +130,15 @@ public partial class DamageNumberRenderer : Node2D
             return;
         }
 
+        // PT3-003 (плейтест-2-рестарт): фантомные цифры над ТРУПОМ — урон по
+        // мёртвой цели не всплывает. Источники: DoT-тики по не-снятым
+        // баффам (чистятся в BodyModule по NPCDeathEvent), поздний резолв
+        // замаха (гейт в CombatService) — здесь catch-all: мёртвый NPC/зверь
+        // остаётся в реестрах с позицией смерти, ResolveTargetPixelPos
+        // рисует «−N» над трупом. Игрок не гейтится (смерть игрока — свой
+        // домен, цифры урона при смерти валидны).
+        if (!IsPlayer(e.TargetId) && IsKnownDeadTarget(e.TargetId)) return;
+
         Vector2? worldPos = ResolveTargetPixelPos(e.TargetId);
         if (worldPos == null) return;
 
@@ -217,4 +226,19 @@ public partial class DamageNumberRenderer : Node2D
     }
 
     private static bool IsPlayer(string id) => id == "player" || id == "player_0";
+
+    /// <summary>
+    /// PT3-003: цель — ИЗВЕСТНЫЙ мёртвый NPC/зверь (мёртвые остаются в
+    /// реестрах до деспавна/обыска). false — жив, игрок или неизвестная
+    /// сущность (последних не блокируем: паттерн LOS-гейта).
+    /// </summary>
+    private bool IsKnownDeadTarget(string entityId)
+    {
+        if (_npcService != null && _npcService.GetNPC(entityId) != null)
+            return !_npcService.IsAlive(entityId);
+        var animal = _animalService?.TryGetAnimal(entityId);
+        if (animal.HasValue && animal.Value.IsValid)
+            return !animal.Value.IsAlive;
+        return false;
+    }
 }
