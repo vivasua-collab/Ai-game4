@@ -1,6 +1,6 @@
 {
- "version": 2.0,
- "updated": "2026-10-24T17:15:00Z",
+ "version": "2.1",
+ "updated": "2026-10-25T06:50:00Z",
  "format": {
   "purpose": "Реестр находок аудита и волн их исправления. Запуск процесса: директива владельца от 19.10.2026 — «по важным находкам аудита запустить анализ и исправление». Источник находок: аудит-вердикты итерации 2 карты проекта (коммит dfb98d0) + открытые верификации PROJECT_MAP.md §5. Ведёт main-агент Z.ai Code; веб-портал читает файл напрямую (runtime, no-store).",
   "type": {
@@ -1960,6 +1960,96 @@
      "event": "Фикс + префикс/постфикс-пруфы + полная регрессия — та же сессия gate"
     }
    ]
+  },
+  {
+   "id": "PT0-001",
+   "type": "bug",
+   "severity": "P1",
+   "title": "Лимит библиотеки техник (L9=24) блокировал изучение — гранты чит-панели молча давали «Выдано 0/3»",
+   "module": "Техники (game/src/Modules/Combat/TechniqueService.cs)",
+   "track_ref": "pt0-playtest",
+   "status": "fixed",
+   "fix_wave": 10,
+   "assignee": "10-25-pt0",
+   "found": "2026-10-24",
+   "summary": "Владелец (Плейтест-0): «откуда лимит на библиотеке? Кто и когда его ввел? Количество техник не должно иметь лимита». Лог: «Библиотека: 20/24» → гранты 3/3→1/3→0/3 — кап достигнут, причина отказа игроку не показывалась.",
+   "analysis": "Git-археология: лимит введён 2026-08-28 коммитом 2fcf9db («Библиотека + Лодаут», LibraryBaseSize=8 + 2×(L−1), L9=24 — тогда решение пользователя). Требование изменилось 24.10: лимит снят (LibraryCapacity = неограниченно, UnboundedLibrary с запасом под QA-надбавки; легаси-константы помечены). UI-счётчик «Библиотека: N» без капа.",
+   "resolution": "fix(pt0) 6b258df: кап снят; статус гранта объясняет отказы (дубль/окно резонанса)."
+  },
+  {
+   "id": "PT0-002",
+   "type": "bug",
+   "severity": "P1",
+   "title": "Вкладки Книги Техник показывали @VBoxContainer@N вместо «Все/L9/L8/Архив/Свитки»",
+   "module": "UI (game/src/Adapter/UI/TechniqueBookWindow.cs)",
+   "track_ref": "pt0-playtest",
+   "status": "fixed",
+   "fix_wave": 10,
+   "assignee": "10-25-pt0",
+   "found": "2026-10-24",
+   "summary": "Владелец (Плейтест-0): «Наименования L9 - L8 сломалось, превратилось в @Vbox». Скрин: вкладки таб-бара = @VBoxContainer@9874/@9952/@9999/@10001.",
+   "analysis": "RebuildTabs: child.QueueFree() отложен до конца кадра; повторный RebuildTabs В ТОМ ЖЕ КАДРЕ (OnLearned ×3 от одного клика «Выдать 3 рандом», level-up+открытие) добавлял вкладки с теми же именами → коллизия с недоудалёнными → Godot автореимя @VBoxContainer@N. ДОКАЗАНО чистым GDScript-тестом (rebuild×2 в кадре → '@VBoxContainer@11'...).",
+   "resolution": "fix(pt0) 6b258df: _tabs.RemoveChild(child) ПЕРЕД QueueFree (имя освобождается сразу). Постфикс-пруф screenshots/pt0_book_tabs_after.png: 3 гранта в ОТКРЫТУЮ книгу (RebuildTabs ×3 в кадре) — вкладки «Все/L1/Свитки» без @-имён."
+  },
+  {
+   "id": "PT0-003",
+   "type": "bug",
+   "severity": "P1",
+   "title": "Меч убивал NPC на 5-6 клетках: базовая melee-атака 2.5 тайла=5 МЕТРОВ (TILE_SIZE_M=2) + pending-каст резолвился без перепроверки дистанции",
+   "module": "Бой (game/src/Modules/Combat/CombatService.cs, Modules/Player/PlayerCombatAdapter.cs)",
+   "track_ref": "pt0-playtest",
+   "status": "fixed",
+   "fix_wave": 10,
+   "assignee": "10-25-pt0",
+   "found": "2026-10-24",
+   "summary": "Владелец: «меч, ближний бой, я смог мечем убить NPC в 5-6 клетках, как так?». Предмет корректен (меч AttackRange=1 тайл, «Дальность: 1 (ближний)»).",
+   "analysis": "Две причины: (1) юнит-путаница — базовая melee-атака игрока = 2.5 ТАЙЛА = 5 МЕТРОВ при TILE_SIZE_M=2 (дальше любой melee-техники 1.5-2м!); (2) pending-каст (~0.5с) резолвил урон БЕЗ гейта дистанции — цель/игрок расходились за время замаха, удар «догонял» на 5-6. Летающий меч в LORE не требуется — это баг.",
+   "resolution": "fix(pt0) 6b258df + 5e0a88e: гейт на РЕЗОЛВЕ pending-каста (MeleeResolveMaxTiles=4 Чебышёв, базовые не-ranged атаки; мгновенные/charged пути не гейтятся — их дистанция проверена интентом). Отказ: «цель ушла из зоны удара»."
+  },
+  {
+   "id": "PT0-004",
+   "type": "bug",
+   "severity": "P2",
+   "title": "Юнит-путаница дальностей: техники в «метрах»-бывших-тайлах (melee 1.5м=0.75 тайла), предметы в тайлах с подписью «м», L9-гранты без дальних техник",
+   "module": "Генерация (game/src/Modules/Generator/TechniqueGeneratorService.cs) + UI",
+   "track_ref": "pt0-playtest",
+   "status": "fixed",
+   "fix_wave": 10,
+   "assignee": "10-25-pt0",
+   "found": "2026-10-24",
+   "summary": "Владелец: «мне техники L9 все сгенерировались с расстоянием урона (дальность) 1-3 м, дальних техник нет». Плюс предмет-окно писало «Дальность: 1 (ближний)» (тайлы без единиц), CheatPanel — «дальность 18 м» про 18 ТАЙЛОВ (=36 м).",
+   "analysis": "Генератор ЗДОРОВ (Python-реплика xorshift64* на 2000 сидах: 45% дальних среди Combat) — выборка владельца неудачна (типы грантятся циклом [Combat,Defense,Healing,Movement,Support,Sensory], Combat каждый 6-й, ~17% все-melee на ~3 Combat) + кап (PT0-001) не давал добрать. ДЕФЕКТ: BaseRangeBySubtype хранил «метры», писавшиеся как тайлы до TILE_SIZE_M=2 — melee 1.5м тонул во флоре кастера (MinAttackRangeTiles=2): заявленные «2.0м» давали фактический доступ 4м.",
+   "resolution": "fix(pt0) 6b258df: юнит-нормализация — BaseRangeBySubtype теперь честные метры (melee 4м=2 тайла паритет с базовой атакой, снаряд 30м, луч 40м, AoE 20м); дисплей предметов ×TILE_SIZE_M («2 м (ближний)»/«36 м (дальний)»); статус лука в метрах; статус гранта объясняет отказы."
+  },
+  {
+   "id": "PT0-005",
+   "type": "bug",
+   "severity": "P2",
+   "title": "CheatPanel: сползание изображения — длинный статус без Autowrap распирал vbox, внизу появлялся горизонтальный скроллбар",
+   "module": "UI (game/src/Adapter/UI/CheatPanel.cs)",
+   "track_ref": "pt0-playtest",
+   "status": "fixed",
+   "fix_wave": 10,
+   "assignee": "10-25-pt0",
+   "found": "2026-10-24",
+   "summary": "Владелец: «В чит меню снова сползание изображения (окно меньше, чем отображаемый текст, внизу появляется полоса прокрутки, где-то не корректно обновляется строка)».",
+   "analysis": "_statusLabel без AutowrapMode: длинные статусы («Легендарка: … dmg=104 dur=2000 | оверкап=False | бонусы=7…») задавали min-width всего vbox → контент шире окна → горизонтальный скроллбар внизу + «сползание». «Строка некорректно обновляется» = пересборка лейаута при смене статуса.",
+   "resolution": "fix(pt0) 6b258df: статус-строка AutowrapMode.WordSmart + SizeFlagsHorizontal.ExpandFill; ScrollContainer.HorizontalScrollMode=Disabled (паттерн R38-6 книги)."
+  },
+  {
+   "id": "PT0-006",
+   "type": "bug",
+   "severity": "P2",
+   "title": "ProjectileRenderer: «Invalid polygon data, triangulation failed» — DrawPolygon без guard на NaN/вырожденные треугольники",
+   "module": "Рендер (game/src/Adapter/Scene/ProjectileRenderer.cs)",
+   "track_ref": "pt0-playtest",
+   "status": "fixed",
+   "fix_wave": 10,
+   "assignee": "10-25-pt0",
+   "found": "2026-10-24",
+   "summary": "Ошибка отладчика владельца 0:11:24: NativeCalls.godot_icall_4_284 → CanvasItem.DrawPolygon → ProjectileRenderer.DrawTriangle(152)←DrawFlight(138)←_Draw(115): Condition \"indices.is_empty()\" — триангуляция нативного полигона падала.",
+   "analysis": "Наконечник стрелы (треугольник) строился из позиций сущностей без валидации: NaN/Inf или слипшиеся в float-точности вершины → нативная триангуляция canvas_item_add_polygon падает с ERROR (не крашит, но спамит и глушит кадр).",
+   "resolution": "fix(pt0) 6b258df: guard в DrawTriangle (не-конечные координаты + |векторное произведение| < ε — вырожденный → пропуск, наконечник косметика) + фильтр From/To в OnDamageApplied (IsFiniteAndSane ≤100000px)."
   }
  ]
 }
