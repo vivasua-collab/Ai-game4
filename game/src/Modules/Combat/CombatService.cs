@@ -452,6 +452,18 @@ namespace CultivationGame.Modules.Combat
         private const int TileCenterOffsetMilli = 500;
 
         /// <summary>
+        /// PT0-3 (плейтест-0, 24.10): потолок Чебышёв-дистанции для РЕЗОЛВА
+        /// базовой melee-атаки. Отбор цели — 2.5 тайла (PlayerCombatAdapter),
+        /// но pending-каст (~0.5с) резолвился БЕЗ перепроверки дистанции —
+        /// цель/игрок уходили за время замаха, и удар «догонял» их на
+        /// 5-6 клеток (жалоба владельца: «мечом убил NPC в 5-6 клетках»).
+        /// Правило: на резолве дистанция > 4 тайлов (2.5 базы + ~1.5 дрейфа
+        /// замаха) → удар срывается. ТЕХНИКИ не гейтятся (Range проверяется
+        /// кастом; homing/AoE — собственные механики честности).
+        /// </summary>
+        public const int MeleeResolveMaxTiles = 4;
+
+        /// <summary>
         /// R21-2: готовность удара участника (промилле). 0 = только что
         /// бил; ≥ порога = готов ударить.
         /// R24-C: реестр дерущихся живёт БЕЗ привязки к UI-бою (NPC-NPC
@@ -1181,6 +1193,24 @@ namespace CultivationGame.Modules.Combat
             if (string.IsNullOrEmpty(defenderId))
             {
                 defenderId = attackerId == _instigatorId ? _currentTargetId : _instigatorId;
+            }
+
+            // PT0-3 (плейтест-0, 24.10): гейт дистанции ближнего боя НА РЕЗОЛВЕ —
+            // базовая melee-атака (не техника, не ranged) не может «догнать»
+            // цель, ушедшую за время замаха (см. MeleeResolveMaxTiles).
+            // Дистанция не резолвится (-1) → не блокируем (паттерн LOS-гейта).
+            if (!isRanged
+                && _techniqueService.GetTechnique(techniqueId) == null
+                && !string.IsNullOrEmpty(defenderId)
+                && _rangeGate != null)
+            {
+                int resolveDist = _rangeGate.GetChebyshevDistanceTiles(attackerId, defenderId);
+                if (resolveDist > MeleeResolveMaxTiles)
+                {
+                    PublishRejection(attackerId, techniqueId,
+                        $"цель ушла из зоны удара ({resolveDist} кл. > {MeleeResolveMaxTiles}, ближний бой)");
+                    return;
+                }
             }
 
             int attackerLevel;

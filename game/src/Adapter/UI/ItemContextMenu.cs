@@ -531,7 +531,11 @@ public partial class ItemContextMenu : Control
         {
             list.Add(("Урон", $"{eq.Damage}"));
             list.Add(("Пробитие брони", $"{eq.Penetration}"));
-            list.Add(("Дальность", eq.AttackRange <= 2 ? $"{eq.AttackRange} (ближний)" : $"{eq.AttackRange} (дальний)"));
+            // PT0-4 (24.10): юниты — предмет хранит ТАЙЛЫ, показываем МЕТРЫ
+            // (TILE_SIZE_M=2): меч «1 (ближний)» читался как 1 м, фактически 2 м.
+            list.Add(("Дальность", eq.AttackRange <= 2
+                ? $"{eq.AttackRange * GameConstants.TILE_SIZE_M} м (ближний)"
+                : $"{eq.AttackRange * GameConstants.TILE_SIZE_M} м (дальний)"));
         }
         if (eq.Defense > 0)
         {

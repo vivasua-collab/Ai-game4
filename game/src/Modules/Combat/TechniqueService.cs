@@ -53,13 +53,19 @@ namespace CultivationGame.Modules.Combat
     /// </summary>
     public class TechniqueService : IDisposable, ISaveable, IWorldResettable
     {
-        // === Библиотека (2026-08-28) ===
+        // === Библиотека (PT0-1, плейтест-0 24.10: ЛИМИТ СНЯТ — решение владельца) ===
+        // 2026-08-28–2026-10-24: ёмкость росла с уровнем (8+2×(L−1), L9=24) —
+        // гранты чит-панели молча упирались в 24/24 («Выдано 0/3», причина не
+        // показывалась). Легаси-константы ниже сохранены для истории/документации.
 
-        /// <summary>Базовый размер библиотеки на L1. L1=8 … L9=24.</summary>
+        /// <summary>ЛЕГАСИ (PT0-1: не используется — лимит снят). База L1.</summary>
         public const int LibraryBaseSize = 8;
 
-        /// <summary>Прирост библиотеки за уровень культивации.</summary>
+        /// <summary>ЛЕГАСИ (PT0-1: не используется — лимит снят). Прирост/уровень.</summary>
         public const int LibraryPerLevel = 2;
+
+        /// <summary>PT0-1: «неограниченно» — с запасом под QA-надбавки без переполнения.</summary>
+        private const int UnboundedLibrary = int.MaxValue - 1000;
 
         /// <summary>Доля мастерства, уходящая в эхо при забвении («осмысление»).</summary>
         public const float EchoTransferRatio = 0.15f;
@@ -205,22 +211,18 @@ namespace CultivationGame.Modules.Combat
             return SlotCapacity(SlotCategory(type), _cachedCultivationLevel) - UsedSlots(type);
         }
 
-        // === Библиотека (2026-08-28: единый cap вместо Combat-пула §12) ===
+        // === Библиотека (2026-08-28: единый cap вместо Combat-пула §12; PT0-1: cap снят) ===
 
-        /// <summary>Базовая ёмкость библиотеки техник для уровня культивации.</summary>
-        public static int LibraryCapacityBase(int cultivationLevel)
-        {
-            int level = Math.Max(1, cultivationLevel);
-            return LibraryBaseSize + (level - 1) * LibraryPerLevel;
-        }
+        /// <summary>PT0-1: лимит снят — метод сохранён для совместимости вызовов.</summary>
+        public static int LibraryCapacityBase(int cultivationLevel) => UnboundedLibrary;
 
-        /// <summary>Текущая полная ёмкость библиотеки (база + расширения).</summary>
-        public int LibraryCapacity => LibraryCapacityBase(_cachedCultivationLevel) + ExtraLibraryCapacity;
+        /// <summary>PT0-1: ёмкость библиотеки не ограничена (ExtraLibraryCapacity — QA-симы).</summary>
+        public int LibraryCapacity => UnboundedLibrary;
 
         /// <summary>Сколько техник изучено (вся библиотека, включая культ/проклятия/формации).</summary>
         public int LibraryUsed => _learnedTechniques.Count;
 
-        /// <summary>Сколько свободных мест в библиотеке.</summary>
+        /// <summary>PT0-1: всегда > 0 (лимит снят); оставлен для совместимости UI/QA.</summary>
         public int LibraryFree => LibraryCapacity - LibraryUsed;
 
         /// <summary>Окно резонанса §8.1: минимальный изучаемый уровень для текущего L.</summary>
@@ -266,7 +268,8 @@ namespace CultivationGame.Modules.Combat
                 if (UsedSlots(data.Type) >= 1) return false;
             }
 
-            // Ёмкость библиотеки — «разум культиватора не безграничен».
+            // Ёмкость библиотеки — PT0-1 (24.10): ЛИМИТ СНЯТ владельцем
+            // (инертная проверка сохранена как документация контракта).
             if (LibraryUsed + 1 > LibraryCapacity) return false;
 
             var learned = new LearnedTechnique

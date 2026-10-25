@@ -149,6 +149,19 @@ public partial class ProjectileRenderer : Node2D
 
     private void DrawTriangle(Vector2 a, Vector2 b, Vector2 c, Color colour)
     {
+        // PT0-6 (плейтест-0, 24.10): нативная триангуляция canvas_item_add_polygon
+        // падает «Invalid polygon data» на NaN/Inf или вырожденном (нулевой
+        // площади) треугольнике — вершины приходят из ResolvePixelPos без
+        // валидации. Guard: пропускаем не-конечные и коллинеарные полигоны
+        // (наконечник — косметика, пропуск безопасен; ошибки больше нет).
+        if (!Mathf.IsFinite(a.X) || !Mathf.IsFinite(a.Y)
+            || !Mathf.IsFinite(b.X) || !Mathf.IsFinite(b.Y)
+            || !Mathf.IsFinite(c.X) || !Mathf.IsFinite(c.Y))
+            return;
+        // Удвоенная площадь = векторное произведение (b−a)×(c−a); |2S| < ε —
+        // вырожденный (все точки на одной прямой/слиплись в float-точности).
+        float cross = (b.X - a.X) * (c.Y - a.Y) - (b.Y - a.Y) * (c.X - a.X);
+        if (Mathf.Abs(cross) < 0.01f) return;
         DrawPolygon(new Vector2[] { a, b, c }, new Color[] { colour, colour, colour });
     }
 
@@ -162,9 +175,19 @@ public partial class ProjectileRenderer : Node2D
         var from = ResolvePixelPos(e.SourceId);
         var to = ResolvePixelPos(e.TargetId);
         if (from == null || to == null) return;
+        // PT0-6: битые позиции (NaN/Inf, разлёт за пределы мира) не запускаем
+        // в полёт — иначе DrawFlight рисует вырожденный наконечник (guard выше
+        // молчит, но и трассер теряет смысл). Мир 500×500 тайлов = 32000 px;
+        // допуск ×2 на будущие карты.
+        if (!IsFiniteAndSane(from.Value) || !IsFiniteAndSane(to.Value)) return;
 
         _flights.Add(new Flight { From = from.Value, To = to.Value, Age = 0f });
     }
+
+    /// <summary>PT0-6: конечные координаты в пределах разумного мира (px).</summary>
+    private static bool IsFiniteAndSane(Vector2 v)
+        => Mathf.IsFinite(v.X) && Mathf.IsFinite(v.Y)
+           && Mathf.Abs(v.X) <= 100_000f && Mathf.Abs(v.Y) <= 100_000f;
 
     /// <summary>Пиксельная позиция сущности (центр тайла) или null.</summary>
     private Vector2? ResolvePixelPos(string entityId)

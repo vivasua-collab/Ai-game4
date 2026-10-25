@@ -100,17 +100,24 @@ namespace CultivationGame.Modules.Generator
         // Таблицы дальности по подтипу (метры)
         // ===================================================================
 
+        // PT0-4 (плейтест-0, 24.10): юнит-нормализация — таблица теперь В МЕТРАХ
+        // (TILE_SIZE_M=2, Constants.cs). Прежние значения (1.5/2/15/20/10)
+        // писались как «тайлы» до введения TILE_SIZE_M: melee 1.5 м = 0.75
+        // тайла тонул во флоре кастера MinAttackRangeTiles=2 — заявленные
+        // «2.0 м» давали фактический доступ 4 м. Новые значения = точные
+        // тайлы × 2: melee 4 м (2 тайла — паритет с базовой атакой игрока
+        // 2.5 тайла), снаряд 30 м (15), луч 40 м (20), AoE 20 м (10).
         private static readonly Dictionary<CombatSubtype, float> BaseRangeBySubtype = new()
         {
-            { CombatSubtype.None,             5f },
-            { CombatSubtype.MeleeStrike,      1.5f },
-            { CombatSubtype.MeleeWeapon,      2.0f },
-            { CombatSubtype.RangedProjectile, 15f },
-            { CombatSubtype.RangedBeam,       20f },
-            { CombatSubtype.RangedAoe,        10f },
-            { CombatSubtype.DefenseBlock,     1.5f },
-            { CombatSubtype.DefenseShield,    0f },
-            { CombatSubtype.DefenseDodge,     3f }
+            { CombatSubtype.None,             10f },  // поддержка/бафф: 5 тайлов
+            { CombatSubtype.MeleeStrike,      4f },   // 2 тайла
+            { CombatSubtype.MeleeWeapon,      4f },   // 2 тайла
+            { CombatSubtype.RangedProjectile, 30f },  // 15 тайлов
+            { CombatSubtype.RangedBeam,       40f },  // 20 тайлов
+            { CombatSubtype.RangedAoe,        20f },   // 10 тайлов
+            { CombatSubtype.DefenseBlock,     4f },   // 2 тайла
+            { CombatSubtype.DefenseShield,    0f },   // на себя
+            { CombatSubtype.DefenseDodge,     6f }    // 3 тайла
         };
 
         // ===================================================================
@@ -735,7 +742,7 @@ namespace CultivationGame.Modules.Generator
         {
             if (BaseRangeBySubtype.TryGetValue(subtype, out float range))
                 return range;
-            return 5f; // Fallback
+            return 10f; // Fallback (PT0-4: метры, консистентно со строкой None)
         }
 
         /// <summary>

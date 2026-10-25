@@ -2607,8 +2607,9 @@ public partial class GameWorldController : Node2D
             if (CombatAdapter.SwitchToRangedMode())
             {
                 var bow = CombatAdapter.GetRangedWeapon();
+                // PT0-4 (24.10): юниты — AttackRange в ТАЙЛАХ, показываем метры.
                 ToastPub?.Publish(new Core.Messaging.Contracts.ToastShownEvent(
-                    $"Режим: дальний бой — {bow!.NameRu} (дальность {bow.AttackRange} м)", 2.0f));
+                    $"Режим: дальний бой — {bow!.NameRu} (дальность {bow.AttackRange * Core.Data.GameConstants.TILE_SIZE_M} м)", 2.0f));
             }
             else
             {

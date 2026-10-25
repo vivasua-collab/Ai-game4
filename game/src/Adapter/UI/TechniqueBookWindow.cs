@@ -339,8 +339,17 @@ public partial class TechniqueBookWindow : Control
     {
         if (_tabs == null) return;
         _chipById.Clear();
+        // PT0-2 (плейтест-0, 24.10): QueueFree отложен до конца кадра — при
+        // повторном RebuildTabs В ТОМ ЖЕ КАДРЕ (OnLearned ×3 от одного клика
+        // «Выдать 3 рандом», level-up + открытие) новые вкладки конфликтуют
+        // именами с недоудалёнными → Godot даёт автореимена «@VBoxContainer@N»
+        // вместо «Все/L9/L8/…» (доказано GDScript-тестом, чекпоинт 10_25).
+        // RemoveChild отцепляет СРАЗУ — имя освобождается до добавления новых.
         foreach (var child in _tabs.GetChildren())
+        {
+            _tabs.RemoveChild(child);
             child.QueueFree();
+        }
 
         var all = Techniques?.GetAllTechniques();
         if (all == null) return;
@@ -793,11 +802,11 @@ public partial class TechniqueBookWindow : Control
     private void RefreshLibraryCounter()
     {
         if (_libraryLabel == null || Techniques == null) return;
-        _libraryLabel.Text = $"Библиотека: {Techniques.LibraryUsed}/{Techniques.LibraryCapacity}";
-        _libraryLabel.AddThemeColorOverride("font_color",
-            Techniques.LibraryFree <= 0
-                ? new Color(0.90f, 0.45f, 0.30f)
-                : new Color(0.85f, 0.75f, 0.55f));
+        // PT0-1 (24.10): лимит библиотеки снят владельцем — показываем счётчик
+        // без капа («Библиотека: 20/24» вводило в заблуждение: гранты чит-панели
+        // молча упирались в потолок «Выдано 0/3»).
+        _libraryLabel.Text = $"Библиотека: {Techniques.LibraryUsed}";
+        _libraryLabel.AddThemeColorOverride("font_color", new Color(0.85f, 0.75f, 0.55f));
     }
 
     private void RefreshChipHighlight()

@@ -149,6 +149,11 @@ namespace CultivationGame.Adapter.UI
                 Name = "CheatScroll",
                 SizeFlagsHorizontal = SizeFlags.ExpandFill,
                 SizeFlagsVertical = SizeFlags.ExpandFill,
+                // PT0-5 (плейтест-0, 24.10): горизонтальный скролл ЗАПРЕЩЁН — иначе
+                // длинные строки (статус легендарки и др.) распирают vbox, внизу
+                // появляется полоса прокрутки и контент «сползает» (паттерн R38-6
+                // книги техник). Ширина контента = ширине окна, лишкое — переносом.
+                HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
             };
             scroll.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
             scroll.OffsetLeft = 8; scroll.OffsetRight = -8;
@@ -312,7 +317,12 @@ namespace CultivationGame.Adapter.UI
 
             // === Статус ===
             vbox.AddChild(MakeSeparator());
+            // PT0-5: статус-строка ПЕРЕНОСИТСЯ по словам и прижата к ширине —
+            // прежде без Autowrap она задавала min-width всего vbox (длинный
+            // статус → горизонтальный скроллбар → «сползание» окна).
             _statusLabel = MakeLabel("Готов", 11, new Color(0.6f, 0.6f, 0.6f));
+            _statusLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+            _statusLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
             vbox.AddChild(_statusLabel);
         }
 
@@ -361,6 +371,7 @@ namespace CultivationGame.Adapter.UI
             if (TechniqueGenerator == null || Techniques == null) return;
             int level = GetGenerationLevel();
             int granted = 0;
+            int rejected = 0;
             // Цикл по пулу активных типов (как TechniqueGrantPhase).
             var types = new[]
             {
@@ -374,8 +385,20 @@ namespace CultivationGame.Adapter.UI
                 var tech = TechniqueGenerator.GenerateSpecified(type, level, level, seed + i);
                 if (tech != null && Techniques.LearnTechnique(tech))
                     granted++;
+                else
+                    rejected++;
             }
-            SetStatus($"Выдано {granted}/3 техник (L{level})");
+            // PT0-1/PT0-4 (24.10): кап библиотеки СНЯТ — отказы теперь только
+            // дубль/окно резонанса; объясняем причину, чтобы «0/3» не выглядел
+            // молчаливым сбоем (прежняя тишина маскировала заполненную библиотеку).
+            string status = $"Выдано {granted}/3 техник (L{level})";
+            if (rejected > 0)
+            {
+                int playerL = Qi != null ? Math.Max(1, (int)Qi.CultivationLevel) : 1;
+                status += $" — {rejected} отклонено (дубль или окно резонанса: " +
+                          $"уровень игрока L{playerL}, изучаемы L[{Math.Max(1, playerL - 4)}..{playerL}])";
+            }
+            SetStatus(status);
         }
 
         private void OnClearTechniques()
@@ -750,7 +773,8 @@ namespace CultivationGame.Adapter.UI
             if (!Equipment.TryEquip(EquipmentSlot.WeaponMain, bow))
             { SetStatus($"Не удалось надеть '{bow.NameRu}' (слот занят?)"); return; }
             CombatAdapter.SwitchToRangedMode();
-            SetStatus($"🏹 {bow.NameRu} (L{bow.ItemLevel}, урон {bow.Damage}, дальность {bow.AttackRange} м) — " +
+            // PT0-4: юниты — AttackRange в ТАЙЛАХ, показываем метры (×TILE_SIZE_M).
+            SetStatus($"🏹 {bow.NameRu} (L{bow.ItemLevel}, урон {bow.Damage}, дальность {bow.AttackRange * Core.Data.GameConstants.TILE_SIZE_M} м) — " +
                       $"режим дальнего боя. Space — выстрел, 1 — назад в melee");
         }
 
