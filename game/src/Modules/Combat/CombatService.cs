@@ -1195,24 +1195,6 @@ namespace CultivationGame.Modules.Combat
                 defenderId = attackerId == _instigatorId ? _currentTargetId : _instigatorId;
             }
 
-            // PT0-3 (плейтест-0, 24.10): гейт дистанции ближнего боя НА РЕЗОЛВЕ —
-            // базовая melee-атака (не техника, не ranged) не может «догнать»
-            // цель, ушедшую за время замаха (см. MeleeResolveMaxTiles).
-            // Дистанция не резолвится (-1) → не блокируем (паттерн LOS-гейта).
-            if (!isRanged
-                && _techniqueService.GetTechnique(techniqueId) == null
-                && !string.IsNullOrEmpty(defenderId)
-                && _rangeGate != null)
-            {
-                int resolveDist = _rangeGate.GetChebyshevDistanceTiles(attackerId, defenderId);
-                if (resolveDist > MeleeResolveMaxTiles)
-                {
-                    PublishRejection(attackerId, techniqueId,
-                        $"цель ушла из зоны удара ({resolveDist} кл. > {MeleeResolveMaxTiles}, ближний бой)");
-                    return;
-                }
-            }
-
             int attackerLevel;
             int defenderLevel;
 
@@ -1643,6 +1625,34 @@ namespace CultivationGame.Modules.Combat
                     foreach (var pt in completed)
                     {
                         _pendingCasts.Remove(pt.AttackerId);
+
+                        // PT0-3 (плейтест-0, 24.10): гейт ДИСТАНЦИИ ближнего боя
+                        // на РЕЗОЛВЕ pending-каста — между интентом и ударом
+                        // проходит ~0.5с, цель/атакующий расходятся; прежде удар
+                        // «догонял» цель на любом расстоянии (жалоба владельца:
+                        // «мечом убил NPC в 5-6 клетках»). Базовая melee-атака
+                        // (не техника, не ranged) при Чебышёв-дистанции >
+                        // MeleeResolveMaxTiles срывается. Мгновенные пути
+                        // (charged/мгновенный каст) НЕ гейтятся — расстояние в
+                        // них проверено интентом (QA-харнессы бьют прямым
+                        // вызовом с произвольных дистанций — Stage5 шаг 6).
+                        // Дистанция не резолвится (-1) → не блокируем (паттерн
+                        // LOS-гейта).
+                        if (!pt.IsRanged
+                            && _techniqueService.GetTechnique(pt.TechniqueId) == null
+                            && !string.IsNullOrEmpty(pt.TargetId)
+                            && _rangeGate != null)
+                        {
+                            int resolveDist = _rangeGate.GetChebyshevDistanceTiles(
+                                pt.AttackerId, pt.TargetId);
+                            if (resolveDist > MeleeResolveMaxTiles)
+                            {
+                                PublishRejection(pt.AttackerId, pt.TechniqueId,
+                                    $"цель ушла из зоны удара ({resolveDist} кл. > {MeleeResolveMaxTiles}, ближний бой)");
+                                continue;
+                            }
+                        }
+
                         // M1: цель на момент старта каста; potency кастера;
                         // Phase 8 ч.2: ranged-флаг.
                         // R25: aim-тайл — прицел AoE пережил каст.

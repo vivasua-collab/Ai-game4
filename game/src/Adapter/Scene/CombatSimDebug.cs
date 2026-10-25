@@ -683,6 +683,14 @@ public partial class CombatSimDebug : Node
             string? crowdB = FindSecondNpc(crowdA);
             if (crowdA != null && crowdB != null)
             {
+                // PT0-3 QA-синхрон (24.10): melee-гейт на РЕЗОЛВЕ pending-каста —
+                // базовый удар больше не «догоняет» цель на любом расстоянии.
+                // Прямые удары харнесса (пара может быть на другом краю карты —
+                // селекция FindHostileNpc/FindSecondNpc без сближения) идут
+                // ЗАРЯЖЕННЫМ путём (isCharged: мгновенный резолв, дистанция
+                // проверена самим фактом намерения) — семантика харнесса
+                // «прямые удары = хит-скан» сохранена, реальный игровой дрейф
+                // (Space/автоатаки через pending 0.5с) гейтится честно.
                 // === (a) тихий NPC-NPC: B бьёт A ===
                 // Гонки с NPCModule-автоатаками (месть A→игроку может
                 // переоткрыть UI-сессию в любой паузе): «тихость» пары меряем
@@ -707,7 +715,8 @@ public partial class CombatSimDebug : Node
                     // которой предупреждал исходный комментарий), НЕ засчитывается
                     // тихому удару B→A; нарушение — только если ЭТОТ удар открыл UI.
                     bool wasInCombat = _combatServiceImpl.IsInCombat;
-                    quietAcc = _combatServiceImpl.ExecuteAttack(crowdB, "npc_strike", crowdA, false);
+                    quietAcc = _combatServiceImpl.ExecuteAttack(crowdB, "npc_strike", crowdA, false,
+                        potencyPermil: 1000, isCharged: true);
                     // immediate: пара без игрока НЕ открыла UI-сессию этим ударом.
                     quietNoUiSession &= !(_combatServiceImpl.IsInCombat && !wasInCombat);
                     await ToSignal(GetTree().CreateTimer(1.2), SceneTreeTimer.SignalName.Timeout);
@@ -777,7 +786,8 @@ public partial class CombatSimDebug : Node
                 {
                     await WaitForOwnCastClearAsync(crowdA, 2.0f);
                     _combatServiceImpl.DebugSetReadinessPermil(crowdA, 1000);
-                    var acc = _combatServiceImpl.ExecuteAttack(crowdAtk, "npc_strike", PlayerCombatId, false);
+                    var acc = _combatServiceImpl.ExecuteAttack(crowdAtk, "npc_strike", PlayerCombatId, false,
+                        potencyPermil: 1000, isCharged: true);
                     GD.Print($"[CombatSim] multi(b) attempt {attempt + 1}: {crowdAtk}→player acc={acc}");
                     await ToSignal(GetTree().CreateTimer(0.8), SceneTreeTimer.SignalName.Timeout);
                 }
@@ -798,7 +808,8 @@ public partial class CombatSimDebug : Node
                 {
                     await WaitForOwnCastClearAsync(crowdB, 2.0f);
                     _combatServiceImpl.DebugSetReadinessPermil(crowdB, 1000);
-                    outsiderAcc = _combatServiceImpl.ExecuteAttack(crowdB, "npc_strike", PlayerCombatId, false);
+                    outsiderAcc = _combatServiceImpl.ExecuteAttack(crowdB, "npc_strike", PlayerCombatId, false,
+                        potencyPermil: 1000, isCharged: true);
                     if (outsiderAcc == AttackAcceptance.Accepted) break;
                     GD.Print($"[CombatSim] multi(b2) attempt {attempt + 1}: {crowdB}→player acc={outsiderAcc} (retry)");
                     await ToSignal(GetTree().CreateTimer(0.4), SceneTreeTimer.SignalName.Timeout);

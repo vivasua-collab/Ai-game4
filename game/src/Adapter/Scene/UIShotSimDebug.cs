@@ -25,6 +25,9 @@ public partial class UIShotSimDebug : Node
     [Inject] private IInventoryService Inventory = null!;
     [Inject] private IEquipmentGenerator EquipmentGenerator = null!;
     [Inject] private IQiService Qi = null!;
+    // PT0-2: гранты в открытое окно книги (проверка вкладок после фикса).
+    [Inject] private ITechniqueGeneratorService? TechniqueGenerator;
+    [Inject] private Modules.Combat.TechniqueService? Techniques;
 
     private GameWorldController? _gwc;
 
@@ -63,9 +66,32 @@ public partial class UIShotSimDebug : Node
         }
 
         // ── №6: книга техник (layout: блоки по типам друг под другом).
+        // PT0-2 (плейтест-0, 24.10): +3 гранта В ОТКРЫТОЕ окно — OnLearned ×3
+        // в одном кадре → RebuildTabs ×3; прежний QueueFree-паттерн на таком
+        // повторе порождал вкладки «@VBoxContainer@N» (жалоба владельца).
         if (_gwc?.TechniqueBookWindowForQA is { } book)
         {
             book.Toggle();
+            await ToSignal(GetTree().CreateTimer(0.4), SceneTreeTimer.SignalName.Timeout);
+            if (TechniqueGenerator != null && Techniques != null)
+            {
+                int pt0Level = Qi == null ? 1 : System.Math.Max(1, (int)Qi.CultivationLevel);
+                long pt0Seed = 424242;
+                int pt0Granted = 0;
+                var pt0Types = new[]
+                {
+                    CultivationGame.Core.Data.TechniqueType.Combat,
+                    CultivationGame.Core.Data.TechniqueType.Defense,
+                    CultivationGame.Core.Data.TechniqueType.Healing,
+                };
+                foreach (var t in pt0Types)
+                {
+                    var tech = TechniqueGenerator.GenerateSpecified(t, pt0Level, pt0Level, pt0Seed++);
+                    if (tech != null && Techniques.LearnTechnique(tech)) pt0Granted++;
+                }
+                GD.Print($"[UIShot] PT0-2: грантов в открытое окно {pt0Granted}/3 — " +
+                         $"RebuildTabs ×{pt0Granted} в одном кадре (проверка вкладок)");
+            }
             await ToSignal(GetTree().CreateTimer(0.6), SceneTreeTimer.SignalName.Timeout);
             Snap(prefix + "_technique.png");
             book.Toggle();
