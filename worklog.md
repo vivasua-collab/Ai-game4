@@ -752,3 +752,19 @@ Stage Summary:
 - Волна 13 закрыта за сессию: 9 находок рестарта → 9 фиксов + 1 осознанный gap (UI кольца), регрессия 37/37, лог рестарта чист (PT1-005 держится).
 - Ключевые озарения: (1) «меню сломано» и «601 автосейв» — ОДИН корень: легаси-каталог × полный парсинг main.json на слот (TryGetSlotMeta грузит весь файл ради save_meta); (2) «персонаж уменьшается» — контент разноразмерен, код масштаба не виноват: чек высоты в валидаторе — обязательный гейт поставки, иначе регресс молчит; (3) у Bow-позы был второй источник усыхания — процедурный fallback 48×48 при недоставленном листе (деградация запрещена, «последний хороший PNG»); (4) фантомный урон = три независимых источника — лечить слоями (корень-баффи, гейт-резолв, catch-all-рендер); (5) правки QA-харнесса после правок игры требуют пересборки — CHARGERQA ловил это.
 - NEXT: владелец — ретесты PT-R08..R13 (автосейвы/меню, полёт L5+, спрайт-рост, фантомы, стартовый лут, выход в меню) + решение PT2-007 (RawQi-баланс NPC) + генерация bow/guard/dash/sleep/breakthrough по мере лимита; агент — PT3-010 (UI кольца) и PT2-008 по постановке волны мелких фич.
+---
+Task ID: DOC-XFER-AIGAME5 (11-06)
+Agent: main-agent (Z.ai Code)
+Task: Разовый перенос всей документации проекта в новый репозиторий Ai-game5 (создан владельцем 2026-11-06, private). Код игры остаётся в Ai-game4.
+
+Work Log:
+- Актуализация: git fetch+pull origin main — already up to date (HEAD 809376d), рабочее дерево чистое.
+- Credential store восстановлен из персистентного my-project/.auth/github.token (паттерн cold_start.sh шаг 3).
+- Состав переноса (весь — документация): docs/ целиком (244 md + project_map.json + snippet.txt: docs, docs_old, docs_v2, docs_temp); checkpoints/ целиком (186 md + 60 log); корневые README.md, worklog.md, SESSION_CONTEXT.md, SESSION_SUMMARY.md, START_PROMPT.md, START_PROMPT_TEMPLATE.md, Caveman.md; portal/README.md; game/resources/sprites/README.md; скрипты окружения cold_start.sh + recover_sandbox.sh (описаны в COLD_START.md); платформенный worklog песочницы → platform_worklog.md (записи субагентов аудита R13/R16+); .gitattributes/.gitignore (репо готово к будущей разработке).
+- НЕ перенесено (сознательно, не документация): код игры (game/src, scenes, data, resources-ассеты), скриншоты PNG (40 шт, 8.2M — артефакты-пруфы, остаются в Ai-game4), JSON-данные портала (bugs/status/playtest/bus_map — операционные данные), спрайт-листы.
+- Секреты: grep ghp_/github_pat_ по всем переносимым файлам — чисто; токен живёт только в my-project/.auth/ (вне git).
+- Точка фиксации: перенос с HEAD Ai-game4 после коммита этой записи (hash в TRANSFER_NOTE.md репозитория Ai-game5).
+
+Stage Summary:
+- Документация проекта (498 файлов ≈ 9.7M: docs + checkpoints + worklogs + README + workflow-скрипты) перенесена в vivasua-collab/Ai-game5 (main) одним коммитом; источник — Ai-game4, состояние на 2026-11-06. Канонический код игры НЕ тронут.
+- NEXT: владелец — решение о судьбе Ai-game5 (новая итерация проекта или doc-зеркало); агент — при старте работы в Ai-game5 читать TRANSFER_NOTE.md (манифест переноса + границы).
